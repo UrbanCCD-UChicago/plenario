@@ -1,6 +1,4 @@
-# EAGER API
-
-# Phase I
+# EAGER API - Phase I
 
 ## Dataset
 
