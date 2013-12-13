@@ -117,7 +117,6 @@ def dataset(dataset):
         base_query = db.session.query(table)
         for clause in query_clauses:
             base_query = base_query.filter(clause)
-        print base_query.statement
         values = [r for r in base_query.offset(offset).limit(limit).all()]
         for value in values:
             d = {}
