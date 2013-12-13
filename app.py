@@ -6,7 +6,7 @@ import json
 from sqlalchemy import Table, func
 
 app = Flask(__name__)
-CONN_STRING = os.environ['EAGER_CONN']
+CONN_STRING = os.environ['WOPR_CONN']
 app.config['SQLALCHEMY_DATABASE_URI'] = CONN_STRING
 
 db = SQLAlchemy(app)

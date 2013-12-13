@@ -1,2 +1,4 @@
 Flask
 flask_sqlalchemy
+gunicorn
+psycopg2
