@@ -1,4 +1,4 @@
-from flask import Flask, make_response, request
+from flask import Flask, make_response, request, render_template
 from flask.ext.sqlalchemy import SQLAlchemy
 import os
 from datetime import date
@@ -126,6 +126,18 @@ def dataset(dataset):
     resp = make_response(json.dumps(resp, default=dthandler))
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
+@app.route('/')
+def index():
+  return render_app_template('index.html')
+
+# UTILITY
+def render_app_template(template, **kwargs):
+    '''Add some goodies to all templates.'''
+
+    if 'config' not in kwargs:
+        kwargs['config'] = app.config
+    return render_template(template, **kwargs)
 
 if __name__ == '__main__':
     app.run(debug=True)
