@@ -3,7 +3,7 @@ from flask.ext.sqlalchemy import SQLAlchemy
 import os
 from datetime import date
 import json
-from sqlalchemy import Table, event
+from sqlalchemy import Table, func
 
 app = Flask(__name__)
 CONN_STRING = os.environ['EAGER_CONN']
@@ -11,52 +11,90 @@ app.config['SQLALCHEMY_DATABASE_URI'] = CONN_STRING
 
 db = SQLAlchemy(app)
 
-class Master(db.Model):
-    __table__ = Table('dat_master', db.Model.metadata,
-                autoload=True, autoload_with=db.engine)
-
-    def as_dict(row):
-        return {c.name: getattr(row, c.name) for c in row.__table__.columns}
-
 dthandler = lambda obj: obj.isoformat() if isinstance(obj, date) else None
 
-@app.route('/')
+OPERATORS = {
+    'eq': '=',
+    'lt': '<',
+    'lte': '<=',
+    'gt': '>',
+    'gte': '>=',
+}
+
+def make_query(table, raw_query_params):
+    table_keys = table.columns.keys()
+    args_keys = raw_query_params.keys()
+    resp = {
+        'meta': {
+            'status': 'error',
+            'message': '',
+        },
+        'objects': [],
+    }
+    status_code = 200
+    query_clauses = []
+    valid_query = True
+    for query_param in args_keys:
+        try:
+            field, operator = query_param.split('__')
+        except ValueError:
+            field = query_param
+            operator = 'eq'
+        query_value = raw_query_params.get(query_param)
+        column = table.columns.get(field)
+        if field not in table_keys:
+            resp['meta']['message'] = '"%s" is not a valid fieldname' % field
+            status_code = 400
+            valid_query = False
+        elif operator == 'in':
+            value = raw_query_params.get(query_param)
+            query = column.in_(value.split(','))
+            query_clauses.append(query)
+        else:
+            try:
+                attr = filter(
+                    lambda e: hasattr(column, e % operator),
+                    ['%s', '%s_', '__%s__']
+                )[0] % operator
+            except IndexError:
+                resp['meta']['message'] = '"%s" is not a valid query operator' % operator
+                status_code = 400
+                valid_query = False
+                break
+            if query_value == 'null':
+                query_value = None
+            query = getattr(column, attr)(query_value)
+            query_clauses.append(query)
+    return valid_query, query_clauses, resp, status_code
+
+@app.route('/api/')
 def meta():
-    args_keys = request.args.keys()
+    status_code = 200
     table = Table('dat_master', db.Model.metadata,
             autoload=True, autoload_with=db.engine)
-    table_keys = table.columns.keys()
-    offset = 0
-    limit = 100
-    if 'offset' in args_keys:
-        offset = request.args.get('offset')
-        args_keys.remove('offset')
-    if 'limit' in args_keys:
-        limit = request.args.get('limit')
-        args_keys.remove('limit')
-    filters = {}
-    for query_param in args_keys:
-        if query_param in table_keys:
-            filters.update({query_param: request.args.get(query_param)})
-        else:
-            res = {
-                'status': 'error',
-                'message': '"%s" is not a valid fieldname' % query_param
-            }
-            resp = make_response(json.dumps(res), 400)
-            resp.headers['Content-Type'] = 'application/json'
-            return resp
-    values = [r for r in db.session.query(table)\
-        .filter_by(**filters)\
-        .offset(offset)\
-        .limit(limit).all()]
     resp = []
+    values = db.session.query(
+        table.columns.get('dataset_name'),
+        func.max(table.columns.get('obs_date')),
+        func.min(table.columns.get('obs_date')),
+        func.max(table.columns.get('longitude')),
+        func.min(table.columns.get('longitude')),
+        func.max(table.columns.get('latitude')),
+        func.min(table.columns.get('latitude')))\
+        .group_by('dataset_name').all()
     for value in values:
-        d = {}
-        for k,v in zip(table_keys, value):
-            d[k] = v
+        obs_to, obs_from = (value[1].strftime('%Y-%m-%d'), value[2].strftime('%Y-%m-%d'))
+        observed_range = '%s - %s' % (obs_from, obs_to)
+        sw = (value[3], value[5])
+        ne = (value[4], value[6])
+        d = {
+            'machine_name': value[0],
+            'human_name': ' '.join(value[0].split('_')).title(),
+            'observed_date_range': observed_range,
+            'bounding_box': (sw, ne),
+        }
         resp.append(d)
-    resp = make_response(json.dumps(resp, default=dthandler))
+    resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
@@ -70,14 +108,22 @@ def dataset(dataset):
         limit = 100
     table = Table('dat_%s' % dataset, db.Model.metadata,
             autoload=True, autoload_with=db.engine)
-    keys = table.columns.keys()
-    values = [r for r in db.session.query(table).offset(offset).limit(limit).all()]
-    resp = []
-    for value in values:
-        d = {}
-        for k,v in zip(keys, value):
-            d[k] = v
-        resp.append(d)
+    table_keys = table.columns.keys()
+    raw_query_params = request.args.copy()
+    valid_query, query_clauses, resp, status_code = make_query(table,raw_query_params)
+    if valid_query:
+        resp['meta']['status'] = 'ok'
+        resp['meta']['message'] = None
+        base_query = db.session.query(table)
+        for clause in query_clauses:
+            base_query = base_query.filter(clause)
+        print base_query.statement
+        values = [r for r in base_query.offset(offset).limit(limit).all()]
+        for value in values:
+            d = {}
+            for k,v in zip(table_keys, value):
+                d[k] = v
+            resp['objects'].append(d)
     resp = make_response(json.dumps(resp, default=dthandler))
     resp.headers['Content-Type'] = 'application/json'
     return resp
