@@ -9,11 +9,11 @@
     <title>W.O.P.R.</title>
 
     <!-- Bootstrap core CSS -->
-    <link href="{% url_for('static' , 'css/bootstrap.min.css' %}" rel="stylesheet">
-    <link href="{% url_for('static', 'css/font-awesome.css' %}" rel="stylesheet">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/font-awesome.css" rel="stylesheet">
 
     <!-- Custom styles for this template -->
-    <link href="static/css/custom.css" rel="stylesheet">
+    <link href="/static/css/custom.css" rel="stylesheet">
 
     <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>
@@ -26,14 +26,64 @@
 
     <div class="container">
       <div class='col-md-10 col-md-offset-1'>
-
-        <div class="jumbotron">
-          <p>W.O.P.R. Geospatial open data platform</p>
-        </div>
-
-        <div class="footer">
-          <p>&copy; DataMade and UrbanCCD</p>
-        </div>
+          <h1>W.O.P.R. Geospatial open data platform</h1>
+          <p>
+              Currently there are three endpoints:
+              <ul>
+                  <li><a href="/api/">/api/</a></li>
+                  <li><a href="/api/master/">/api/master/</a></li>
+                  <li><a href="/api/chicago_business_licences/">/api/chicago_business_licences/</a></li>
+              </ul>
+          </p>
+          <h3>/api/</h3>
+          <p>
+              This will act as a “data about the data” endpoint. It queries the master table,
+              finds all the unique datasets and attempts to build out what those datasets contain
+              in terms of temporal and spatial constraints. Other than the Master table,
+              there is only one other dataset currently available (Chicago Business Licences).
+          </p>
+          <hr />
+          <h3>/api/master/</h3>
+          <p>
+              This endpoint contains a record for every row in every dataset with brief temporal and spatial
+              information about the row. This can give a user of the platform a quick overview about what is
+              available within their constraints.
+          </p>
+          <hr />
+          <h3>/api/&lt;dataset_name&gt;/</h3>
+          <p>
+              After a user queries the master table and finds the data that he or she is interested in, the next
+              step is to get the dataset names from there and start querying the actual datasets. To do that, it’s
+              as simple as appending that dataset name onto the URL path.
+          </p>
+          <hr />
+          <h3>Performing queries</h3>
+          <p>
+              Currently by default the response that a user gets when visiting the endpoints listed above is
+              limited to the first 100 rows. This can be adjusted by apending a <code>limit</code> query
+              parameter to the URL like so:
+          </p>
+          <pre>/api/master/?limit=500</pre>
+          <p>
+              To fetch the next set of rows, a user can append an <code>offset</code> query parameter to the
+              URL like so:
+          </p>
+          <pre>/api/master/?limit=500&offset=500</pre>
+          <p>
+              Beyond that, queries can be constructed by appending the name of a field and a SQL operator separated
+              by two underscores. So to find all the records in the master table that were observed before November
+              12, 2007 a user would construct her query like so:
+          </p>
+          <pre>/api/master/?limit=500&obs_date__lt=2007-11-12</pre>
+          <p>
+              These query parameters can be chained together and are linked together with a SQL <code>AND</code>
+              under the hood. To perform a simple equality test, just leave out the double underscore part:
+          </p>
+          <pre>/api/master/?obs_date=2007-11-12</pre>
+          <hr />
+          <div class="footer">
+            <p>&copy; DataMade and UrbanCCD</p>
+          </div>
       </div>
     </div> <!-- /container -->
 
@@ -42,10 +92,10 @@
     ================================================== -->
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="https://code.jquery.com/jquery-1.10.1.min.js"></script>
-    <script src="static/js/bootstrap.min.js"></script>
-    <script src="static/js/analytics_lib.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+    <script src="/static/js/analytics_lib.js"></script>
 
-    <script src="static/js/moment.min.js"></script>
+    <script src="/static/js/moment.min.js"></script>
 
   </body>
 </html>
