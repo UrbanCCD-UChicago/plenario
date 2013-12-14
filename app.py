@@ -36,7 +36,7 @@ def make_query(table, raw_query_params):
     valid_query = True
     if 'offset' in args_keys:
         args_keys.remove('offset')
-    if limit in args_keys:
+    if 'limit' in args_keys:
         args_keys.remove('limit')
     for query_param in args_keys:
         try:
