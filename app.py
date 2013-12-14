@@ -34,8 +34,10 @@ def make_query(table, raw_query_params):
     status_code = 200
     query_clauses = []
     valid_query = True
-    args_keys.remove('offset')
-    args_keys.remove('limit')
+    if 'offset' in args_keys:
+        args_keys.remove('offset')
+    if limit in args_keys:
+        args_keys.remove('limit')
     for query_param in args_keys:
         try:
             field, operator = query_param.split('__')
