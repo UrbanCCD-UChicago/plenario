@@ -4,6 +4,7 @@ import os
 from datetime import date
 import json
 from sqlalchemy import Table, func
+from sqlalchemy.exc import NoSuchTableError
 
 app = Flask(__name__)
 CONN_STRING = os.environ['WOPR_CONN']
@@ -110,11 +111,21 @@ def dataset(dataset):
         offset = 0
     if not limit:
         limit = 100
-    table = Table('dat_%s' % dataset, db.Model.metadata,
-            autoload=True, autoload_with=db.engine)
-    table_keys = table.columns.keys()
-    raw_query_params = request.args.copy()
-    valid_query, query_clauses, resp, status_code = make_query(table,raw_query_params)
+    try:
+        table = Table('dat_%s' % dataset, db.Model.metadata,
+                autoload=True, autoload_with=db.engine)
+        table_keys = table.columns.keys()
+        raw_query_params = request.args.copy()
+        valid_query, query_clauses, resp, status_code = make_query(table,raw_query_params)
+    except NoSuchTableError:
+        valid_query = False
+        resp = {
+            'meta': {
+                'status': 'error',
+                'message': 'No dataset called "%s"' % dataset,
+            },
+            'objects': [],
+        }
     if valid_query:
         resp['meta']['status'] = 'ok'
         resp['meta']['message'] = None
