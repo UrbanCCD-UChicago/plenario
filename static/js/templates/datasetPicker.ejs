@@ -1,0 +1,6 @@
+<select id="dataset">
+<option value="None">---------</option>
+<% $.each(datasets, function(i, dataset){ %> 
+    <option value="<%= dataset.machine_name %>"><%= dataset.human_name %></option>
+<% }) %>
+</select>

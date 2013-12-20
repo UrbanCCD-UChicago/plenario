@@ -14,14 +14,6 @@ db = SQLAlchemy(app)
 
 dthandler = lambda obj: obj.isoformat() if isinstance(obj, date) else None
 
-OPERATORS = {
-    'eq': '=',
-    'lt': '<',
-    'lte': '<=',
-    'gt': '>',
-    'gte': '>=',
-}
-
 def make_query(table, raw_query_params):
     table_keys = table.columns.keys()
     args_keys = raw_query_params.keys()
@@ -111,6 +103,7 @@ def dataset(dataset):
         offset = 0
     if not limit:
         limit = 100
+    status_code = 200
     try:
         table = Table('dat_%s' % dataset, db.Model.metadata,
                 autoload=True, autoload_with=db.engine)
@@ -126,6 +119,7 @@ def dataset(dataset):
             },
             'objects': [],
         }
+        status_code = 400
     if valid_query:
         resp['meta']['status'] = 'ok'
         resp['meta']['message'] = None
@@ -138,13 +132,17 @@ def dataset(dataset):
             for k,v in zip(table_keys, value):
                 d[k] = v
             resp['objects'].append(d)
-    resp = make_response(json.dumps(resp, default=dthandler))
+    resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
 @app.route('/')
 def index():
-  return render_app_template('index.html')
+    return render_app_template('index.html')
+
+@app.route('/map/')
+def map():
+    return render_app_template('map.html')
 
 # UTILITY
 def render_app_template(template, **kwargs):

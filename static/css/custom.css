@@ -73,3 +73,8 @@ body {
 }
 
 .nowrap { white-space:nowrap; }
+
+/* MAP styles */
+#map {
+    min-height: 500px;
+}
