@@ -48,10 +48,6 @@ def make_query(table, raw_query_params):
             query = column.in_(query_value.split(','))
             query_clauses.append(query)
         elif operator == 'within':
-            # TODO: Capture geospatial queries here and format like so:
-            # .filter(table.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geo)))
-            # This should work because we are reflecting the table with 
-            # a proper geometry column (see line 125)
             val = json.loads(query_value)['geometry']
             val['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
             query = column.ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val)))
