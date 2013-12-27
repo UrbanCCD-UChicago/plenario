@@ -60,7 +60,7 @@
     function edit_create(layer, map){
         $('#map').spin('large');
         var query = {};
-        query['location__geoWithin'] = JSON.stringify(layer.toGeoJSON());
+        query['geom__within'] = JSON.stringify(layer.toGeoJSON());
         var start = $('.start').val().replace('Start Date: ', '');
         var end = $('.end').val().replace('End Date: ', '');
         start = moment(start)
@@ -71,8 +71,8 @@
             end = end.endOf('day').unix();
             valid = true;
         }
-        query['date__lte'] = end;
-        query['date__gte'] = start;
+        //query['date__lte'] = end;
+        //query['date__gte'] = start;
        //var on = [];
        //var type_checkboxes = $('.filter.type');
        //$.each(type_checkboxes, function(i, checkbox){
@@ -98,24 +98,16 @@
         if(valid){
             $.when(get_results(query)).then(function(resp){
                 $('#map').spin(false);
-                $.each(resp.results, function(i, result){
-                    var location = result.location;
+                $.each(resp.objects, function(i, result){
+                    var location = result.geom;
                     location.properties = result;
                     geojson.addLayer(L.geoJson(location, {
                         pointToLayer: function(feature, latlng){
-                            if (feature.properties.type == 'violent'){
-                                marker_opts.color = '#7B3294';
-                                marker_opts.fillColor = '#7B3294';
-                            } else if (feature.properties.type == 'property'){
-                                marker_opts.color = '#ca0020';
-                                marker_opts.fillColor = '#ca0020';
-                            } else {
-                                marker_opts.color = '#008837';
-                                marker_opts.fillColor = '#008837';
-                            }
+                            marker_opts.color = '#7B3294';
+                            marker_opts.fillColor = '#7B3294';
                             return L.circleMarker(latlng, marker_opts)
-                        },
-                        onEachFeature: bind_popup
+                        }//,
+                        //onEachFeature: bind_popup
                     })).addTo(map);
                 });
             }).fail(function(data){

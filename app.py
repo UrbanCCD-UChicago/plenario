@@ -3,8 +3,9 @@ from flask.ext.sqlalchemy import SQLAlchemy
 import os
 from datetime import date
 import json
-from sqlalchemy import Table, func
+from sqlalchemy import Table, func, distinct, Column
 from sqlalchemy.exc import NoSuchTableError
+from geoalchemy2 import Geometry
 
 app = Flask(__name__)
 CONN_STRING = os.environ['WOPR_CONN']
@@ -44,8 +45,16 @@ def make_query(table, raw_query_params):
             status_code = 400
             valid_query = False
         elif operator == 'in':
-            value = raw_query_params.get(query_param)
-            query = column.in_(value.split(','))
+            query = column.in_(query_value.split(','))
+            query_clauses.append(query)
+        elif operator == 'within':
+            # TODO: Capture geospatial queries here and format like so:
+            # .filter(table.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geo)))
+            # This should work because we are reflecting the table with 
+            # a proper geometry column (see line 125)
+            val = json.loads(query_value)['geometry']
+            val['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
+            query = column.ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val)))
             query_clauses.append(query)
         else:
             try:
@@ -70,28 +79,24 @@ def meta():
     table = Table('dat_master', db.Model.metadata,
             autoload=True, autoload_with=db.engine)
     resp = []
+    # TODO: Doing aggregate queries here is super slow. It would be nice to speed it up
+    # This query only performs well after making an index on dataset_name
     values = db.session.query(
-        table.columns.get('dataset_name'),
-        func.max(table.columns.get('obs_date')),
-        func.min(table.columns.get('obs_date')),
-        func.max(table.columns.get('longitude')),
-        func.min(table.columns.get('longitude')),
-        func.max(table.columns.get('latitude')),
-        func.min(table.columns.get('latitude')))\
-        .group_by('dataset_name').all()
+        distinct(table.columns.get('dataset_name'))).all()
     for value in values:
-        obs_to, obs_from = (value[1].strftime('%Y-%m-%d'), value[2].strftime('%Y-%m-%d'))
-        observed_range = '%s - %s' % (obs_from, obs_to)
-        sw = (value[3], value[5])
-        ne = (value[4], value[6])
+       #obs_to, obs_from = (value[1].strftime('%Y-%m-%d'), value[2].strftime('%Y-%m-%d'))
+       #observed_range = '%s - %s' % (obs_from, obs_to)
+       #s = select([func.ST_AsGeoJSON(func.ST_Estimated_Extent(
+       #    'dat_%s' % value[0], 'geom'))])
+       #bbox = json.loads(list(db.engine.execute(s))[0][0])
         d = {
             'machine_name': value[0],
             'human_name': ' '.join(value[0].split('_')).title(),
-            'observed_date_range': observed_range,
-            'bounding_box': (sw, ne),
+           #'observed_date_range': observed_range,
+           #'bounding_box': bbox,
         }
         resp.append(d)
-    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp = make_response(json.dumps(resp), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
@@ -104,9 +109,16 @@ def dataset(dataset):
     if not limit:
         limit = 100
     status_code = 200
+    geo = False
     try:
         table = Table('dat_%s' % dataset, db.Model.metadata,
                 autoload=True, autoload_with=db.engine)
+        if hasattr(table.c, 'geom'):
+            geo = True
+            table = Table('dat_%s' % dataset, db.Model.metadata,
+                    Column('geom', Geometry('POINT')),
+                    autoload=True, autoload_with=db.engine,
+                    extend_existing=True)
         table_keys = table.columns.keys()
         raw_query_params = request.args.copy()
         valid_query, query_clauses, resp, status_code = make_query(table,raw_query_params)
@@ -124,6 +136,8 @@ def dataset(dataset):
         resp['meta']['status'] = 'ok'
         resp['meta']['message'] = None
         base_query = db.session.query(table)
+        if geo:
+            base_query = db.session.query(table, func.ST_AsGeoJSON(table.c.geom))
         for clause in query_clauses:
             base_query = base_query.filter(clause)
         values = [r for r in base_query.offset(offset).limit(limit).all()]
@@ -131,6 +145,8 @@ def dataset(dataset):
             d = {}
             for k,v in zip(table_keys, value):
                 d[k] = v
+            if geo:
+                d['geom'] = json.loads(value[-1])
             resp['objects'].append(d)
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'

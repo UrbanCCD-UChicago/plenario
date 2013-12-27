@@ -1,2 +1,8 @@
-<input class="filter start" type="text" value="Start Date: <%= moment().subtract('d', 365).format('YYYY-MM-DD') %>" placeholder="Start Date"/>
-<input class="filter end" type="text" value="End Date: <%= moment().format('YYYY-MM-DD') %>" placeholder="End Date"/>
+<form role="form">
+<div class="form-group">
+<input class="filter start form-control" type="text" value="Start Date: <%= moment().subtract('d', 365).format('YYYY-MM-DD') %>" placeholder="Start Date"/>
+</div>
+<div class="form-group">
+<input class="filter end form-control" type="text" value="End Date: <%= moment().format('YYYY-MM-DD') %>" placeholder="End Date"/>
+</div>
+</form>
