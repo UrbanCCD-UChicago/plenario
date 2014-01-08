@@ -161,7 +161,6 @@ def master():
                 'geom': json.loads(value[2]),
                 }
             results.append(d)
-        print results
         results = sorted(results, key=itemgetter('dataset_name'))
         ids = {}
         for k,g in groupby(results, key=itemgetter('dataset_name')):
