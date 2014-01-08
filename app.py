@@ -6,6 +6,8 @@ import json
 from sqlalchemy import Table, func, distinct, Column
 from sqlalchemy.exc import NoSuchTableError
 from geoalchemy2 import Geometry
+from operator import itemgetter
+from itertools import groupby
 
 app = Flask(__name__)
 CONN_STRING = os.environ['WOPR_CONN']
@@ -98,52 +100,88 @@ def meta():
 
 @app.route('/api/<dataset>/')
 def dataset(dataset):
+    resp = {
+        'meta': {
+            'status': 'error',
+            'message': '',
+        },
+        'objects': [],
+    }
+    status_code = 200
+    pks = request.args.get('dataset_row_id')
+    table = Table('dat_%s' % dataset, db.Model.metadata,
+            autoload=True, autoload_with=db.engine)
+    table_keys = table.columns.keys()
+    pk = [p for p in table.primary_key][0]
+    if pks:
+        pks = pks.split(',')
+        values = [o for o in db.session.query(table).filter(pk.in_(pks)).all()]
+        for value in values:
+            d = {}
+            for k,v in zip(table_keys, value):
+                d[k] = v
+            resp['objects'].append(d)
+        resp['meta']['status'] = 'ok'
+    else:
+        resp['meta']['message'] = \
+            'A comma separated list of %s is required' % pk.name
+        status_code = 400
+    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    return resp
+
+@app.route('/api/master/')
+def master():
     offset = request.args.get('offset')
     limit = request.args.get('limit')
     if not offset:
         offset = 0
     if not limit:
-        limit = 100
+        limit = 1000
     status_code = 200
-    geo = False
-    try:
-        table = Table('dat_%s' % dataset, db.Model.metadata,
-                autoload=True, autoload_with=db.engine)
-        if hasattr(table.c, 'geom'):
-            geo = True
-            table = Table('dat_%s' % dataset, db.Model.metadata,
-                    Column('geom', Geometry('POINT')),
-                    autoload=True, autoload_with=db.engine,
-                    extend_existing=True)
-        table_keys = table.columns.keys()
-        raw_query_params = request.args.copy()
-        valid_query, query_clauses, resp, status_code = make_query(table,raw_query_params)
-    except NoSuchTableError:
-        valid_query = False
-        resp = {
-            'meta': {
-                'status': 'error',
-                'message': 'No dataset called "%s"' % dataset,
-            },
-            'objects': [],
-        }
-        status_code = 400
+    table = Table('dat_master', db.Model.metadata,
+            Column('geom', Geometry('POINT')),
+            autoload=True, autoload_with=db.engine,
+            extend_existing=True)
+    table_keys = table.columns.keys()
+    raw_query_params = request.args.copy()
+    valid_query, query_clauses, resp, status_code = make_query(table,raw_query_params)
     if valid_query:
         resp['meta']['status'] = 'ok'
         resp['meta']['message'] = None
-        base_query = db.session.query(table)
-        if geo:
-            base_query = db.session.query(table, func.ST_AsGeoJSON(table.c.geom))
+        base_query = db.session.query(table.c.dataset_name,\
+            table.c.dataset_row_id, func.ST_AsGeoJSON(table.c.geom))
         for clause in query_clauses:
             base_query = base_query.filter(clause)
         values = [r for r in base_query.offset(offset).limit(limit).all()]
+        results = []
         for value in values:
-            d = {}
-            for k,v in zip(table_keys, value):
-                d[k] = v
-            if geo:
-                d['geom'] = json.loads(value[-1])
-            resp['objects'].append(d)
+            d = {
+                'dataset_name': value[0],
+                'dataset_row_id': value[1],
+                'geom': json.loads(value[2]),
+                }
+            results.append(d)
+        print results
+        results = sorted(results, key=itemgetter('dataset_name'))
+        ids = {}
+        for k,g in groupby(results, key=itemgetter('dataset_name')):
+            group = list(g)
+            ids[k] = [i['dataset_row_id'] for i in group]
+            resp[k] = {}
+            for item in group:
+                resp[k][item['dataset_row_id']] = {'geom': item['geom']}
+        for name,pks in ids.items():
+            dataset = Table('dat_%s' % name, db.Model.metadata,
+                autoload=True, autoload_with=db.engine,
+                extend_existing=True)
+            pk = [p for p in dataset.primary_key][0]
+            set_keys = dataset.columns.keys()
+            details = [d for d in db.session.query(dataset).filter(pk.in_(pks)).all()]
+            for detail in details:
+                d = {}
+                for k,v in zip(set_keys, detail):
+                    d[k] = v
+                resp[name][d[pk.name]] = d
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp

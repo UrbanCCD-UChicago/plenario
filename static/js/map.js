@@ -28,12 +28,12 @@
         map.on('draw:created', draw_create);
         map.on('draw:edited', draw_edit);
         map.on('draw:deleted', draw_delete);
-        $.when(get_datasets()).then(
-            function(resp){
-                var tpl = new EJS({url: '/static/js/templates/datasetPicker.ejs'});
-                $('#dataset-picker').html(tpl.render({datasets: resp}));
-            }
-        );
+      //$.when(get_datasets()).then(
+      //    function(resp){
+      //        var tpl = new EJS({url: '/static/js/templates/datasetPicker.ejs'});
+      //        $('#dataset-picker').html(tpl.render({datasets: resp}));
+      //    }
+      //);
         var filtpl = new EJS({url: '/static/js/templates/filterTemplate.ejs'})
         $('#filters').html(filtpl.render({}));
         $('#dataset').on('change', function(){
@@ -67,12 +67,12 @@
         end = moment(end)
         var valid = false;
         if (start.isValid() && end.isValid()){
-            start = start.startOf('day').unix();
-            end = end.endOf('day').unix();
+            start = start.startOf('day').format('YYYY/MM/DD');
+            end = end.endOf('day').format('YYYY/MM/DD');
             valid = true;
         }
-        //query['date__lte'] = end;
-        //query['date__gte'] = start;
+        query['obs_date__le'] = end;
+        query['obs_date__ge'] = start;
        //var on = [];
        //var type_checkboxes = $('.filter.type');
        //$.each(type_checkboxes, function(i, checkbox){
@@ -98,18 +98,19 @@
         if(valid){
             $.when(get_results(query)).then(function(resp){
                 $('#map').spin(false);
-                $.each(resp.objects, function(i, result){
-                    var location = result.geom;
-                    location.properties = result;
-                    geojson.addLayer(L.geoJson(location, {
-                        pointToLayer: function(feature, latlng){
-                            marker_opts.color = '#7B3294';
-                            marker_opts.fillColor = '#7B3294';
-                            return L.circleMarker(latlng, marker_opts)
-                        }//,
-                        //onEachFeature: bind_popup
-                    })).addTo(map);
-                });
+                console.log(resp);
+              //$.each(resp.objects, function(i, result){
+              //    var location = result.geom;
+              //    location.properties = result;
+              //    geojson.addLayer(L.geoJson(location, {
+              //        pointToLayer: function(feature, latlng){
+              //            marker_opts.color = '#7B3294';
+              //            marker_opts.fillColor = '#7B3294';
+              //            return L.circleMarker(latlng, marker_opts)
+              //        },
+              //        onEachFeature: bind_popup
+              //    })).addTo(map);
+              //});
             }).fail(function(data){
                 $('#map').spin(false);
                 var error = {
@@ -127,9 +128,9 @@
         drawnItems.addLayer(layer);
     }
     function bind_popup(feature, layer){
-        var crime_template = new EJS({url: 'js/views/dataTemplate.ejs'});
+        var data_template = new EJS({url: '/static/js/templates/dataTemplate.ejs'});
         var props = feature.properties;
-        var pop_content = crime_template.render(props);
+        var pop_content = data_template.render({props:props});
         layer.bindPopup(pop_content, {
             closeButton: true,
             minWidth: 320
@@ -147,9 +148,8 @@
     }
 
     function get_results(query){
-        var dataset = $('#dataset').val();
         return $.ajax({
-            url: '/api/' + dataset + '/',
+            url: '/api/master/',
             dataType: 'json',
             data: query
         });
