@@ -121,11 +121,13 @@ def dataset(agg):
     table = Table('dat_master', db.Model.metadata,
             autoload=True, autoload_with=db.engine,
             extend_existing=True)
-    time_agg = func.date_trunc(agg, table.c['obs_ts'])
+    time_agg = func.date_trunc(agg, table.c['obs_date'])
     base_query = db.session.query(time_agg, func.count(time_agg), table.c['dataset_name'])\
-        .filter(table.c['obs_ts'].__ge__(start_time))\
-        .filter(table.c['obs_ts'].__le__(end_time))\
-        .group_by(table.c['dataset_name']).group_by(time_agg)
+        .filter(table.c['obs_date'].__ge__(start_time))\
+        .filter(table.c['obs_date'].__le__(end_time))\
+        .group_by(table.c['dataset_name'])\
+        .group_by(time_agg)\
+        .order_by(time_agg)
     values = [o for o in base_query.all()]
     for value in values:
         d = {
