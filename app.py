@@ -1,7 +1,8 @@
 from flask import Flask, make_response, request, render_template
 from flask.ext.sqlalchemy import SQLAlchemy
 import os
-from datetime import date
+from datetime import date, datetime, timedelta
+import time
 import json
 from sqlalchemy import Table, func, distinct, Column
 from sqlalchemy.exc import NoSuchTableError
@@ -98,8 +99,8 @@ def meta():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-@app.route('/api/<dataset>/')
-def dataset(dataset):
+@app.route('/api/<agg>/')
+def dataset(agg):
     resp = {
         'meta': {
             'status': 'error',
@@ -108,25 +109,34 @@ def dataset(dataset):
         'objects': [],
     }
     status_code = 200
-    pks = request.args.get('dataset_row_id')
-    table = Table('dat_%s' % dataset, db.Model.metadata,
-            autoload=True, autoload_with=db.engine)
-    table_keys = table.columns.keys()
-    pk = [p for p in table.primary_key][0]
-    if pks:
-        pks = pks.split(',')
-        values = [o for o in db.session.query(table).filter(pk.in_(pks)).all()]
-        for value in values:
-            d = {}
-            for k,v in zip(table_keys, value):
-                d[k] = v
-            resp['objects'].append(d)
-        resp['meta']['status'] = 'ok'
-    else:
-        resp['meta']['message'] = \
-            'A comma separated list of %s is required' % pk.name
-        status_code = 400
+    start_ts = request.args.get('start_time')
+    end_ts = request.args.get('end_time')
+    if not start_ts or not end_ts:
+        now = datetime.now()
+        end_ts = time.mktime(now.timetuple())
+        then = now - timedelta(days=180)
+        start_ts = time.mktime(then.timetuple())
+    start_time = datetime.fromtimestamp(float(start_ts))
+    end_time = datetime.fromtimestamp(float(end_ts))
+    table = Table('dat_master', db.Model.metadata,
+            autoload=True, autoload_with=db.engine,
+            extend_existing=True)
+    time_agg = func.date_trunc(agg, table.c['obs_ts'])
+    base_query = db.session.query(time_agg, func.count(time_agg), table.c['dataset_name'])\
+        .filter(table.c['obs_ts'].__ge__(start_time))\
+        .filter(table.c['obs_ts'].__le__(end_time))\
+        .group_by(table.c['dataset_name']).group_by(time_agg)
+    values = [o for o in base_query.all()]
+    for value in values:
+        d = {
+            'dataset_name': value[2],
+            'temporal_group': value[0],
+            'count': value[1],
+            }
+        resp['objects'].append(d)
+    resp['meta']['status'] = 'ok'
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp.headers['Content-Type'] = 'application/json'
     return resp
 
 @app.route('/api/master/')
@@ -136,7 +146,7 @@ def master():
     if not offset:
         offset = 0
     if not limit:
-        limit = 1000
+        limit = 500
     status_code = 200
     table = Table('dat_master', db.Model.metadata,
             Column('geom', Geometry('POINT')),
