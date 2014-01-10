@@ -77,6 +77,7 @@ body {
 /* MAP styles */
 #map {
     min-height: 500px;
+    margin-top: 15px;
 }
 
 .leaflet-top.leaflet-left{
@@ -177,4 +178,9 @@ body {
 .ui-tooltip {
     width: 25%;
     overflow: hidden;
+}
+
+/* Response */
+.response-table {
+    width: 100%;
 }

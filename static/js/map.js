@@ -28,14 +28,6 @@
         map.on('draw:created', draw_create);
         map.on('draw:edited', draw_edit);
         map.on('draw:deleted', draw_delete);
-      //$.when(get_datasets()).then(
-      //    function(resp){
-      //        var tpl = new EJS({url: '/static/js/templates/datasetPicker.ejs'});
-      //        $('#dataset-picker').html(tpl.render({datasets: resp}));
-      //    }
-      //);
-      //var filtpl = new EJS({url: '/static/js/templates/filterTemplate.ejs'})
-      //$('#filters').html(filtpl.render({}));
         $('.date-filter').datepicker({
             dayNamesMin: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
             prevText: '',
@@ -63,7 +55,7 @@
     }
 
     function edit_create(layer, map){
-        //$('#map').spin('large');
+        $('#map').spin('large');
         var query = {};
         query['geom__within'] = JSON.stringify(layer.toGeoJSON());
         var start = $('#start-date-filter').val();
@@ -85,23 +77,6 @@
         var agg = $('#time-agg-filter').val();
         query['obs_date__le'] = end;
         query['obs_date__ge'] = start;
-        console.log(query);
-       //var on = [];
-       //var type_checkboxes = $('.filter.type');
-       //$.each(type_checkboxes, function(i, checkbox){
-       //    if($(checkbox).is(':checked')){
-       //        on.push($(checkbox).attr('value'));
-       //    }
-       //});
-       //query['type'] = on.join(',')
-       //on = [];
-       //var time_checkboxes = $('.filter.time');
-       //$.each(time_checkboxes, function(i, checkbox){
-       //    if($(checkbox).is(':checked')){
-       //        on.push($(checkbox).attr('value'));
-       //    }
-       //});
-       //query['time'] = on.join(',')
         var marker_opts = {
             radius: 10,
             weight: 2,
@@ -112,23 +87,14 @@
             $.when(get_results(query, agg)).then(function(resp){
                 $('#map').spin(false);
                 console.log(resp);
-              //$.each(resp.objects, function(i, result){
-              //    var location = result.geom;
-              //    location.properties = result;
-              //    geojson.addLayer(L.geoJson(location, {
-              //        pointToLayer: function(feature, latlng){
-              //            marker_opts.color = '#7B3294';
-              //            marker_opts.fillColor = '#7B3294';
-              //            return L.circleMarker(latlng, marker_opts)
-              //        },
-              //        onEachFeature: bind_popup
-              //    })).addTo(map);
-              //});
-            }).fail(function(data){
+                var aggTpl = new EJS({url: '/static/js/templates/responseTemplate.ejs'})
+                $('#response').html(aggTpl.render({'datasets': resp.objects}));
+            }).fail(function(resp){
                 $('#map').spin(false);
+                console.log(resp);
                 var error = {
                     header: 'Woops!',
-                    body: data['responseJSON']['meta']['message'],
+                    body: resp['responseJSON']['meta']['message'],
                 }
                 var errortpl = new EJS({url: '/static/js/templates/modalTemplate.ejs'})
                 $('#errorModal').html(errortpl.render(error));

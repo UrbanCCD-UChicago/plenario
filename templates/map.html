@@ -6,9 +6,6 @@
 {% block content %}
 <div class="row">
     <div class="col-md-6">
-        <div class="row">
-            <div id="map" class="col-md-12 half-height"></div>
-        </div>
         <div class="row filters">
             <div class="col-md-12">
                 <h3>Build a query</h3>
@@ -29,7 +26,7 @@
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-12">
+                            <div class="col-md-6">
                               <div class="form-group">
                                     <label for="time-agg-filter">Time aggregate: </label>
                                     <select id="time-agg-filter">
@@ -44,15 +41,27 @@
                                     </select>
                                 </div>
                             </div>
+                            <div class="col-md-6">
+                                 <button type="button" class="btn btn-success">Submit</button>
+                            </div>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
+        <div class="row">
+            <div class="col-md-2 col-md-offset-10">
+            </div>
+        </div>
+        <div class="row">
+            <div id="map" class="col-md-12 half-height"></div>
+        </div>
     </div>
     <div class="col-md-6">
         <h3>Here is where the response goes</h3>
         <p>We can also show instructions for how to use this junk</p>
+        <div id="response">
+        </div>
     </div>
 </div>
 <div class="modal fade" id="errorModal" tabindex="-1" role="dialog" aria-labelledby="error" aria-hidden="true"></div>

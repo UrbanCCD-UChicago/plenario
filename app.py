@@ -132,12 +132,19 @@ def dataset(agg):
             .group_by(time_agg)\
             .order_by(time_agg)
         values = [o for o in base_query.all()]
+        results = []
         for value in values:
             d = {
                 'dataset_name': value[2],
-                'temporal_group': value[0],
+                'group': value[0],
                 'count': value[1],
                 }
+            results.append(d)
+        results = sorted(results, key=itemgetter('dataset_name'))
+        for k,g in groupby(results, key=itemgetter('dataset_name')):
+            d = {'dataset_name': ' '.join(k.split('_')).title()}
+            d['temporal_aggregate'] = agg
+            d['objects'] = list(g)
             resp['objects'].append(d)
         resp['meta']['status'] = 'ok'
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
