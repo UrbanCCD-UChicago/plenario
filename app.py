@@ -1,4 +1,5 @@
-from flask import Flask, make_response, request, render_template
+from flask import Flask, make_response, request, render_template, current_app
+from functools import update_wrapper
 from flask.ext.sqlalchemy import SQLAlchemy
 import os
 from datetime import date, datetime, timedelta
