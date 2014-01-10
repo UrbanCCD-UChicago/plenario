@@ -4,16 +4,61 @@
     <link rel="stylesheet" href="/static/css/leaflet.draw.css" />
 {% endblock %}
 {% block content %}
-<div class="col-md-3">
-    <h3>Buncha filters and junk</h3>
-    <p>Probably actually a listing of datasets and meta</p>
-    <div id="dataset-picker"></div>
-    <div id="filters"></div>
+<div class="row">
+    <div class="col-md-6">
+        <div class="row">
+            <div id="map" class="col-md-12 half-height"></div>
+        </div>
+        <div class="row filters">
+            <div class="col-md-12">
+                <h3>Build a query</h3>
+                <div id="filters">
+                    <form role="form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="start-date-filter">Start Date: </label>
+                                    <input id="start-date-filter" class="date-filter form-control" type="text"/>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="end-date-filter">End Date: </label>
+                                    <input id="end-date-filter" class="date-filter form-control" type="text"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                              <div class="form-group">
+                                    <label for="time-agg-filter">Time aggregate: </label>
+                                    <select id="time-agg-filter">
+                                        <option value="minute">Minute</option>
+                                        <option value="hour">Hour</option>
+                                        <option value="day" selected="true">Day</option>
+                                        <option value="week">Week</option>
+                                        <option value="month">Month</option>
+                                        <option value="quarter">Quarter</option>
+                                        <option value="year">Year</option>
+                                        <option value="decade">Decade</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <h3>Here is where the response goes</h3>
+        <p>We can also show instructions for how to use this junk</p>
+    </div>
 </div>
-<div id="map" class="col-md-9 full-height"></div>
 <div class="modal fade" id="errorModal" tabindex="-1" role="dialog" aria-labelledby="error" aria-hidden="true"></div>
 {% endblock %}
 {% block extra_javascript %}
+    <script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
     <script type="text/javascript" src="/static/js/ejs_production.js"></script>
     <script type="text/javascript" src="/static/js/spin.min.js"></script>
     <script type="text/javascript" src="/static/js/jquery.spin.js"></script>

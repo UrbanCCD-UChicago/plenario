@@ -17,6 +17,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = CONN_STRING
 db = SQLAlchemy(app)
 
 dthandler = lambda obj: obj.isoformat() if isinstance(obj, date) else None
+master_table = Table('dat_master', db.Model.metadata,
+        autoload=True, autoload_with=db.engine)
 
 def make_query(table, raw_query_params):
     table_keys = table.columns.keys()
@@ -75,13 +77,11 @@ def make_query(table, raw_query_params):
 @app.route('/api/')
 def meta():
     status_code = 200
-    table = Table('dat_master', db.Model.metadata,
-            autoload=True, autoload_with=db.engine)
     resp = []
     # TODO: Doing aggregate queries here is super slow. It would be nice to speed it up
     # This query only performs well after making an index on dataset_name
     values = db.session.query(
-        distinct(table.columns.get('dataset_name'))).all()
+        distinct(master_table.columns.get('dataset_name'))).all()
     for value in values:
        #obs_to, obs_from = (value[1].strftime('%Y-%m-%d'), value[2].strftime('%Y-%m-%d'))
        #observed_range = '%s - %s' % (obs_from, obs_to)
@@ -109,34 +109,37 @@ def dataset(agg):
         'objects': [],
     }
     status_code = 200
-    start_ts = request.args.get('start_time')
-    end_ts = request.args.get('end_time')
-    if not start_ts or not end_ts:
+    raw_query_params = request.args.copy()
+    valid_query, query_clauses, resp, status_code = make_query(master_table,raw_query_params)
+    if valid_query:
+        start_ts = request.args.get('start_time')
+        end_ts = request.args.get('end_time')
         now = datetime.now()
-        end_ts = time.mktime(now.timetuple())
-        then = now - timedelta(days=180)
-        start_ts = time.mktime(then.timetuple())
-    start_time = datetime.fromtimestamp(float(start_ts))
-    end_time = datetime.fromtimestamp(float(end_ts))
-    table = Table('dat_master', db.Model.metadata,
-            autoload=True, autoload_with=db.engine,
-            extend_existing=True)
-    time_agg = func.date_trunc(agg, table.c['obs_date'])
-    base_query = db.session.query(time_agg, func.count(time_agg), table.c['dataset_name'])\
-        .filter(table.c['obs_date'].__ge__(start_time))\
-        .filter(table.c['obs_date'].__le__(end_time))\
-        .group_by(table.c['dataset_name'])\
-        .group_by(time_agg)\
-        .order_by(time_agg)
-    values = [o for o in base_query.all()]
-    for value in values:
-        d = {
-            'dataset_name': value[2],
-            'temporal_group': value[0],
-            'count': value[1],
-            }
-        resp['objects'].append(d)
-    resp['meta']['status'] = 'ok'
+        if not start_ts:
+            then = now - timedelta(days=180)
+            start_ts = time.mktime(then.timetuple())
+        if not end_ts:
+            end_ts = time.mktime(now.timetuple())
+        start_time = datetime.fromtimestamp(float(start_ts))
+        end_time = datetime.fromtimestamp(float(end_ts))
+        time_agg = func.date_trunc(agg, master_table.c['obs_date'])
+        base_query = db.session.query(time_agg, 
+            func.count(master_table.c['obs_date']),
+            master_table.c['dataset_name'])
+        for clause in query_clauses:
+            base_query = base_query.filter(clause)
+        base_query = base_query.group_by(master_table.c['dataset_name'])\
+            .group_by(time_agg)\
+            .order_by(time_agg)
+        values = [o for o in base_query.all()]
+        for value in values:
+            d = {
+                'dataset_name': value[2],
+                'temporal_group': value[0],
+                'count': value[1],
+                }
+            resp['objects'].append(d)
+        resp['meta']['status'] = 'ok'
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
@@ -150,18 +153,14 @@ def master():
     if not limit:
         limit = 500
     status_code = 200
-    table = Table('dat_master', db.Model.metadata,
-            Column('geom', Geometry('POINT')),
-            autoload=True, autoload_with=db.engine,
-            extend_existing=True)
-    table_keys = table.columns.keys()
+    table_keys = master_table.columns.keys()
     raw_query_params = request.args.copy()
-    valid_query, query_clauses, resp, status_code = make_query(table,raw_query_params)
+    valid_query, query_clauses, resp, status_code = make_query(master_table,raw_query_params)
     if valid_query:
         resp['meta']['status'] = 'ok'
         resp['meta']['message'] = None
-        base_query = db.session.query(table.c.dataset_name,\
-            table.c.dataset_row_id, func.ST_AsGeoJSON(table.c.geom))
+        base_query = db.session.query(master_table.c.dataset_name,\
+            master_table.c.dataset_row_id, func.ST_AsGeoJSON(master_table.c.geom))
         for clause in query_clauses:
             base_query = base_query.filter(clause)
         values = [r for r in base_query.offset(offset).limit(limit).all()]

@@ -34,8 +34,13 @@
       //        $('#dataset-picker').html(tpl.render({datasets: resp}));
       //    }
       //);
-        var filtpl = new EJS({url: '/static/js/templates/filterTemplate.ejs'})
-        $('#filters').html(filtpl.render({}));
+      //var filtpl = new EJS({url: '/static/js/templates/filterTemplate.ejs'})
+      //$('#filters').html(filtpl.render({}));
+        $('.date-filter').datepicker({
+            dayNamesMin: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+            prevText: '',
+            nextText: ''
+        });
         $('#dataset').on('change', function(){
             console.log('OK heres where we show and hide info about the datasets')
         })
@@ -58,21 +63,29 @@
     }
 
     function edit_create(layer, map){
-        $('#map').spin('large');
+        //$('#map').spin('large');
         var query = {};
         query['geom__within'] = JSON.stringify(layer.toGeoJSON());
-        var start = $('.start').val().replace('Start Date: ', '');
-        var end = $('.end').val().replace('End Date: ', '');
+        var start = $('#start-date-filter').val();
+        var end = $('#end-date-filter').val();
         start = moment(start)
+        if (!start){
+            start = moment().subtract('days', 180);
+        }
         end = moment(end)
+        if(!end){
+            end = moment();
+        }
         var valid = false;
         if (start.isValid() && end.isValid()){
             start = start.startOf('day').format('YYYY/MM/DD');
             end = end.endOf('day').format('YYYY/MM/DD');
             valid = true;
         }
+        var agg = $('#time-agg-filter').val();
         query['obs_date__le'] = end;
         query['obs_date__ge'] = start;
+        console.log(query);
        //var on = [];
        //var type_checkboxes = $('.filter.type');
        //$.each(type_checkboxes, function(i, checkbox){
@@ -96,7 +109,7 @@
             fillOpacity: 0.6
         };
         if(valid){
-            $.when(get_results(query)).then(function(resp){
+            $.when(get_results(query, agg)).then(function(resp){
                 $('#map').spin(false);
                 console.log(resp);
               //$.each(resp.objects, function(i, result){
@@ -137,7 +150,7 @@
         })
     }
     function resize_junk(){
-        $('.full-height').height(window.innerHeight - 40);
+        $('.half-height').height((window.innerHeight  / 2) - 40);
     }
 
     function get_datasets(){
@@ -147,9 +160,9 @@
         })
     }
 
-    function get_results(query){
+    function get_results(query, agg){
         return $.ajax({
-            url: '/api/master/',
+            url: '/api/' + agg + '/',
             dataType: 'json',
             data: query
         });
