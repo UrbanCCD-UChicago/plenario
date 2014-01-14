@@ -10,6 +10,8 @@ from sqlalchemy.exc import NoSuchTableError
 from geoalchemy2 import Geometry
 from operator import itemgetter
 from itertools import groupby
+from cStringIO import StringIO
+import csv
 
 app = Flask(__name__)
 CONN_STRING = os.environ['WOPR_CONN']
@@ -144,15 +146,11 @@ def meta():
 @app.route('/api/<agg>/')
 @crossdomain(origin="*")
 def dataset(agg):
-    resp = {
-        'meta': {
-            'status': 'error',
-            'message': '',
-        },
-        'objects': [],
-    }
-    status_code = 200
     raw_query_params = request.args.copy()
+    datatype = 'json'
+    if raw_query_params.get('datatype'):
+        datatype = raw_query_params.get('datatype')
+        del raw_query_params['datatype']
     valid_query, query_clauses, resp, status_code = make_query(master_table,raw_query_params)
     if valid_query:
         start_ts = request.args.get('start_time')
@@ -190,8 +188,27 @@ def dataset(agg):
             d['objects'] = list(g)
             resp['objects'].append(d)
         resp['meta']['status'] = 'ok'
-    resp = make_response(json.dumps(resp, default=dthandler), status_code)
-    resp.headers['Content-Type'] = 'application/json'
+    if datatype == 'json':
+        resp = make_response(json.dumps(resp, default=dthandler), status_code)
+        resp.headers['Content-Type'] = 'application/json'
+    elif datatype == 'csv':
+        if not raw_query_params.get('dataset_name'):
+            resp = {
+                'meta': {
+                    'status': 'error',
+                    'message': 'If you want data in a CSV format, you also need to specify a dataset_name'
+                },
+                'objects': []
+            }
+        else:
+            outp = StringIO()
+            data = resp['objects'][0]
+            fields = data['objects'][0].keys()
+            writer = csv.DictWriter(outp, fields)
+            writer.writeheader()
+            writer.writerows(data['objects'])
+            resp = make_response(outp.getvalue(), 200)
+            resp.headers['Content-Type'] = 'text/csv'
     return resp
 
 @app.route('/api/master/')
