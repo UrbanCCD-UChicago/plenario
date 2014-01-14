@@ -7,6 +7,7 @@ import time
 import json
 from sqlalchemy import Table, func, distinct, Column
 from sqlalchemy.exc import NoSuchTableError
+from sqlalchemy.types import NullType
 from geoalchemy2 import Geometry
 from operator import itemgetter
 from itertools import groupby
@@ -143,9 +144,26 @@ def meta():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
+@app.route('/api/fields/<dataset_name>/')
+def dataset_fields(dataset_name):
+    table = Table('dat_%s' % dataset_name, db.Model.metadata,
+        autoload=True, autoload_with=db.engine,
+        extend_existing=True)
+    fields = table.columns.keys()
+    data = []
+    for col in table.columns:
+        if not isinstance(col.type, NullType):
+            d = {}
+            d['field_name'] = col.name
+            d['field_type'] = str(col.type)
+            data.append(d)
+    resp = make_response(json.dumps(data))
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
 @app.route('/api/<agg>/')
 @crossdomain(origin="*")
-def dataset(agg):
+def aggregates(agg):
     raw_query_params = request.args.copy()
     datatype = 'json'
     if raw_query_params.get('datatype'):
