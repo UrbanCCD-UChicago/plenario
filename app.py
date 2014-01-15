@@ -161,14 +161,24 @@ def dataset_fields(dataset_name):
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-@app.route('/api/<agg>/')
+@app.route('/api/master/')
 @crossdomain(origin="*")
-def aggregates(agg):
+def dataset():
+    resp = {
+        'meta': {
+            'status': 'error',
+            'message': '',
+        },
+        'objects': [],
+    }
+    status_code = 200
     raw_query_params = request.args.copy()
-    datatype = 'json'
-    if raw_query_params.get('datatype'):
-        datatype = raw_query_params.get('datatype')
-        del raw_query_params['datatype']
+    agg = raw_query_params.get('agg')
+    if not agg:
+        # TODO: Make a more informed judgement about minumum tempral resolution
+        agg = 'day'
+    else:
+        del raw_query_params['agg']
     valid_query, query_clauses, resp, status_code = make_query(master_table,raw_query_params)
     if valid_query:
         start_ts = request.args.get('start_time')
@@ -229,8 +239,8 @@ def aggregates(agg):
             resp.headers['Content-Type'] = 'text/csv'
     return resp
 
-@app.route('/api/master/')
-def master():
+@app.route('/api/details/')
+def details():
     offset = request.args.get('offset')
     limit = request.args.get('limit')
     if not offset:
