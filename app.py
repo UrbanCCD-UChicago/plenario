@@ -164,14 +164,6 @@ def dataset_fields(dataset_name):
 @app.route('/api/master/')
 @crossdomain(origin="*")
 def dataset():
-    resp = {
-        'meta': {
-            'status': 'error',
-            'message': '',
-        },
-        'objects': [],
-    }
-    status_code = 200
     raw_query_params = request.args.copy()
     agg = raw_query_params.get('agg')
     if not agg:
@@ -179,6 +171,10 @@ def dataset():
         agg = 'day'
     else:
         del raw_query_params['agg']
+    datatype = 'json'
+    if raw_query_params.get('datatype'):
+        datatype = raw_query_params['datatype']
+        del raw_query_params['datatype']
     valid_query, query_clauses, resp, status_code = make_query(master_table,raw_query_params)
     if valid_query:
         start_ts = request.args.get('start_time')
