@@ -177,16 +177,6 @@ def dataset():
         del raw_query_params['datatype']
     valid_query, query_clauses, resp, status_code = make_query(master_table,raw_query_params)
     if valid_query:
-        start_ts = request.args.get('start_time')
-        end_ts = request.args.get('end_time')
-        now = datetime.now()
-        if not start_ts:
-            then = now - timedelta(days=180)
-            start_ts = time.mktime(then.timetuple())
-        if not end_ts:
-            end_ts = time.mktime(now.timetuple())
-        start_time = datetime.fromtimestamp(float(start_ts))
-        end_time = datetime.fromtimestamp(float(end_ts))
         time_agg = func.date_trunc(agg, master_table.c['obs_date'])
         base_query = db.session.query(time_agg, 
             func.count(master_table.c['obs_date']),
@@ -235,54 +225,54 @@ def dataset():
             resp.headers['Content-Type'] = 'text/csv'
     return resp
 
-@app.route('/api/details/')
+@app.route('/api/detail-aggregate/')
+@crossdomain(origin="*")
 def details():
-    offset = request.args.get('offset')
-    limit = request.args.get('limit')
-    if not offset:
-        offset = 0
-    if not limit:
-        limit = 500
-    status_code = 200
-    table_keys = master_table.columns.keys()
     raw_query_params = request.args.copy()
-    valid_query, query_clauses, resp, status_code = make_query(master_table,raw_query_params)
+    agg = raw_query_params.get('base-agg')
+    if not agg:
+        # TODO: Make a more informed judgement about minumum tempral resolution
+        agg = 'day'
+    else:
+        del raw_query_params['base-agg']
+    datatype = 'json'
+    if raw_query_params.get('base-datatype'):
+        datatype = raw_query_params['base-datatype']
+        del raw_query_params['base-datatype']
+    queries = {
+        'base' : {},
+        'detail': {},
+    }
+    for k,v in raw_query_params.items():
+        qt, field = k.split('-')
+        queries[qt][field] = v
+    valid_query, query_clauses, resp, status_code = make_query(master_table, queries['base'])
     if valid_query:
-        resp['meta']['status'] = 'ok'
-        resp['meta']['message'] = None
-        base_query = db.session.query(master_table.c.dataset_name,\
-            master_table.c.dataset_row_id, func.ST_AsGeoJSON(master_table.c.geom))
+        base_query = db.session.query(master_table.c.dataset_row_id)
         for clause in query_clauses:
             base_query = base_query.filter(clause)
-        values = [r for r in base_query.offset(offset).limit(limit).all()]
-        results = []
+        values = [r for r in base_query.all()]
+        pks = []
         for value in values:
-            d = {
-                'dataset_name': value[0],
-                'dataset_row_id': value[1],
-                'geom': json.loads(value[2]),
-                }
-            results.append(d)
-        results = sorted(results, key=itemgetter('dataset_name'))
-        ids = {}
-        for k,g in groupby(results, key=itemgetter('dataset_name')):
-            group = list(g)
-            ids[k] = [i['dataset_row_id'] for i in group]
-            resp[k] = {}
-            for item in group:
-                resp[k][item['dataset_row_id']] = {'geom': item['geom']}
-        for name,pks in ids.items():
-            dataset = Table('dat_%s' % name, db.Model.metadata,
-                autoload=True, autoload_with=db.engine,
-                extend_existing=True)
-            pk = [p for p in dataset.primary_key][0]
-            set_keys = dataset.columns.keys()
-            details = [d for d in db.session.query(dataset).filter(pk.in_(pks)).all()]
+            pks.append(str(value[0]))
+        dataset = Table('dat_%s' % raw_query_params['base-dataset_name'], db.Model.metadata,
+            autoload=True, autoload_with=db.engine,
+            extend_existing=True)
+        pk = [p.name for p in dataset.primary_key][0]
+        set_keys = dataset.columns.keys()
+        queries['detail'][pk + '__in'] = ','.join(pks)
+        valid_query, query_clauses, resp, status_code = make_query(dataset, queries['detail'])
+        if valid_query:
+            resp['meta']['status'] = 'ok'
+            base_query = db.session.query(dataset)
+            for clause in query_clauses:
+                base_query = base_query.filter(clause)
+            details = [d for d in base_query.all()]
             for detail in details:
                 d = {}
                 for k,v in zip(set_keys, detail):
                     d[k] = v
-                resp[name][d[pk.name]] = d
+                resp['objects'].append(d)
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
