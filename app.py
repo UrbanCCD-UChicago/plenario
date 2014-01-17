@@ -257,6 +257,7 @@ def details():
             extend_existing=True)
         valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
         if valid_query:
+            resp['meta']['status'] = 'ok'
             pk = [p.name for p in dataset.primary_key][0]
             base_query = base_query.join(dataset, master_table.c.dataset_row_id == dataset.c[pk])
         for clause in base_clauses:
