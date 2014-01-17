@@ -145,6 +145,7 @@ def meta():
     return resp
 
 @app.route('/api/fields/<dataset_name>/')
+@crossdomain(origin="*")
 def dataset_fields(dataset_name):
     table = Table('dat_%s' % dataset_name, db.Model.metadata,
         autoload=True, autoload_with=db.engine,
@@ -246,33 +247,29 @@ def details():
     for k,v in raw_query_params.items():
         qt, field = k.split('-')
         queries[qt][field] = v
-    valid_query, query_clauses, resp, status_code = make_query(master_table, queries['base'])
+    valid_query, base_clauses, resp, status_code = make_query(master_table, queries['base'])
     if valid_query:
-        base_query = db.session.query(master_table.c.dataset_row_id)
-        for clause in query_clauses:
-            base_query = base_query.filter(clause)
-        values = [r for r in base_query.all()]
-        pks = []
-        for value in values:
-            pks.append(str(value[0]))
+        resp['meta']['status'] = 'ok'
+        time_agg = func.date_trunc(agg, master_table.c['obs_date'])
+        base_query = db.session.query(time_agg, func.count(master_table.c.dataset_row_id))
         dataset = Table('dat_%s' % raw_query_params['base-dataset_name'], db.Model.metadata,
             autoload=True, autoload_with=db.engine,
             extend_existing=True)
-        pk = [p.name for p in dataset.primary_key][0]
-        set_keys = dataset.columns.keys()
-        queries['detail'][pk + '__in'] = ','.join(pks)
-        valid_query, query_clauses, resp, status_code = make_query(dataset, queries['detail'])
+        valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
         if valid_query:
-            resp['meta']['status'] = 'ok'
-            base_query = db.session.query(dataset)
-            for clause in query_clauses:
-                base_query = base_query.filter(clause)
-            details = [d for d in base_query.all()]
-            for detail in details:
-                d = {}
-                for k,v in zip(set_keys, detail):
-                    d[k] = v
-                resp['objects'].append(d)
+            pk = [p.name for p in dataset.primary_key][0]
+            base_query = base_query.join(dataset, master_table.c.dataset_row_id == dataset.c[pk])
+        for clause in base_clauses:
+            base_query = base_query.filter(clause)
+        for clause in detail_clauses:
+            base_query = base_query.filter(clause)
+        values = [r for r in base_query.group_by(time_agg).order_by(time_agg).all()]
+        for value in values:
+            d = {
+                'group': value[0],
+                'count': value[1]
+            }
+            resp['objects'].append(d)
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
