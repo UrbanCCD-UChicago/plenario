@@ -200,7 +200,7 @@ def dataset():
         for k,g in groupby(results, key=itemgetter('dataset_name')):
             d = {'dataset_name': ' '.join(k.split('_')).title()}
             d['temporal_aggregate'] = agg
-            d['objects'] = list(g)
+            d['items'] = list(g)
             resp['objects'].append(d)
         resp['meta']['status'] = 'ok'
     if datatype == 'json':
@@ -218,41 +218,90 @@ def dataset():
         else:
             outp = StringIO()
             data = resp['objects'][0]
-            fields = data['objects'][0].keys()
+            fields = data['items'][0].keys()
             writer = csv.DictWriter(outp, fields)
             writer.writeheader()
-            writer.writerows(data['objects'])
+            writer.writerows(data['items'])
             resp = make_response(outp.getvalue(), 200)
             resp.headers['Content-Type'] = 'text/csv'
     return resp
 
-@app.route('/api/detail-aggregate/')
-@crossdomain(origin="*")
-def details():
-    raw_query_params = request.args.copy()
-    agg = raw_query_params.get('base-agg')
+def parse_join_query(params):
+    agg = params.get('base-agg')
     if not agg:
         # TODO: Make a more informed judgement about minumum tempral resolution
         agg = 'day'
     else:
-        del raw_query_params['base-agg']
+        del params['base-agg']
     datatype = 'json'
-    if raw_query_params.get('base-datatype'):
-        datatype = raw_query_params['base-datatype']
-        del raw_query_params['base-datatype']
+    if params.get('base-datatype'):
+        datatype = params['base-datatype']
+        del params['base-datatype']
     queries = {
         'base' : {},
         'detail': {},
     }
-    for k,v in raw_query_params.items():
+    for k,v in params.items():
         qt, field = k.split('-')
         queries[qt][field] = v
+    return agg, datatype, queries
+
+@app.route('/api/detail/')
+@crossdomain(origin="*")
+def detail():
+    raw_query_params = request.args.copy()
+    agg, datatype, queries = parse_join_query(raw_query_params)
+    valid_query, base_clauses, resp, status_code = make_query(master_table, queries['base'])
+    if valid_query:
+        resp['meta']['status'] = 'ok'
+        dname = raw_query_params['base-dataset_name']
+        dataset = Table('dat_%s' % dname, db.Model.metadata,
+            autoload=True, autoload_with=db.engine,
+            extend_existing=True)
+        base_query = db.session.query(master_table.c.obs_date, dataset)
+        valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
+        if valid_query:
+            resp['meta']['status'] = 'ok'
+            pk = [p.name for p in dataset.primary_key][0]
+            base_query = base_query.join(dataset, master_table.c.dataset_row_id == dataset.c[pk])
+        for clause in base_clauses:
+            base_query = base_query.filter(clause)
+        for clause in detail_clauses:
+            base_query = base_query.filter(clause)
+        values = [r for r in base_query.order_by(master_table.c.obs_date.desc()).all()]
+        fieldnames = dataset.columns.keys()
+        for value in values:
+            d = {}
+            for k,v in zip(fieldnames, value[1:]):
+                d[k] = v
+            resp['objects'].append(d)
+        resp['meta']['total'] = len(resp['objects'])
+    if datatype == 'json':
+        resp = make_response(json.dumps(resp, default=dthandler), status_code)
+        resp.headers['Content-Type'] = 'application/json'
+    elif datatype == 'csv':
+        outp = StringIO()
+        writer = csv.DictWriter(outp, fieldnames)
+        writer.writeheader()
+        writer.writerows(resp['objects'])
+        resp = make_response(outp.getvalue(), 200)
+        resp.headers['Content-Type'] = 'text/csv'
+        filedate = datetime.now().strftime('%Y-%m-%d')
+        resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
+    return resp
+
+@app.route('/api/detail-aggregate/')
+@crossdomain(origin="*")
+def detail_aggregate():
+    raw_query_params = request.args.copy()
+    agg, datatype, queries = parse_join_query(raw_query_params)
     valid_query, base_clauses, resp, status_code = make_query(master_table, queries['base'])
     if valid_query:
         resp['meta']['status'] = 'ok'
         time_agg = func.date_trunc(agg, master_table.c['obs_date'])
         base_query = db.session.query(time_agg, func.count(master_table.c.dataset_row_id))
-        dataset = Table('dat_%s' % raw_query_params['base-dataset_name'], db.Model.metadata,
+        dname = raw_query_params['base-dataset_name']
+        dataset = Table('dat_%s' % dname, db.Model.metadata,
             autoload=True, autoload_with=db.engine,
             extend_existing=True)
         valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
@@ -265,12 +314,18 @@ def details():
         for clause in detail_clauses:
             base_query = base_query.filter(clause)
         values = [r for r in base_query.group_by(time_agg).order_by(time_agg).all()]
+        items = []
         for value in values:
             d = {
                 'group': value[0],
                 'count': value[1]
             }
-            resp['objects'].append(d)
+            items.append(d)
+        resp['objects'].append({
+            'temporal_aggregate': agg,
+            'dataset_name': dname,
+            'items': items
+        })
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
