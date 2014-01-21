@@ -227,27 +227,21 @@ def dataset():
     return resp
 
 def parse_join_query(params):
-    agg = params.get('base-agg')
-    if not agg:
-        # TODO: Make a more informed judgement about minumum tempral resolution
-        agg = 'day'
-    else:
-        del params['base-agg']
-    datatype = 'json'
-    if params.get('base-datatype'):
-        datatype = params['base-datatype']
-        del params['base-datatype']
     queries = {
         'base' : {},
         'detail': {},
     }
-    for k,v in params.items():
-        try:
-            qt, field = k.split('-')
-        except ValueError:
-            field = k
-            qt = 'base'
-        queries[qt][field] = v
+    agg = 'day'
+    datatype = 'json'
+    for key, value in params.items():
+        if key in ['obs_date', 'geom', 'dataset_name']:
+            queries['base'][key] = value
+        elif key == 'agg':
+            agg = value
+        elif key == 'datatype':
+            datatype = value
+        else:
+            queries['detail'][key] = value
     return agg, datatype, queries
 
 @app.route('/api/detail/')
@@ -304,7 +298,7 @@ def detail_aggregate():
         resp['meta']['status'] = 'ok'
         time_agg = func.date_trunc(agg, master_table.c['obs_date'])
         base_query = db.session.query(time_agg, func.count(master_table.c.dataset_row_id))
-        dname = raw_query_params['base-dataset_name']
+        dname = raw_query_params['dataset_name']
         dataset = Table('dat_%s' % dname, db.Model.metadata,
             autoload=True, autoload_with=db.engine,
             extend_existing=True)
