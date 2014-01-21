@@ -242,7 +242,11 @@ def parse_join_query(params):
         'detail': {},
     }
     for k,v in params.items():
-        qt, field = k.split('-')
+        try:
+            qt, field = k.split('-')
+        except ValueError:
+            field = k
+            qt = 'base'
         queries[qt][field] = v
     return agg, datatype, queries
 
