@@ -323,7 +323,7 @@ def detail_aggregate():
             items.append(d)
         resp['objects'].append({
             'temporal_aggregate': agg,
-            'dataset_name': dname,
+            'dataset_name': ' '.join(dname.split('_')).title(),
             'items': items
         })
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
