@@ -1,11 +1,11 @@
-from flask import Flask, make_response, request, render_template, current_app
+from flask import Flask, make_response, request, render_template, current_app, g
 from functools import update_wrapper
-from flask.ext.sqlalchemy import SQLAlchemy
 import os
 from datetime import date, datetime, timedelta
 import time
 import json
-from sqlalchemy import Table, func, distinct, Column
+from sqlalchemy import Table, func, distinct, Column, create_engine, MetaData
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.types import NullType
 from geoalchemy2 import Geometry
@@ -15,14 +15,18 @@ from cStringIO import StringIO
 import csv
 
 app = Flask(__name__)
-CONN_STRING = os.environ['WOPR_CONN']
-app.config['SQLALCHEMY_DATABASE_URI'] = CONN_STRING
 
-db = SQLAlchemy(app)
+engine = create_engine(os.environ['WOPR_CONN'])
+metadata = MetaData()
+Session = sessionmaker(bind=engine)
+session = Session()
 
 dthandler = lambda obj: obj.isoformat() if isinstance(obj, date) else None
-master_table = Table('dat_master', db.Model.metadata,
-        autoload=True, autoload_with=db.engine)
+
+@app.before_request
+def before_request():
+    g.master_table = Table('dat_master', metadata,
+        autoload=True, autoload_with=engine)
 
 def crossdomain(origin=None, methods=None, headers=None,
                 max_age=21600, attach_to_all=True,
@@ -125,8 +129,8 @@ def meta():
     resp = []
     # TODO: Doing aggregate queries here is super slow. It would be nice to speed it up
     # This query only performs well after making an index on dataset_name
-    values = db.session.query(
-        distinct(master_table.columns.get('dataset_name'))).all()
+    values = session.query(
+        distinct(g.master_table.columns.get('dataset_name'))).all()
     for value in values:
        #obs_to, obs_from = (value[1].strftime('%Y-%m-%d'), value[2].strftime('%Y-%m-%d'))
        #observed_range = '%s - %s' % (obs_from, obs_to)
@@ -147,8 +151,8 @@ def meta():
 @app.route('/api/fields/<dataset_name>/')
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
-    table = Table('dat_%s' % dataset_name, db.Model.metadata,
-        autoload=True, autoload_with=db.engine,
+    table = Table('dat_%s' % dataset_name, metadata,
+        autoload=True, autoload_with=engine,
         extend_existing=True)
     fields = table.columns.keys()
     data = []
@@ -176,15 +180,15 @@ def dataset():
     if raw_query_params.get('datatype'):
         datatype = raw_query_params['datatype']
         del raw_query_params['datatype']
-    valid_query, query_clauses, resp, status_code = make_query(master_table,raw_query_params)
+    valid_query, query_clauses, resp, status_code = make_query(g.master_table,raw_query_params)
     if valid_query:
-        time_agg = func.date_trunc(agg, master_table.c['obs_date'])
-        base_query = db.session.query(time_agg, 
-            func.count(master_table.c['obs_date']),
-            master_table.c['dataset_name'])
+        time_agg = func.date_trunc(agg, g.master_table.c['obs_date'])
+        base_query = session.query(time_agg, 
+            func.count(g.master_table.c['obs_date']),
+            g.master_table.c['dataset_name'])
         for clause in query_clauses:
             base_query = base_query.filter(clause)
-        base_query = base_query.group_by(master_table.c['dataset_name'])\
+        base_query = base_query.group_by(g.master_table.c['dataset_name'])\
             .group_by(time_agg)\
             .order_by(time_agg)
         values = [o for o in base_query.all()]
@@ -249,24 +253,24 @@ def parse_join_query(params):
 def detail():
     raw_query_params = request.args.copy()
     agg, datatype, queries = parse_join_query(raw_query_params)
-    valid_query, base_clauses, resp, status_code = make_query(master_table, queries['base'])
+    valid_query, base_clauses, resp, status_code = make_query(g.master_table, queries['base'])
     if valid_query:
         resp['meta']['status'] = 'ok'
         dname = raw_query_params['base-dataset_name']
-        dataset = Table('dat_%s' % dname, db.Model.metadata,
-            autoload=True, autoload_with=db.engine,
+        dataset = Table('dat_%s' % dname, metadata,
+            autoload=True, autoload_with=engine,
             extend_existing=True)
-        base_query = db.session.query(master_table.c.obs_date, dataset)
+        base_query = session.query(g.master_table.c.obs_date, dataset)
         valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
         if valid_query:
             resp['meta']['status'] = 'ok'
             pk = [p.name for p in dataset.primary_key][0]
-            base_query = base_query.join(dataset, master_table.c.dataset_row_id == dataset.c[pk])
+            base_query = base_query.join(dataset, g.master_table.c.dataset_row_id == dataset.c[pk])
         for clause in base_clauses:
             base_query = base_query.filter(clause)
         for clause in detail_clauses:
             base_query = base_query.filter(clause)
-        values = [r for r in base_query.order_by(master_table.c.obs_date.desc()).all()]
+        values = [r for r in base_query.order_by(g.master_table.c.obs_date.desc()).all()]
         fieldnames = dataset.columns.keys()
         for value in values:
             d = {}
@@ -293,20 +297,20 @@ def detail():
 def detail_aggregate():
     raw_query_params = request.args.copy()
     agg, datatype, queries = parse_join_query(raw_query_params)
-    valid_query, base_clauses, resp, status_code = make_query(master_table, queries['base'])
+    valid_query, base_clauses, resp, status_code = make_query(g.master_table, queries['base'])
     if valid_query:
         resp['meta']['status'] = 'ok'
-        time_agg = func.date_trunc(agg, master_table.c['obs_date'])
-        base_query = db.session.query(time_agg, func.count(master_table.c.dataset_row_id))
+        time_agg = func.date_trunc(agg, g.master_table.c['obs_date'])
+        base_query = session.query(time_agg, func.count(g.master_table.c.dataset_row_id))
         dname = raw_query_params['dataset_name']
-        dataset = Table('dat_%s' % dname, db.Model.metadata,
-            autoload=True, autoload_with=db.engine,
+        dataset = Table('dat_%s' % dname, metadata,
+            autoload=True, autoload_with=engine,
             extend_existing=True)
         valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
         if valid_query:
             resp['meta']['status'] = 'ok'
             pk = [p.name for p in dataset.primary_key][0]
-            base_query = base_query.join(dataset, master_table.c.dataset_row_id == dataset.c[pk])
+            base_query = base_query.join(dataset, g.master_table.c.dataset_row_id == dataset.c[pk])
             for clause in base_clauses:
                 base_query = base_query.filter(clause)
             for clause in detail_clauses:
