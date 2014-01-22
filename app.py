@@ -234,7 +234,7 @@ def parse_join_query(params):
     agg = 'day'
     datatype = 'json'
     for key, value in params.items():
-        if key in ['obs_date', 'geom', 'dataset_name']:
+        if key.split('__')[0] in ['obs_date', 'geom', 'dataset_name']:
             queries['base'][key] = value
         elif key == 'agg':
             agg = value
@@ -307,23 +307,23 @@ def detail_aggregate():
             resp['meta']['status'] = 'ok'
             pk = [p.name for p in dataset.primary_key][0]
             base_query = base_query.join(dataset, master_table.c.dataset_row_id == dataset.c[pk])
-        for clause in base_clauses:
-            base_query = base_query.filter(clause)
-        for clause in detail_clauses:
-            base_query = base_query.filter(clause)
-        values = [r for r in base_query.group_by(time_agg).order_by(time_agg).all()]
-        items = []
-        for value in values:
-            d = {
-                'group': value[0],
-                'count': value[1]
-            }
-            items.append(d)
-        resp['objects'].append({
-            'temporal_aggregate': agg,
-            'dataset_name': ' '.join(dname.split('_')).title(),
-            'items': items
-        })
+            for clause in base_clauses:
+                base_query = base_query.filter(clause)
+            for clause in detail_clauses:
+                base_query = base_query.filter(clause)
+            values = [r for r in base_query.group_by(time_agg).order_by(time_agg).all()]
+            items = []
+            for value in values:
+                d = {
+                    'group': value[0],
+                    'count': value[1]
+                }
+                items.append(d)
+            resp['objects'].append({
+                'temporal_aggregate': agg,
+                'dataset_name': ' '.join(dname.split('_')).title(),
+                'items': items
+            })
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
