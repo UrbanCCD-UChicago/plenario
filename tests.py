@@ -1,4 +1,5 @@
 import os
+import json
 import unittest
 from test_fixtures.test_models import Base, Master, Crime, BusinessLicense
 from sqlalchemy import create_engine
@@ -43,9 +44,11 @@ class WoprTest(unittest.TestCase):
         self.session.commit()
         self.app = app.test_client()
 
-    def test_empty_db(self):
-        rv = self.app.get('/test/')
-        self.assertEqual(rv.data, '[]')
+    def test_fields(self):
+        fields = self.app.get('/api/fields/chicago_crimes_all/')
+        observed_names = [f['field_name'] for f in json.loads(fields.data)]
+        expected_names = Crime.__table__.columns.keys()
+        self.assertEqual(observed_names, expected_names)
 
 if __name__ == "__main__":
     unittest.main()
