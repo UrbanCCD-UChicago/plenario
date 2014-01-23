@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 import time
 import json
 from sqlalchemy import Table, func, distinct, Column, create_engine, MetaData
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.types import NullType
 from geoalchemy2 import Geometry
@@ -18,19 +18,19 @@ app = Flask(__name__)
 
 engine = create_engine(os.environ['WOPR_CONN'])
 metadata = MetaData()
-Session = sessionmaker(bind=engine)
-session = Session()
+session = scoped_session(sessionmaker(autocommit=False,
+                                      autoflush=False,
+                                      bind=engine))
 
 dthandler = lambda obj: obj.isoformat() if isinstance(obj, date) else None
 
-@app.before_request
-def before_request():
-    g.master_table = Table('dat_master', metadata,
-        autoload=True, autoload_with=engine)
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+      session.remove()
 
 def crossdomain(origin=None, methods=None, headers=None,
                 max_age=21600, attach_to_all=True,
-                automatic_options=True):
+                automatic_options=True): # pragma: no cover
     if methods is not None:
         methods = ', '.join(sorted(x.upper() for x in methods))
     if headers is not None and not isinstance(headers, basestring):
@@ -117,7 +117,7 @@ def make_query(table, raw_query_params):
                 status_code = 400
                 valid_query = False
                 break
-            if query_value == 'null':
+            if query_value == 'null': # pragma: no cover
                 query_value = None
             query = getattr(column, attr)(query_value)
             query_clauses.append(query)
@@ -127,21 +127,24 @@ def make_query(table, raw_query_params):
 def meta():
     status_code = 200
     resp = []
-    # TODO: Doing aggregate queries here is super slow. It would be nice to speed it up
-    # This query only performs well after making an index on dataset_name
+    # TODO: Doinaggregate queries here is super slow. It would be nice to speed it up
+    # This query only performs well after makinan index on dataset_name
+    master_table = Table('dat_master', metadata,
+        autoload=True, autoload_with=engine, extend_existing=True)
+
     values = session.query(
-        distinct(g.master_table.columns.get('dataset_name'))).all()
+        distinct(master_table.columns.get('dataset_name'))).all()
     for value in values:
        #obs_to, obs_from = (value[1].strftime('%Y-%m-%d'), value[2].strftime('%Y-%m-%d'))
-       #observed_range = '%s - %s' % (obs_from, obs_to)
+       #observed_ran = '%s - %s' % (obs_from, obs_to)
        #s = select([func.ST_AsGeoJSON(func.ST_Estimated_Extent(
-       #    'dat_%s' % value[0], 'geom'))])
+       #    'dat_%s' % value[0], 'om'))])
        #bbox = json.loads(list(db.engine.execute(s))[0][0])
         d = {
             'machine_name': value[0],
             'human_name': ' '.join(value[0].split('_')).title(),
-           #'observed_date_range': observed_range,
-           #'bounding_box': bbox,
+           #'observed_date_ran': observed_range,
+           #'boundinbox': bbox,
         }
         resp.append(d)
     resp = make_response(json.dumps(resp), status_code)
@@ -151,20 +154,47 @@ def meta():
 @app.route('/api/fields/<dataset_name>/')
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
-    table = Table('dat_%s' % dataset_name, metadata,
-        autoload=True, autoload_with=engine,
-        extend_existing=True)
-    fields = table.columns.keys()
-    data = []
-    for col in table.columns:
-        if not isinstance(col.type, NullType):
-            d = {}
-            d['field_name'] = col.name
-            d['field_type'] = str(col.type)
-            data.append(d)
-    resp = make_response(json.dumps(data))
+    try:
+        table = Table('dat_%s' % dataset_name, metadata,
+            autoload=True, autoload_with=engine,
+            extend_existing=True)
+        data = {
+            'meta': {
+                'status': 'ok',
+                'message': ''
+            },
+            'objects': []
+        }
+        status_code = 200
+        table_exists = True
+    except NoSuchTableError:
+        table_exists = False
+        data = {
+            'meta': {
+                'status': 'error',
+                'message': "'%s' is not a valid table name" % dataset_name
+            },
+            'objects': []
+        }
+        status_code = 400
+    if table_exists:
+        fields = table.columns.keys()
+        for col in table.columns:
+            if not isinstance(col.type, NullType):
+                d = {}
+                d['field_name'] = col.name
+                d['field_type'] = str(col.type)
+                data['objects'].append(d)
+    resp = make_response(json.dumps(data), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
+def make_csv(data, fields):
+    outp = StringIO()
+    writer = csv.DictWriter(outp, fields)
+    writer.writeheader()
+    writer.writerows(data)
+    return outp.getvalue()
 
 @app.route('/api/master/')
 @crossdomain(origin="*")
@@ -172,7 +202,7 @@ def dataset():
     raw_query_params = request.args.copy()
     agg = raw_query_params.get('agg')
     if not agg:
-        # TODO: Make a more informed judgement about minumum tempral resolution
+        # TODO: Make a more informed judment about minumum tempral resolution
         agg = 'day'
     else:
         del raw_query_params['agg']
@@ -180,15 +210,17 @@ def dataset():
     if raw_query_params.get('datatype'):
         datatype = raw_query_params['datatype']
         del raw_query_params['datatype']
-    valid_query, query_clauses, resp, status_code = make_query(g.master_table,raw_query_params)
+    master_table = Table('dat_master', metadata,
+        autoload=True, autoload_with=engine, extend_existing=True)
+    valid_query, query_clauses, resp, status_code = make_query(master_table,raw_query_params)
     if valid_query:
-        time_agg = func.date_trunc(agg, g.master_table.c['obs_date'])
+        time_agg = func.date_trunc(agg, master_table.c['obs_date'])
         base_query = session.query(time_agg, 
-            func.count(g.master_table.c['obs_date']),
-            g.master_table.c['dataset_name'])
+            func.count(master_table.c['obs_date']),
+            master_table.c['dataset_name'])
         for clause in query_clauses:
             base_query = base_query.filter(clause)
-        base_query = base_query.group_by(g.master_table.c['dataset_name'])\
+        base_query = base_query.group_by(master_table.c['dataset_name'])\
             .group_by(time_agg)\
             .order_by(time_agg)
         values = [o for o in base_query.all()]
@@ -220,14 +252,13 @@ def dataset():
                 'objects': []
             }
         else:
-            outp = StringIO()
             data = resp['objects'][0]
             fields = data['items'][0].keys()
-            writer = csv.DictWriter(outp, fields)
-            writer.writeheader()
-            writer.writerows(data['items'])
-            resp = make_response(outp.getvalue(), 200)
+            resp = make_response(make_csv(data['items'], fields), 200)
             resp.headers['Content-Type'] = 'text/csv'
+            dname = raw_query_params['dataset_name']
+            filedate = datetime.now().strftime('%Y-%m-%d')
+            resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
     return resp
 
 def parse_join_query(params):
@@ -253,24 +284,26 @@ def parse_join_query(params):
 def detail():
     raw_query_params = request.args.copy()
     agg, datatype, queries = parse_join_query(raw_query_params)
-    valid_query, base_clauses, resp, status_code = make_query(g.master_table, queries['base'])
+    master_table = Table('dat_master', metadata,
+        autoload=True, autoload_with=engine, extend_existing=True)
+    valid_query, base_clauses, resp, status_code = make_query(master_table, queries['base'])
     if valid_query:
         resp['meta']['status'] = 'ok'
-        dname = raw_query_params['base-dataset_name']
+        dname = raw_query_params['dataset_name']
         dataset = Table('dat_%s' % dname, metadata,
             autoload=True, autoload_with=engine,
             extend_existing=True)
-        base_query = session.query(g.master_table.c.obs_date, dataset)
+        base_query = session.query(master_table.c.obs_date, dataset)
         valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
         if valid_query:
             resp['meta']['status'] = 'ok'
             pk = [p.name for p in dataset.primary_key][0]
-            base_query = base_query.join(dataset, g.master_table.c.dataset_row_id == dataset.c[pk])
+            base_query = base_query.join(dataset, master_table.c.dataset_row_id == dataset.c[pk])
         for clause in base_clauses:
             base_query = base_query.filter(clause)
         for clause in detail_clauses:
             base_query = base_query.filter(clause)
-        values = [r for r in base_query.order_by(g.master_table.c.obs_date.desc()).all()]
+        values = [r for r in base_query.order_by(master_table.c.obs_date.desc()).all()]
         fieldnames = dataset.columns.keys()
         for value in values:
             d = {}
@@ -282,13 +315,11 @@ def detail():
         resp = make_response(json.dumps(resp, default=dthandler), status_code)
         resp.headers['Content-Type'] = 'application/json'
     elif datatype == 'csv':
-        outp = StringIO()
-        writer = csv.DictWriter(outp, fieldnames)
-        writer.writeheader()
-        writer.writerows(resp['objects'])
-        resp = make_response(outp.getvalue(), 200)
-        resp.headers['Content-Type'] = 'text/csv'
+        resp = make_response(make_csv(resp['objects'], fieldnames), 200)
         filedate = datetime.now().strftime('%Y-%m-%d')
+        dname = raw_query_params['dataset_name']
+        filedate = datetime.now().strftime('%Y-%m-%d')
+        resp.headers['Content-Type'] = 'text/csv'
         resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
     return resp
 
@@ -297,11 +328,13 @@ def detail():
 def detail_aggregate():
     raw_query_params = request.args.copy()
     agg, datatype, queries = parse_join_query(raw_query_params)
-    valid_query, base_clauses, resp, status_code = make_query(g.master_table, queries['base'])
+    master_table = Table('dat_master', metadata,
+        autoload=True, autoload_with=engine, extend_existing=True)
+    valid_query, base_clauses, resp, status_code = make_query(master_table, queries['base'])
     if valid_query:
         resp['meta']['status'] = 'ok'
-        time_agg = func.date_trunc(agg, g.master_table.c['obs_date'])
-        base_query = session.query(time_agg, func.count(g.master_table.c.dataset_row_id))
+        time_agg = func.date_trunc(agg, master_table.c['obs_date'])
+        base_query = session.query(time_agg, func.count(master_table.c.dataset_row_id))
         dname = raw_query_params['dataset_name']
         dataset = Table('dat_%s' % dname, metadata,
             autoload=True, autoload_with=engine,
@@ -310,7 +343,7 @@ def detail_aggregate():
         if valid_query:
             resp['meta']['status'] = 'ok'
             pk = [p.name for p in dataset.primary_key][0]
-            base_query = base_query.join(dataset, g.master_table.c.dataset_row_id == dataset.c[pk])
+            base_query = base_query.join(dataset, master_table.c.dataset_row_id == dataset.c[pk])
             for clause in base_clauses:
                 base_query = base_query.filter(clause)
             for clause in detail_clauses:
@@ -341,7 +374,7 @@ def map():
     return render_app_template('map.html')
 
 # UTILITY
-def render_app_template(template, **kwargs):
+def render_app_template(template, **kwar):
     '''Add some goodies to all templates.'''
 
     if 'config' not in kwargs:

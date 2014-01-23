@@ -1,5 +1,6 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Integer, String, Boolean, DateTime, Date, Column, Float
+from sqlalchemy import Integer, String, Boolean, Date, Column
+from sqlalchemy.dialects.postgresql import TIMESTAMP, DOUBLE_PRECISION
 from geoalchemy2 import Geometry
 
 Base = declarative_base()
@@ -11,10 +12,10 @@ class Master(Base):
     end_date = Column(Date, default=None)
     current_flag = Column(Boolean)
     location = Column(String)
-    latitude = Column(Float(precision=53))
-    longitude = Column(Float(precision=53))
+    latitude = Column(DOUBLE_PRECISION(precision=53))
+    longitude = Column(DOUBLE_PRECISION(precision=53))
     obs_date = Column(Date, default=True)
-    obs_ts = Column(DateTime)
+    obs_ts = Column(TIMESTAMP)
     geotag1 = Column(String(length=50))
     geotag2 = Column(String(length=50))
     geotag3 = Column(String(length=50))
@@ -30,7 +31,7 @@ class Crime(Base):
     current_flag = Column(Boolean)
     id = Column(Integer)
     case_number = Column(String(length=10))
-    orig_date = Column(DateTime)
+    orig_date = Column(TIMESTAMP)
     block = Column(String(length=50))
     iucr = Column(String(length=10))
     primary_type = Column(String(length=100))
@@ -46,9 +47,9 @@ class Crime(Base):
     x_coordinate = Column(Integer)
     y_coordinate = Column(Integer)
     year = Column(Integer)
-    updated_on = Column(DateTime, default=None)
-    latitude = Column(Float(precision=53))
-    longitude = Column(Float(precision=53))
+    updated_on = Column(TIMESTAMP, default=None)
+    latitude = Column(DOUBLE_PRECISION(precision=53))
+    longitude = Column(DOUBLE_PRECISION(precision=53))
     location = Column(String(length=50))
 
 class BusinessLicense(Base):
@@ -80,6 +81,6 @@ class BusinessLicense(Base):
     date_issued = Column(Date, default=None)
     license_status = Column(String(length=10))
     license_status_change_date = Column(Date, default=None)
-    latitude = Column(Float(precision=53))
-    longitude = Column(Float(precision=53))
+    latitude = Column(DOUBLE_PRECISION(precision=53))
+    longitude = Column(DOUBLE_PRECISION(precision=53))
     location = Column(String(length=50))
