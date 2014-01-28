@@ -374,7 +374,7 @@ def map():
     return render_app_template('map.html')
 
 # UTILITY
-def render_app_template(template, **kwar):
+def render_app_template(template, **kwargs):
     '''Add some goodies to all templates.'''
 
     if 'config' not in kwargs:
