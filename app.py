@@ -369,10 +369,6 @@ def detail_aggregate():
 def index():
     return render_app_template('index.html')
 
-@app.route('/map/')
-def map():
-    return render_app_template('map.html')
-
 # UTILITY
 def render_app_template(template, **kwargs):
     '''Add some goodies to all templates.'''
