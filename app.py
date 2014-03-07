@@ -218,6 +218,7 @@ def dataset():
         base_query = session.query(time_agg, 
             func.count(master_table.c['obs_date']),
             master_table.c['dataset_name'])
+        base_query = base_query.filter(master_table.c['current_flag'] == True)
         for clause in query_clauses:
             base_query = base_query.filter(clause)
         base_query = base_query.group_by(master_table.c['dataset_name'])\
