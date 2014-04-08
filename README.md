@@ -1,7 +1,49 @@
-# WOPR API - Phase I
+# W.O.P.R. API
 
-Geospatial, time-series API prototype for open data in Chicago. 
+RESTful API for geospatial and time aggregation across multiple Chicago open datasets. Lovingly dubbed the WOPR.
 
-See the [issue tracker](https://github.com/datamade/wopr-api/issues) for current progress.
+## Running locally
 
-![W.O.P.R from War Games (1983)](http://2.bp.blogspot.com/-Y1RvyoZ6Ly0/Ts559PctATI/AAAAAAAAIGc/6BjNPv0zlYI/s1600/wopr1.jpg)
+``` bash
+git clone git@github.com:datamade/wopr-api.git
+cd wopr-api
+pip install -r requirements.txt
+python app.py
+```
+
+navigate to http://localhost:5000/
+
+# Data
+
+New datasets are actively being added to the WOPR API. We keep track of them in this [Google Doc](https://docs.google.com/spreadsheet/ccc?key=0Au-2OHnpwhGTdGJzUWJ2SERwVXZLeDU4Y3laWFJvNEE&usp=sharing#gid=0)
+
+# Dependencies
+We used the following open source tools:
+
+* [Flask](http://flask.pocoo.org/) - a microframework for Python web applications
+* [SQL Alchemy](http://www.sqlalchemy.org/) - Python SQL toolkit and Object Relational Mapper
+* [Green Unicorn](http://gunicorn.org/) - Python WSGI HTTP Server for UNIX
+* [psycopg2](http://initd.org/psycopg/) - PostgreSQL adapter for the Python 
+* [GeoAlchemy 2](http://geoalchemy-2.readthedocs.org/en/0.2.4/) - provides extensions to SQLAlchemy for working with spatial databases
+
+## Team
+
+* Derek Eder
+* Eric van Zanten
+* Forest Gregg
+
+## Errors / Bugs
+
+If something is not behaving intuitively, it is a bug, and should be reported.
+Report it here: https://github.com/datamade/wopr-api/issues
+
+## Note on Patches/Pull Requests
+ 
+* Fork the project.
+* Make your feature addition or bug fix.
+* Commit, do not mess with rakefile, version, or history.
+* Send me a pull request. Bonus points for topic branches.
+
+## Copyright
+
+Copyright (c) 2014 DataMade and the University of Chicago. Released under the [MIT License](https://github.com/datamade/wopr-api/blob/master/LICENSE).
