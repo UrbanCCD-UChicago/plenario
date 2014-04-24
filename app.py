@@ -4,10 +4,11 @@ import os
 from datetime import date, datetime, timedelta
 import time
 import json
-from sqlalchemy import Table, func, distinct, Column, create_engine, MetaData
+from sqlalchemy import Table, func, distinct, Column, create_engine, MetaData, Float
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.types import NullType
+from sqlalchemy.sql.expression import cast
 from geoalchemy2 import Geometry
 from operator import itemgetter
 from itertools import groupby
@@ -129,23 +130,15 @@ def meta():
     resp = []
     # TODO: Doinaggregate queries here is super slow. It would be nice to speed it up
     # This query only performs well after makinan index on dataset_name
-    master_table = Table('dat_master', metadata,
+    meta_table = Table('meta_master', metadata,
         autoload=True, autoload_with=engine, extend_existing=True)
 
-    values = session.query(
-        distinct(master_table.columns.get('dataset_name'))).all()
+    values = session.query(meta_table).all()
+    keys = meta_table.columns.keys()
     for value in values:
-       #obs_to, obs_from = (value[1].strftime('%Y-%m-%d'), value[2].strftime('%Y-%m-%d'))
-       #observed_ran = '%s - %s' % (obs_from, obs_to)
-       #s = select([func.ST_AsGeoJSON(func.ST_Estimated_Extent(
-       #    'dat_%s' % value[0], 'om'))])
-       #bbox = json.loads(list(db.engine.execute(s))[0][0])
-        d = {
-            'machine_name': value[0],
-            'human_name': ' '.join(value[0].split('_')).title(),
-           #'observed_date_ran': observed_range,
-           #'boundinbox': bbox,
-        }
+        d = {}
+        for k,v in zip(keys, value):
+            d[k] = v
         resp.append(d)
     resp = make_response(json.dumps(resp), status_code)
     resp.headers['Content-Type'] = 'application/json'
