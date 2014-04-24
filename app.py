@@ -125,6 +125,7 @@ def make_query(table, raw_query_params):
     return valid_query, query_clauses, resp, status_code
 
 @app.route('/api/')
+@crossdomain(origin="*")
 def meta():
     status_code = 200
     resp = []
