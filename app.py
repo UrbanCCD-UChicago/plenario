@@ -14,6 +14,7 @@ from operator import itemgetter
 from itertools import groupby
 from cStringIO import StringIO
 import csv
+from shapely.wkb import loads
 
 app = Flask(__name__)
 
@@ -196,7 +197,6 @@ def dataset():
     raw_query_params = request.args.copy()
     agg = raw_query_params.get('agg')
     if not agg:
-        # TODO: Make a more informed judment about minumum tempral resolution
         agg = 'day'
     else:
         del raw_query_params['agg']
@@ -357,6 +357,32 @@ def detail_aggregate():
                 'items': items
             })
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+@app.route('/api/grid/<year>/')
+def grid(year):
+    dataset_name = request.args.get('dataset_name')
+    resolution = request.args.get('resolution')
+    resp = []
+    master_table = Table('dat_master', metadata,
+        autoload=True, autoload_with=engine, extend_existing=True)
+    query = session.query(func.count(master_table.c.dataset_row_id), 
+            func.ST_SnapToGrid(master_table.c.location_geom, float(resolution)))\
+            .filter(master_table.c.obs_date >= '01-01-%s' % year)\
+            .filter(master_table.c.obs_date <= '12-31-%s' % year)\
+            .filter(master_table.c.dataset_name == dataset_name)\
+            .group_by(func.ST_SnapToGrid(master_table.c.location_geom, float(resolution)))
+    values = [d for d in query.all()]
+    fieldnames = ['count', 'grid_center']
+    for value in values:
+        d = {}
+        for k,v in zip(fieldnames, value):
+            d[k] = v
+        if d['grid_center']:
+            d['grid_center'] = loads(d['grid_center'].decode('hex')).__geo_interface__
+        resp.append(d)
+    resp = make_response(json.dumps(resp, default=dthandler))
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
