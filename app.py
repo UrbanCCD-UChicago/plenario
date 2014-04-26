@@ -361,10 +361,11 @@ def detail_aggregate():
     return resp
 
 @app.route('/api/grid/<year>/')
+@crossdomain(origin="*")
 def grid(year):
     dataset_name = request.args.get('dataset_name')
     resolution = request.args.get('resolution')
-    resp = []
+    resp = {'type': 'FeatureCollection', 'features': []}
     master_table = Table('dat_master', metadata,
         autoload=True, autoload_with=engine, extend_existing=True)
     query = session.query(func.count(master_table.c.dataset_row_id), 
@@ -374,14 +375,14 @@ def grid(year):
             .filter(master_table.c.dataset_name == dataset_name)\
             .group_by(func.ST_SnapToGrid(master_table.c.location_geom, float(resolution)))
     values = [d for d in query.all()]
-    fieldnames = ['count', 'grid_center']
     for value in values:
-        d = {}
-        for k,v in zip(fieldnames, value):
-            d[k] = v
-        if d['grid_center']:
-            d['grid_center'] = loads(d['grid_center'].decode('hex')).__geo_interface__
-        resp.append(d)
+        d = {
+            'type': 'Feature', 
+            'properties': {'count': value[0]},
+        }
+        if value[1]:
+            d['geometry'] = loads(value[1].decode('hex')).__geo_interface__
+        resp['features'].append(d)
     resp = make_response(json.dumps(resp, default=dthandler))
     resp.headers['Content-Type'] = 'application/json'
     return resp
