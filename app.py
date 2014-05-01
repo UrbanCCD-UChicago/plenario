@@ -142,7 +142,7 @@ def meta():
         for k,v in zip(keys, value):
             d[k] = v
         resp.append(d)
-    resp = make_response(json.dumps(resp), status_code)
+    resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
