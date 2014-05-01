@@ -1,6 +1,7 @@
 from flask import Flask, make_response, request, render_template, current_app, g
 from functools import update_wrapper
 import os
+import math
 from datetime import date, datetime, timedelta
 import time
 import json
@@ -360,25 +361,37 @@ def detail_aggregate():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-@app.route('/api/grid/<year>/')
+def getSizeInDegrees(meters, latitude):
+    size_x = abs(meters / (111111.0 * math.cos(latitude)))
+    size_y = meters / 111111.0
+    return size_x, size_y
+
+@app.route('/api/grid/')
 @crossdomain(origin="*")
-def grid(year):
+def grid():
     dataset_name = request.args.get('dataset_name')
     resolution = request.args.get('resolution')
+    year = request.args.get('year')
+    center = request.args.getlist('center[]')
     resp = {'type': 'FeatureCollection', 'features': []}
     master_table = Table('dat_master', metadata,
         autoload=True, autoload_with=engine, extend_existing=True)
+    size_x, size_y = getSizeInDegrees(float(resolution), float(center[0]))
     query = session.query(func.count(master_table.c.dataset_row_id), 
-            func.ST_SnapToGrid(master_table.c.location_geom, float(resolution)))\
+            func.ST_SnapToGrid(master_table.c.location_geom, size_x, size_y))\
             .filter(master_table.c.obs_date >= '01-01-%s' % year)\
             .filter(master_table.c.obs_date <= '12-31-%s' % year)\
             .filter(master_table.c.dataset_name == dataset_name)\
-            .group_by(func.ST_SnapToGrid(master_table.c.location_geom, float(resolution)))
+            .group_by(func.ST_SnapToGrid(master_table.c.location_geom, size_x, size_y))
     values = [d for d in query.all()]
     for value in values:
         d = {
             'type': 'Feature', 
-            'properties': {'count': value[0]},
+            'properties': {
+                'count': value[0], 
+                'size_x': size_x, 
+                'size_y': size_y
+            },
         }
         if value[1]:
             d['geometry'] = loads(value[1].decode('hex')).__geo_interface__
