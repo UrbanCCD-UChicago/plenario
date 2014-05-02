@@ -16,6 +16,7 @@ from itertools import groupby
 from cStringIO import StringIO
 import csv
 from shapely.wkb import loads
+from shapely.geometry import box
 
 app = Flask(__name__)
 
@@ -381,20 +382,21 @@ def grid():
             func.ST_SnapToGrid(master_table.c.location_geom, size_x, size_y))\
             .filter(master_table.c.obs_date >= '01-01-%s' % year)\
             .filter(master_table.c.obs_date <= '12-31-%s' % year)\
-            .filter(master_table.c.dataset_name == dataset_name)\
-            .group_by(func.ST_SnapToGrid(master_table.c.location_geom, size_x, size_y))
+            .filter(master_table.c.dataset_name == dataset_name)
+    query = query.group_by(func.ST_SnapToGrid(master_table.c.location_geom, size_x, size_y))
     values = [d for d in query.all()]
     for value in values:
         d = {
             'type': 'Feature', 
             'properties': {
                 'count': value[0], 
-                'size_x': size_x, 
-                'size_y': size_y
             },
         }
         if value[1]:
-            d['geometry'] = loads(value[1].decode('hex')).__geo_interface__
+            pt = loads(value[1].decode('hex'))
+            south, west = (pt.x - (size_x / 2)), (pt.y - (size_y /2))
+            north, east = (pt.x + (size_x / 2)), (pt.y + (size_y / 2))
+            d['geometry'] = box(south, west, north, east).__geo_interface__
         resp['features'].append(d)
     resp = make_response(json.dumps(resp, default=dthandler))
     resp.headers['Content-Type'] = 'application/json'
