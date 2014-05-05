@@ -1,0 +1,27 @@
+<% var formats = {
+    minute: 'dddd, MMMM Do YYYY, h:mma',
+    hour: 'dddd, MMMM Do YYYY, ha',
+    day: 'dddd, MMMM Do YYYY',
+    week: 'wo [week of] YYYY',
+    month: 'MMMM YYYY',
+    year: 'YYYY'
+} %>
+<% $.each(datasets, function(i, dataset){ %> 
+    <h3><%= dataset.dataset_name %></h3>
+    <table class="table-striped response-table">
+        <thead>
+            <tr>
+                <th>Aggregate</th>
+                <th>Count</th>
+            </tr>
+        </thead>
+        <tbody>
+        <% $.each(dataset.objects, function(i, object){ %> 
+            <tr>
+                <td><%= moment(object.group).format(formats[dataset.temporal_aggregate]) %></td>
+                <td><%= object.count %></td>
+            </tr>
+        <% }) %>
+        </tbody>
+    </table>
+<%})%>
