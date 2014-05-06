@@ -2,7 +2,7 @@ import requests
 import os
 from datetime import datetime
 from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
-    UniqueConstraint, text
+    UniqueConstraint, text, and_, or_
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from wopr.database import engine, Base
@@ -21,7 +21,7 @@ class SocrataError(Exception):
 
 def download_crime():
     r = requests.get(CRIMES, stream=True)
-    fpath = '%s/crime_%s.csv' % (DATA_DIR, datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
+    fpath = '%s/crime_%s.csv.gz' % (DATA_DIR, datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
     with gzip.open(os.path.join(fpath), 'wb') as f:
         for chunk in r.iter_content(chunk_size=1024):
             if chunk:
@@ -42,11 +42,11 @@ def dat_crime():
     dat_crime_table.append_column(Column('end_date', TIMESTAMP, default=None))
     dat_crime_table.append_column(Column('current_flag', Boolean, default=True))
     dat_crime_table.append_constraint(UniqueConstraint('id', 'start_date'))
-    dat_crime_table.create(bind=engine)
-    new_cols = ['start_date', 'end_date', 'current_flag', 'chicago_crimes_row_id']
+    dat_crime_table.create(bind=engine, checkfirst=True)
+    new_cols = ['start_date', 'end_date', 'current_flag', 'chicago_crimes_all_row_id']
     dat_ins = dat_crime_table.insert()\
         .from_select(
-            [c.name for c in dat_crime_table.columns.keys() if c.name not in new_cols],
+            [c for c in dat_crime_table.columns.keys() if c not in new_cols],
             select([c for c in src_crime_table.columns])
         )
     conn = engine.connect()
@@ -65,7 +65,7 @@ def raw_crime(fpath=None, tablename='raw_chicago_crimes_all'):
     cursor = conn.cursor()
     with gzip.open(fpath, 'rb') as f:
         cursor.copy_expert("COPY %s \
-            (id, case_number, date, block, iucr, primary_type, \
+            (id, case_number, orig_date, block, iucr, primary_type, \
             description, location_description, arrest, domestic, \
             beat, district, ward, community_area, fbi_code, \
             x_coordinate, y_coordinate, year, updated_on, \
@@ -75,7 +75,7 @@ def raw_crime(fpath=None, tablename='raw_chicago_crimes_all'):
     return raw_crime_table
 
 def dedupe_crime():
-    # Step Two: Find dubplicate records by id
+    # Step Two: Find dubplicate records by case_number
     try:
         raw_crime_table = Table('raw_chicago_crimes_all', Base.metadata, 
             autoload=True, autoload_with=engine, extend_existing=True)
@@ -90,7 +90,7 @@ def dedupe_crime():
         .from_select(
             ['dup_row_id'], 
             select([func.max(raw_crime_table.c.dup_row_id)])\
-            .group_by(raw_crime_table.c.id)
+            .group_by(raw_crime_table.c.case_number)
         )
     conn = engine.connect()
     conn.execute(ins)
@@ -127,7 +127,6 @@ def new_crime():
         dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
             autoload=True, autoload_with=engine, extend_existing=True)
     except NoSuchTableError:
-        # bust this out into a function
         dat_crime_table = dat_crime()
     try:
         src_crime_table = Table('src_chicago_crimes_all', Base.metadata, 
@@ -164,19 +163,123 @@ def update_master():
     except NoSuchTableError:
         new_crime_table = new_crime()
     col_names = ['start_date', 'end_date', 'current_flag', 'location', 'latitude', 'longitude']
-    cols = [c for c in dat_crime_table.columns if c.name in col_names]
+    cols = [
+        dat_crime_table.c.start_date,
+        dat_crime_table.c.end_date,
+        dat_crime_table.c.current_flag,
+        dat_crime_table.c.location,
+        dat_crime_table.c.latitude, 
+        dat_crime_table.c.longitude,
+    ]
     cols.append(dat_crime_table.c.orig_date.label('obs_date'))
     cols.append(text("NULL AS obs_ts"))
+    cols.append(text("NULL AS geotag1"))
+    cols.append(text("NULL AS geotag2"))
+    cols.append(text("NULL AS geotag3"))
     cols.append(text("'chicago_crimes_all' AS dataset_name"))
-    cols.append(text("ST_PointFromText('POINT(' || dat_chicago_crimes_all.longitude || ' ' || dat_chicago_crimes_all.latitude || ')') as location_geom"))
     cols.append(dat_crime_table.c.chicago_crimes_all_row_id.label('dataset_row_id'))
+    cols.append(text("ST_PointFromText('POINT(' || dat_chicago_crimes_all.longitude || ' ' || dat_chicago_crimes_all.latitude || ')', 4326) as location_geom"))
     ins = MasterTable.insert()\
         .from_select(
-            MasterTable.columns.keys(),
+            [c for c in MasterTable.columns.keys() if c != 'master_row_id'],
             select(cols)\
                 .select_from(dat_crime_table.join(new_crime_table, 
                     dat_crime_table.c.id == new_crime_table.c.id))
         )
-    print ins
+    conn = engine.connect()
+    conn.execute(ins)
+
+def chg_crime():
+    try:
+        dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
+            autoload=True, autoload_with=engine, extend_existing=True)
+    except NoSuchTableError:
+        dat_crime_table = dat_crime()
+    try:
+        src_crime_table = Table('src_chicago_crimes_all', Base.metadata, 
+            autoload=True, autoload_with=engine, extend_existing=True)
+    except NoSuchTableError:
+        src_crime_table = new_crime()
+    chg_crime_table = Table('chg_chicago_crimes_all', Base.metadata, 
+        Column('id', Integer, primary_key=True),
+        extend_existing=True)
+    chg_crime_table.drop(bind=engine, checkfirst=True)
+    chg_crime_table.create(bind=engine)
+    ins = chg_crime_table.insert()\
+          .from_select(
+              ['id'],
+              select([src_crime_table.c.id])\
+                  .select_from(src_crime_table.join(dat_crime_table,
+                      src_crime_table.c.id == dat_crime_table.c.id))\
+                  .where(or_(
+                          and_(dat_crime_table.c.current_flag == True, 
+                                and_(or_(src_crime_table.c.id != None, dat_crime_table.c.id != None), 
+                                src_crime_table.c.id != dat_crime_table.c.id)),
+                          and_(or_(src_crime_table.c.case_number != None, 
+                              dat_crime_table.c.case_number != None), 
+                              src_crime_table.c.case_number != dat_crime_table.c.case_number),
+                          and_(or_(src_crime_table.c.orig_date != None, 
+                              dat_crime_table.c.orig_date != None), 
+                              src_crime_table.c.orig_date != dat_crime_table.c.orig_date),
+                          and_(or_(src_crime_table.c.block != None, 
+                              dat_crime_table.c.block != None), 
+                              src_crime_table.c.block != dat_crime_table.c.block),
+                          and_(or_(src_crime_table.c.iucr != None, 
+                              dat_crime_table.c.iucr != None), 
+                              src_crime_table.c.iucr != dat_crime_table.c.iucr),
+                          and_(or_(src_crime_table.c.primary_type != None, 
+                              dat_crime_table.c.primary_type != None), 
+                              src_crime_table.c.primary_type != dat_crime_table.c.primary_type),
+                          and_(or_(src_crime_table.c.description != None, 
+                              dat_crime_table.c.description != None), 
+                              src_crime_table.c.description != dat_crime_table.c.description),
+                          and_(or_(src_crime_table.c.location_description != None, 
+                              dat_crime_table.c.location_description != None), 
+                              src_crime_table.c.location_description != dat_crime_table.c.location_description),
+                          and_(or_(src_crime_table.c.arrest != None, 
+                              dat_crime_table.c.arrest != None), 
+                              src_crime_table.c.arrest != dat_crime_table.c.arrest),
+                          and_(or_(src_crime_table.c.domestic != None, 
+                              dat_crime_table.c.domestic != None), 
+                              src_crime_table.c.domestic != dat_crime_table.c.domestic),
+                          and_(or_(src_crime_table.c.beat != None, 
+                              dat_crime_table.c.beat != None), 
+                              src_crime_table.c.beat != dat_crime_table.c.beat),
+                          and_(or_(src_crime_table.c.district != None, 
+                              dat_crime_table.c.district != None), 
+                              src_crime_table.c.district != dat_crime_table.c.district),
+                          and_(or_(src_crime_table.c.ward != None, 
+                              dat_crime_table.c.ward != None), 
+                              src_crime_table.c.ward != dat_crime_table.c.ward),
+                          and_(or_(src_crime_table.c.community_area != None, 
+                              dat_crime_table.c.community_area != None), 
+                              src_crime_table.c.community_area != dat_crime_table.c.community_area),
+                          and_(or_(src_crime_table.c.fbi_code != None, 
+                              dat_crime_table.c.fbi_code != None), 
+                              src_crime_table.c.fbi_code != dat_crime_table.c.fbi_code),
+                          and_(or_(src_crime_table.c.x_coordinate != None, 
+                              dat_crime_table.c.x_coordinate != None), 
+                              src_crime_table.c.x_coordinate != dat_crime_table.c.x_coordinate),
+                          and_(or_(src_crime_table.c.y_coordinate != None, 
+                              dat_crime_table.c.y_coordinate != None), 
+                              src_crime_table.c.y_coordinate != dat_crime_table.c.y_coordinate),
+                          and_(or_(src_crime_table.c.year != None, 
+                              dat_crime_table.c.year != None), 
+                              src_crime_table.c.year != dat_crime_table.c.year),
+                          and_(or_(src_crime_table.c.updated_on != None, 
+                              dat_crime_table.c.updated_on != None), 
+                              src_crime_table.c.updated_on != dat_crime_table.c.updated_on),
+                          and_(or_(src_crime_table.c.latitude != None, 
+                              dat_crime_table.c.latitude != None), 
+                              src_crime_table.c.latitude != dat_crime_table.c.latitude),
+                          and_(or_(src_crime_table.c.longitude != None, 
+                              dat_crime_table.c.longitude != None), 
+                              src_crime_table.c.longitude != dat_crime_table.c.longitude),
+                          and_(or_(src_crime_table.c.location != None, 
+                              dat_crime_table.c.location != None), 
+                              src_crime_table.c.location != dat_crime_table.c.location),
+                      )
+                  )
+          )
     conn = engine.connect()
     conn.execute(ins)

@@ -5,7 +5,7 @@ from geoalchemy2 import Geometry
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 
-from wopr.database import Base, engine
+from wopr.database import Base, engine, Point
 
 #MetaTable = Table('meta_master', Base.metadata,
 #    autoload=True, autoload_with=engine)
@@ -36,6 +36,6 @@ def crime_table(name, metadata):
             Column('updated_on', TIMESTAMP, default=None),
             Column('latitude', DOUBLE_PRECISION(precision=53)),
             Column('longitude', DOUBLE_PRECISION(precision=53)),
-            Column('location', String(length=50)),
+            Column('location', Point),
     extend_existing=True)
     return table
