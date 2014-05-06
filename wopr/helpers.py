@@ -205,6 +205,13 @@ def chg_crime():
         extend_existing=True)
     chg_crime_table.drop(bind=engine, checkfirst=True)
     chg_crime_table.create(bind=engine)
+    src_cols = [c for c in src_crime_table.columns if c.name != 'id']
+    dat_cols = [c for c in dat_crime_table.columns if c.name != 'id']
+    and_args = []
+    for s, d in zip(src_cols, dat_cols):
+        ors = or_(s != None, d != None)
+        ands = and_(ors, s != d)
+        and_args.append(ands)
     ins = chg_crime_table.insert()\
           .from_select(
               ['id'],
@@ -215,71 +222,8 @@ def chg_crime():
                           and_(dat_crime_table.c.current_flag == True, 
                                 and_(or_(src_crime_table.c.id != None, dat_crime_table.c.id != None), 
                                 src_crime_table.c.id != dat_crime_table.c.id)),
-                          and_(or_(src_crime_table.c.case_number != None, 
-                              dat_crime_table.c.case_number != None), 
-                              src_crime_table.c.case_number != dat_crime_table.c.case_number),
-                          and_(or_(src_crime_table.c.orig_date != None, 
-                              dat_crime_table.c.orig_date != None), 
-                              src_crime_table.c.orig_date != dat_crime_table.c.orig_date),
-                          and_(or_(src_crime_table.c.block != None, 
-                              dat_crime_table.c.block != None), 
-                              src_crime_table.c.block != dat_crime_table.c.block),
-                          and_(or_(src_crime_table.c.iucr != None, 
-                              dat_crime_table.c.iucr != None), 
-                              src_crime_table.c.iucr != dat_crime_table.c.iucr),
-                          and_(or_(src_crime_table.c.primary_type != None, 
-                              dat_crime_table.c.primary_type != None), 
-                              src_crime_table.c.primary_type != dat_crime_table.c.primary_type),
-                          and_(or_(src_crime_table.c.description != None, 
-                              dat_crime_table.c.description != None), 
-                              src_crime_table.c.description != dat_crime_table.c.description),
-                          and_(or_(src_crime_table.c.location_description != None, 
-                              dat_crime_table.c.location_description != None), 
-                              src_crime_table.c.location_description != dat_crime_table.c.location_description),
-                          and_(or_(src_crime_table.c.arrest != None, 
-                              dat_crime_table.c.arrest != None), 
-                              src_crime_table.c.arrest != dat_crime_table.c.arrest),
-                          and_(or_(src_crime_table.c.domestic != None, 
-                              dat_crime_table.c.domestic != None), 
-                              src_crime_table.c.domestic != dat_crime_table.c.domestic),
-                          and_(or_(src_crime_table.c.beat != None, 
-                              dat_crime_table.c.beat != None), 
-                              src_crime_table.c.beat != dat_crime_table.c.beat),
-                          and_(or_(src_crime_table.c.district != None, 
-                              dat_crime_table.c.district != None), 
-                              src_crime_table.c.district != dat_crime_table.c.district),
-                          and_(or_(src_crime_table.c.ward != None, 
-                              dat_crime_table.c.ward != None), 
-                              src_crime_table.c.ward != dat_crime_table.c.ward),
-                          and_(or_(src_crime_table.c.community_area != None, 
-                              dat_crime_table.c.community_area != None), 
-                              src_crime_table.c.community_area != dat_crime_table.c.community_area),
-                          and_(or_(src_crime_table.c.fbi_code != None, 
-                              dat_crime_table.c.fbi_code != None), 
-                              src_crime_table.c.fbi_code != dat_crime_table.c.fbi_code),
-                          and_(or_(src_crime_table.c.x_coordinate != None, 
-                              dat_crime_table.c.x_coordinate != None), 
-                              src_crime_table.c.x_coordinate != dat_crime_table.c.x_coordinate),
-                          and_(or_(src_crime_table.c.y_coordinate != None, 
-                              dat_crime_table.c.y_coordinate != None), 
-                              src_crime_table.c.y_coordinate != dat_crime_table.c.y_coordinate),
-                          and_(or_(src_crime_table.c.year != None, 
-                              dat_crime_table.c.year != None), 
-                              src_crime_table.c.year != dat_crime_table.c.year),
-                          and_(or_(src_crime_table.c.updated_on != None, 
-                              dat_crime_table.c.updated_on != None), 
-                              src_crime_table.c.updated_on != dat_crime_table.c.updated_on),
-                          and_(or_(src_crime_table.c.latitude != None, 
-                              dat_crime_table.c.latitude != None), 
-                              src_crime_table.c.latitude != dat_crime_table.c.latitude),
-                          and_(or_(src_crime_table.c.longitude != None, 
-                              dat_crime_table.c.longitude != None), 
-                              src_crime_table.c.longitude != dat_crime_table.c.longitude),
-                          and_(or_(src_crime_table.c.location != None, 
-                              dat_crime_table.c.location != None), 
-                              src_crime_table.c.location != dat_crime_table.c.location),
-                      )
-                  )
+                          *and_args))
           )
+    print ins
     conn = engine.connect()
     conn.execute(ins)
