@@ -1,10 +1,18 @@
 import os
 from flask import Flask
 from celery import Celery
+from celery.schedules import crontab
 from wopr.database import session as db_session
 from wopr.api import api
 
 BROKER_URL = 'sqs://%s:%s@' % (os.environ['AWS_ACCESS_KEY'], os.environ['AWS_SECRET_KEY'])
+
+CELERYBEAT_SCHEDULE = {
+    'update_crime_every_day': {
+        'task': 'wopr.tasks.update_crime',
+        'schedule': crontab(minute=0, hour=8),
+    }
+}
 
 def create_app():
     app = Flask(__name__)
@@ -19,6 +27,7 @@ def make_celery(app=None):
     app = app or create_app()
     celery_app = Celery(app.import_name, broker=BROKER_URL)
     celery_app.conf['CELERY_IMPORTS'] = ('wopr.tasks',)
+    celery_app.conf['CELERYBEAT_SCHEDULE'] = CELERYBEAT_SCHEDULE
     TaskBase = celery_app.Task
     class ContextTask(TaskBase):
         abstract = True

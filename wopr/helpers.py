@@ -153,6 +153,7 @@ def new_crime():
     return new_crime_table
 
 def update_dat_crimes():
+    # Step Five: Update Main Crime table
     try:
         dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
             autoload=True, autoload_with=engine, extend_existing=True)
@@ -185,7 +186,7 @@ def update_dat_crimes():
     return 'Crime Table updated'
 
 def update_master():
-    # Step Five: Update Master table
+    # Step Six: Update Master table
     try:
         dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
             autoload=True, autoload_with=engine, extend_existing=True)
@@ -226,7 +227,7 @@ def update_master():
     return 'Master updated'
 
 def chg_crime():
-    # Step Six: Find updates
+    # Step Seven: Find updates
     try:
         dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
             autoload=True, autoload_with=engine, extend_existing=True)
