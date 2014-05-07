@@ -287,6 +287,7 @@ def update_crime_current_flag():
     return 'Crime table current flag updated'
 
 def update_master_current_flag():
+    # Step Eight: Update end_date and current_flag in master table
     try:
         dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
             autoload=True, autoload_with=engine, extend_existing=True)
