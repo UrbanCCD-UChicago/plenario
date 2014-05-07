@@ -1,6 +1,6 @@
 import requests
 import os
-from datetime import datetime
+from datetime import datetime, date
 from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
     UniqueConstraint, text, and_, or_
 from sqlalchemy.exc import NoSuchTableError
@@ -75,7 +75,7 @@ def raw_crime(fpath=None, tablename='raw_chicago_crimes_all'):
     return raw_crime_table
 
 def dedupe_crime():
-    # Step Two: Find dubplicate records by case_number
+    # Step Two: Find duplicate records by case_number
     try:
         raw_crime_table = Table('raw_chicago_crimes_all', Base.metadata, 
             autoload=True, autoload_with=engine, extend_existing=True)
@@ -119,10 +119,12 @@ def src_crime():
         )
     conn = engine.connect()
     conn.execute(ins)
+    raw_crime_table.drop(bind=engine)
+    dedupe_crime_table.drop(bind=engine)
     return src_crime_table
 
 def new_crime():
-    # Step Four: Insert new crimes into dat table
+    # Step Four: Find New Crimes
     try:
         dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
             autoload=True, autoload_with=engine, extend_existing=True)
@@ -144,11 +146,43 @@ def new_crime():
             select([src_crime_table.c.id])\
                 .select_from(src_crime_table.join(dat_crime_table, 
                     src_crime_table.c.id == dat_crime_table.c.id, isouter=True))\
-                .where(dat_crime_table.c.chicago_crimes_all_row_id != None)
+                .where(dat_crime_table.c.chicago_crimes_all_row_id == None)
         )
     conn = engine.connect()
     conn.execute(ins)
     return new_crime_table
+
+def update_dat_crimes():
+    try:
+        dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
+            autoload=True, autoload_with=engine, extend_existing=True)
+    except NoSuchTableError:
+        dat_crime_table = dat_crime()
+    try:
+        src_crime_table = Table('src_chicago_crimes_all', Base.metadata, 
+            autoload=True, autoload_with=engine, extend_existing=True)
+    except NoSuchTableError:
+        src_crime_table = src_crime()
+    try:
+        new_crime_table = Table('new_chicago_crimes_all', Base.metadata, 
+            autoload=True, autoload_with=engine, extend_existing=True)
+    except NoSuchTableError:
+        new_crime_table = new_crime()
+    excluded_cols = ['end_date', 'current_flag', 'chicago_crimes_all_row_id']
+    dat_cols = [c for c in dat_crime_table.columns.keys() if c not in excluded_cols]
+    excluded_cols.append('start_date')
+    src_cols = [c for c in src_crime_table.columns if c.name not in excluded_cols]
+    src_cols.append(text("'%s' AS start_date" % datetime.now().strftime('%Y-%m-%d')))
+    ins = dat_crime_table.insert()\
+        .from_select(
+            dat_cols,
+            select(src_cols)\
+                .select_from(src_crime_table.join(new_crime_table,
+                    src_crime_table.c.id == new_crime_table.c.id))
+        )
+    conn = engine.connect()
+    conn.execute(ins)
+    return 'Crime Table updated'
 
 def update_master():
     # Step Five: Update Master table
@@ -188,8 +222,11 @@ def update_master():
         )
     conn = engine.connect()
     conn.execute(ins)
+    new_crime_table.drop(bind=engine)
+    return 'Master updated'
 
 def chg_crime():
+    # Step Six: Find updates
     try:
         dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
             autoload=True, autoload_with=engine, extend_existing=True)
@@ -224,6 +261,42 @@ def chg_crime():
                                 src_crime_table.c.id != dat_crime_table.c.id)),
                           *and_args))
           )
-    print ins
     conn = engine.connect()
     conn.execute(ins)
+    return chg_crime_table
+
+def update_crime_current_flag():
+    # Step Seven: Update end_date and current_flag in crime table
+    try:
+        dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
+            autoload=True, autoload_with=engine, extend_existing=True)
+    except NoSuchTableError:
+        dat_crime_table = dat_crime()
+    try:
+        chg_crime_table = Table('chg_chicago_crimes_all', Base.metadata, 
+            autoload=True, autoload_with=engine, extend_existing=True)
+    except NoSuchTableError:
+        chg_crime_table = chg_crime()
+    update = dat_crime_table.update()\
+        .values(current_flag=False, end_date=datetime.now().strftime('%Y-%m-%d'))\
+        .where(dat_crime_table.c.id==chg_crime_table.c.id)\
+        .where(dat_crime_table.c.current_flag == True)
+    print update
+    conn = engine.connect()
+    conn.execute(update)
+    return 'Crime table current flag updated'
+
+def update_master_current_flag():
+    try:
+        dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
+            autoload=True, autoload_with=engine, extend_existing=True)
+    except NoSuchTableError:
+        dat_crime_table = dat_crime()
+    update = MasterTable.update()\
+        .values(current_flag=False, end_date=datetime.now().strftime('%Y-%m-%d'))\
+        .where(MasterTable.c.dataset_row_id == dat_crime_table.c.chicago_crimes_all_row_id)\
+        .where(dat_crime_table.c.current_flag==False)\
+        .where(dat_crime_table.c.end_date==date.today())
+    conn = engine.connect()
+    conn.execute(update)
+    return 'Master table current flag updated'
