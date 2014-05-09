@@ -14,10 +14,16 @@ AWS_KEY = os.environ['AWS_ACCESS_KEY']
 AWS_SECRET = os.environ['AWS_SECRET_KEY']
 DATA_DIR = os.environ['WOPR_DATA_DIR']
 
-class SocrataError(Exception): 
-    def __init__(self, message):
-        Exception.__init__(self, message)
-        self.message = message
+def cleanup_temp_tables():
+    tables = ['new', 'src', 'raw', 'chg', 'dedup']
+    for table in tables:
+        try:
+            t = Table('%s_chicago_crimes_all' % table, Base.metadata, 
+                autoload=True, autoload_with=engine, extend_existing=True)
+            t.drop(bind=engine, checkfirst=True)
+        except NoSuchTableError:
+            pass
+    return 'Temp tables dropped'
 
 def download_crime():
     r = requests.get(CRIMES, stream=True)
@@ -90,7 +96,7 @@ def dedupe_crime():
         .from_select(
             ['dup_row_id'], 
             select([func.max(raw_crime_table.c.dup_row_id)])\
-            .group_by(raw_crime_table.c.case_number)
+            .group_by(raw_crime_table.c.id)
         )
     conn = engine.connect()
     conn.execute(ins)
@@ -119,8 +125,6 @@ def src_crime():
         )
     conn = engine.connect()
     conn.execute(ins)
-    raw_crime_table.drop(bind=engine)
-    dedupe_crime_table.drop(bind=engine)
     return src_crime_table
 
 def new_crime():
@@ -149,8 +153,12 @@ def new_crime():
                 .where(dat_crime_table.c.chicago_crimes_all_row_id == None)
         )
     conn = engine.connect()
-    conn.execute(ins)
-    return new_crime_table
+    try:
+        conn.execute(ins)
+        return new_crime_table
+    except TypeError:
+        # No new records
+        return None
 
 def update_dat_crimes():
     # Step Five: Update Main Crime table
@@ -223,7 +231,6 @@ def update_master():
         )
     conn = engine.connect()
     conn.execute(ins)
-    new_crime_table.drop(bind=engine)
     return 'Master updated'
 
 def chg_crime():
