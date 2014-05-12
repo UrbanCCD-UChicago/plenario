@@ -11,7 +11,21 @@ def index():
 
 @views.route('/grid/')
 def grid_view():
-    return render_template('grid.html')
+    context = {}
+    context['datasets'] = session.query(MetaTable).all()
+    context['default'] = [d for d in context['datasets'] if d.dataset_name == 'chicago_crimes_all'][0]
+    context['resolutions'] = {
+        300: '~300m', 
+        400: '~400m', 
+        500: '~500m', 
+        750: '~750m', 
+        1000: '~1km', 
+        2000: '~2km', 
+        3000: '~3km', 
+        4000: '~4km', 
+        5000: '~5km'
+    }
+    return render_template('grid.html', **context)
 
 @views.route('/map/')
 def map_view():
