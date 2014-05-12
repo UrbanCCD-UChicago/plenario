@@ -21,21 +21,17 @@ celery_app = Celery(__name__, broker=BROKER_URL)
 
 @celery_app.task
 def update_crime(fpath=None):
-    new = chain(
-        raw_crime.s(fpath=fpath), 
-        dedupe_crime.s(),
-        src_crime.s(),
-        new_crime.s()
-    )()
+    raw_crime(fpath=fpath)
+    dedupe_crime()
+    src_crime()
+    new = new_crime()
     if new is not None:
-        updates = chain(
-            update_dat_crimes.s(),
-            update_master.s(),
-            chg_crime.s(),
-            update_crime_current_flag.s(),
-            update_master_current_flag.s(),
-            cleanup_temp_tables.s()
-        )()
+        update_dat_crimes()
+        update_master()
+        chg_crime()
+        update_crime_current_flag()
+        update_master_current_flag()
+        cleanup_temp_tables()
     return None
 
 @task_postrun.connect
