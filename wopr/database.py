@@ -6,8 +6,8 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 from psycopg2.extensions import adapt, register_adapter, AsIs
 
-engine = create_engine(os.environ['WOPR_CONN'], convert_unicode=True)
-session = scoped_session(sessionmaker(bind=engine,
+app_engine = create_engine(os.environ['WOPR_CONN'], convert_unicode=True)
+session = scoped_session(sessionmaker(bind=app_engine,
                                       autocommit=False,
                                       autoflush=False))
 Base = declarative_base()
