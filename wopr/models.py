@@ -7,8 +7,8 @@ from sqlalchemy.orm import relationship, backref
 
 from wopr.database import Base, engine, Point
 
-#MetaTable = Table('meta_master', Base.metadata,
-#    autoload=True, autoload_with=engine)
+MetaTable = Table('meta_master', Base.metadata,
+    autoload=True, autoload_with=engine)
 
 MasterTable = Table('dat_master', Base.metadata,
     autoload=True, autoload_with=engine)

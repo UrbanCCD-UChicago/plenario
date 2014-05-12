@@ -3,6 +3,7 @@ from flask import Flask
 from celery.schedules import crontab
 from wopr.database import session as db_session
 from wopr.api import api
+from wopr.views import views
 
 CELERYBEAT_SCHEDULE = {
     'update_crime_every_day': {
@@ -15,6 +16,7 @@ def create_app():
     app = Flask(__name__)
     app.url_map.strict_slashes = False
     app.register_blueprint(api)
+    app.register_blueprint(views)
     app.config['CELERY_IMPORTS'] = ('wopr.tasks',)
     app.config['CELERYBEAT_SCHEDULE'] = CELERYBEAT_SCHEDULE
     app.config['CELERY_TIMEZONE'] = 'America/Chicago'

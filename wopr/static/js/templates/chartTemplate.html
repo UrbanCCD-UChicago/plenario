@@ -1,0 +1,14 @@
+<div id="<%= el + '_' + iteration %>" class="chart"></div>
+<div class="btn-group">
+    <button type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown">
+        Download
+        <span class="caret"></span>
+    </button>
+    <ul class="dropdown-menu <%= detail ? 'detail' : ''%>" role="menu">
+        <li><a id="<%= el %>-csv-download" href="javascript://" class="data-download">CSV</a></li>
+        <li><a id="<%= el %>-json-download" href="javascript://" class="data-download">JSON</a></li>
+    </ul>
+</div>
+<% if (!detail){ %>
+    <button type="button" class="btn btn-default explore" id="<%= el %>-explore">Explore this data</button>
+<% } %>

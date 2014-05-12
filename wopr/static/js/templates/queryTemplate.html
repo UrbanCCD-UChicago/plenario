@@ -1,0 +1,22 @@
+<h4>Query Clauses</h4>
+<ul>
+<% $.each(query, function(field, value){ %>
+    <% if (field == 'agg'){ %>
+    <li><strong><%= field %></strong> = <%= value %></li>
+    <% } else { %>
+        <% var fn = field.split('__'); %>
+        <% var f = fn[0]; %>
+        <% var op = fn[1]; %>
+        <li><strong><%= f %></strong>
+        <% if (op == 'ge'){ %>
+            >= <%= value %></li>
+        <% } else if(op == 'le'){ %>
+            <= <%= value %></li>
+        <% } else if(f == 'geom'){ %>
+            within the shape you drew</li>
+        <% } else { %>
+            <%= op ? op : '=' %> <%= value %></li>
+        <% } %>
+    <% } %>
+<% }) %>
+</ul>

@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}WOPR Grid Explorer{% endblock %}
+{% block extra_styles %}
+    <link href="{{ url_for('static', filename='css/leaflet.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/leaflet.label.css') }}" rel="stylesheet">
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <div class='row'>
+            <div class='col-md-4'>
+                <div class='well'>
+                    <div id="sidebar"></div>
+                </div>
+            </div>
+
+            <div class='col-md-8'>
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+    <script type="text/ejs" id="metaControl">
+        <div>
+            <h4 id="dataset-name" class="light"><%= human_name %></h4>
+            <form class="form" role="form">
+                <div class="form-group">
+                    <label for="dataset-picker">Pick another dataset: </label>
+                    <select id="dataset-picker" class="form-control">
+                        <% $.each(datasets, function(i, dataset){ %>
+                          <option value="<%= dataset.dataset_name %>" <% if(dataset.human_name === human_name) { %> selected=true <% } %>>
+                                <%= dataset.human_name %>
+                            </option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="year-picker">Pick another year: </label>
+                    <select id="year-picker" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label for="resolution-picker">Pick another resolution: </label>
+                    <select id="resolution-picker" class="form-control">
+                        <% var resolutions = {300: '~300m', 400: '~400m', 500: '~500m', 750: '~750m', 1000: '~1km', 2000: '~2km', 3000: '~3km', 4000: '~4km', 5000: '~5km'} %>
+                        <% $.each(resolutions, function(i, r){ %>
+                            <option value="<%= i %>"<% if(parseFloat(i) === resolution){ %> selected=true <% } %>>
+                                <%= r %>
+                            </option>
+                        <% }) %>
+                    </select>
+                </div>
+            </form>
+        </div>
+    </script>
+{% endblock %}
+{% block extra_javascript %}
+    <script src="{{ url_for('static', filename='js/range.js') }}" type="text/javascript"></script>
+    <script src="{{ url_for('static', filename='js/spin.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/jquery.spin.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ejs_production.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/leaflet.js') }}" type="text/javascript"></script>
+    <script src="{{ url_for('static', filename='js/leaflet.label.js') }}" type="text/javascript"></script>
+    <script src="{{ url_for('static', filename='js/jenks.js') }}" type="text/javascript"></script>
+    <script src="{{ url_for('static', filename='js/grid-map.js') }}" type="text/javascript"></script>
+{% endblock %}

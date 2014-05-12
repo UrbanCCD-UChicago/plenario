@@ -4,9 +4,18 @@
   <div class='col-md-10 col-md-offset-1'>
       <h1>W.O.P.R. Geospatial open data platform</h1>
       <p>
-          Currently there are three endpoints:
+          <strong>Example Applications</strong>
           <ul>
-              <li><a href="/api/">/api/</a></li>
+              <li><a href="{{ url_for('views.grid_view') }}">Grid Aggregation</a></li>
+              <li><a href="{{ url_for('views.map_view') }}">Data Explorer</a></li>
+          </ul>
+      </p>
+      <hr />
+      <h2>API Documentation</h2>
+      <p>
+          <strong>Currently there are three endpoints:</strong>
+          <ul>
+              <li>/api/</li>
               <li>/api/master/</li>
               <li>/api/fields/&lt;dataset_name&gt;/</li>
               <li>/api/detail-aggregate/</li>
@@ -43,8 +52,8 @@
       <h3>/api/master/</h3>
       <p>
           This endpoint contains a record for every row in every dataset with
-          brief temporal and spatial information about the row. The endpoint 
-          should only be called using query parameters. This can give a user 
+          brief temporal and spatial information about the row. The endpoint
+          should only be called using query parameters. This can give a user
           of the platform a quick overview about what is available within
           their constraints.
       </p>

@@ -1,6 +1,5 @@
 /* Space out content a bit */
 body {
-  padding-top: 20px;
   padding-bottom: 20px;
   font-size: 17px;
 }
@@ -77,9 +76,7 @@ body {
 /* MAP styles */
 #map {
     min-height: 500px;
-    margin-top: 15px;
 }
-
 .leaflet-top.leaflet-left{
     margin-left: 20px;
 }
@@ -183,4 +180,25 @@ body {
 /* Response */
 .response-table {
     width: 100%;
+}
+
+/* Map legend styles */
+.legend {
+    line-height: 18px;
+    color: #555;
+    background: rgba(255,255,255,0.8);
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    border-radius: 5px;
+}
+
+.legend div {
+    padding: 10px;
+}
+
+.legend i {
+    width: 18px;
+    height: 18px;
+    float: left;
+    margin-right: 8px;
+    opacity: 0.7;
 }

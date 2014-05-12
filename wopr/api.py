@@ -18,7 +18,7 @@ import csv
 from shapely.wkb import loads
 from shapely.geometry import box
 
-#from wopr.models import MasterTable, MetaTable
+from wopr.models import MasterTable, MetaTable
 from wopr.database import session
 
 api = Blueprint('api', __name__)
@@ -383,8 +383,4 @@ def grid():
     resp = make_response(json.dumps(resp, default=dthandler))
     resp.headers['Content-Type'] = 'application/json'
     return resp
-
-@api.route('/')
-def index():
-    return render_template('index.html')
 
