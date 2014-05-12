@@ -9,7 +9,7 @@ from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
     UniqueConstraint, text, and_, or_
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.exc import NoSuchTableError
-from wopr.database import engine, Base
+from wopr.database import task_engine as engine, Base
 from wopr.models import crime_table, MasterTable
 import gzip
 

@@ -6,7 +6,7 @@ import math
 from datetime import date, datetime, timedelta
 import time
 import json
-from sqlalchemy import func, distinct, Column, Float
+from sqlalchemy import func, distinct, Column, Float, Table
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.types import NullType
 from sqlalchemy.sql.expression import cast
@@ -19,7 +19,7 @@ from shapely.wkb import loads
 from shapely.geometry import box
 
 from wopr.models import MasterTable, MetaTable
-from wopr.database import session
+from wopr.database import session, app_engine as engine, Base
 
 api = Blueprint('api', __name__)
 
@@ -142,7 +142,7 @@ def meta():
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
     try:
-        table = Table('dat_%s' % dataset_name, metadata,
+        table = Table('dat_%s' % dataset_name, Base.metadata,
             autoload=True, autoload_with=engine,
             extend_existing=True)
         data = {
@@ -273,7 +273,7 @@ def detail():
     if valid_query:
         resp['meta']['status'] = 'ok'
         dname = raw_query_params['dataset_name']
-        dataset = Table('dat_%s' % dname, metadata,
+        dataset = Table('dat_%s' % dname, Base.metadata,
             autoload=True, autoload_with=engine,
             extend_existing=True)
         base_query = session.query(MasterTable.c.obs_date, dataset)
@@ -317,7 +317,7 @@ def detail_aggregate():
         time_agg = func.date_trunc(agg, MasterTable.c['obs_date'])
         base_query = session.query(time_agg, func.count(MasterTable.c.dataset_row_id))
         dname = raw_query_params['dataset_name']
-        dataset = Table('dat_%s' % dname, metadata,
+        dataset = Table('dat_%s' % dname, Base.metadata,
             autoload=True, autoload_with=engine,
             extend_existing=True)
         valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
