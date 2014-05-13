@@ -1,23 +1,20 @@
 import os
 from celery import Task, Celery, chain
 from datetime import datetime, timedelta
-from wopr.database import session
-from wopr.models import crime_table
+from wopr.database import task_engine as engine, Base
+from wopr.models import crime_table, MasterTable
 from wopr.helpers import download_crime
+from wopr import make_celery
 from datetime import datetime, date
 from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
     UniqueConstraint, text, and_, or_
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.exc import NoSuchTableError
-from wopr.database import task_engine as engine, Base
-from wopr.models import crime_table, MasterTable
 import gzip
 
 from celery.signals import task_postrun
 
-BROKER_URL = 'sqs://%s:%s@' % (os.environ['AWS_ACCESS_KEY'], os.environ['AWS_SECRET_KEY'])
-
-celery_app = Celery(__name__, broker=BROKER_URL)
+celery_app = make_celery()
 
 @celery_app.task
 def update_crime(fpath=None):
@@ -31,7 +28,7 @@ def update_crime(fpath=None):
         chg_crime()
         update_crime_current_flag()
         update_master_current_flag()
-        cleanup_temp_tables()
+    cleanup_temp_tables()
     return None
 
 @task_postrun.connect
