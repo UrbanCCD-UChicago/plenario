@@ -103,6 +103,12 @@ def make_query(table, raw_query_params):
             val['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
             query = column.ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val)))
             query_clauses.append(query)
+        elif operator.startswith('time_of_day'):
+            if operator.endswith('ge'):
+                query = func.date_part('hour', column).__ge__(query_value)
+            elif operator.endswith('le'):
+                query = func.date_part('hour', column).__le__(query_value)
+            query_clauses.append(query)
         else:
             try:
                 attr = filter(
