@@ -31,10 +31,6 @@ def update_crime(fpath=None):
     cleanup_temp_tables()
     return None
 
-@task_postrun.connect
-def close_session(*args, **kwargs):
-    session.remove()
-
 @celery_app.task
 def cleanup_temp_tables():
     tables = ['new', 'src', 'raw', 'chg', 'dedup']
