@@ -254,7 +254,7 @@ def parse_join_query(params):
     agg = 'day'
     datatype = 'json'
     for key, value in params.items():
-        if key.split('__')[0] in ['obs_date', 'geom', 'dataset_name']:
+        if key.split('__')[0] in ['obs_date', 'location_geom', 'dataset_name']:
             queries['base'][key] = value
         elif key == 'agg':
             agg = value
