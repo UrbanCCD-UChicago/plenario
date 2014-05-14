@@ -25,6 +25,9 @@ def grid_view():
         4000: '~4km', 
         5000: '~5km'
     }
+    context['operators'] = {
+        'is': 'eq',
+    }
     return render_template('grid.html', **context)
 
 @views.route('/map/')

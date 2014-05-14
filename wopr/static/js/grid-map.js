@@ -89,6 +89,7 @@ $(window).resize(function () {
                     }).addTo(map);
                     legend.addTo(map);
                 }
+                getFieldDefs(grid_data['dataset']);
             }
         );
     }
@@ -113,6 +114,15 @@ $(window).resize(function () {
         };
     }
 
+    function getFieldDefs(dataset_name){
+        $.when($.getJSON('/api/fields/' + dataset_name + '/')).then(
+            function(fields){
+                $('#fielddefs').show();
+                $('#fielddefs-list').val()
+            }
+        )
+    }
+
     function getGrid(url, grid){
         var data = {
             dataset_name: grid['dataset'],
@@ -121,67 +131,5 @@ $(window).resize(function () {
             center: grid['center'],
         }
         return $.getJSON(url, data)
-    }
-
-    //function metaUpdate(grid_data){
-    //    $('#sidebar').spin('large');
-    //    var tpl = new EJS({text: $('#metaControl').html()})
-    //    $.when($.getJSON('/api/')).then(
-    //        function(datasets){
-    //            $(self._div).spin(false);
-    //            grid_data['datasets'] = datasets;
-    //            var opts = makeYearPicker();
-    //            $('#sidebar').html(tpl.render(grid_data));
-    //            $('#year-picker').html(opts);
-    //            $('#dataset-picker').on('change', function(e){
-    //                grid_data['dataset'] = $(this).val();
-    //                grid_data['human_name'] = $('#dataset-picker').find(':selected').first().text().trim();
-    //                var opts = makeYearPicker();
-    //                $('#year-picker').html(opts);
-    //                adjustYear();
-    //                loadLayer(grid_data);
-    //            })
-    //            $('#year-picker').on('change', function(e){
-    //                grid_data['year'] = parseInt($(this).val());
-    //                adjustYear();
-    //                loadLayer(grid_data);
-    //            })
-    //            $('#resolution-picker').on('change', function(e){
-    //                grid_data['resolution'] = parseFloat($(this).val());
-    //                adjustYear();
-    //                loadLayer(grid_data);
-    //            })
-    //        }
-    //    )
-    //}
-    //function makeYearPicker(){
-    //    $.each(grid_data['datasets'], function(i, set){
-    //        if(set['dataset_name'] === grid_data['dataset']){
-    //            grid_data['obs_from'] = set['obs_from'];
-    //            grid_data['obs_to'] = set['obs_to'];
-    //        }
-    //    });
-    //    var end = parseInt(moment(grid_data['obs_to']).format('YYYY')) + 1;
-    //    var start = parseInt(moment(grid_data['obs_from']).format('YYYY'));
-    //    var years = Number.range(start, end);
-    //    var opts = '';
-    //    $.each(years, function(i, y){
-    //        opts += '<option value="' + y + '"';
-    //        if(y === grid_data['year']){
-    //            opts += "selected=true";
-    //        }
-    //        opts += ">" + y + "</option>";
-    //    });
-    //    return opts;
-    //}
-    function adjustYear(){
-        var to = parseInt(moment(grid_data['obs_to']).format('YYYY'));
-        var from = parseInt(moment(grid_data['obs_from']).format('YYYY'));
-        if(grid_data['year'] >= to ){
-            grid_data['year'] = to
-        }
-        if(grid_data['year'] <= from){
-            grid_data['year'] = from;
-        }
     }
 })()

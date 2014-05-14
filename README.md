@@ -8,7 +8,7 @@ RESTful API for geospatial and time aggregation across multiple Chicago open dat
 git clone git@github.com:datamade/wopr-api.git
 cd wopr-api
 pip install -r requirements.txt
-python app.py
+python runserver.py
 ```
 
 navigate to http://localhost:5000/

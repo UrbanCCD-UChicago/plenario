@@ -44,6 +44,22 @@
                                         {% endfor %}
                                     </select>
                                 </div>
+                                <div id="fielddefs" class="form-group" style="display:none;">
+                                    <div class="row">
+                                        <div class="col-xs-6">
+                                            <label for="fielddefs-list">Field Definitions: </label>
+                                            <select id="fielddefs-list"></select>
+                                        </div>
+                                        <div class="col-xs-6">
+                                            <label for="operators-list">Operators: </label>
+                                            <select id="operators-list">
+                                                {% for op in ['is', 'is not', 'is less than', 'is more than', 'is in', 'is like'] %}
+                                                    <option value="">
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
                             </form>
                         </div>
                     </div>
