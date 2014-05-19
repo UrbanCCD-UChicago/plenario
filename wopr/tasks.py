@@ -44,15 +44,18 @@ def cleanup_temp_tables():
     return 'Temp tables dropped'
 
 @celery_app.task
-def dat_crime():
+def dat_crime(fpath=None):
     # Step Zero: Create dat_crime table
+    raw_crime(fpath=fpath)
+    dedupe_crime()
+    src_crime()
     src_crime_table = Table('src_chicago_crimes_all', Base.metadata, 
         autoload=True, autoload_with=engine, extend_existing=True)
     dat_crime_table = crime_table('dat_chicago_crimes_all', Base.metadata)
     dat_crime_table.append_column(Column('chicago_crimes_all_row_id', Integer, primary_key=True))
-    dat_crime_table.append_column(Column('start_date', TIMESTAMP, default=datetime.now))
-    dat_crime_table.append_column(Column('end_date', TIMESTAMP, default=None))
-    dat_crime_table.append_column(Column('current_flag', Boolean, default=True))
+    dat_crime_table.append_column(Column('start_date', TIMESTAMP, server_default=text('CURRENT_TIMESTAMP')))
+    dat_crime_table.append_column(Column('end_date', TIMESTAMP, server_default=text('CURRENT_TIMESTAMP')))
+    dat_crime_table.append_column(Column('current_flag', Boolean, server_default=text('TRUE')))
     dat_crime_table.append_constraint(UniqueConstraint('id', 'start_date'))
     dat_crime_table.create(bind=engine, checkfirst=True)
     new_cols = ['start_date', 'end_date', 'current_flag', 'chicago_crimes_all_row_id']
@@ -61,9 +64,18 @@ def dat_crime():
             [c for c in dat_crime_table.columns.keys() if c not in new_cols],
             select([c for c in src_crime_table.columns])
         )
-    conn = engine.connect()
+    conn = engine.contextual_connect()
     res = conn.execute(dat_ins)
-    return res
+    cols = crime_master_cols(dat_crime_table)
+    master_ins = MasterTable.insert()\
+        .from_select(
+            [c for c in MasterTable.columns.keys() if c != 'master_row_id'],
+            select(cols)\
+                .select_from(dat_crime_table)
+        )
+    conn = engine.contextual_connect()
+    res = conn.execute(master_ins)
+    return 'DAT crime created'
 
 @celery_app.task
 def raw_crime(fpath=None, tablename='raw_chicago_crimes_all'):
@@ -89,7 +101,7 @@ def raw_crime(fpath=None, tablename='raw_chicago_crimes_all'):
 
 @celery_app.task
 def dedupe_crime():
-    # Step Two: Find duplicate records by case_number
+    # Step Two: Find duplicate records by ID
     raw_crime_table = Table('raw_chicago_crimes_all', Base.metadata, 
         autoload=True, autoload_with=engine, extend_existing=True)
     dedupe_crime_table = Table('dedup_chicago_crimes_all', Base.metadata,
@@ -183,16 +195,7 @@ def update_dat_crimes():
     conn.execute(ins)
     return 'Crime Table updated'
 
-@celery_app.task
-def update_master():
-    # Step Six: Update Master table
-    dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
-        autoload=True, autoload_with=engine, extend_existing=True)
-    try:
-        new_crime_table = Table('new_chicago_crimes_all', Base.metadata, 
-            autoload=True, autoload_with=engine, extend_existing=True)
-    except NoSuchTableError:
-        return None
+def crime_master_cols(dat_crime_table):
     col_names = ['start_date', 'end_date', 'current_flag', 'location', 'latitude', 'longitude']
     cols = [
         dat_crime_table.c.start_date,
@@ -210,6 +213,19 @@ def update_master():
     cols.append(text("'chicago_crimes_all' AS dataset_name"))
     cols.append(dat_crime_table.c.chicago_crimes_all_row_id.label('dataset_row_id'))
     cols.append(text("ST_PointFromText('POINT(' || dat_chicago_crimes_all.longitude || ' ' || dat_chicago_crimes_all.latitude || ')', 4326) as location_geom"))
+    return cols
+
+@celery_app.task
+def update_master():
+    # Step Six: Update Master table
+    dat_crime_table = Table('dat_chicago_crimes_all', Base.metadata, 
+        autoload=True, autoload_with=engine, extend_existing=True)
+    try:
+        new_crime_table = Table('new_chicago_crimes_all', Base.metadata, 
+            autoload=True, autoload_with=engine, extend_existing=True)
+    except NoSuchTableError:
+        return None
+    cols = crime_master_cols(dat_crime_table)
     ins = MasterTable.insert()\
         .from_select(
             [c for c in MasterTable.columns.keys() if c != 'master_row_id'],
