@@ -83,6 +83,8 @@ def make_query(table, raw_query_params):
         args_keys.remove('offset')
     if 'limit' in args_keys:
         args_keys.remove('limit')
+    if 'order_by' in args_keys:
+        args_keys.remove('order_by')
     for query_param in args_keys:
         try:
             field, operator = query_param.split('__')
@@ -275,6 +277,8 @@ def parse_join_query(params):
 def detail():
     raw_query_params = request.args.copy()
     agg, datatype, queries = parse_join_query(raw_query_params)
+    limit = raw_query_params.get('limit')
+    order_by = raw_query_params.get('order_by')
     valid_query, base_clauses, resp, status_code = make_query(MasterTable, queries['base'])
     if valid_query:
         resp['meta']['status'] = 'ok'
@@ -290,9 +294,14 @@ def detail():
             base_query = base_query.join(dataset, MasterTable.c.dataset_row_id == dataset.c[pk])
         for clause in base_clauses:
             base_query = base_query.filter(clause)
+        if order_by:
+            col, order = order_by.split(',')
+            base_query = base_query.order_by(getattr(MasterTable.c[col], order)())
         for clause in detail_clauses:
             base_query = base_query.filter(clause)
-        values = [r for r in base_query.order_by(MasterTable.c.obs_date.desc()).all()]
+        if limit:
+            base_query = base_query.limit(limit)
+        values = [r for r in base_query.all()]
         fieldnames = dataset.columns.keys()
         for value in values:
             d = {}
