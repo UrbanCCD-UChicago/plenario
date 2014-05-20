@@ -3,3 +3,4 @@
 Icon?
 .dropbox
 .coverage
+celerybeat-schedule
