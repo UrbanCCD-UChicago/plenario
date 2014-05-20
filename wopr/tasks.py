@@ -249,8 +249,8 @@ def chg_crime():
         extend_existing=True)
     chg_crime_table.drop(bind=engine, checkfirst=True)
     chg_crime_table.create(bind=engine)
-    src_cols = [c for c in src_crime_table.columns if c.name != 'id']
-    dat_cols = [c for c in dat_crime_table.columns if c.name != 'id']
+    src_cols = [c for c in src_crime_table.columns if c.name not in ['id', 'start_date', 'end_date']]
+    dat_cols = [c for c in dat_crime_table.columns if c.name not in ['id', 'start_date', 'end_date']]
     and_args = []
     for s, d in zip(src_cols, dat_cols):
         ors = or_(s != None, d != None)
