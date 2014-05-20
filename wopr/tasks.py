@@ -54,7 +54,7 @@ def dat_crime(fpath=None):
     dat_crime_table = crime_table('dat_chicago_crimes_all', Base.metadata)
     dat_crime_table.append_column(Column('chicago_crimes_all_row_id', Integer, primary_key=True))
     dat_crime_table.append_column(Column('start_date', TIMESTAMP, server_default=text('CURRENT_TIMESTAMP')))
-    dat_crime_table.append_column(Column('end_date', TIMESTAMP, server_default=text('CURRENT_TIMESTAMP')))
+    dat_crime_table.append_column(Column('end_date', TIMESTAMP, server_default=text('NULL')))
     dat_crime_table.append_column(Column('current_flag', Boolean, server_default=text('TRUE')))
     dat_crime_table.append_constraint(UniqueConstraint('id', 'start_date'))
     dat_crime_table.create(bind=engine, checkfirst=True)
