@@ -89,7 +89,7 @@ $(window).resize(function () {
                     }).addTo(map);
                     legend.addTo(map);
                 }
-                getFieldDefs(grid_data['dataset']);
+                // getFieldDefs(grid_data['dataset']);
             }
         );
     }
