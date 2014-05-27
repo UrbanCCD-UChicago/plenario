@@ -28,7 +28,7 @@
                                     <label for="year-picker">Pick another year: </label>
                                     {% for dataset in datasets %}
                                         <select id="{{dataset.dataset_name}}-yearpicker" class="yearpicker form-control" {% if dataset.dataset_name != default.dataset_name%}style="display:none;"{% endif %}>
-                                            {% for year in range(dataset.obs_from.year, dataset.obs_to.year) %}
+                                            {% for year in range(dataset.obs_from.year, dataset.obs_to.year + 1) %}
                                             <option value="{{year}}" {% if year == 2013 %}selected=true{% endif %}>{{year}}</option>
                                             {% endfor %}
                                         </select>

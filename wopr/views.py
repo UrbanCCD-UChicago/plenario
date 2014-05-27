@@ -2,6 +2,7 @@ from flask import make_response, request, render_template, current_app, g, \
     Blueprint
 from wopr.models import MasterTable, MetaTable
 from wopr.database import session
+from datetime import datetime, timedelta
 
 views = Blueprint('views', __name__)
 
@@ -13,6 +14,11 @@ def index():
 def grid_view():
     context = {}
     context['datasets'] = session.query(MetaTable).all()
+    for dataset in context['datasets']:
+        if not dataset.obs_to or not dataset.obs_from:
+            # Arbitrarily setting obs_to and obs_from if they are not present.
+            dataset.obs_from = datetime.now() - timedelta(days=365 * 4)
+            dataset.obs_to = datetime.now()
     context['default'] = [d for d in context['datasets'] if d.dataset_name == 'chicago_crimes_all'][0]
     context['resolutions'] = {
         300: '~300m', 
