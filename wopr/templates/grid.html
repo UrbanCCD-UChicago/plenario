@@ -2,7 +2,9 @@
 {% block title %}WOPR Grid Explorer{% endblock %}
 {% block extra_styles %}
     <link href="{{ url_for('static', filename='css/leaflet.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/leaflet.draw.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/leaflet.label.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/daterangepicker-bs3.css') }}" rel="stylesheet">
 {% endblock %}
 {% block content %}
     <div class="container">
@@ -25,14 +27,8 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label for="year-picker">Pick another year: </label>
-                                    {% for dataset in datasets %}
-                                        <select id="{{dataset.dataset_name}}-yearpicker" class="yearpicker form-control" {% if dataset.dataset_name != default.dataset_name%}style="display:none;"{% endif %}>
-                                            {% for year in range(dataset.obs_from.year, dataset.obs_to.year + 1) %}
-                                            <option value="{{year}}" {% if year == 2013 %}selected=true{% endif %}>{{year}}</option>
-                                            {% endfor %}
-                                        </select>
-                                    {% endfor %}
+                                    <label for="date_range">Date Range: </label>
+                                    <input id="date_range" class="form-control" type="text"/>
                                 </div>
                                 <div class="form-group">
                                     <label for="resolution-picker">Pick another resolution: </label>
@@ -74,10 +70,12 @@
 {% endblock %}
 {% block extra_javascript %}
     <script src="{{ url_for('static', filename='js/range.js') }}" type="text/javascript"></script>
+    <script src="{{ url_for('static', filename='js/daterangepicker.js') }}"></script>
     <script src="{{ url_for('static', filename='js/spin.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/jquery.spin.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ejs_production.js') }}"></script>
     <script src="{{ url_for('static', filename='js/leaflet.js') }}" type="text/javascript"></script>
+    <script src="{{ url_for('static', filename='js/leaflet.draw.js') }}" type="text/javascript"></script>
     <script src="{{ url_for('static', filename='js/leaflet.label.js') }}" type="text/javascript"></script>
     <script src="{{ url_for('static', filename='js/jenks.js') }}" type="text/javascript"></script>
     <script src="{{ url_for('static', filename='js/grid-map.js') }}" type="text/javascript"></script>

@@ -12,13 +12,16 @@ $(window).resize(function () {
     L.tileLayer('https://{s}.tiles.mapbox.com/v3/datamade.hn83a654/{z}/{x}/{y}.png', {
         attribution: '<a href="http://www.mapbox.com/about/maps/" target="_blank">Terms &amp; Feedback</a>'
     }).addTo(map);
+    var start_date = moment().subtract('days', 372);
+    var end_date = moment().subtract('days', 7);
+    var min_date = moment().subtract('years', 5);
+    var max_date = moment().subtract('days', 7);
     var grid_data = {
-        year: 2013,
         dataset: 'chicago_crimes_all',
         human_name: 'Crimes - 2001 to present',
         resolution: 1000, //in meters
-        obs_from: '2001-01-01',
-        obs_to: moment().subtract('days', 7).format('YYYY-MM-DD')
+        obs_from: start_date.format('YYYY-MM-DD'),
+        obs_to: end_date.format('YYYY-MM-DD')
     }
     var legend = L.control({position: 'bottomright'});
     legend.onAdd = function(map){
@@ -35,6 +38,23 @@ $(window).resize(function () {
         div.innerHTML = '<div><strong>' + grid_data['human_name'] + '</strong><br />' + labels.join('<br />') + '</div>';
         return div
     }
+    var drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+    var drawControl = new L.Control.Draw({
+        edit: {
+            featureGroup: drawnItems
+        },
+        draw: {
+            polyline: false,
+            circle: false,
+            marker: false
+        }
+    });
+    map.addControl(drawControl);
+    map.on('draw:created', draw_create);
+    map.on('draw:edited', draw_edit);
+    map.on('draw:deleted', draw_delete);
+    map.on('draw:drawstart', draw_delete);
     var map_colors = [
         '#deebf7',
         '#c6dbef',
@@ -44,6 +64,19 @@ $(window).resize(function () {
         '#2171b5',
         '#084594'
     ]
+    var date_range_opts = {
+        format: 'M/D/YYYY',
+        showDropdowns: true,
+        startDate: start_date,
+        endDate: end_date,
+        minDate: min_date,
+        maxDate: max_date
+    }
+    $('#date_range').daterangepicker(
+      date_range_opts,
+      date_range_callback
+    )
+    update_date_range();
     $('#dataset-picker').on('change', function(e){
         var name = $(this).val();
         grid_data['dataset'] = name;
@@ -52,21 +85,34 @@ $(window).resize(function () {
         $('#' + name + '-yearpicker').show();
         loadLayer(grid_data);
     });
-    $('.yearpicker').on('change', function(e){
-        grid_data['year'] = parseInt($(this).val());
-        loadLayer(grid_data);
-    })
     $('#resolution-picker').on('change', function(e){
         grid_data['resolution'] = parseFloat($(this).val());
         loadLayer(grid_data);
     })
     loadLayer(grid_data);
+    function date_range_callback(start, end, label){
+        start_date = start;
+        end_date = end;
+    }
+    function draw_create(e){
+        drawnItems.addLayer(e.layer);
+        grid_data['location_geom__within'] = JSON.stringify(e.layer.toGeoJSON());
+        loadLayer(grid_data)
+    }
+    function draw_edit(e){
+        console.log(e.layer);
+    }
+    function draw_delete(e){
+        console.log(e.layer);
+    }
     function loadLayer(grid_data){
         $('#map').spin('large');
         grid_data['center'] = [map.getCenter().lat, map.getCenter().lng]
         var url ='/api/grid/'
-        $.when(getGrid(url, grid_data)).then(
-            function(grid){
+        $.when(getGrid(url, grid_data), $.getJSON('/api/')).then(
+            function(grid, meta){
+                grid = grid[0];
+                meta = meta[0];
                 $('#map').spin(false);
                 var values = [];
                 $.each(grid['features'], function(i, val){
@@ -89,6 +135,39 @@ $(window).resize(function () {
                     }).addTo(map);
                     legend.addTo(map);
                 }
+                $.each(meta, function(i, m){
+                    if(m['dataset_name'] == grid_data['dataset']){
+                        if (m.obs_from){
+                            min_date = moment(m['obs_from'], 'YYYY-MM-DD');
+                        } else {
+                            min_date = moment().subtract('years', 5);
+                        }
+                        if (m.obs_to){
+                            max_date = moment(m['obs_to'], 'YYYY-MM-DD');
+                        } else {
+                            max_date = moment();
+                        }
+                    }
+                });
+                if (end_date.isAfter(max_date)){
+                    end_date = max_date;
+                }
+                if (start_date.isBefore(min_date)){
+                    start_state = min_date;
+                }
+                date_range_opts['minDate'] = min_date
+                date_range_opts['maxDate'] = max_date
+                date_range_opts['startDate'] = start_date
+                date_range_opts['endDate'] = end_date
+                $('#date_range').daterangepicker(date_range_opts, date_range_callback);
+                $('#date_range').on('apply.daterangepicker', function(ev, picker) {
+                    start_date = picker.startDate
+                    end_date = picker.endDate
+                    grid_data['obs_from'] = start_date.format('YYYY-MM-DD')
+                    grid_data['obs_to'] = end_date.format('YYYY-MM-DD')
+                    loadLayer(grid_data);
+                });
+                update_date_range();
                 // getFieldDefs(grid_data['dataset']);
             }
         );
@@ -127,9 +206,16 @@ $(window).resize(function () {
         var data = {
             dataset_name: grid['dataset'],
             resolution: grid['resolution'],
-            year: grid['year'],
             center: grid['center'],
+            obs_date__ge: grid['obs_from'],
+            obs_date__le: grid['obs_to'],
+        }
+        if (typeof grid['location_geom__within'] !== 'undefined'){
+            data['location_geom__within'] = grid['location_geom__within']
         }
         return $.getJSON(url, data)
+    }
+    function update_date_range(){
+        $('#date_range').val(start_date.format('M/D/YYYY') + " - " + end_date.format('M/D/YYYY'));
     }
 })()

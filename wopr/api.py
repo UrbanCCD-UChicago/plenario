@@ -133,8 +133,6 @@ def make_query(table, raw_query_params):
 def meta():
     status_code = 200
     resp = []
-    # TODO: Doinaggregate queries here is super slow. It would be nice to speed it up
-    # This query only performs well after makinan index on dataset_name
     values = session.query(MetaTable).all()
     keys = MetaTable.columns.keys()
     for value in values:
@@ -371,15 +369,25 @@ def getSizeInDegrees(meters, latitude):
 def grid():
     dataset_name = request.args.get('dataset_name')
     resolution = request.args.get('resolution')
-    year = request.args.get('year')
+    obs_to = request.args.get('obs_date__le')
+    obs_from = request.args.get('obs_date__ge')
+    location_geom = request.args.get('location_geom__within')
     center = request.args.getlist('center[]')
     resp = {'type': 'FeatureCollection', 'features': []}
     size_x, size_y = getSizeInDegrees(float(resolution), float(center[0]))
     query = session.query(func.count(MasterTable.c.dataset_row_id), 
             func.ST_SnapToGrid(MasterTable.c.location_geom, size_x, size_y))\
-            .filter(MasterTable.c.obs_date >= '01-01-%s' % year)\
-            .filter(MasterTable.c.obs_date <= '12-31-%s' % year)\
             .filter(MasterTable.c.dataset_name == dataset_name)
+    if obs_from:
+        query = query.filter(MasterTable.c.obs_date >= obs_from)
+    if obs_to:
+        query = query.filter(MasterTable.c.obs_date <= obs_to)
+    if location_geom:
+        val = json.loads(location_geom)['geometry']
+        val['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
+        query = column.ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val)))
+        query = query.filter(MasterTable.c.location_geom\
+                .ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val))))
     query = query.group_by(func.ST_SnapToGrid(MasterTable.c.location_geom, size_x, size_y))
     values = [d for d in query.all()]
     for value in values:
