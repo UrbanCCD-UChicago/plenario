@@ -47,7 +47,21 @@ $(window).resize(function () {
         draw: {
             polyline: false,
             circle: false,
-            marker: false
+            marker: false,
+            polygon: {
+                shapeOptions: {
+                    'color': '#123456',
+                    'opacity': 0.4,
+                    'fillOpacity': 0
+                }
+            },
+            rectangle: {
+                shapeOptions: {
+                    'color': '#123456',
+                    'opacity': 0.4,
+                    'fillOpacity': 0
+                }
+            }
         }
     });
     map.addControl(drawControl);
