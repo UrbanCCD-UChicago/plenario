@@ -6,7 +6,7 @@ $(window).resize(function () {
 }).resize();
 
 (function(){
-    var grid_layer;
+    var grid_layer = new L.FeatureGroup();
     var jenks_cutoffs;
     var map = L.map('map').fitBounds([[41.644286009999995, -87.94010087999999], [42.023134979999995, -87.52366115999999]]);
     L.tileLayer('https://{s}.tiles.mapbox.com/v3/datamade.hn83a654/{z}/{x}/{y}.png', {
@@ -90,6 +90,17 @@ $(window).resize(function () {
         loadLayer(grid_data);
     })
     loadLayer(grid_data);
+    $('.showmore').on('click', function(){
+        var add_height = $('#dataset-description').height();
+        $('.showmore-content').height(add_height);
+        $(this).hide()
+        $('.showless').show()
+    });
+    $('.showless').on('click', function(){
+        $('.showmore-content').height(165);
+        $(this).hide()
+        $('.showmore').show()
+    })
     function date_range_callback(start, end, label){
         start_date = start;
         end_date = end;
@@ -100,55 +111,60 @@ $(window).resize(function () {
         loadLayer(grid_data)
     }
     function draw_edit(e){
-        console.log(e.layer);
+        var layers = e.layers;
+        layers.eachLayer(function(layer){
+            drawnItems.addLayer(layer);
+            grid_data['location_geom__within'] = JSON.stringify(layer.toGeoJSON());
+        });
     }
     function draw_delete(e){
-        console.log(e.layer);
+        grid_layer.clearLayers();
+        drawnItems.clearLayers();
     }
     function loadLayer(grid_data){
         $('#map').spin('large');
         grid_data['center'] = [map.getCenter().lat, map.getCenter().lng]
         var url ='/api/grid/'
-        $.when(getGrid(url, grid_data), $.getJSON('/api/')).then(
+        $.when(getGrid(url, grid_data), $.getJSON('/api/', {'dataset_name': grid_data['dataset']})).then(
             function(grid, meta){
                 grid = grid[0];
-                meta = meta[0];
+                meta = meta[0][0];
                 $('#map').spin(false);
                 var values = [];
                 $.each(grid['features'], function(i, val){
                     values.push(val['properties']['count']);
                 });
                 try{legend.removeFrom(map);}catch(e){};
+                grid_layer.clearLayers();
                 if (typeof grid_layer !== 'undefined'){
                     map.removeLayer(grid_layer);
                 }
+                // Should probably do something here to let users know
+                // that there are no results
                 if (values.length > 0){
                     jenks_cutoffs = jenks(values, 6);
                     jenks_cutoffs[0] = 0;
                     jenks_cutoffs.pop();
-                    grid_layer = L.geoJson(grid, {
+                    grid_layer.addLayer(L.geoJson(grid, {
                         style: styleGrid,
                         onEachFeature: function(feature, layer){
                             var content = '<h4>Count: ' + feature.properties.count + '</h4>';
                             layer.bindLabel(content);
                         }
-                    }).addTo(map);
+                    })).addTo(map);
                     legend.addTo(map);
+                    map.fitBounds(grid_layer.getBounds());
                 }
-                $.each(meta, function(i, m){
-                    if(m['dataset_name'] == grid_data['dataset']){
-                        if (m.obs_from){
-                            min_date = moment(m['obs_from'], 'YYYY-MM-DD');
-                        } else {
-                            min_date = moment().subtract('years', 5);
-                        }
-                        if (m.obs_to){
-                            max_date = moment(m['obs_to'], 'YYYY-MM-DD');
-                        } else {
-                            max_date = moment();
-                        }
-                    }
-                });
+                if (meta.obs_from){
+                    min_date = moment(meta['obs_from'], 'YYYY-MM-DD');
+                } else {
+                    min_date = moment().subtract('years', 5);
+                }
+                if (meta.obs_to){
+                    max_date = moment(meta['obs_to'], 'YYYY-MM-DD');
+                } else {
+                    max_date = moment();
+                }
                 if (end_date.isAfter(max_date)){
                     end_date = max_date;
                 }
@@ -168,7 +184,8 @@ $(window).resize(function () {
                     loadLayer(grid_data);
                 });
                 update_date_range();
-                // getFieldDefs(grid_data['dataset']);
+                $('#dataset-name').html(meta['human_name']);
+                $('#dataset-description').html(meta['description']);
             }
         );
     }

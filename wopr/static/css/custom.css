@@ -6,6 +6,20 @@ body {
 
 .label:hover { text-decoration: none; }
 
+.showmore-content {
+    overflow: hidden;
+    height: 165px;
+}
+
+.showmore-content p {
+    font-size: 14px;
+    line-height: 20px;
+}
+
+.showmore, .showless {
+    margin-top: 10px;
+}
+
 /* Everything but the jumbotron gets side spacing for mobile first views */
 .header,
 .marketing,

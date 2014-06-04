@@ -13,8 +13,6 @@
                 <div class='well'>
                     <div id="sidebar">
                         <div>
-                          <h4 id="dataset-name" class="light">{{ default.human_name }}</h4>
-                          <p id="dataset-description">{{ default.description|truncate }}</p>
                             <form class="form" role="form">
                                 <div class="form-group">
                                     <label for="dataset-picker">Pick another dataset: </label>
@@ -57,6 +55,12 @@
                                     </div>
                                 </div>
                             </form>
+                            <div class="showmore-content">
+                                <h4 id="dataset-name" class="light">{{ default.human_name }}</h4>
+                                <p id="dataset-description">{{ default.description }}</p>
+                            </div>
+                            <button class="btn btn-primary showmore" type="button">Show more</button>
+                            <button class="btn btn-primary showless" type="button" style="display:none">Show less</button>
                         </div>
                     </div>
                 </div>

@@ -133,7 +133,12 @@ def make_query(table, raw_query_params):
 def meta():
     status_code = 200
     resp = []
-    values = session.query(MetaTable).all()
+    dataset_name = request.args.get('dataset_name')
+    if dataset_name:
+        values = session.query(MetaTable)\
+            .filter(MetaTable.c.dataset_name == dataset_name).all()
+    else:
+        values = session.query(MetaTable).all()
     keys = MetaTable.columns.keys()
     for value in values:
         d = {}
@@ -385,7 +390,6 @@ def grid():
     if location_geom:
         val = json.loads(location_geom)['geometry']
         val['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
-        query = column.ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val)))
         query = query.filter(MasterTable.c.location_geom\
                 .ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val))))
     query = query.group_by(func.ST_SnapToGrid(MasterTable.c.location_geom, size_x, size_y))
