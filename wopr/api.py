@@ -101,7 +101,13 @@ def make_query(table, raw_query_params):
             query = column.in_(query_value.split(','))
             query_clauses.append(query)
         elif operator == 'within':
-            val = json.loads(query_value)['geometry']
+            geo = json.loads(query_value)
+            if 'features' in geo.keys():
+                val = geo['features'][0]['geometry']
+            elif 'geometry' in geo.keys():
+                val = geo['geometry']
+            else:
+                val = geo
             val['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
             query = column.ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val)))
             query_clauses.append(query)
