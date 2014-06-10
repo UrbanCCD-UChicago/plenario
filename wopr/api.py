@@ -17,6 +17,7 @@ from cStringIO import StringIO
 import csv
 from shapely.wkb import loads
 from shapely.geometry import box
+from collections import OrderedDict
 
 from wopr.models import MasterTable, MetaTable
 from wopr.database import session, app_engine as engine, Base
@@ -193,10 +194,9 @@ def dataset_fields(dataset_name):
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-def make_csv(data, fields):
+def make_csv(data):
     outp = StringIO()
-    writer = csv.DictWriter(outp, fields)
-    writer.writeheader()
+    writer = csv.writer(outp)
     writer.writerows(data)
     return outp.getvalue()
 
@@ -236,7 +236,7 @@ def dataset():
             results.append(d)
         results = sorted(results, key=itemgetter('dataset_name'))
         for k,g in groupby(results, key=itemgetter('dataset_name')):
-            d = {'dataset_name': ' '.join(k.split('_')).title()}
+            d = {'dataset_name': k}
             d['temporal_aggregate'] = agg
             d['items'] = list(g)
             resp['objects'].append(d)
@@ -245,22 +245,22 @@ def dataset():
         resp = make_response(json.dumps(resp, default=dthandler), status_code)
         resp.headers['Content-Type'] = 'application/json'
     elif datatype == 'csv':
-        if not raw_query_params.get('dataset_name'):
-            resp = {
-                'meta': {
-                    'status': 'error',
-                    'message': 'If you want data in a CSV format, you also need to specify a dataset_name'
-                },
-                'objects': []
-            }
-        else:
-            data = resp['objects'][0]
-            fields = data['items'][0].keys()
-            resp = make_response(make_csv(data['items'], fields), 200)
-            resp.headers['Content-Type'] = 'text/csv'
-            dname = raw_query_params['dataset_name']
-            filedate = datetime.now().strftime('%Y-%m-%d')
-            resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
+        csv_resp = []
+        fields = ['temporal_group']
+        results = sorted(results, key=itemgetter('group'))
+        for k,g in groupby(results, key=itemgetter('group')):
+            d = [k]
+            for row in list(g):
+                if row['dataset_name'] not in fields:
+                    fields.append(row['dataset_name'])
+                d.append(row['count'])
+            csv_resp.append(d)
+        csv_resp[0] = fields
+        csv_resp = make_csv(csv_resp)
+        resp = make_response(csv_resp, 200)
+        resp.headers['Content-Type'] = 'text/csv'
+        filedate = datetime.now().strftime('%Y-%m-%d')
+        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % (filedate)
     return resp
 
 def parse_join_query(params):
@@ -322,7 +322,9 @@ def detail():
         resp = make_response(json.dumps(resp, default=dthandler), status_code)
         resp.headers['Content-Type'] = 'application/json'
     elif datatype == 'csv':
-        resp = make_response(make_csv(resp['objects'], fieldnames), 200)
+        csv_resp = [fieldnames]
+        csv_resp.extend([v[1:] for v in values])
+        resp = make_response(make_csv(csv_resp), 200)
         filedate = datetime.now().strftime('%Y-%m-%d')
         dname = raw_query_params['dataset_name']
         filedate = datetime.now().strftime('%Y-%m-%d')
