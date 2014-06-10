@@ -391,9 +391,20 @@ def grid():
     obs_to = request.args.get('obs_date__le')
     obs_from = request.args.get('obs_date__ge')
     location_geom = request.args.get('location_geom__within')
+    buff = request.args.get('buffer', 100)
     center = request.args.getlist('center[]')
     resp = {'type': 'FeatureCollection', 'features': []}
     size_x, size_y = getSizeInDegrees(float(resolution), float(center[0]))
+    if location_geom:
+        location_geom = json.loads(location_geom)['geometry']
+        if location_geom['type'] == 'LineString':
+            shape = asShape(location_geom)
+            lat = shape.centroid.y
+            # 100 meters by default
+            x, y = getSizeInDegrees(int(buff), lat)
+            size_x, size_y = getSizeInDegrees(50, lat)
+            location_geom = shape.buffer(y).__geo_interface__
+        location_geom['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
     query = session.query(func.count(MasterTable.c.dataset_row_id), 
             func.ST_SnapToGrid(MasterTable.c.location_geom, size_x, size_y))\
             .filter(MasterTable.c.dataset_name == dataset_name)
@@ -402,10 +413,8 @@ def grid():
     if obs_to:
         query = query.filter(MasterTable.c.obs_date <= obs_to)
     if location_geom:
-        val = json.loads(location_geom)['geometry']
-        val['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
         query = query.filter(MasterTable.c.location_geom\
-                .ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val))))
+                .ST_Within(func.ST_GeomFromGeoJSON(json.dumps(location_geom))))
     query = query.group_by(func.ST_SnapToGrid(MasterTable.c.location_geom, size_x, size_y))
     values = [d for d in query.all()]
     for value in values:

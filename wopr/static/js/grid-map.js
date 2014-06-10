@@ -45,7 +45,6 @@ $(window).resize(function () {
             featureGroup: drawnItems
         },
         draw: {
-            polyline: false,
             circle: false,
             marker: false,
             polygon: {
@@ -102,6 +101,10 @@ $(window).resize(function () {
     $('#resolution-picker').on('change', function(e){
         grid_data['resolution'] = parseFloat($(this).val());
         loadLayer(grid_data);
+    });
+    $('#buffer-picker').on('change', function(e){
+        grid_data['buffer'] = parseFloat($(this).val());
+        loadLayer(grid_data);
     })
     loadLayer(grid_data);
     $('.showmore').on('click', function(){
@@ -120,6 +123,11 @@ $(window).resize(function () {
         end_date = end;
     }
     function draw_create(e){
+        if(e.layerType == 'polyline'){
+            $('#buffer').show();
+        } else {
+            $('#buffer').hide();
+        }
         drawnItems.addLayer(e.layer);
         grid_data['location_geom__within'] = JSON.stringify(e.layer.toGeoJSON());
         loadLayer(grid_data)
@@ -239,10 +247,13 @@ $(window).resize(function () {
             resolution: grid['resolution'],
             center: grid['center'],
             obs_date__ge: grid['obs_from'],
-            obs_date__le: grid['obs_to'],
+            obs_date__le: grid['obs_to']
         }
         if (typeof grid['location_geom__within'] !== 'undefined'){
             data['location_geom__within'] = grid['location_geom__within']
+        }
+        if (typeof grid['buffer'] !== 'undefined'){
+            data['buffer'] = grid['buffer']
         }
         return $.getJSON(url, data)
     }
