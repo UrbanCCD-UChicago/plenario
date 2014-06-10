@@ -25,24 +25,22 @@
 
   <body style="height: 100%">
       <div class="navbar navbar-default navbar-static-top" role="navigation">
-        <div class="container">
-          <div class="navbar-header">
-            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
-              <span class="sr-only">Toggle navigation</span>
-              <span class="icon-bar"></span>
-              <span class="icon-bar"></span>
-              <span class="icon-bar"></span>
-            </button>
-            <a class="navbar-brand" href="/">W.O.P.R. API Explorer</a>
-          </div>
-          <div class="navbar-collapse collapse pull-right">
-            <ul class="nav navbar-nav">
-              <li class="{% if request.path == '/' %}active{% endif %}"><a href="{{ url_for('views.index') }}">Home</a></li>
-              <li class="{% if request.path == '/grid/' %}active{% endif %}"><a href="{{ url_for('views.grid_view') }}">Grid</a></li>
-              <li class="{% if request.path == '/map/' %}active{% endif %}"><a href="{{ url_for('views.map_view') }}">Map</a></li>
-            </ul>
-          </div><!--/.nav-collapse -->
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="/">W.O.P.R. API Explorer</a>
         </div>
+        <div class="navbar-collapse collapse pull-right">
+          <ul class="nav navbar-nav">
+            <li class="{% if request.path == '/' %}active{% endif %}"><a href="{{ url_for('views.index') }}">API</a></li>
+            <li class="{% if request.path == '/grid/' %}active{% endif %}"><a href="{{ url_for('views.grid_view') }}">Grid</a></li>
+            <li class="{% if request.path == '/map/' %}active{% endif %}"><a href="{{ url_for('views.map_view') }}">Map</a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
       </div>
     {% block content %}{% endblock %}
 

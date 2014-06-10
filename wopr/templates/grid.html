@@ -7,7 +7,7 @@
     <link href="{{ url_for('static', filename='css/daterangepicker-bs3.css') }}" rel="stylesheet">
 {% endblock %}
 {% block content %}
-    <div class="container">
+    <div class="col-md-12">
         <div class='row'>
             <div class='col-md-4'>
                 <div class='well'>
@@ -15,7 +15,7 @@
                         <div>
                             <form class="form" role="form">
                                 <div class="form-group">
-                                    <label for="dataset-picker">Pick another dataset: </label>
+                                    <label for="dataset-picker">Dataset: </label>
                                     <select id="dataset-picker" class="form-control">
                                         {% for dataset in datasets %}
                                             <option value="{{ dataset.dataset_name }}"{% if dataset.human_name == default.human_name %} selected=true {% endif %}>
@@ -25,11 +25,11 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label for="date_range">Date Range: </label>
+                                    <label for="date_range">Date range: </label>
                                     <input id="date_range" class="form-control" type="text"/>
                                 </div>
                                 <div class="form-group">
-                                    <label for="resolution-picker">Pick another resolution: </label>
+                                    <label for="resolution-picker">Spatial resolution: </label>
                                     <select id="resolution-picker" class="form-control">
                                         {% for k,v in resolutions|dictsort %}
                                             <option value="{{ k }}"{% if v == '~1km' %} selected=true {% endif %}>
@@ -85,7 +85,6 @@
                 <div id="map"></div>
             </div>
         </div>
-    </div>
 {% endblock %}
 {% block extra_javascript %}
     <script src="{{ url_for('static', filename='js/range.js') }}" type="text/javascript"></script>
