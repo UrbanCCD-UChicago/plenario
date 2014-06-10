@@ -295,7 +295,6 @@
                     featureGroup: self.map.drawnItems
                 },
                 draw: {
-                    polyline: false,
                     circle: false,
                     marker: false
                 }

@@ -16,7 +16,7 @@ from itertools import groupby
 from cStringIO import StringIO
 import csv
 from shapely.wkb import loads
-from shapely.geometry import box
+from shapely.geometry import box, asShape
 from collections import OrderedDict
 
 from wopr.models import MasterTable, MetaTable
@@ -109,6 +109,12 @@ def make_query(table, raw_query_params):
                 val = geo['geometry']
             else:
                 val = geo
+            if val['type'] == 'LineString':
+                shape = asShape(val)
+                lat = shape.centroid.y
+                # 100 meters by default
+                x, y = getSizeInDegrees(100, lat)
+                val = shape.buffer(y).__geo_interface__
             val['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
             query = column.ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val)))
             query_clauses.append(query)
