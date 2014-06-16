@@ -7,3 +7,5 @@ celery
 boto
 shapely
 requests
+raven
+blinker

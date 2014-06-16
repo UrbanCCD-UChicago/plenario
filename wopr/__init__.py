@@ -2,6 +2,7 @@ import os
 from flask import Flask
 from celery import Task, Celery
 from celery.schedules import crontab
+from raven.contrib.flask import Sentry
 from wopr.database import session as db_session
 from wopr.api import api
 from wopr.views import views
@@ -15,11 +16,14 @@ CELERYBEAT_SCHEDULE = {
     }
 }
 
+sentry = Sentry(dsn=os.environ['WOPR_SENTRY_URL'])
+
 def create_app():
     app = Flask(__name__)
     app.url_map.strict_slashes = False
     app.register_blueprint(api)
     app.register_blueprint(views)
+    sentry.init_app(app)
     @app.teardown_appcontext
     def shutdown_session(exception=None):
         db_session.remove()
