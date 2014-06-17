@@ -1,12 +1,12 @@
-# W.O.P.R. API
+# Plenar.io
 
-RESTful API for geospatial and time aggregation across multiple Chicago open datasets. Lovingly dubbed the WOPR.
+RESTful API for geospatial and time aggregation across multiple Chicago open datasets. The API formerly known as WOPR.
 
 ## Running locally
 
 ``` bash
-git clone git@github.com:datamade/wopr-api.git
-cd wopr-api
+git clone git@github.com:datamade/plenario.git
+cd plenario
 pip install -r requirements.txt
 python runserver.py
 ```
@@ -15,7 +15,7 @@ navigate to http://localhost:5000/
 
 # Data
 
-New datasets are actively being added to the WOPR API. We keep track of them in this [Google Doc](https://docs.google.com/spreadsheet/ccc?key=0Au-2OHnpwhGTdGJzUWJ2SERwVXZLeDU4Y3laWFJvNEE&usp=sharing#gid=0)
+New datasets are actively being added to the plenario API. We keep track of them in this [Google Doc](https://docs.google.com/spreadsheet/ccc?key=0Au-2OHnpwhGTdGJzUWJ2SERwVXZLeDU4Y3laWFJvNEE&usp=sharing#gid=0)
 
 # Dependencies
 We used the following open source tools:
@@ -35,7 +35,7 @@ We used the following open source tools:
 ## Errors / Bugs
 
 If something is not behaving intuitively, it is a bug, and should be reported.
-Report it here: https://github.com/datamade/wopr-api/issues
+Report it here: https://github.com/datamade/plenario/issues
 
 ## Note on Patches/Pull Requests
  
@@ -46,4 +46,4 @@ Report it here: https://github.com/datamade/wopr-api/issues
 
 ## Copyright
 
-Copyright (c) 2014 DataMade and the University of Chicago. Released under the [MIT License](https://github.com/datamade/wopr-api/blob/master/LICENSE).
+Copyright (c) 2014 DataMade and the University of Chicago. Released under the [MIT License](https://github.com/datamade/plenario/blob/master/LICENSE).
