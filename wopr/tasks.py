@@ -11,8 +11,11 @@ from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.exc import NoSuchTableError
 import gzip
+from raven.handlers.logging import SentryHandler
+from raven.conf import setup_logging
 
-from celery.signals import task_postrun
+handler = SentryHandler(os.environ['CELERY_SENTRY_URL'])
+setup_logging(handler)
 
 celery_app = make_celery()
 

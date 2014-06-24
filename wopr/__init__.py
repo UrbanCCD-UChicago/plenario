@@ -35,6 +35,7 @@ def make_celery(app=None):
     celery_app.conf['CELERY_IMPORTS'] = ('wopr.tasks',)
     celery_app.conf['CELERYBEAT_SCHEDULE'] = CELERYBEAT_SCHEDULE
     celery_app.conf['CELERY_TIMEZONE'] = 'America/Chicago'
+    celery_app.conf['CELERYD_HIJACK_ROOT_LOGGER'] = False
     TaskBase = celery_app.Task
     class ContextTask(TaskBase):
         abstract = True
