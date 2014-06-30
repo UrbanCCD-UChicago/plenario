@@ -176,7 +176,7 @@
             'click .explore': 'exploreDataset'
         },
         initialize: function(){
-            this.explore = new ExploreView({el: '#explore'});
+            //this.explore = new ExploreView({el: '#explore'});
         },
         render: function(){
             var self = this;
@@ -213,26 +213,26 @@
             $.when(this.resultsFetcher()).then(function(resp){
                 self.$el.spin(false);
                 results = resp.objects;
+                var objects = []
                 $.each(results, function(i, obj){
-                    var el = obj.items[0].dataset_name;
-                    var item = {
-                        el: el,
-                        objects: obj,
-                        iteration: i,
-                        query: self.query,
-                        detail: false
-                    }
-                    var chart = new ChartView({
-                        model: item
-                    });
-                    self.$el.append(chart.render().el);
-                    var data = [];
+                    obj['values'] = []
                     $.each(obj.items, function(i, o){
-                        data.push([moment(o.group).unix()*1000, o.count]);
+                        obj['values'].push(o.count);
                     });
-                    chart.addData(data);
-                    self.charts[el] = chart;
+                    obj['meta'] = self.about.datasetsObj[obj['dataset_name']]
+                    objects.push(obj)
                 });
+                self.$el.html(template_cache('datasetTable', {
+                    objects: objects,
+                    query: self.query
+                }));
+                $.each(objects, function(i, obj){
+                    $('#' + obj.meta.dataset_name + '-sparkline').sparkline(
+                        obj.values, {
+                        width: '200px',
+                        tooltipClassname: 'sparkline-tooltip'
+                    });
+                })
                 $('#about').hide();
             }).fail(function(resp){
                 new ErrorView({el: '#errorModal', model: resp});
@@ -258,7 +258,12 @@
             $.when(this.get_datasets()).then(
                 function(resp){
                     self.$el.spin(false);
-                    self.$el.html(template_cache('aboutTemplate', {datasets:resp}))
+                    self.$el.html(template_cache('aboutTemplate', {datasets:resp}));
+                    var dataObjs = {}
+                    $.each(resp, function(i, obj){
+                        dataObjs[obj['dataset_name']] = obj;
+                    })
+                    self.datasetsObj = dataObjs;
                 }
             )
         },
@@ -277,6 +282,7 @@
         },
         initialize: function(){
             this.resp = this.attributes.resp;
+            this.resp.about = this.attributes.about;
             var then = moment().subtract('d', 180).format('MM/DD/YYYY');
             var now = moment().format('MM/DD/YYYY');
             this.$el.html(template_cache('mapTemplate', {end: now, start: then}));
@@ -395,7 +401,7 @@
         defaultRoute: function(){
             var resp = new ResponseView({el: '#response'});
             var about = new AboutView({el: '#about'});
-            var map = new MapView({el: '#map-view', attributes: {resp: resp}})
+            var map = new MapView({el: '#map-view', attributes: {resp: resp, about: about}})
         },
         aggregate: function(query){
             var q = parseParams(query);

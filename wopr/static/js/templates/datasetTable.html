@@ -1,0 +1,23 @@
+<% var matrix = "/api/master/?" + $.param(query) + '&datatype=csv' %>
+<p><a href="<%= matrix %>">Download data matrix</a></p>
+<table class="table-striped table-condensed table">
+    <thead>
+        <tr>
+            <th>Dataset Name</th>
+            <th>Overview</th>
+            <th>Points</th>
+            <th>Detail</th>
+        </tr>
+    </thead>
+    <tbody>
+        <% $.each(objects, function(i, obj){ %>
+            <% var points = "/api/detail/?" + $.param(query) + '&dataset_name=' + obj.meta.dataset_name %>
+            <tr>
+                <td><%= obj.meta.human_name %></td>
+                <td><span id="<%= obj.meta.dataset_name %>-sparkline">Loading...</span></td>
+                <td><a href="<%= points %>" target="_blank">Download</a></td>
+                <td><a href="javascript://" class="detail-view">View</a></td>
+            </tr>
+        <% }) %>
+    </tbody>
+</table>
