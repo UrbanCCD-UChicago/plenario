@@ -15,6 +15,19 @@
             </tr>
         <% } %>
         <tr>
+            <% var points_query = query %>
+            <% delete points_query['resolution'] %>
+            <% delete points_query['center'] %>
+            <% var points = "/api/detail/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
+            <td>
+                Download:
+            </td>
+            <td>
+                <a href="<%= points + '&datatype=csv' %>" class="data-download" target="_blank">CSV</a><br />
+                <a href="<%= points %>" class="data-download" target="_blank">JSON</a>
+            </td>
+        </tr>
+        <tr>
             <td>Update frequency:</td>
             <td><%= meta.update_freq %></td>
         </tr>
