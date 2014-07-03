@@ -39,8 +39,3 @@ def grid_view():
 @views.route('/map/')
 def map_view():
     return render_template('map.html')
-
-@views.route('/map/detail/<dataset_name>/')
-def map_detail(dataset_name):
-    context = {}
-    return render_template('map_detail.html', **context)

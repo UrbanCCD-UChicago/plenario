@@ -12,6 +12,7 @@
     <tbody>
         <% $.each(objects, function(i, obj){ %>
             <% var points = "/api/detail/?" + $.param(query) + '&dataset_name=' + obj.meta.dataset_name %>
+            <% var detail = "/map/detail/" + obj.meta.dataset_name + '/?' + $.param(query) %>
             <tr>
                 <td><%= obj.meta.human_name %></td>
                 <td><span id="<%= obj.meta.dataset_name %>-sparkline">Loading...</span></td>
@@ -26,18 +27,9 @@
                             <li><a href="<%= points %>" class="data-download" target="_blank">JSON</a></li>
                         </ul>
                     </div>
+                </td>
                 <td>
-                <td>
-                    <div class="btn-group">
-                        <button type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown">
-                            Download
-                            <span class="caret"></span>
-                        </button>
-                        <ul class="dropdown-menu" role="menu">
-                            <li><a href="javascript://" class="data-download">CSV</a></li>
-                            <li><a href="javascript://" class="data-download">JSON</a></li>
-                        </ul>
-                    </div>
+                    <a href="javascript://" class="detail" data-dataset_name="<%= obj.meta.dataset_name %>">View</a>
                 </td>
             </tr>
         <% }) %>
