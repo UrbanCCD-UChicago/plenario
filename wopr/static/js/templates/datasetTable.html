@@ -15,8 +15,30 @@
             <tr>
                 <td><%= obj.meta.human_name %></td>
                 <td><span id="<%= obj.meta.dataset_name %>-sparkline">Loading...</span></td>
-                <td><a href="<%= points %>" target="_blank">Download</a></td>
-                <td><a href="javascript://" class="detail-view">View</a></td>
+                <td>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown">
+                            Download
+                            <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu" role="menu">
+                            <li><a href="<%= points + '&datatype=csv' %>" class="data-download" target="_blank">CSV</a></li>
+                            <li><a href="<%= points %>" class="data-download" target="_blank">JSON</a></li>
+                        </ul>
+                    </div>
+                <td>
+                <td>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown">
+                            Download
+                            <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu" role="menu">
+                            <li><a href="javascript://" class="data-download">CSV</a></li>
+                            <li><a href="javascript://" class="data-download">JSON</a></li>
+                        </ul>
+                    </div>
+                </td>
             </tr>
         <% }) %>
     </tbody>

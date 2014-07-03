@@ -12,23 +12,17 @@
                 <div id="query"></div>
             </div>
             <div class="col-md-6">
-                <div id="about"></div>
-                <div id="refine"></div>
                 <div id="response"></div>
-                <div id="explore"></div>
             </div>
         </div>
     </div>
     <div class="modal fade" id="errorModal" tabindex="-1" role="dialog" aria-labelledby="error" aria-hidden="true"></div>
 {% endblock %}
 {% block extra_javascript %}
-    <script src="{{ url_for('static', filename='js/jquery-ui.min.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.sparkline.min.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/underscore-min.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/backbone-min.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/spin.min.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.spin.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/leaflet.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/leaflet.draw.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/data-map.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/detail-map.js') }}"></script>
 {% endblock %}
+

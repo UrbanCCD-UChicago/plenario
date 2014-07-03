@@ -172,9 +172,9 @@
         }
     });
     var ResponseView = Backbone.View.extend({
-        events: {
-            'click .explore': 'exploreDataset'
-        },
+      //events: {
+      //    'click .explore': 'exploreDataset'
+      //},
         initialize: function(){
             //this.explore = new ExploreView({el: '#explore'});
         },
@@ -191,50 +191,57 @@
             this.getResults();
             //}
         },
-        exploreDataset: function(e){
-            var self = this;
-            this.query['dataset_name'] = $(e.target).attr('id').split('-')[0];
-            this.query['datatype'] = 'json';
-            $.each(this.charts, function(key,chart){
-                if (key != self.query.dataset_name){
-                    chart.remove();
-                }
-            });
-            this.explore.attributes = {
-                base_query: this.query,
-                parent: this
-            }
-            this.$el.after(this.explore.render().el);
-            var route = "detail/" + $.param(this.query);
-            router.navigate(route);
-        },
+        //exploreDataset: function(e){
+        //    var self = this;
+        //    this.query['dataset_name'] = $(e.target).attr('id').split('-')[0];
+        //    this.query['datatype'] = 'json';
+        //    $.each(this.charts, function(key,chart){
+        //        if (key != self.query.dataset_name){
+        //            chart.remove();
+        //        }
+        //    });
+        //    this.explore.attributes = {
+        //        base_query: this.query,
+        //        parent: this
+        //    }
+        //    this.$el.after(this.explore.render().el);
+        //    var route = "detail/" + $.param(this.query);
+        //    router.navigate(route);
+        //},
         getResults: function(){
             var self = this;
-            $.when(this.resultsFetcher()).then(function(resp){
-                self.$el.spin(false);
-                results = resp.objects;
-                var objects = []
-                $.each(results, function(i, obj){
-                    obj['values'] = []
-                    $.each(obj.items, function(i, o){
-                        obj['values'].push(o.count);
+            $.when(this.resultsFetcher(), this.metaFetcher()).then(
+                function(resp, meta_resp){
+                    self.$el.spin(false);
+                    var results = resp[0].objects;
+                    var m = meta_resp[0]
+                    var objects = []
+                    var meta = {}
+                    $.each(m, function(i, obj){
+                        meta[obj.dataset_name] = obj
+                    })
+                    $.each(results, function(i, obj){
+                        obj['values'] = []
+                        $.each(obj.items, function(i, o){
+                            obj['values'].push(o.count);
+                        });
+                        obj['meta'] = meta[obj['dataset_name']]
+                        objects.push(obj)
                     });
-                    obj['meta'] = self.about.datasetsObj[obj['dataset_name']]
-                    objects.push(obj)
-                });
-                self.$el.html(template_cache('datasetTable', {
-                    objects: objects,
-                    query: self.query
-                }));
-                $.each(objects, function(i, obj){
-                    $('#' + obj.meta.dataset_name + '-sparkline').sparkline(
-                        obj.values, {
-                        width: '200px',
-                        tooltipClassname: 'sparkline-tooltip'
-                    });
-                })
-                $('#about').hide();
-            }).fail(function(resp){
+                    self.$el.html(template_cache('datasetTable', {
+                        objects: objects,
+                        query: self.query
+                    }));
+                    $.each(objects, function(i, obj){
+                        $('#' + obj.meta.dataset_name + '-sparkline').sparkline(
+                            obj.values, {
+                            width: '150px',
+                            tooltipClassname: 'sparkline-tooltip'
+                        });
+                    })
+                    $('#about').hide();
+                }
+            ).fail(function(resp){
                 new ErrorView({el: '#errorModal', model: resp});
             });
         },
@@ -245,6 +252,12 @@
                 dataType: 'json',
                 data: self.query
             });
+        },
+        metaFetcher: function(){
+            return $.ajax({
+                url: '/api/',
+                dataType: 'json'
+            })
         }
     });
     var AboutView = Backbone.View.extend({
@@ -401,13 +414,16 @@
         defaultRoute: function(){
             var resp = new ResponseView({el: '#response'});
             var about = new AboutView({el: '#about'});
-            var map = new MapView({el: '#map-view', attributes: {resp: resp, about: about}})
+            var map = new MapView({el: '#map-view', attributes: {resp: resp}})
         },
         aggregate: function(query){
             var q = parseParams(query);
             var resp = new ResponseView({el: '#response', attributes: {query: q}});
             resp.render();
-            var attrs = {resp:resp}
+            var attrs = {
+                resp: resp,
+                about: about
+            }
             if (typeof q['location_geom__within'] !== 'undefined'){
                 attrs['dataLayer'] = $.parseJSON(q['location_geom__within']);
             }
