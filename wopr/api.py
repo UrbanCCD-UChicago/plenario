@@ -381,9 +381,9 @@ def detail_aggregate():
 def getSizeInDegrees(meters, latitude):
 
     earth_circumference = 40041000 # meters, average circumference
-    meters_per_degree = 360 / earth_circumference
+    degrees_per_meter = 360 / earth_circumference
     
-    degrees_at_equator = meters * meters_per_degree
+    degrees_at_equator = meters * degrees_per_meter
 
     latitude_correction = 1.0 / math.cos(latitude * (math.pi / 180.0))
     
