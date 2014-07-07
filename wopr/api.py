@@ -383,10 +383,10 @@ def getSizeInDegrees(meters, latitude):
     
     degrees_at_equator = (meters / equator_circumference) * 360.0
 
-    degrees_y = degrees_at_equator
-    
     latitude_correction = 1.0 / math.cos(latitude * (math.pi / 180.0))
+    
     degrees_x = degrees_at_equator * latitude_correction
+    degrees_y = degrees_at_equator
 
     return degrees_x, degrees_y
 
