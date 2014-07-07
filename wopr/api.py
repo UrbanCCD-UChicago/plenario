@@ -381,8 +381,7 @@ def detail_aggregate():
 def getSizeInDegrees(meters, latitude):
     equator_circumference = 111111.0
     
-    # degrees_at_equator = (meters / (equator_circumference / (2 * pi))) * (180 / pi )
-    degrees_at_equator = meters * (360 / equator_circumference)
+    degrees_at_equator = (meters / equator_circumference) * 360 
 
     degrees_y = degrees_at_equator
     
