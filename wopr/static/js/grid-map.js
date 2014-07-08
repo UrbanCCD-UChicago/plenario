@@ -64,6 +64,8 @@ $(window).resize(function () {
         }
     });
     map.addControl(drawControl);
+    var d = new L.Control.Distance(); map.addControl(d);
+    map.addControl(new L.Control.Scale());
     map.on('draw:created', draw_create);
     map.on('draw:edited', draw_edit);
     map.on('draw:deleted', draw_delete);
