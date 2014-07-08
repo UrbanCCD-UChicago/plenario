@@ -64,8 +64,8 @@ $(window).resize(function () {
         }
     });
     map.addControl(drawControl);
-    var d = new L.Control.Distance(); map.addControl(d);
-    map.addControl(new L.Control.Scale());
+    map.addControl(new L.Control.Distance()); //distance plugin when drawing lines
+    map.addControl(new L.Control.Scale()); //show distance scale in lower left
     map.on('draw:created', draw_create);
     map.on('draw:edited', draw_edit);
     map.on('draw:deleted', draw_delete);
