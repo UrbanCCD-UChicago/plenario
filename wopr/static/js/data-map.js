@@ -280,7 +280,8 @@
             var then = moment().subtract('d', 180).format('MM/DD/YYYY');
             var now = moment().format('MM/DD/YYYY');
             this.$el.html(template_cache('mapTemplate', {end: now, start: then}));
-            this.map = L.map('map').setView([41.880517,-87.644061], 11);
+            //this.map = L.map('map').setView([41.880517,-87.644061], 11);
+            this.map = L.map('map').setView([37.7733,-122.4367], 11);
             L.tileLayer('https://{s}.tiles.mapbox.com/v3/derekeder.hehblhbj/{z}/{x}/{y}.png', {
               attribution: '<a href="http://www.mapbox.com/about/maps/" target="_blank">Terms &amp; Feedback</a>'
             }).addTo(this.map);
