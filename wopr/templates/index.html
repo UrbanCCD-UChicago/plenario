@@ -13,7 +13,7 @@
       <hr />
       <h2>API documentation</h2>
       <p>
-          <strong>Currently there are three endpoints:</strong>
+          <strong>Currently there are five endpoints:</strong>
           <ul>
               <li>/api/</li>
               <li>/api/master/</li>
@@ -43,7 +43,7 @@
           <strong><code>human_name</code></strong> Human friendly name for the dataset.
       </p>
       <p>
-          <strong><code>dataset_name</code></strong> Machine name for the dataset. Values are passed into the queries below as <code>dataset_name</code>
+          <strong><code>dataset_name</code></strong> Machine name for the dataset. Values are passed into the queries below as <code>dataset_name</code>.
       </p>
       <p>
           <strong><code>update_freq</code></strong> Update frequency.
@@ -87,7 +87,10 @@
           operator that can be applied to this is <code>within</code>. See
           “Performing queries” for more.
       </p>
-      <hr />
+      <p>
+          <strong><code>datatype</code></strong> Data format. Current options are 
+          <code>json</code> (default) and <code>csv</code>. 
+      </p><hr />
       <h3>/api/fields/&lt;dataset_name&gt;/</h3>
       <p>
           Gives you a listing of all the fields and their data types for the given
@@ -100,7 +103,7 @@
       <p>
           These endpoints give you a way to query a particular dataset. The
           only difference is that <code>/api/detail-aggregate/</code> gives you
-          an temporally aggregated response and <code>/api/detail/</code>
+          a temporally aggregated response and <code>/api/detail/</code>
           responds with the point level records.
       </p>
       <hr />
@@ -109,7 +112,7 @@
           Queries can be constructed by appending the name of a field and a SQL
           operator separated by two underscores. So to find all the records in
           the master table for all crime and environmental complaints that were
-          observed after November 12, 2007 but before November 12 2008, a user
+          observed after November 12, 2007 but before November 12, 2008, a user
           would construct her query like so:
       </p>
       <pre>/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints</pre>
@@ -124,9 +127,6 @@
           simple equality test, just leave out the double underscore part:
       </p>
       <pre>/api/master/?obs_date=2007-11-12</pre>
-      <p>
-          Once you’ve queried the master table and have an idea of what
-      </p>
       <hr />
       <div class="footer">
         <p>&copy; DataMade and UrbanCCD</p>
