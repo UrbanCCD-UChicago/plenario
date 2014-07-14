@@ -1,0 +1,39 @@
+<table class="table">
+    <tbody>
+        <tr>
+            <td>Name:</td>
+            <td><%= meta.human_name %></td>
+        </tr>
+        <tr>
+            <td>Source:</td>
+            <td><a href="<%= meta.source_url %>" target="_blank">View</a></td>
+        </tr>
+        <% if(meta.obs_from && meta.obs_to){ %>
+            <tr>
+                <td>Date range:</td>
+                <td><%= meta.obs_from %>&en;<%= meta.obs_to %></td>
+            </tr>
+        <% } %>
+        <tr>
+            <% var points_query = query %>
+            <% delete points_query['resolution'] %>
+            <% delete points_query['center'] %>
+            <% var points = "/api/detail/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
+            <td>
+                Download:
+            </td>
+            <td>
+                <a href="<%= points + '&datatype=csv' %>" class="data-download" target="_blank">CSV</a><br />
+                <a href="<%= points %>" class="data-download" target="_blank">JSON</a>
+            </td>
+        </tr>
+        <tr>
+            <td>Update frequency:</td>
+            <td><%= meta.update_freq %></td>
+        </tr>
+        <tr>
+            <td>Description:</td>
+            <td><%= meta.description %></td>
+        </tr>
+    </tbody>
+</table>
