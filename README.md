@@ -1,6 +1,6 @@
 # Plenar.io
 
-RESTful API for geospatial and time aggregation across multiple Chicago open datasets.
+RESTful API for geospatial and time aggregation across multiple open datasets.
 
 This project is funded by the [NSF Social, Behavioral, and Economics Research Directorate](http://www.nsf.gov/dir/index.jsp?org=SBE) through a grant to the [Urban Center for Computation and Data](https://urbanccd.org/) (UrbanCCD). It is being implemented by [DataMade](http://datamade.us) and UrbanCCD.
 
@@ -19,7 +19,7 @@ navigate to http://localhost:5000/
 
 # Data
 
-New datasets are actively being added to the plenario API. We keep track of them in this [Google Doc](https://docs.google.com/spreadsheet/ccc?key=0Au-2OHnpwhGTdGJzUWJ2SERwVXZLeDU4Y3laWFJvNEE&usp=sharing#gid=0)
+New datasets are actively being added to the Plenario API. We keep track of them in this [Google Doc](https://docs.google.com/spreadsheet/ccc?key=0Au-2OHnpwhGTdGJzUWJ2SERwVXZLeDU4Y3laWFJvNEE&usp=sharing#gid=0).
 
 # Dependencies
 We used the following open source tools:
@@ -38,7 +38,7 @@ We used the following open source tools:
 * Svetlozar Nestorov
 * Jonathan Giuffrida
 * Maggie King
-* Jaijun Shen
+* Jiajun Shen
 
 ### DataMade
 * Derek Eder
