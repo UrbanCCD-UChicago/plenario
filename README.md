@@ -26,8 +26,23 @@ We used the following open source tools:
 * [psycopg2](http://initd.org/psycopg/) - PostgreSQL adapter for the Python 
 * [GeoAlchemy 2](http://geoalchemy-2.readthedocs.org/en/0.2.4/) - provides extensions to SQLAlchemy for working with spatial databases
 
-## Team
+## Credits
 
+This project is funded by the [NSF Social, Behavioral, and Economics Research Directorate](http://www.nsf.gov/dir/index.jsp?org=SBE) through a grant to the [Urban Center for Computation and Data](https://urbanccd.org/) (UrbanCCD). It is being implemented by [DataMade](http://datamade.us) and UrbanCCD.
+
+For more details, see the presentation slides from [Exploring Open Civic Data Through Time and Space](https://docs.google.com/presentation/d/1Une-A1k0mUAIYac5UlmeSDLw4VyHYsaw1NW5f4YKWas/edit#slide=id.p) given in June 2014.
+
+The team is:
+
+### UrbanCCD
+* Charlie Catlett
+* Brett Goldstein
+* Svetlozar Nestorov
+* Jonathan Giuffrida
+* Maggie King
+* Jaijun Shen
+
+### DataMade
 * Derek Eder
 * Eric van Zanten
 * Forest Gregg
