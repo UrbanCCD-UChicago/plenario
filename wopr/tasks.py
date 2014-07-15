@@ -2,7 +2,7 @@ import os
 from celery import Task, Celery, chain
 from datetime import datetime, timedelta
 from wopr.database import task_engine as engine, Base
-from wopr.models import crime_table, MasterTable, sf_crime_table
+from wopr.models import crime_table, MasterTable, sf_crime_table, shp2table
 from wopr.helpers import download_crime
 from wopr import make_celery
 from datetime import datetime, date
@@ -10,10 +10,14 @@ from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
     UniqueConstraint, text, and_, or_
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.exc import NoSuchTableError
+from geoalchemy2 import Geometry
 import gzip
 from raven.handlers.logging import SentryHandler
 from raven.conf import setup_logging
 from zipfile import ZipFile
+import fiona
+from shapely.geometry import shape, Polygon, MultiPolygon
+import json
 
 #handler = SentryHandler(os.environ['CELERY_SENTRY_URL'])
 #setup_logging(handler)
@@ -307,7 +311,7 @@ def sf_crime_master_cols(dat_crime_table, crime_type='violent'):
     cols.append(text("NULL AS geotag1"))
     cols.append(text("NULL AS geotag2"))
     cols.append(text("NULL AS geotag3"))
-    cols.append(text("'chicago_crimes_{0}' AS dataset_name".format(crime_type)))
+    cols.append(text("'sf_crimes_{0}' AS dataset_name".format(crime_type)))
     cols.append(dat_crime_table.c.sf_crimes_all_row_id.label('dataset_row_id'))
     #cols.append(text("ST_PointFromText('POINT(' || dat_sf_crimes_all.longitude || ' ' || dat_sf_crimes_all.latitude || ')') as location"))
     cols.append(text("ST_PointFromText('POINT(' || dat_sf_crimes_{0}.longitude || ' ' || dat_sf_crimes_{0}.latitude || ')', 4326) as location_geom".format(crime_type)))
@@ -398,3 +402,30 @@ def update_master_current_flag():
     conn = engine.contextual_connect()
     conn.execute(update)
     return 'Master table current flag updated'
+
+def import_shapefile(fpath, name, force_multipoly=False):
+    # Open the shapefile with fiona
+    with fiona.open('/', vfs='zip://{0}'.format(fpath)) as shp:
+        shp_table = shp2table(name, Base.metadata, shp.schema,
+            force_multipoly=force_multipoly)
+        shp_table.drop(bind=engine, checkfirst=True)
+        shp_table.append_column(Column('row_id', Integer, primary_key=True))
+        shp_table.create(bind=engine)
+        features = []
+        count = 0
+        for r in shp:
+            if not force_multipoly and r['geometry']['type'] == 'MultiPolygon':
+                return import_shapefile(fpath, name, force_multipoly=True)
+            row_dict = dict(r['properties'])
+            geom = shape(json.loads(str(r['geometry']).replace('\'', '"')\
+                .replace('(', '[').replace(')', ']')))
+            if force_multipoly and r['geometry']['type'] != 'MultiPolygon':
+                geom = MultiPolygon([geom])
+            row_dict['geom'] = geom.wkt
+            features.append(row_dict)
+            #if count > 9: break
+            count += 1
+    ins = shp_table.insert(features)
+    conn = engine.contextual_connect()
+    conn.execute(ins)
+    return 'Table {0} created from shapefile'.format(name)

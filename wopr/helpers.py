@@ -2,7 +2,7 @@ import requests
 import os
 from datetime import datetime, date
 from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
-    UniqueConstraint, text, and_, or_
+    Date, DateTime, UniqueConstraint, text, and_, or_
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from wopr.database import task_engine as engine, Base
@@ -309,3 +309,4 @@ def update_master_current_flag():
     conn = engine.connect()
     conn.execute(update)
     return 'Master table current flag updated'
+

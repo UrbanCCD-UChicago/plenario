@@ -6,3 +6,4 @@ Icon?
 .coverage
 celerybeat-schedule
 data/
+notebooks/
