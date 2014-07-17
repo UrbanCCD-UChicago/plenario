@@ -2,7 +2,7 @@ import os
 from celery import Task, Celery, chain
 from datetime import datetime, timedelta
 from wopr.database import task_engine as engine, Base
-from wopr.models import crime_table, MasterTable, sf_crime_table, shp2table
+from wopr.models import crime_table, MasterTable
 from wopr.helpers import download_crime
 from wopr import make_celery
 from datetime import datetime, date
@@ -12,14 +12,10 @@ from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.exc import NoSuchTableError
 from geoalchemy2 import Geometry
 from geoalchemy2.elements import WKTElement
+from geoalchemy2.shape import from_shape
 import gzip
 from raven.handlers.logging import SentryHandler
 from raven.conf import setup_logging
-from zipfile import ZipFile
-import fiona
-from shapely.geometry import shape, Polygon, MultiPolygon
-import json
-import pyproj
 
 #handler = SentryHandler(os.environ['CELERY_SENTRY_URL'])
 #setup_logging(handler)

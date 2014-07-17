@@ -6,7 +6,6 @@ from sqlalchemy.dialects.postgresql import TIMESTAMP, DOUBLE_PRECISION, TIME,\
 from geoalchemy2 import Geometry
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
-from fiona import prop_width, prop_type
 
 from wopr.database import Base, app_engine as engine, Point
 
@@ -40,22 +39,6 @@ def crime_table(name, metadata):
             Column('latitude', DOUBLE_PRECISION(precision=53)),
             Column('longitude', DOUBLE_PRECISION(precision=53)),
             Column('location', Point),
-    extend_existing=True)
-    return table
-
-def sf_crime_table(name, metadata):
-    table = Table(name, metadata,
-            Column( 'id',           Integer                         ),
-            Column( 'category',     String(length=50)               ),
-            Column( 'description',  String(length=100)              ),
-            Column( 'day_of_week',  String(length=10)               ),
-            Column( 'date',         DATE                            ),
-            Column( 'time',         TIME                            ),
-            Column( 'pd_district',  String(length=20)               ),
-            Column( 'resolution',   String(length=50)               ),
-            Column( 'location_str', String(length=100)              ),
-            Column( 'longitude',    DOUBLE_PRECISION(precision=53)  ),
-            Column( 'latitude',     DOUBLE_PRECISION(precision=53)  ),
     extend_existing=True)
     return table
 
