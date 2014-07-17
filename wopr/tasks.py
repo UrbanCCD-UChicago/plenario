@@ -31,6 +31,7 @@ def update_crime(fpath=None):
         chg_crime()
         update_crime_current_flag()
         update_master_current_flag()
+    cleanup_temp_tables()
     return None
 
 @celery_app.task
@@ -77,7 +78,6 @@ def dat_crime(fpath=None):
         )
     conn = engine.contextual_connect()
     res = conn.execute(master_ins)
-    cleanup_temp_tables()
     return 'DAT crime created'
 
 @celery_app.task
