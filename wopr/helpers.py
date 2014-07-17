@@ -6,8 +6,13 @@ from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from wopr.database import task_engine as engine, Base
-from wopr.models import crime_table, MasterTable
+from wopr.models import crime_table, MasterTable, shp2table
 import gzip
+from zipfile import ZipFile
+import fiona
+from shapely.geometry import shape, Polygon, MultiPolygon
+import json
+import pyproj
 
 CRIMES = 'https://data.cityofchicago.org/api/views/ijzp-q8t2/rows.csv?accessType=DOWNLOAD'
 #AWS_KEY = os.environ['AWS_ACCESS_KEY']
