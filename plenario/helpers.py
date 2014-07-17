@@ -5,8 +5,8 @@ from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
     UniqueConstraint, text, and_, or_
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.dialects.postgresql import TIMESTAMP
-from wopr.database import task_engine as engine, Base
-from wopr.models import crime_table, MasterTable
+from plenario.database import task_engine as engine, Base
+from plenario.models import crime_table, MasterTable
 import gzip
 
 CRIMES = 'https://data.cityofchicago.org/api/views/ijzp-q8t2/rows.csv?accessType=DOWNLOAD'

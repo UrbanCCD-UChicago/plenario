@@ -19,8 +19,8 @@ from shapely.wkb import loads
 from shapely.geometry import box, asShape
 from collections import OrderedDict
 
-from wopr.models import MasterTable, MetaTable
-from wopr.database import session, app_engine as engine, Base
+from plenario.models import MasterTable, MetaTable
+from plenario.database import session, app_engine as engine, Base
 
 api = Blueprint('api', __name__)
 

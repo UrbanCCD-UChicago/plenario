@@ -1,10 +1,10 @@
 import os
 from celery import Task, Celery, chain
 from datetime import datetime, timedelta
-from wopr.database import task_engine as engine, Base
-from wopr.models import crime_table, MasterTable
-from wopr.helpers import download_crime
-from wopr import make_celery
+from plenario.database import task_engine as engine, Base
+from plenario.models import crime_table, MasterTable
+from plenario.helpers import download_crime
+from plenario import make_celery
 from datetime import datetime, date
 from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
     UniqueConstraint, text, and_, or_

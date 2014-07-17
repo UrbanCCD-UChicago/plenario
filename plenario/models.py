@@ -5,7 +5,7 @@ from geoalchemy2 import Geometry
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 
-from wopr.database import Base, app_engine as engine, Point
+from plenario.database import Base, app_engine as engine, Point
 
 MetaTable = Table('meta_master', Base.metadata,
     autoload=True, autoload_with=engine)

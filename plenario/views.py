@@ -1,7 +1,7 @@
 from flask import make_response, request, render_template, current_app, g, \
     Blueprint
-from wopr.models import MasterTable, MetaTable
-from wopr.database import session
+from plenario.models import MasterTable, MetaTable
+from plenario.database import session
 from datetime import datetime, timedelta
 
 views = Blueprint('views', __name__)
