@@ -39,3 +39,7 @@ def grid_view():
 @views.route('/map/')
 def map_view():
     return render_template('map.html')
+
+@views.route('/docs')
+def api_docs():
+	return render_template('docs.html')
