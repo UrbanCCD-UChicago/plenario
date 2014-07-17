@@ -2,135 +2,30 @@
 {% block content %}
 <div class="container">
   <div class='col-md-10 col-md-offset-1'>
-      <h1>Plenar.io geospatial open data platform</h1>
+    <h3>Plenar.io: A spatio-temporal open data platform</h3>
+    <p>Over the past few years, all levels of government from the <a href="http://data.gov">federal administration</a> to <a href="http://data.cityofchicago.org">individual municipalities</a> have been moving toward an open data model, publicly releasing data on how government entities function. Plenar.io tells a unified story of place by centralizing data from these various sources in order to increase accessibility and help ordinary citizens and researchers draw connections between datasets. Data can be viewed via a map interface and accessed by download or via a RESTful API. 
+    </p>
+    <h3>Applications (under development)</h3>
+    <p>
+      <ul>
+        <li><a href="{{ url_for('views.api_docs') }}">API documentation</a></li>
+        <li><a href="{{ url_for('views.map_view') }}">Data Explorer</a></li>
+        <li><a href="{{ url_for('views.grid_view') }}">Grid Aggregation</a></li>
+      </ul>
+    </p>
+    <hr />
+	<h3>Attributions</h3>
+	<p>
+This project is funded by the <a href="http://www.nsf.gov/dir/index.jsp?org=SBE">NSF Social, Behavioral, and Economics Research Directorate</a> through a grant to the University of Chicago Urban Center for Computation and Data (<a href="https://urbanccd.org/">UrbanCCD</a>). It is being implemented by UrbanCCD and <a href="http://datamade.us">DataMade</a>.
+	</p>
+    <p>
+    You're invited to follow our development on <a href="https://github.com/datamade/plenario">GitHub</a>.
+    </p>
+    <div class="footer">
       <p>
-          <strong>Example applications</strong>
-          <ul>
-              <li><a href="{{ url_for('views.grid_view') }}">Grid Aggregation</a></li>
-              <li><a href="{{ url_for('views.map_view') }}">Data Explorer</a></li>
-          </ul>
+        Released under the MIT License.
       </p>
-      <hr />
-      <h2>API documentation</h2>
-      <p>
-          <strong>Currently there are three endpoints:</strong>
-          <ul>
-              <li>/api/</li>
-              <li>/api/master/</li>
-              <li>/api/fields/&lt;dataset_name&gt;/</li>
-              <li>/api/detail-aggregate/</li>
-              <li>/api/detail/</li>
-          </ul>
-      </p>
-      <h3>/api/</h3>
-      <p>
-          This is the “data about the data” endpoint. It contains a record for
-          each dataset with the following attributes:
-      </p>
-      <p>
-          <strong><code>description</code></strong> Verbose, official description of the dataset.
-      </p>
-      <p>
-          <strong><code>source_url</code></strong> If available, the URL where the data was originally sourced.
-      </p>
-      <p>
-          <strong><code>obs_from</code></strong> Oldest date available in the dataset.
-      </p>
-      <p>
-          <strong><code>obs_to</code></strong> Newest date available in the dataset.
-      </p>
-      <p>
-          <strong><code>human_name</code></strong> Human friendly name for the dataset.
-      </p>
-      <p>
-          <strong><code>dataset_name</code></strong> Machine name for the dataset. Values are passed into the queries below as <code>dataset_name</code>
-      </p>
-      <p>
-          <strong><code>update_freq</code></strong> Update frequency.
-      </p>
-      <hr />
-      <h3>/api/master/</h3>
-      <p>
-          This endpoint contains a record for every row in every dataset with
-          brief temporal and spatial information about the row. The endpoint
-          should only be called using query parameters. This can give a user
-          of the platform a quick overview about what is available within
-          their constraints.
-      </p>
-      <p>
-          <strong>Possible query parameters</strong>
-      </p>
-      <p>
-          <strong><code>agg</code></strong> Under the hood, this takes advantage of
-          <a href="http://www.postgresql.org/docs/9.1/static/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC" target="_blank">
-              PostgreSQL’s <code>date_trunc</code> function
-          </a>
-          and can take any precision values that are valid there. If
-          not supplied, this defaults to <code>day</code>. If the supplied
-          value is of a higher resolution that the highest available
-          temporal resolution for the dataset, it will just aggregate by
-          the highest available resolution.
-      </p>
-      <p>
-          <strong><code>obs_date</code></strong> Date of obversations. This can
-          have filters applied such as <code>gt</code> and <code>lt</code>. For
-          more details on performing this kind of operation, see “Performing
-          queries” below.
-      </p>
-      <p>
-          <strong><code>dataset_name</code></strong> Machine version of the
-          dataset name as you get it from the <code>/api/</code> endpoint.
-      </p>
-      <p>
-          <strong><code>location_geom</code></strong> A stringified GeoJSON
-          polygon representing the area of interest. Currently, the only query
-          operator that can be applied to this is <code>within</code>. See
-          “Performing queries” for more.
-      </p>
-      <hr />
-      <h3>/api/fields/&lt;dataset_name&gt;/</h3>
-      <p>
-          Gives you a listing of all the fields and their data types for the given
-          dataset. This is useful for figuring out how to structure a query against
-          the <code>/api/detail/</code> or <code>/api/detail-aggregate/</code>
-          endpoints.
-      </p>
-      <hr />
-      <h3>/api/detail-aggregate/ &amp; /api/detail/</h3>
-      <p>
-          These endpoints give you a way to query a particular dataset. The
-          only difference is that <code>/api/detail-aggregate/</code> gives you
-          an temporally aggregated response and <code>/api/detail/</code>
-          responds with the point level records.
-      </p>
-      <hr />
-      <h3>Performing queries</h3>
-      <p>
-          Queries can be constructed by appending the name of a field and a SQL
-          operator separated by two underscores. So to find all the records in
-          the master table for all crime and environmental complaints that were
-          observed after November 12, 2007 but before November 12 2008, a user
-          would construct her query like so:
-      </p>
-      <pre>/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints</pre>
-      <p>
-          Any SQL-like operator should be valid given that it makes sense to
-          use with the field type. So, for example, testing if a string field
-          is less than an integer will return an error.
-      </p>
-      <p>
-          These query parameters can be chained together and are linked
-          together with a SQL <code>AND</code> under the hood. To perform a
-          simple equality test, just leave out the double underscore part:
-      </p>
-      <pre>/api/master/?obs_date=2007-11-12</pre>
-      <p>
-          Once you’ve queried the master table and have an idea of what
-      </p>
-      <hr />
-      <div class="footer">
-        <p>&copy; DataMade and UrbanCCD</p>
-      </div>
+    </div>
   </div>
 </div> <!-- /container -->
 {% endblock content %}

@@ -1,6 +1,10 @@
 # Plenar.io
 
-RESTful API for geospatial and time aggregation across multiple Chicago open datasets. The API formerly known as WOPR.
+RESTful API for geospatial and time aggregation across multiple open datasets.
+
+This project is funded by the [NSF Social, Behavioral, and Economics Research Directorate](http://www.nsf.gov/dir/index.jsp?org=SBE) through a grant to the [Urban Center for Computation and Data](https://urbanccd.org/) (UrbanCCD). It is being implemented by [DataMade](http://datamade.us) and UrbanCCD.
+
+For more details, see the presentation slides from [Exploring Open Civic Data Through Time and Space](https://docs.google.com/presentation/d/1Une-A1k0mUAIYac5UlmeSDLw4VyHYsaw1NW5f4YKWas/edit#slide=id.p) given in June 2014.
 
 ## Running locally
 
@@ -11,11 +15,11 @@ pip install -r requirements.txt
 python runserver.py
 ```
 
-navigate to http://localhost:5000/
+navigate to http://localhost:5001/
 
 # Data
 
-New datasets are actively being added to the plenario API. We keep track of them in this [Google Doc](https://docs.google.com/spreadsheet/ccc?key=0Au-2OHnpwhGTdGJzUWJ2SERwVXZLeDU4Y3laWFJvNEE&usp=sharing#gid=0)
+New datasets are actively being added to the Plenario API. We keep track of them in this [Google Doc](https://docs.google.com/spreadsheet/ccc?key=0Au-2OHnpwhGTdGJzUWJ2SERwVXZLeDU4Y3laWFJvNEE&usp=sharing#gid=0).
 
 # Dependencies
 We used the following open source tools:
@@ -28,6 +32,15 @@ We used the following open source tools:
 
 ## Team
 
+### UrbanCCD
+* Charlie Catlett
+* Brett Goldstein
+* Svetlozar Nestorov
+* Jonathan Giuffrida
+* Maggie King
+* Jiajun Shen
+
+### DataMade
 * Derek Eder
 * Eric van Zanten
 * Forest Gregg

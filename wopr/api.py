@@ -379,9 +379,18 @@ def detail_aggregate():
     return resp
 
 def getSizeInDegrees(meters, latitude):
-    size_x = abs(meters / (111111.0 * math.cos(latitude)))
-    size_y = meters / 111111.0
-    return size_x, size_y
+
+    earth_circumference = 40041000.0 # meters, average circumference
+    degrees_per_meter = 360.0 / earth_circumference
+    
+    degrees_at_equator = meters * degrees_per_meter
+
+    latitude_correction = 1.0 / math.cos(latitude * (math.pi / 180.0))
+    
+    degrees_x = degrees_at_equator * latitude_correction
+    degrees_y = degrees_at_equator
+
+    return degrees_x, degrees_y
 
 @api.route('/api/grid/')
 @crossdomain(origin="*")
