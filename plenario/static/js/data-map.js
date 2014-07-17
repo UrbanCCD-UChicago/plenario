@@ -149,6 +149,7 @@
                     self.$el.spin(false);
                     self.$el.html(template_cache('aboutTemplate', {datasets:resp}));
                     var dataObjs = {}
+                    console.log(resp);
                     $.each(resp, function(i, obj){
                         dataObjs[obj['dataset_name']] = obj;
                     })
