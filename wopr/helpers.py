@@ -15,8 +15,8 @@ import json
 import pyproj
 
 CRIMES = 'https://data.cityofchicago.org/api/views/ijzp-q8t2/rows.csv?accessType=DOWNLOAD'
-#AWS_KEY = os.environ['AWS_ACCESS_KEY']
-#AWS_SECRET = os.environ['AWS_SECRET_KEY']
+AWS_KEY = os.environ['AWS_ACCESS_KEY']
+AWS_SECRET = os.environ['AWS_SECRET_KEY']
 DATA_DIR = os.environ['WOPR_DATA_DIR']
 
 def cleanup_temp_tables():

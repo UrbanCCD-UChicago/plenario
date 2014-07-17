@@ -1,6 +1,6 @@
 import os
-from sqlalchemy import Column, Integer, String, Boolean, Table, Date, DateTime, Float,\
-    Numeric
+from sqlalchemy import Column, Integer, String, Boolean, Table, Date, DateTime, \
+    Float, Numeric
 from sqlalchemy.dialects.postgresql import TIMESTAMP, DOUBLE_PRECISION, TIME,\
     DATE
 from geoalchemy2 import Geometry
@@ -43,7 +43,7 @@ def crime_table(name, metadata):
     return table
 
 def map_esri_type(esri_type):
-    """ Map esri type (extracted through fiona) to SQLAlchemy type """
+    """ Map esri type (extracted through fiona) to SQLAlchemy type. """
     tl = esri_type.split(':')
     t = tl[0]
     l = tl[1] if len(tl) > 1 else None
@@ -59,7 +59,8 @@ def map_esri_type(esri_type):
             return Numeric(int(ps[0]), int(ps[1]))
             
 def shp2table(name, metadata, schema, force_multipoly=False):
-    """ Create a SQLAlchemy table schema from a shapefile schema opbtained through fiona
+    """ Create a SQLAlchemy table schema from a shapefile schema
+        obtained through fiona.
     """
     # Create a list of columns for the features' properties
     attr_list = []

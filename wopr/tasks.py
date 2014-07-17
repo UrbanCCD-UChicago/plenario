@@ -10,15 +10,12 @@ from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
     UniqueConstraint, text, and_, or_
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.exc import NoSuchTableError
-from geoalchemy2 import Geometry
-from geoalchemy2.elements import WKTElement
-from geoalchemy2.shape import from_shape
 import gzip
 from raven.handlers.logging import SentryHandler
 from raven.conf import setup_logging
 
-#handler = SentryHandler(os.environ['CELERY_SENTRY_URL'])
-#setup_logging(handler)
+handler = SentryHandler(os.environ['CELERY_SENTRY_URL'])
+setup_logging(handler)
 
 celery_app = make_celery()
 
@@ -34,7 +31,6 @@ def update_crime(fpath=None):
         chg_crime()
         update_crime_current_flag()
         update_master_current_flag()
-    cleanup_temp_tables()
     return None
 
 @celery_app.task
@@ -89,7 +85,6 @@ def raw_crime(fpath=None, tablename='raw_chicago_crimes_all'):
     # Step One: Load raw downloaded data
     if not fpath:
         fpath = download_crime()
-    print 'Crime file downloaded\n\n'
     raw_crime_table = crime_table(tablename, Base.metadata)
     raw_crime_table.drop(bind=engine, checkfirst=True)
     raw_crime_table.append_column(Column('dup_row_id', Integer, primary_key=True))
@@ -308,4 +303,3 @@ def update_master_current_flag():
     conn = engine.contextual_connect()
     conn.execute(update)
     return 'Master table current flag updated'
-

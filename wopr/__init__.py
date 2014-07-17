@@ -7,8 +7,7 @@ from wopr.database import session as db_session
 from wopr.api import api
 from wopr.views import views
 
-#BROKER_URL = 'sqs://%s:%s@' % (os.environ['AWS_ACCESS_KEY'], os.environ['AWS_SECRET_KEY'])
-BROKER_URL = 'amqp://guest@localhost//' 
+BROKER_URL = 'sqs://%s:%s@' % (os.environ['AWS_ACCESS_KEY'], os.environ['AWS_SECRET_KEY'])
 
 CELERYBEAT_SCHEDULE = {
     'update_crime_every_day': {
@@ -17,14 +16,14 @@ CELERYBEAT_SCHEDULE = {
     }
 }
 
-#sentry = Sentry(dsn=os.environ['WOPR_SENTRY_URL'])
+sentry = Sentry(dsn=os.environ['WOPR_SENTRY_URL'])
 
 def create_app():
     app = Flask(__name__)
     app.url_map.strict_slashes = False
     app.register_blueprint(api)
     app.register_blueprint(views)
-    #sentry.init_app(app)
+    sentry.init_app(app)
     @app.teardown_appcontext
     def shutdown_session(exception=None):
         db_session.remove()
