@@ -1,44 +1,40 @@
-<div id="map" class="col-md-12 half-height"></div>
+<div id="map" class="col-md-8 half-height"></div>
 
-<br />
-<div id="filters">
-    <form role="form">
-        <div class="row">
-            <div class="col-md-4">
-                <div class="form-group">
-                    <label for="start-date-filter">Start Date</label>
-                    <input id="start-date-filter" class="date-filter form-control" type="text" placeholder="<%= start %>" />
-                </div>
+<div class="col-md-4">
+    <div id="filters" class='well'>
+        <form role="form">
+            <div class="form-group">
+                <label for="start-date-filter">Start Date</label>
+                <input id="start-date-filter" class="date-filter form-control" type="text" value="<%= start %>" />
             </div>
-            <div class="col-md-4">
-                <div class="form-group">
-                    <label for="end-date-filter">End Date</label>
-                    <input id="end-date-filter" class="date-filter form-control" type="text" placeholder="<%= end %>"/>
-                </div>
-            </div>
-            <div class="col-md-4">
-              <div class="form-group">
-                    <label for="time-agg-filter">Aggregate by</label>
-                    <select id="time-agg-filter">
-                        <option value="minute">Minute</option>
-                        <option value="hour">Hour</option>
-                        <option value="day">Day</option>
-                        <option value="week">Week</option>
-                        <option value="month" selected="true">Month</option>
-                        <option value="quarter">Quarter</option>
-                        <option value="year">Year</option>
-                        <option value="decade">Decade</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-        <div class="row">
 
-            <div class="col-md-12">
-                 <button type="button" id="submit-query" class="btn btn-success">Submit</button>
-                 <a href='#' id="reset" class="btn btn-default">Reset</a>
+            <div class="form-group">
+                <label for="end-date-filter">End Date</label>
+                <input id="end-date-filter" class="date-filter form-control" type="text" value="<%= end %>"/>
             </div>
-        </div>
-    </form>
+
+            <div class="form-group">
+                <label for="time-agg-filter">Aggregate by</label>
+                <select class='form-control' id="time-agg-filter">
+                    <option value="minute">Minute</option>
+                    <option value="hour">Hour</option>
+                    <option value="day">Day</option>
+                    <option value="week" selected="true">Week</option>
+                    <option value="month">Month</option>
+                    <option value="quarter">Quarter</option>
+                    <option value="year">Year</option>
+                    <option value="decade">Decade</option>
+                </select>
+            </div>
+
+            <button type="button" id="submit-query" class="btn btn-success">
+                <i class='fa fa-search'></i>
+                Submit
+            </button>
+            <a href='#' id="reset" class="btn btn-default">
+                <i class='fa fa-undo'></i>
+                Reset
+            </a>
+        </form>
+    </div>
 </div>
-

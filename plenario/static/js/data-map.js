@@ -108,14 +108,21 @@
                         objects: objects,
                         query: self.query
                     }));
-                    $.each(objects, function(i, obj){
-                        $('#' + obj.meta.dataset_name + '-sparkline').sparkline(
-                            obj.values, {
-                            width: '150px',
-                            tooltipClassname: 'sparkline-tooltip'
-                        });
-                    })
                     $('#about').hide();
+
+                    // Sparklines
+                      $(".sparkline").sparkline("html", {
+                        chartRangeMin: 0,
+                        fillColor: "#ddf2fb",
+                        height: "30px",
+                        lineColor: "#518fc9",
+                        lineWidth: 1,
+                        minSpotColor: "#0b810b",
+                        maxSpotColor: "#c10202",
+                        spotColor: false,
+                        spotRadius: 2,
+                        width: "290px"
+                      });
                 }
             ).fail(function(resp){
                 new ErrorView({el: '#errorModal', model: resp});
