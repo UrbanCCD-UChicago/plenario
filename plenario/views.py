@@ -36,9 +36,13 @@ def grid_view():
     }
     return render_template('grid.html', **context)
 
-@views.route('/map/')
-def map_view():
-    return render_template('map.html')
+@views.route('/explore')
+def explore_view():
+    return render_template('explore.html')
+
+@views.route('/explore/detail')
+def explore_detail_view():
+    return render_template('explore_detail.html')
 
 @views.route('/docs')
 def api_docs():
