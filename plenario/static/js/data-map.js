@@ -212,7 +212,12 @@
             this.center = [41.880517,-87.644061];
             this.query = this.attributes.query;
             this.meta = this.attributes.meta;
-            this.map = L.map('map').setView(this.center, 11);
+            var map_options = {
+                scrollWheelZoom: false,
+                tapTolerance: 30,
+                minZoom: 1
+            };
+            this.map = L.map('map', map_options).setView(this.center, 11);
             L.tileLayer('https://{s}.tiles.mapbox.com/v3/derekeder.hehblhbj/{z}/{x}/{y}.png', {
               attribution: '<a href="http://www.mapbox.com/about/maps/" target="_blank">Terms &amp; Feedback</a>'
             }).addTo(this.map);
@@ -342,7 +347,8 @@
             // initialize the Leaflet map
             var map_options = {
                 scrollWheelZoom: false,
-                tapTolerance: 30
+                tapTolerance: 30,
+                minZoom: 1
             };
             this.map = L.map('map', map_options).setView([41.880517,-87.644061], 11);
             L.tileLayer('https://{s}.tiles.mapbox.com/v3/derekeder.hehblhbj/{z}/{x}/{y}.png', {
