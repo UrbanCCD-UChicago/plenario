@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Explore - Plenar.io{% endblock %}
+{% block extra_styles %}
+    <link href="{{ url_for('static', filename='css/leaflet.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/leaflet.draw.css') }}" rel="stylesheet">
+{% endblock %}
+{% block content %}
+    <div class="col-md-12">
+        <div class="row">
+            <div class="col-md-12">
+                <div id="map-view"></div>
+                <div id="query"></div>
+            </div>
+            <div class="col-md-12">
+                <div id="about"></div>
+                <div id="detail"></div>
+                <div id="response"></div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="errorModal" tabindex="-1" role="dialog" aria-labelledby="error" aria-hidden="true"></div>
+{% endblock %}
+{% block extra_javascript %}
+    <script src="{{ url_for('static', filename='js/jquery-ui.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/jenks.js') }}" type="text/javascript"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.sparkline.min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/underscore-min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/backbone-min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/spin.min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.spin.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/leaflet.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/leaflet.draw.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/leaflet.label.js') }}" type="text/javascript"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/data-map.js') }}"></script>
+{% endblock %}

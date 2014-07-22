@@ -1,0 +1,38 @@
+<% var matrix = "/api/master/?" + $.param(query) + '&datatype=csv' %>
+<table class="table-striped table-condensed table">
+    <thead>
+        <tr>
+            <th>Dataset Name</th>
+            <th>Trend</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        <% $.each(objects, function(i, obj){ %>
+            <% var points = "/api/detail/?" + $.param(query) + '&dataset_name=' + obj.meta.dataset_name %>
+            <tr>
+                <td><%= obj.meta.human_name %></td>
+                <td><span class='sparkline' id="<%= obj.meta.dataset_name %>-sparkline"><%= obj.values %></span></td>
+                <td>
+                    <a href="javascript://" class="detail btn btn-info btn-sm " data-dataset_name="<%= obj.meta.dataset_name %>">
+                        <i class='fa fa-info-circle'></i>
+                        View
+                    </a>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown">
+                            <i class='fa fa-download'></i>
+                            Download
+                            <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu" role="menu">
+                            <li><a href="<%= points + '&datatype=csv' %>" class="data-download" target="_blank">CSV</a></li>
+                            <li><a href="<%= points %>" class="data-download" target="_blank">JSON</a></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+        <% }) %>
+    </tbody>
+</table>
+
+<p><a class='btn btn-primary' href="<%= matrix %>"><i class='fa fa-download'></i> Download entire data matrix</a></p>

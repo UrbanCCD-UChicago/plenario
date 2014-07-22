@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}About - Plenar.io{% endblock %}
+{% block content %}
+<div class="container">
+  <div class='col-md-10 col-md-offset-1'>
+    <h3>Plenar.io: A spatio-temporal open data platform</h3>
+    <p>Over the past few years, all levels of government from the <a href="http://data.gov">federal administration</a> to <a href="http://data.cityofchicago.org">individual municipalities</a> have been moving toward an open data model, publicly releasing data on how government entities function. Plenar.io tells a unified story of place by centralizing data from these various sources in order to increase accessibility and help ordinary citizens and researchers draw connections between datasets. Data can be viewed via a map interface and accessed by download or via a RESTful API. 
+    </p>
+    <h3>Applications (under development)</h3>
+    <p>
+      <ul>
+        <li><a href="{{ url_for('views.api_docs') }}">API documentation</a></li>
+        <li><a href="{{ url_for('views.map_view') }}">Data Explorer</a></li>
+        <li><a href="{{ url_for('views.grid_view') }}">Grid Aggregation</a></li>
+      </ul>
+    </p>
+    <hr />
+	<h3>Attributions</h3>
+	<p>
+This project is funded by the <a href="http://www.nsf.gov/dir/index.jsp?org=SBE">NSF Social, Behavioral, and Economics Research Directorate</a> through a grant to the University of Chicago Urban Center for Computation and Data (<a href="https://urbanccd.org/">UrbanCCD</a>). It is being implemented by UrbanCCD and <a href="http://datamade.us">DataMade</a>.
+	</p>
+    <p>
+    You're invited to follow our development on <a href="https://github.com/datamade/plenario">GitHub</a>.
+    </p>
+    <div class="footer">
+      <p>
+        Released under the MIT License.
+      </p>
+    </div>
+  </div>
+</div> <!-- /container -->
+{% endblock content %}

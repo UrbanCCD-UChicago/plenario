@@ -1,0 +1,18 @@
+<p>This is a prototype for demonstrating geospatial and time aggregation across multiple Chicago open datasets.</p>
+
+<h4>Datasets available</h4>
+
+<table class='table table-bordered table-condensed'>
+  <thead>
+    <tr>
+      <th>Dataset</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% $.each(datasets, function(i, set){ %>
+      <tr>
+        <td><%= set.human_name %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

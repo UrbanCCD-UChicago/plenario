@@ -1,0 +1,40 @@
+<div id="map" class="col-md-8 half-height"></div>
+
+<div class="col-md-4">
+    <div id="filters" class='well'>
+        <form role="form">
+            <div class="form-group">
+                <label for="start-date-filter">Start Date</label>
+                <input id="start-date-filter" class="date-filter form-control" type="text" value="<%= start %>" />
+            </div>
+
+            <div class="form-group">
+                <label for="end-date-filter">End Date</label>
+                <input id="end-date-filter" class="date-filter form-control" type="text" value="<%= end %>"/>
+            </div>
+
+            <div class="form-group">
+                <label for="time-agg-filter">Aggregate by</label>
+                <select class='form-control' id="time-agg-filter">
+                    <option value="minute">Minute</option>
+                    <option value="hour">Hour</option>
+                    <option value="day">Day</option>
+                    <option value="week" selected="true">Week</option>
+                    <option value="month">Month</option>
+                    <option value="quarter">Quarter</option>
+                    <option value="year">Year</option>
+                    <option value="decade">Decade</option>
+                </select>
+            </div>
+
+            <button type="button" id="submit-query" class="btn btn-success">
+                <i class='fa fa-search'></i>
+                Submit
+            </button>
+            <a href='#' id="reset" class="btn btn-default">
+                <i class='fa fa-undo'></i>
+                Reset
+            </a>
+        </form>
+    </div>
+</div>
