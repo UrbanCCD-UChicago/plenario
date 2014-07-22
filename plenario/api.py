@@ -1,5 +1,5 @@
 from flask import make_response, request, render_template, current_app, g, \
-    Blueprint
+    Blueprint, abort
 from functools import update_wrapper
 import os
 import math
@@ -18,9 +18,11 @@ import csv
 from shapely.wkb import loads
 from shapely.geometry import box, asShape
 from collections import OrderedDict
+from urlparse import urlparse
 
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
+from plenario.helpers import get_socrata_data_info
 
 api = Blueprint('api', __name__)
 
@@ -443,3 +445,24 @@ def grid():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
+@api.route('/api/submit-dataset/', methods=['POST'])
+def submit_dataset():
+    resp = {'status': 'ok', 'message': ''}
+    post = request.form
+    referer = urlparse(request.headers['Referer']).netloc
+    req_url = urlparse(request.url).netloc
+    if referer != req_url:
+        abort(401)
+    if post.get('view_url'):
+        dataset_info, errors, status_code = get_socrata_data_info(post['view_url'])
+        if errors:
+            resp['message'] = ', '.join([e for e in errors])
+            resp['status'] = 'error'
+            status_code = 400
+    else:
+        resp['status'] = 'error'
+        resp['message'] = 'Must provide a socrata view url'
+        status_code = 400
+    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp

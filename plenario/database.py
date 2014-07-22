@@ -38,3 +38,7 @@ class Point(types.UserDefinedType):
             else:
                 raise psycopg2.InterfaceError("bad point representation: %r" % value)
         return process
+
+def init_db():
+    import plenario.models
+    Base.metadata.create_all(bind=app_engine)

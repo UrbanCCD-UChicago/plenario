@@ -1,0 +1,115 @@
+
+{% extends 'base.html' %}
+{% block title %}Add a dataset - Plenar.io{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class='col-md-10 col-md-offset-1'>
+            <h2>Add a dataset to Plenario</h2>
+            <form role="form" method="POST">
+                <div class="form-group">
+                    <label for="dataset_url">Socrata URL</label>
+                    <input type="text" class="form-control" name="dataset_url" />
+                </div>
+                <div class="form-group">
+                    <button class="btn" type="submit">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% if errors %}
+        <div class="row">
+            <div class="col-md-10 col-md-offset-1">
+                <h4>There were some problems with your submission: </h4>
+                {% for error in errors %}
+                    <p>{{error}}</p>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+    {% if dataset_info %}
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <h4 id="name" data-view="{{dataset_info.view_url}}">{{dataset_info.name}}
+                {% if dataset_info.update_freq %}
+                <br />Updated: {{dataset_info.update_freq}}
+                {% endif %}
+            </h4>
+            {% if dataset_info.description %}
+                <p>{{dataset_info.description}}</p>
+            {% endif %}
+            <form role="form">
+                <button type="submit" class="btn" id="datatype-submit">Submit</button>
+                <div id="errors"></div>
+                <table class="table">
+                    <thead>
+                        <th>Choose Type</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Socrata Data Type</th>
+                        <th>Width</th>
+                        <th>Value Range</th>
+                        <th>Sample values</th>
+                    </thead>
+                    <tbody>
+                        {% for info in dataset_info.columns %}
+                            <tr>
+                                <td>
+                                    <select class="plenario-type">
+                                        <option value="">-----------</option>
+                                        <option value="{{info.machine_name}}">Date Field</option>
+                                        <option value="{{info.machine_name}}">ID Field</option>
+                                        <option value="{{info.machine_name}}">Latitude</option>
+                                        <option value="{{info.machine_name}}">Longitude</option>
+                                        <option value="{{info.machine_name}}">Location</option>
+                                    </select>
+                                </td>
+                                <td>{{ info.human_name }}</td>
+                                <td>{{ info.description }}</td>
+                                <td>{{ info.data_type }}</td>
+                                <td>{{ info.width }}</td>
+                                <td>{{ info.smallest }} — {{info.largest}}</td>
+                                <td>
+                                    {% for i in info.sample_values %}
+                                        {{i}}{% if not loop.last %}, {% endif %}
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div> <!-- /container -->
+{% endblock content %}
+{% block extra_javascript %}
+    <script type="text/javascript">
+        $(document).ready(function(){
+            $('#datatype-submit').on('click', function(e){
+                e.preventDefault();
+                var data_types = {};
+                var valid = true;
+                $.each($('.plenario-type option'), function(i, opt){
+                    if($(opt).is(':selected') && $(opt).val()){
+                        var d_type = $(opt).text().split(' ').join('_').toLowerCase()
+                        if (typeof data_types[d_type] !== 'undefined'){
+                            valid = false
+                            $('#errors').append('<p><strong>You defined more than one ' + $(opt).text() + '</strong></p>')
+                        } else {
+                            data_types[d_type] = $(opt).val()
+                        }
+                    }
+                })
+                if(valid){
+                    data_types['view_url'] = $('#name').data('view')
+                    console.log(data_types);
+                    $.post('/api/submit-dataset/', data_types, function(resp){
+                        console.log(resp);
+                    })
+                }
+            })
+        })
+    </script>
+{% endblock %}

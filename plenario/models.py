@@ -1,6 +1,6 @@
 import os
 from sqlalchemy import Column, Integer, String, Boolean, Table, Date, DateTime, \
-    Float, Numeric
+    Float, Numeric, Text
 from sqlalchemy.dialects.postgresql import TIMESTAMP, DOUBLE_PRECISION, TIME,\
     DATE
 from geoalchemy2 import Geometry
@@ -9,11 +9,40 @@ from sqlalchemy.orm import relationship, backref
 
 from plenario.database import Base, app_engine as engine, Point
 
-MetaTable = Table('meta_master', Base.metadata,
-    autoload=True, autoload_with=engine)
+class MetaTable(Base):
+    __tablename__ = 'meta_master'
+    dataset_name = Column(String(100), nullable=False)
+    human_name = Column(String(200), nullable=False)
+    description = Column(Text)
+    source_url = Column(String(100), nullable=False, primary_key=True)
+    obs_from = Column(Date)
+    obs_to = Column(Date)
+    bbox = Column(Geometry('POLYGON', srid=4326))
+    update_freq = Column(String(100), nullable=False)
 
-MasterTable = Table('dat_master', Base.metadata,
-    autoload=True, autoload_with=engine)
+    def __repr__(self):
+        return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
+
+class MasterTable(Base):
+    __tablename__ = 'dat_master'
+    master_row_id = Column(Integer, primary_key=True)
+    start_date = Column(Date)
+    end_date = Column(Date)
+    current_flag = Column(Boolean, default=True)
+    location = Column(Point)
+    latitude = Column(DOUBLE_PRECISION(precision=53))
+    longitude = Column(DOUBLE_PRECISION(precision=53))
+    obs_date = Column(Date)
+    obs_ts = Column(TIMESTAMP, default=None)
+    geotag1 = Column(String(50))
+    geotag2 = Column(String(50))
+    geotag3 = Column(String(50))
+    dataset_name = Column(Integer)
+    dataset_row_id = Column(Integer)
+    location_geom = Column(Geometry('POINT', srid=4326))
+
+    def __repr__(self):
+        return '<Master %r (%r)>' % (self.dataset_row_id, self.dataset_name)
 
 def crime_table(name, metadata):
     table = Table(name, metadata,

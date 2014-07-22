@@ -2,7 +2,10 @@ from flask import make_response, request, render_template, current_app, g, \
     Blueprint
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session
+from plenario.helpers import get_socrata_data_info
 from datetime import datetime, timedelta
+from urlparse import urlparse
+import requests
 
 views = Blueprint('views', __name__)
 
@@ -44,6 +47,27 @@ def explore_view():
 def explore_detail_view():
     return render_template('explore_detail.html')
 
-@views.route('/docs')
+@views.route('/docs/')
 def api_docs():
-	return render_template('docs.html')
+    return render_template('docs.html')
+
+@views.route('/add-dataset/', methods=['GET', 'POST'])
+def add_dataset():
+    dataset_info = {}
+    errors = []
+    if request.method == 'POST':
+        url = request.form.get('dataset_url')
+        if url:
+            parsed = urlparse(url)
+            host = 'https://%s' % parsed.netloc
+            path = 'api/views'
+            fourbyfour = parsed.path.split('/')[-1]
+            view_url = '%s/%s/%s' % (host, path, fourbyfour)
+            dataset_info, errors, status_code = get_socrata_data_info(view_url)
+            if status_code is not None and status_code != 200:
+                errors.append('URL returns a %s status code' % status_code)
+        else:
+            errors.append('Need a URL')
+    context = {'dataset_info': dataset_info, 'errors': errors}
+    return render_template('add-dataset.html', **context)
+

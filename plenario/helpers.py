@@ -387,3 +387,56 @@ def import_shapefile(fpath, name, force_multipoly=False, proj=4326):
     conn.execute(ins)
     return 'Table {0} created from shapefile'.format(name)
 
+def get_socrata_data_info(view_url):
+    errors = []
+    status_code = None
+    try:
+        r = requests.get(view_url)
+        status_code = r.status_code
+    except requests.exceptions.InvalidURL:
+        errors.append('Invalid URL')
+    except requests.exceptions.ConnectionError:
+        errors.append('URL can not be reached')
+    try:
+        resp = r.json()
+    except AttributeError:
+        errors.append('No Socrata views endpoint available for this dataset')
+        resp = None
+    if resp:
+        columns = resp.get('columns')
+        if columns:
+            dataset_info = {
+                'name': resp['name'],
+                'description': resp.get('description'),
+                'columns': [],
+                'view_url': view_url
+            }
+            try:
+                dataset_info['update_freq'] = \
+                    resp['metadata']['custom_fields']['Metadata']['Update Frequency']
+            except KeyError:
+                dataset_info['update_freq'] = None
+            for column in columns:
+                d = {
+                    'human_name': column['name'],
+                    'machine_name': column['fieldName'],
+                    'data_type': column['dataTypeName'],
+                    'description': column.get('description', ''),
+                    'width': column['width'],
+                    'sample_values': [],
+                    'smallest': '',
+                    'largest': '',
+                }
+                if column.get('cachedContents'):
+                    cached = column['cachedContents']
+                    if cached.get('top'):
+                        d['sample_values'] = \
+                            [c['item'] for c in cached['top']][:5]
+                    if cached.get('smallest'):
+                        d['smallest'] = cached['smallest']
+                    if cached.get('largest'):
+                        d['largest'] = cached['largest']
+                dataset_info['columns'].append(d)
+        else:
+            errors.append('Views endpoint not structured as expected')
+    return dataset_info, errors, status_code
