@@ -307,7 +307,13 @@
             var then = moment().subtract('d', 180).format('MM/DD/YYYY');
             var now = moment().format('MM/DD/YYYY');
             this.$el.html(template_cache('mapTemplate', {end: now, start: then}));
-            this.map = L.map('map').setView([41.880517,-87.644061], 11);
+
+            // initialize the Leaflet map
+            var map_options = {
+                scrollWheelZoom: false,
+                tapTolerance: 30
+            };
+            this.map = L.map('map', map_options).setView([41.880517,-87.644061], 11);
             L.tileLayer('https://{s}.tiles.mapbox.com/v3/derekeder.hehblhbj/{z}/{x}/{y}.png', {
               attribution: '<a href="http://www.mapbox.com/about/maps/" target="_blank">Terms &amp; Feedback</a>'
             }).addTo(this.map);
@@ -343,6 +349,7 @@
                         fillColor: "#f06eaa",
                         weight: 4
                 }));
+                //this.map.fitBounds(this.map.drawnItems.getBounds());
             }
         },
         resetForm: function(e){
@@ -390,6 +397,7 @@
             query['obs_date__ge'] = start;
             if (this.map.dataLayer){
                 query['location_geom__within'] = JSON.stringify(this.map.dataLayer);
+                this.map.fitBounds(this.map.drawnItems.getBounds());
             }
             query['agg'] = $('#time-agg-filter').val();
             if(valid){

@@ -98,6 +98,8 @@ body {
     margin-left: 5px;
 }
 
+#drawing-tools-img { margin-right: 10px; margin-top: 5px;}
+
 /* Dataset table styles */
 .jqsfield {
     color: white;

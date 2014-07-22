@@ -1,7 +1,28 @@
-<div id="map" class="col-md-8 half-height"></div>
-
 <div class="col-md-4">
-    <div id="filters" class='well'>
+    <div id="filters">
+        <div class="panel-group" id="accordion">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h4 class="panel-title">
+                <a data-toggle="collapse" data-parent="#accordion" href="#collapse-intro">
+                <i class='fa fa-info-circle'></i>
+                  Instructions
+                </a>
+              </h4>
+            </div>
+            <div id="collapse-intro" class="panel-collapse collapse">
+              <div class="panel-body">
+                <div class='clearfix'></div>
+                <p class='pull-left'><img id='drawing-tools-img' src='/static/images/draw-tools.png' alt='drawing tools' /></p>
+                <p>Draw a box, line or a custom shape on the map and select the dates and time aggregation below to filter datasets.</p>
+
+                <p class='pull-right'><a class='btn btn-primary btn-sm' href='#' id='dismiss-intro'>OK, thanks!</a></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
         <form role="form">
             <div class="form-group">
                 <label for="start-date-filter">Start Date</label>
@@ -27,7 +48,7 @@
                 </select>
             </div>
 
-            <button type="button" id="submit-query" class="btn btn-success">
+            <button type="button" id="submit-query" class="btn btn-primary">
                 <i class='fa fa-search'></i>
                 Submit
             </button>
@@ -38,3 +59,4 @@
         </form>
     </div>
 </div>
+<div id="map" class="col-md-8 half-height"></div>
