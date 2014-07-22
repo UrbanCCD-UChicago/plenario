@@ -49,6 +49,7 @@
 
     var DetailView = Backbone.View.extend({
         initialize: function(){
+            window.scrollTo(0, 0);
             this.$el.empty()
             this.query = this.attributes.query;
             this.meta = this.attributes.meta;
@@ -144,6 +145,9 @@
         }
     });
     var AboutView = Backbone.View.extend({
+        events: {
+            'click .detail': 'detailView'
+        },
         initialize: function(){
             this.render();
         },
@@ -169,6 +173,33 @@
                 url: '/api/',
                 dataType: 'json'
             })
+        },
+        detailView: function(e){
+            this.$el.hide()
+
+            var query = {};
+            var start = $('#start-date-filter').val();
+            var end = $('#end-date-filter').val();
+            start = moment(start);
+            if (!start){ start = moment().subtract('days', 180); }
+            end = moment(end)
+            if(!end){ end = moment(); }
+            start = start.startOf('day').format('YYYY/MM/DD');
+            end = end.endOf('day').format('YYYY/MM/DD');
+
+            query['obs_date__le'] = end;
+            query['obs_date__ge'] = start;
+            query['agg'] = $('#time-agg-filter').val();
+
+            var dataset_name = $(e.target).data('dataset_name')
+            console.log(dataset_name);
+            query['dataset_name'] = dataset_name
+
+            new DetailView({el:'#detail', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
+            $('#map-view').empty();
+            new GridMapView({el: '#map-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
+            var route = 'detail/' + $.param(query)
+            router.navigate(route)
         }
     });
 
@@ -414,9 +445,7 @@
                     header: 'Woops!',
                     body: message,
                 }
-                var errortpl = new EJS({url: 'js/templates/modalTemplate.ejs'})
-                $('#errorModal').html(errortpl.render(error));
-                $('#errorModal').modal();
+                new ErrorView({el: '#errorModal', model: resp});
             }
         }
     });
@@ -428,13 +457,19 @@
             "detail/:query": "detail"
         },
         defaultRoute: function(){
+
+            $('#map-view').empty();
+            $('#query').empty();
+
+            $('#about').empty();
+            $('#detail').empty();
+            $('#response').empty();
+
             var resp = new ResponseView({el: '#response'});
-            var about = new AboutView({el: '#about'});
+            var about = new AboutView({el: '#about', attributes: {resp: resp}});
             var map = new MapView({el: '#map-view', attributes: {resp: resp}})
         },
         aggregate: function(query){
-            $('#detail').hide()
-            $('#response').show()
             var q = parseParams(query);
             var resp = new ResponseView({el: '#response', attributes: {query: q}});
             resp.render();
