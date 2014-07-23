@@ -22,7 +22,7 @@ from urlparse import urlparse
 
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
-from plenario.helpers import get_socrata_data_info
+from plenario.helpers import get_socrata_data_info, slugify
 
 api = Blueprint('api', __name__)
 
@@ -459,6 +459,28 @@ def submit_dataset():
             resp['message'] = ', '.join([e for e in errors])
             resp['status'] = 'error'
             status_code = 400
+        else:
+            source_domain = urlparse(dataset_info['view_url']).netloc
+            dataset_id = dataset_info['view_url'].split('/')[-1]
+            source_url = 'http://%s/resource/%s' % (source_domain, dataset_id)
+            md = session.query(MetaTable).get(source_url)
+            if not md:
+                d = {
+                    'dataset_name': slugify(dataset_info['name'], delim=u'_'),
+                    'human_name': dataset_info['name'],
+                    'description': dataset_info['description'],
+                    'source_url': source_url,
+                    'update_freq': post['update_frequency'],
+                    'business_key': post['id_field'],
+                    'observed_date': post['date_field'],
+                    'latitude': post['latitude'],
+                    'longitude': post['longitude'],
+                    'location': post['location']
+                }
+                md = MetaTable(**d)
+                session.add(md)
+                session.commit()
+            resp['message'] = 'Dataset %s submitted successfully' % md.human_name
     else:
         resp['status'] = 'error'
         resp['message'] = 'Must provide a socrata view url'

@@ -66,8 +66,13 @@ def add_dataset():
             dataset_info, errors, status_code = get_socrata_data_info(view_url)
             if status_code is not None and status_code != 200:
                 errors.append('URL returns a %s status code' % status_code)
+            dataset_info['submitted_url'] = url
         else:
             errors.append('Need a URL')
     context = {'dataset_info': dataset_info, 'errors': errors}
     return render_template('add-dataset.html', **context)
 
+@views.route('/view-datasets/')
+def view_datasets():
+    datasets = session.query(MetaTable).all()
+    return render_template('view-datasets.html', datasets=datasets)

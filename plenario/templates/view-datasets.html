@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}View datasets - Plenar.io{% endblock %}
+{% block content %}
+<div class="container">
+    {% if errors %}
+        <div class="row">
+            <div class="col-md-10 col-md-offset-1">
+                <h4>There were some problems with your submission: </h4>
+                {% for error in errors %}
+                    <p>{{error}}</p>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <h4>Datasets in Plenario</h4>
+            <div id="errors"></div>
+            <table class="table">
+                <thead>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Date range</th>
+                    <th>Update frequency</th>
+                    <th></th>
+                </thead>
+                <tbody>
+                    {% for dataset in datasets %}
+                        <tr>
+                            <td>{{ dataset.human_name }}</td>
+                            <td>{{ dataset.description }}</td>
+                            {% if dataset.obs_from and dataset.obs_to %}
+                            <td>{{ dataset.obs_from }}—{{dataset.obs_to}}</td>
+                            {% else %}
+                            <td></td>
+                            {% endif %}
+                            <td>{{ dataset.update_freq }}</td>
+                            <td><button class="btn update-dataset" data-dataset="{{dataset.source_url}}">Update</button></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div> <!-- /container -->
+{% endblock content %}
+{% block extra_javascript %}
+    <script type="text/javascript">
+        $(document).ready(function(){
+            $('.update-dataset').on('click', function(e){
+                e.preventDefault()
+                console.log($(this).data('dataset'))
+            })
+        })
+    </script>
+{% endblock %}

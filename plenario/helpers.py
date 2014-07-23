@@ -1,5 +1,7 @@
 import requests
 import os
+import re
+from unicodedata import normalize
 from datetime import datetime, date
 from sqlalchemy import Column, Integer, Table, func, select, Boolean, \
     Date, DateTime, UniqueConstraint, text, and_, or_
@@ -419,7 +421,7 @@ def get_socrata_data_info(view_url):
             for column in columns:
                 d = {
                     'human_name': column['name'],
-                    'machine_name': column['fieldName'],
+                    'machine_name': column['name'],
                     'data_type': column['dataTypeName'],
                     'description': column.get('description', ''),
                     'width': column['width'],
@@ -436,7 +438,21 @@ def get_socrata_data_info(view_url):
                         d['smallest'] = cached['smallest']
                     if cached.get('largest'):
                         d['largest'] = cached['largest']
+                    if cached.get('null'):
+                        if cached['null'] > 0:
+                            d['null_values'] = True
+                        else:
+                            d['null_values'] = False
                 dataset_info['columns'].append(d)
         else:
             errors.append('Views endpoint not structured as expected')
     return dataset_info, errors, status_code
+
+def slugify(text, delim=u'-'):
+    punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.]+')
+    result = []
+    for word in punct_re.split(text.lower()):
+        word = normalize('NFKD', word).encode('ascii', 'ignore')
+        if word:
+            result.append(word)
+    return unicode(delim.join(result))

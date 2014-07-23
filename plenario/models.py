@@ -19,6 +19,12 @@ class MetaTable(Base):
     obs_to = Column(Date)
     bbox = Column(Geometry('POLYGON', srid=4326))
     update_freq = Column(String(100), nullable=False)
+    # Store the names of fields in source data
+    business_key = Column(String, nullable=False)
+    observed_date = Column(String, nullable=False)
+    latitude = Column(String)
+    longitude = Column(String)
+    location = Column(String)
 
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
