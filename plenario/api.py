@@ -22,7 +22,7 @@ from urlparse import urlparse
 
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
-from plenario.helpers import get_socrata_data_info, slugify
+from plenario.utils.helpers import get_socrata_data_info, slugify
 
 api = Blueprint('api', __name__)
 

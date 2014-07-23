@@ -6,8 +6,9 @@ from raven.contrib.flask import Sentry
 from plenario.database import session as db_session
 from plenario.api import api
 from plenario.views import views
+from urllib import quote_plus
 
-BROKER_URL = 'sqs://%s:%s@' % (os.environ['AWS_ACCESS_KEY'], os.environ['AWS_SECRET_KEY'])
+BROKER_URL = 'redis://localhost:6379/0'
 
 CELERYBEAT_SCHEDULE = {
     'update_crime_every_day': {
@@ -36,6 +37,7 @@ def make_celery(app=None):
     celery_app.conf['CELERYBEAT_SCHEDULE'] = CELERYBEAT_SCHEDULE
     celery_app.conf['CELERY_TIMEZONE'] = 'America/Chicago'
     celery_app.conf['CELERYD_HIJACK_ROOT_LOGGER'] = False
+    celery_app.conf['CELERY_IGNORE_RESULT'] = True
     TaskBase = celery_app.Task
     class ContextTask(TaskBase):
         abstract = True

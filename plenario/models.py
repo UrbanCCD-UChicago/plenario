@@ -29,6 +29,9 @@ class MetaTable(Base):
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
 
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
 class MasterTable(Base):
     __tablename__ = 'dat_master'
     master_row_id = Column(Integer, primary_key=True)
@@ -38,7 +41,7 @@ class MasterTable(Base):
     location = Column(Point)
     latitude = Column(DOUBLE_PRECISION(precision=53))
     longitude = Column(DOUBLE_PRECISION(precision=53))
-    obs_date = Column(Date)
+    obs_date = Column(Date, index=True)
     obs_ts = Column(TIMESTAMP, default=None)
     geotag1 = Column(String(50))
     geotag2 = Column(String(50))

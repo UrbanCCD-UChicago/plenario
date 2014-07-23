@@ -30,9 +30,9 @@
                             <td>{{ dataset.human_name }}</td>
                             <td>{{ dataset.description }}</td>
                             {% if dataset.obs_from and dataset.obs_to %}
-                            <td>{{ dataset.obs_from }}—{{dataset.obs_to}}</td>
+                                <td>{{ dataset.obs_from }}—{{dataset.obs_to}}</td>
                             {% else %}
-                            <td></td>
+                                <td></td>
                             {% endif %}
                             <td>{{ dataset.update_freq }}</td>
                             <td><button class="btn update-dataset" data-dataset="{{dataset.source_url}}">Update</button></td>

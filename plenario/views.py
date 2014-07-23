@@ -2,7 +2,7 @@ from flask import make_response, request, render_template, current_app, g, \
     Blueprint
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session
-from plenario.helpers import get_socrata_data_info
+from plenario.utils.helpers import get_socrata_data_info
 from datetime import datetime, timedelta
 from urlparse import urlparse
 import requests
