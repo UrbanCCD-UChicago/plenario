@@ -7,7 +7,7 @@ from geoalchemy2 import Geometry
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 
-from plenario.database import Base, app_engine as engine, Point
+from plenario.database import Base, app_engine as engine
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
@@ -38,7 +38,7 @@ class MasterTable(Base):
     start_date = Column(Date)
     end_date = Column(Date)
     current_flag = Column(Boolean, default=True)
-    location = Column(Point)
+    location = Column(String(100))
     latitude = Column(DOUBLE_PRECISION(precision=53))
     longitude = Column(DOUBLE_PRECISION(precision=53))
     obs_date = Column(Date, index=True)
@@ -46,7 +46,7 @@ class MasterTable(Base):
     geotag1 = Column(String(50))
     geotag2 = Column(String(50))
     geotag3 = Column(String(50))
-    dataset_name = Column(Integer)
+    dataset_name = Column(String(100))
     dataset_row_id = Column(Integer)
     location_geom = Column(Geometry('POINT', srid=4326))
 
