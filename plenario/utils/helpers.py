@@ -11,7 +11,7 @@ from csvkit.unicsv import UnicodeCSVReader
 from csvkit.typeinference import normalize_table
 import gzip
 from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
-    Integer, Table, text, func, select
+    Integer, Table, text, func, select, or_, and_
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from types import NoneType
 
@@ -205,6 +205,7 @@ def update_dat_table(meta):
     conn.execute(ins)
 
 def update_master(meta):
+    # Step Seven: Insert new records into master table
     dat_table = Table('dat_%s' % meta['dataset_name'], Base.metadata, 
                   autoload=True, autoload_with=engine, extend_existing=True)
     new_table = Table('new_%s' % meta['dataset_name'], Base.metadata, 
@@ -245,6 +246,52 @@ def update_master(meta):
         )
     conn = engine.connect()
     conn.execute(ins)
+
+def find_changes(meta):
+    # Step Eight: Find changes
+    dat_table = Table('dat_%s' % meta['dataset_name'], Base.metadata, 
+                  autoload=True, autoload_with=engine, extend_existing=True)
+    src_table = Table('src_%s' % meta['dataset_name'], Base.metadata, 
+                  autoload=True, autoload_with=engine, extend_existing=True)
+    chg_table = Table('chg_%s' % meta['dataset_name'], Base.metadata,
+                  Column('id', Integer, primary_key=True), 
+                  extend_existing=True)
+    chg_table.drop(bind=engine, checkfirst=True)
+    chg_table.create(bind=engine)
+    bk = slugify(meta['business_key'])
+    skip_cols = ['start_date', 'end_date', 'current_flag', bk]
+    src_cols = [c for c in src_table.columns if c.name != bk]
+    dat_cols = [c for c in dat_table.columns if c.name not in skip_cols]
+    and_args = []
+    for s,d in zip(src_cols, dat_cols):
+        ors = or_(s != None, d != None)
+        ands = and_(ors, s != d)
+        and_args.append(ands)
+    ins = chg_table.insert()\
+        .from_select(
+            ['id'],
+            select([src_table.c.dataset_row_id])\
+                .select_from(src_table.join(dat_table,
+                    getattr(src_table.c, bk) == \
+                    getattr(dat_table.c, bk)))\
+                .where(or_(*and_args))
+                .where(and_(dat_table.c.current_flag == True, 
+                    or_(getattr(src_table.c, bk) != None, getattr(dat_table.c, bk) != None)))
+        )
+    conn = engine.connect()
+    try:
+        conn.execute(ins)
+    except TypeError:
+        # No changes found
+        pass
+
+def update_dat_current_flag(meta):
+    # Step Nine: Update data table with changed records
+    return None
+
+def update_master_current_flag(meta):
+    # Step Nine: Update master table with changed records
+    return None
 
 def get_socrata_data_info(view_url):
     errors = []
