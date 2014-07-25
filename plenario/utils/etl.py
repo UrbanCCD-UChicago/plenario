@@ -5,6 +5,7 @@ from datetime import datetime, date, time
 from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.models import MetaTable, MasterTable
+from plenario.utils.helpers import slugify
 from urlparse import urlparse
 from csvkit.unicsv import UnicodeCSVReader
 from csvkit.typeinference import normalize_table
@@ -130,7 +131,7 @@ class PlenarioETL(object):
             kwargs = {}
             if col.name not in skip_cols:
                 cols.append(Column(col.name, col.type, **kwargs))
-        self.raw_table = Table('raw_%s' % meta['dataset_name'], Base.metadata, 
+        self.raw_table = Table('raw_%s' % self.dataset_name, Base.metadata, 
                           *cols, extend_existing=True)
         self.raw_table.drop(bind=engine, checkfirst=True)
         self.raw_table.append_column(Column('dup_row_id', Integer, primary_key=True))
@@ -172,11 +173,11 @@ class PlenarioETL(object):
     def _make_src_table(self):
         # Step Four: Make a table with every unique record.
         cols = []
-        skip_cols = ['start_date', 'end_date', 'current_flag']
+        skip_cols = ['start_date', 'end_date', 'current_flag', 'dataset_row_id']
         for col in self.dat_table.columns:
             if col.name not in skip_cols:
                 kwargs = {}
-                if col.primary_key:
+                if col.name == slugify(self.business_key):
                     kwargs['primary_key'] = True
                 if col.server_default:
                     kwargs['server_default'] = col.server_default
@@ -187,7 +188,7 @@ class PlenarioETL(object):
         self.src_table.create(bind=engine)
         ins = self.src_table.insert()\
             .from_select(
-                [c for c in src_table.columns.keys() if c != 'dataset_row_id'],
+                [c for c in self.src_table.columns.keys()],
                 select([c for c in self.raw_table.columns if c.name != 'dup_row_id'])\
                     .where(self.raw_table.c.dup_row_id == self.dedupe_table.c.dup_row_id)
             )
@@ -197,15 +198,16 @@ class PlenarioETL(object):
     def _find_new_records(self):
         # Step Five: Find the new records
         bk = slugify(self.business_key)
+        bk_type = getattr(self.dat_table.c, bk).type
         self.new_table = Table('new_%s' % self.dataset_name, Base.metadata,
-                          Column('id', Integer, primary_key=True),
+                          Column('id', bk_type, primary_key=True),
                           extend_existing=True)
         self.new_table.drop(bind=engine, checkfirst=True)
         self.new_table.create(bind=engine)
         ins = self.new_table.insert()\
             .from_select(
                 ['id'],
-                select([self.src_table.c.dataset_row_id])\
+                select([getattr(self.src_table.c, bk)])\
                     .select_from(self.src_table.join(self.dat_table, 
                         getattr(self.src_table.c, bk) == \
                             getattr(self.dat_table.c, bk), isouter=True))\
@@ -221,16 +223,17 @@ class PlenarioETL(object):
 
     def _update_dat_table(self):
         # Step Six: Update the dat table
-        skip_cols = ['end_date', 'current_flag']
+        skip_cols = ['end_date', 'current_flag', 'dataset_row_id']
         dat_cols = [c for c in self.dat_table.columns.keys() if c not in skip_cols]
         src_cols = [text("'%s' AS start_date" % datetime.now().isoformat())]
         src_cols.extend([c for c in self.src_table.columns if c.name not in skip_cols])
+        bk = slugify(self.business_key)
         ins = self.dat_table.insert()\
             .from_select(
                 dat_cols,
                 select(src_cols)\
                     .select_from(self.src_table.join(self.new_table,
-                        self.src_table.c.dataset_row_id == self.new_table.c.id))
+                        getattr(self.src_table.c, bk) == self.new_table.c.id))
             )
         conn = engine.connect()
         conn.execute(ins)
@@ -248,7 +251,7 @@ class PlenarioETL(object):
             .label('latitude'))
         dat_cols.append(getattr(self.dat_table.c, slugify(self.longitude))\
             .label('longitude'))
-        dat_cols.append(getattr(self.dat_table.c, slugify(observed_date))\
+        dat_cols.append(getattr(self.dat_table.c, slugify(self.observed_date))\
             .label('obs_date'))
         dat_cols.append(text("NULL AS obs_ts"))
         dat_cols.append(text("NULL AS geotag1"))
@@ -263,12 +266,13 @@ class PlenarioETL(object):
                       self.dataset_name, self.latitude,
                   )))
         mt = MasterTable.__table__
+        bk = slugify(self.business_key)
         ins = mt.insert()\
             .from_select(
                 [c for c in mt.columns.keys() if c != 'master_row_id'],
                 select(dat_cols)\
                     .select_from(self.dat_table.join(self.new_table, 
-                        self.dat_table.c.dataset_row_id == self.new_table.c.id)
+                        getattr(self.dat_table.c, bk) == self.new_table.c.id)
                     )
             )
         conn = engine.connect()
@@ -276,13 +280,15 @@ class PlenarioETL(object):
 
     def _find_changes(self):
         # Step Eight: Find changes
+        bk = slugify(self.business_key)
+        bk_type = getattr(self.dat_table.c, bk).type
         self.chg_table = Table('chg_%s' % self.dataset_name, Base.metadata,
-                      Column('id', Integer, primary_key=True), 
+                      Column('id', bk_type, primary_key=True), 
                       extend_existing=True)
         self.chg_table.drop(bind=engine, checkfirst=True)
         self.chg_table.create(bind=engine)
         bk = slugify(self.business_key)
-        skip_cols = ['start_date', 'end_date', 'current_flag', bk]
+        skip_cols = ['start_date', 'end_date', 'current_flag', bk, 'dataset_row_id']
         src_cols = [c for c in self.src_table.columns if c.name != bk]
         dat_cols = [c for c in self.dat_table.columns if c.name not in skip_cols]
         and_args = []
@@ -293,7 +299,7 @@ class PlenarioETL(object):
         ins = self.chg_table.insert()\
             .from_select(
                 ['id'],
-                select([self.src_table.c.dataset_row_id])\
+                select([getattr(self.src_table.c, bk)])\
                     .select_from(self.src_table.join(self.dat_table,
                         getattr(self.src_table.c, bk) == \
                         getattr(self.dat_table.c, bk)))\
@@ -316,24 +322,28 @@ class PlenarioETL(object):
         # Need to figure out how to make the end_date more granular than a day. 
         # For datasets that update more frequently than every day, this will be
         # crucial so that we are updating the current_flag on the correct records.
+        bk = slugify(self.business_key)
         update = self.dat_table.update()\
             .values(current_flag=False, end_date=datetime.now().strftime('%Y-%m-%d'))\
-            .where(self.dat_table.c.dataset_row_id == self.chg_table.c.id)\
+            .where(getattr(self.dat_table.c, bk) == self.chg_table.c.id)\
             .where(self.dat_table.c.current_flag == True)
         conn = engine.connect()
         conn.execute(update)
         return None
 
-    def update_master_current_flag(self):
+    def _update_master_current_flag(self):
         # Step Ten: Update master table with changed records
 
         # Need to figure out how to make the end_date more granular than a day. 
         # For datasets that update more frequently than every day, this will be
         # crucial so that we are updating the current_flag on the correct records.
-        update = MasterTable.update()\
-            .value(current_flag=False, end_date=datetime.now().isoformat())\
-            .where(MasterTable.dataset_row_id == self.dat_table.c.dataset_row_id)\
+        mt = MasterTable.__table__
+        update = mt.update()\
+            .values(current_flag=False, end_date=datetime.now().strftime('%Y-%m-%d'))\
+            .where(mt.c.dataset_row_id == self.dat_table.c.dataset_row_id)\
             .where(self.dat_table.c.current_flag == False)\
             .where(self.dat_table.c.end_date == datetime.now().strftime('%Y-%m-%d'))
+        conn = engine.connect()
+        conn.execute(update)
         return None
 

@@ -35,8 +35,8 @@ class MetaTable(Base):
 class MasterTable(Base):
     __tablename__ = 'dat_master'
     master_row_id = Column(Integer, primary_key=True)
-    start_date = Column(Date)
-    end_date = Column(Date)
+    start_date = Column(TIMESTAMP)
+    end_date = Column(TIMESTAMP)
     current_flag = Column(Boolean, default=True)
     location = Column(String(100))
     latitude = Column(DOUBLE_PRECISION(precision=53))

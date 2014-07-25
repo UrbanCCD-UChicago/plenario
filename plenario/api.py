@@ -23,6 +23,7 @@ from urlparse import urlparse
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
 from plenario.utils.helpers import get_socrata_data_info, slugify
+from plenario.tasks import add_dataset
 
 api = Blueprint('api', __name__)
 
@@ -216,16 +217,17 @@ def dataset():
     if raw_query_params.get('datatype'):
         datatype = raw_query_params['datatype']
         del raw_query_params['datatype']
-    valid_query, query_clauses, resp, status_code = make_query(MasterTable,raw_query_params)
+    mt = MasterTable.__table__
+    valid_query, query_clauses, resp, status_code = make_query(mt,raw_query_params)
     if valid_query:
-        time_agg = func.date_trunc(agg, MasterTable.c['obs_date'])
+        time_agg = func.date_trunc(agg, mt.c['obs_date'])
         base_query = session.query(time_agg, 
-            func.count(MasterTable.c['obs_date']),
-            MasterTable.c['dataset_name'])
-        base_query = base_query.filter(MasterTable.c['current_flag'] == True)
+            func.count(mt.c['obs_date']),
+            mt.c['dataset_name'])
+        base_query = base_query.filter(mt.c['current_flag'] == True)
         for clause in query_clauses:
             base_query = base_query.filter(clause)
-        base_query = base_query.group_by(MasterTable.c['dataset_name'])\
+        base_query = base_query.group_by(mt.c['dataset_name'])\
             .group_by(time_agg)\
             .order_by(time_agg)
         values = [o for o in base_query.all()]
@@ -291,24 +293,25 @@ def detail():
     agg, datatype, queries = parse_join_query(raw_query_params)
     limit = raw_query_params.get('limit')
     order_by = raw_query_params.get('order_by')
-    valid_query, base_clauses, resp, status_code = make_query(MasterTable, queries['base'])
+    mt = MasterTable.__table__
+    valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
     if valid_query:
         resp['meta']['status'] = 'ok'
         dname = raw_query_params['dataset_name']
         dataset = Table('dat_%s' % dname, Base.metadata,
             autoload=True, autoload_with=engine,
             extend_existing=True)
-        base_query = session.query(MasterTable.c.obs_date, dataset)
+        base_query = session.query(mt.c.obs_date, dataset)
         valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
         if valid_query:
             resp['meta']['status'] = 'ok'
             pk = [p.name for p in dataset.primary_key][0]
-            base_query = base_query.join(dataset, MasterTable.c.dataset_row_id == dataset.c[pk])
+            base_query = base_query.join(dataset, mt.c.dataset_row_id == dataset.c[pk])
         for clause in base_clauses:
             base_query = base_query.filter(clause)
         if order_by:
             col, order = order_by.split(',')
-            base_query = base_query.order_by(getattr(MasterTable.c[col], order)())
+            base_query = base_query.order_by(getattr(mt.c[col], order)())
         for clause in detail_clauses:
             base_query = base_query.filter(clause)
         if limit:
@@ -340,11 +343,12 @@ def detail():
 def detail_aggregate():
     raw_query_params = request.args.copy()
     agg, datatype, queries = parse_join_query(raw_query_params)
-    valid_query, base_clauses, resp, status_code = make_query(MasterTable, queries['base'])
+    mt = MasterTable.__table__
+    valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
     if valid_query:
         resp['meta']['status'] = 'ok'
-        time_agg = func.date_trunc(agg, MasterTable.c['obs_date'])
-        base_query = session.query(time_agg, func.count(MasterTable.c.dataset_row_id))
+        time_agg = func.date_trunc(agg, mt.c['obs_date'])
+        base_query = session.query(time_agg, func.count(mt.c.dataset_row_id))
         dname = raw_query_params['dataset_name']
         dataset = Table('dat_%s' % dname, Base.metadata,
             autoload=True, autoload_with=engine,
@@ -353,7 +357,7 @@ def detail_aggregate():
         if valid_query:
             resp['meta']['status'] = 'ok'
             pk = [p.name for p in dataset.primary_key][0]
-            base_query = base_query.join(dataset, MasterTable.c.dataset_row_id == dataset.c[pk])
+            base_query = base_query.join(dataset, mt.c.dataset_row_id == dataset.c[pk])
             for clause in base_clauses:
                 base_query = base_query.filter(clause)
             for clause in detail_clauses:
@@ -411,17 +415,18 @@ def grid():
             size_x, size_y = getSizeInDegrees(50, lat)
             location_geom = shape.buffer(y).__geo_interface__
         location_geom['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
-    query = session.query(func.count(MasterTable.c.dataset_row_id), 
-            func.ST_SnapToGrid(MasterTable.c.location_geom, size_x, size_y))\
-            .filter(MasterTable.c.dataset_name == dataset_name)
+    mt = MasterTable.__table__
+    query = session.query(func.count(mt.c.dataset_row_id), 
+            func.ST_SnapToGrid(mt.c.location_geom, size_x, size_y))\
+            .filter(mt.c.dataset_name == dataset_name)
     if obs_from:
-        query = query.filter(MasterTable.c.obs_date >= obs_from)
+        query = query.filter(mt.c.obs_date >= obs_from)
     if obs_to:
-        query = query.filter(MasterTable.c.obs_date <= obs_to)
+        query = query.filter(mt.c.obs_date <= obs_to)
     if location_geom:
-        query = query.filter(MasterTable.c.location_geom\
+        query = query.filter(mt.c.location_geom\
                 .ST_Within(func.ST_GeomFromGeoJSON(json.dumps(location_geom))))
-    query = query.group_by(func.ST_SnapToGrid(MasterTable.c.location_geom, size_x, size_y))
+    query = query.group_by(func.ST_SnapToGrid(mt.c.location_geom, size_x, size_y))
     values = [d for d in query.all()]
     for value in values:
         d = {
@@ -475,6 +480,7 @@ def submit_dataset():
                 md = MetaTable(**d)
                 session.add(md)
                 session.commit()
+            add_dataset.delay(md.source_url)
             resp['message'] = 'Dataset %s submitted successfully' % md.human_name
     else:
         resp['status'] = 'error'
