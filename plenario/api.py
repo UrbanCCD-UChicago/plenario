@@ -150,16 +150,11 @@ def meta():
     resp = []
     dataset_name = request.args.get('dataset_name')
     if dataset_name:
-        values = session.query(MetaTable)\
-            .filter(MetaTable.c.dataset_name == dataset_name).all()
+        metas = session.query(MetaTable)\
+            .filter(MetaTable.dataset_name == dataset_name).all()
     else:
-        values = session.query(MetaTable).all()
-    keys = MetaTable.columns.keys()
-    for value in values:
-        d = {}
-        for k,v in zip(keys, value):
-            d[k] = v
-        resp.append(d)
+        metas = session.query(MetaTable).all()
+    resp.extend([m.as_dict() for m in metas])
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp

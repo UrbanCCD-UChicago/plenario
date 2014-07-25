@@ -38,6 +38,25 @@ def download_csv(url, fname):
                 f.flush()
     return fpath
 
+def cleanup_temp_tables(dataset_name):
+    for prefix in ['raw', 'dedupe', 'src', 'new', 'chg']:
+        table = Table('%s_%s' % (prefix, dataset_name), Base.metadata,
+                autoload=True, autoload_with=engine, extend_existing=True)
+        table.drop(bind=engine, checkfirst=True)
+
+def update_from_file(fpath, meta):
+    insert_raw_data(fpath, meta)
+    dedupe_raw_data(meta)
+    make_src_table(meta)
+    find_new_records(meta)
+    update_dat_table(meta)
+    update_master(meta)
+    changes = find_changes(meta)
+    if changes:
+        update_dat_current_flag(meta)
+        update_master_current_flag(meta)
+    cleanup_temp_tables(meta['dataset_name'])
+
 def initialize_table(source_url):
     # Step One: Make a table where the data will eventually live
     domain = urlparse(source_url).netloc
@@ -67,7 +86,8 @@ def initialize_table(source_url):
         if has_nulls[col_name]:
             kwargs['nullable'] = True
         cols.append(Column(slugify(col_name), COL_TYPES[d_type], **kwargs))
-    table = Table('dat_%s' % md.dataset_name, Base.metadata, *cols)
+    table = Table('dat_%s' % md.dataset_name, Base.metadata, 
+                  *cols, extend_existing=True)
     table.create(engine, checkfirst=True)
     return fpath
 
@@ -281,16 +301,40 @@ def find_changes(meta):
     conn = engine.connect()
     try:
         conn.execute(ins)
+        return True
     except TypeError:
         # No changes found
-        pass
+        return False
 
 def update_dat_current_flag(meta):
     # Step Nine: Update data table with changed records
+    dat_table = Table('dat_%s' % meta['dataset_name'], Base.metadata, 
+                  autoload=True, autoload_with=engine, extend_existing=True)
+    chg_table = Table('chg_%s' % meta['dataset_name'], Base.metadata, 
+                  autoload=True, autoload_with=engine, extend_existing=True)
+    # Need to figure out how to make the end_date more granular than a day. 
+    # For datasets that update more frequently than every day, this will be
+    # crucial so that we are updating the current_flag on the correct records.
+    update = dat_table.update()\
+        .values(current_flag=False, end_date=datetime.now().strftime('%Y-%m-%d'))\
+        .where(dat_table.c.dataset_row_id == chg_table.c.id)\
+        .where(dat_table.c.current_flag == True)
+    conn = engine.connect()
+    conn.execute(update)
     return None
 
 def update_master_current_flag(meta):
-    # Step Nine: Update master table with changed records
+    # Step Ten: Update master table with changed records
+    dat_table = Table('dat_%s' % meta['dataset_name'], Base.metadata, 
+                  autoload=True, autoload_with=engine, extend_existing=True)
+    # Need to figure out how to make the end_date more granular than a day. 
+    # For datasets that update more frequently than every day, this will be
+    # crucial so that we are updating the current_flag on the correct records.
+    update = MasterTable.update()\
+        .value(current_flag=False, end_date=datetime.now().isoformat())\
+        .where(MasterTable.dataset_row_id == dat_table.c.dataset_row_id)\
+        .where(dat_table.c.current_flag == False)\
+        .where(dat_table.c.end_date == datetime.now().strftime('%Y-%m-%d'))
     return None
 
 def get_socrata_data_info(view_url):
