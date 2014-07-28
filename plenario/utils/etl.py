@@ -247,10 +247,14 @@ class PlenarioETL(object):
         ]
         dat_cols.append(getattr(self.dat_table.c, slugify(self.location))\
             .label('location'))
-        dat_cols.append(getattr(self.dat_table.c, slugify(self.latitude))\
-            .label('latitude'))
-        dat_cols.append(getattr(self.dat_table.c, slugify(self.longitude))\
-            .label('longitude'))
+        if self.latitude and self.longitude:
+            dat_cols.append(getattr(self.dat_table.c, slugify(self.latitude))\
+                .label('latitude'))
+            dat_cols.append(getattr(self.dat_table.c, slugify(self.longitude))\
+                .label('longitude'))
+        else:
+            dat_cols.append(text("NULL AS latitude"))
+            dat_cols.append(text("NULL AS longitude"))
         dat_cols.append(getattr(self.dat_table.c, slugify(self.observed_date))\
             .label('obs_date'))
         dat_cols.append(text("NULL AS obs_ts"))
@@ -259,12 +263,29 @@ class PlenarioETL(object):
         dat_cols.append(text("NULL AS geotag3"))
         dat_cols.append(text("'%s' AS dataset_name" % self.dataset_name))
         dat_cols.append(self.dat_table.c.dataset_row_id)
-        dat_cols.append(text(
-            "ST_PointFromText('POINT(' || dat_%s.%s || ' ' || dat_%s.%s || ')', 4326) \
-                  as location_geom" % (
-                      self.dataset_name, self.longitude, 
-                      self.dataset_name, self.latitude,
-                  )))
+        if self.latitude and self.longitude:
+            dat_cols.append(text(
+                "ST_PointFromText('POINT(' || dat_%s.%s || ' ' || dat_%s.%s || ')', 4326) \
+                      as location_geom" % (
+                          self.dataset_name, self.longitude, 
+                          self.dataset_name, self.latitude,
+                      )))
+        elif self.location:
+            # probably a better way to do this...
+            dat_cols.append(text(
+                "ST_PointFromText('POINT(' || \
+                      split_part(substr(replace(dat_%s.%s, ')', ''), strpos(dat_%s.%s, '(') + 1, length(dat_%s.%s) - 2), ',', 2) \
+                      || ' ' || \
+                      split_part(substr(replace(dat_%s.%s, '(', ''), strpos(dat_%s.%s, '(') + 1, length(dat_%s.%s) - 2), ',', 1) \
+                      || ')', 4326) \
+                      as location_geom" % (
+                          self.dataset_name, slugify(self.location), 
+                          self.dataset_name, slugify(self.location),
+                          self.dataset_name, slugify(self.location), 
+                          self.dataset_name, slugify(self.location),
+                          self.dataset_name, slugify(self.location), 
+                          self.dataset_name, slugify(self.location),
+                      )))
         mt = MasterTable.__table__
         bk = slugify(self.business_key)
         ins = mt.insert()\
@@ -275,6 +296,7 @@ class PlenarioETL(object):
                         getattr(self.dat_table.c, bk) == self.new_table.c.id)
                     )
             )
+        print ins
         conn = engine.connect()
         conn.execute(ins)
 

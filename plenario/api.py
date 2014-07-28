@@ -473,9 +473,9 @@ def submit_dataset():
                     'update_freq': post['update_frequency'],
                     'business_key': post['id_field'],
                     'observed_date': post['date_field'],
-                    'latitude': post['latitude'],
-                    'longitude': post['longitude'],
-                    'location': post['location']
+                    'latitude': post.get('latitude'),
+                    'longitude': post.get('longitude'),
+                    'location': post.get('location')
                 }
                 md = MetaTable(**d)
                 session.add(md)

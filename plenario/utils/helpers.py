@@ -62,11 +62,13 @@ def get_socrata_data_info(view_url):
     return dataset_info, errors, status_code
 
 def slugify(text, delim=u'_'):
-    punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.]+')
-    result = []
-    for word in punct_re.split(text.lower()):
-        word = normalize('NFKD', word).encode('ascii', 'ignore')
-        if word:
-            result.append(word)
-    return unicode(delim.join(result))
-
+    if text:
+        punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.]+')
+        result = []
+        for word in punct_re.split(text.lower()):
+            word = normalize('NFKD', word).encode('ascii', 'ignore')
+            if word:
+                result.append(word)
+        return unicode(delim.join(result))
+    else:
+        return text
