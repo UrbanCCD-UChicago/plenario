@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}Login - Plenar.io{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class='col-md-4 col-md-offset-4'>
+            <h2>Login</h2>
+            <form role="form" method="POST">
+                {{form.csrf_token}}
+                    {% if form.email.errors %}
+                    <div class="form-group has-error has-feedback">
+                    {% else %}
+                    <div class="form-group">
+                    {% endif %}
+                        <input name="email" type="text" class="form-control" placeholder="Email address" value="{{ '%s' % email if email }}" />
+                        {% if form.email.errors %}
+                            <span class="form-control-feedback"></span>
+                            {% for error in form.email.errors %}
+                            <span class="help-block">{{error}}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    {% if form.password.errors %}
+                    <div class="form-group has-error has-feedback">
+                    {% else %}
+                    <div class="form-group">
+                    {% endif %}
+                        <input name="password" type="password" class="form-control" placeholder="Password" />
+                        {% if form.password.errors %}
+                            <span class="form-control-feedback"></span>
+                            {% for error in form.password.errors %}
+                            <span class="help-block">{{error}}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                <div class="form-group">
+                    <button class="btn" type="submit">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

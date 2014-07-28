@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Add User - Plenar.io{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class='col-md-4 col-md-offset-4'>
+            <h2>Add a user</h2>
+            <form role="form" method="POST">
+                {{form.csrf_token}}
+                    {% if form.name.errors %}
+                    <div class="form-group has-error has-feedback">
+                    {% else %}
+                    <div class="form-group">
+                    {% endif %}
+                        <input name="name" type="text" class="form-control" placeholder="Username" value="{{ '%s' % name if name }}" />
+                        {% if form.name.errors %}
+                            <span class="glyphicon form-control-feedback"></span>
+                            {% for error in form.name.errors %}
+                            <span class="help-block">{{error}}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    {% if form.email.errors %}
+                    <div class="form-group has-error has-feedback">
+                    {% else %}
+                    <div class="form-group">
+                    {% endif %}
+                        <input name="email" type="text" class="form-control" placeholder="Email address" value="{{ '%s' % email if email }}" />
+                        {% if form.email.errors %}
+                            <span class="glyphicon form-control-feedback"></span>
+                            {% for error in form.email.errors %}
+                            <span class="help-block">{{error}}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    {% if form.password.errors %}
+                    <div class="form-group has-error has-feedback">
+                    {% else %}
+                    <div class="form-group">
+                    {% endif %}
+                        <input name="password" type="password" class="form-control" placeholder="Password" />
+                        {% if form.password.errors %}
+                            <span class="glyphicon glyphicon-remove form-control-feedback"></span>
+                            {% for error in form.password.errors %}
+                            <span class="help-block">{{error}}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                <div class="form-group">
+                    <button class="btn" type="submit">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-8 col-md-offset-2">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>API Key</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                        <tr>
+                            <td>{{user.name}}</td>
+                            <td>{{user.email}}</td>
+                            <td>{{user.id}}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

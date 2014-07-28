@@ -9,3 +9,6 @@ shapely
 requests
 raven
 blinker
+Flask-WTF
+Flask-Login
+flask-bcrypt
