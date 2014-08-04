@@ -8,10 +8,10 @@
             <p>{{error}}</p>
         {% endfor %}
     {% endif %}
-    <h4>
+    <h2>
         {{ datasets|length }} datasets in Plenar.io 
-        <small><a class='btn btn-info' href='/add-dataset/'>Add dataset</a></small>
-    </h4>
+        <small><a href='/add-dataset/'>Add dataset &raquo;</a></small>
+    </h2>
     <div id="errors"></div>
     <table class="table table-bordered table-condensed">
         <thead>
@@ -32,7 +32,7 @@
                     {% endif %}
                     <td>{{ dataset.update_freq }}</td>
                     <td>-</td>
-                    <td><button class="btn update-dataset" data-dataset="{{dataset.source_url}}"><i class='fa fa-refresh'></i> Update now</button></td>
+                    <td><button class="btn btn-default btn-sm update-dataset" data-dataset="{{dataset.source_url}}"><i class='fa fa-refresh'></i> Update now</button></td>
                 </tr>
             {% endfor %}
         </tbody>
