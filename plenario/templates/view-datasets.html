@@ -13,7 +13,7 @@
         <small><a href='/add-dataset/'>Add dataset &raquo;</a></small>
     </h2>
     <div id="errors"></div>
-    <table class="table table-bordered table-condensed">
+    <table class="table table-bordered table-condensed display">
         <thead>
             <th>Name</th>
             <th>Date range</th>
@@ -38,14 +38,18 @@
         </tbody>
     </table>
 </div> <!-- /container -->
+<!-- DataTables CSS -->
+<link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
 {% endblock content %}
 {% block extra_javascript %}
+    <script type="text/javascript" charset="utf8" src="//cdn.datatables.net/1.10.2/js/jquery.dataTables.js"></script>
     <script type="text/javascript">
         $(document).ready(function(){
             $('.update-dataset').on('click', function(e){
                 e.preventDefault()
                 console.log($(this).data('dataset'))
             })
+            $('.display').DataTable();
         })
     </script>
 {% endblock %}
