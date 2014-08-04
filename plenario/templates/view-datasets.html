@@ -1,5 +1,9 @@
 {% extends 'base.html' %}
 {% block title %}View datasets - Plenar.io{% endblock %}
+{% block extra_styles %}
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
+{% endblock %}
 {% block content %}
 <div class="container">
     {% if errors %}
@@ -13,7 +17,7 @@
         <small><a href='/add-dataset/'>Add dataset &raquo;</a></small>
     </h2>
     <div id="errors"></div>
-    <table class="table table-bordered table-condensed display">
+    <table id='datasets-table' class="table table-bordered table-condensed">
         <thead>
             <th>Name</th>
             <th>Date range</th>
@@ -38,8 +42,6 @@
         </tbody>
     </table>
 </div> <!-- /container -->
-<!-- DataTables CSS -->
-<link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
 {% endblock content %}
 {% block extra_javascript %}
     <script type="text/javascript" charset="utf8" src="//cdn.datatables.net/1.10.2/js/jquery.dataTables.js"></script>
@@ -49,7 +51,10 @@
                 e.preventDefault()
                 console.log($(this).data('dataset'))
             })
-            $('.display').DataTable();
+            $('#datasets-table').DataTable( {
+                "paging": false,
+                "searching": false
+            } );
         })
     </script>
 {% endblock %}
