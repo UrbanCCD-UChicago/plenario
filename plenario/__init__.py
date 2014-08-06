@@ -8,7 +8,10 @@ from plenario.auth import auth, login_manager
 from plenario.views import views
 from urllib import quote_plus
 
-sentry = Sentry(dsn=os.environ['WOPR_SENTRY_URL'])
+try:
+    sentry = Sentry(dsn=os.environ['WOPR_SENTRY_URL'])
+except KeyError:
+    sentry = None
 
 def create_app():
     app = Flask(__name__)
@@ -16,7 +19,8 @@ def create_app():
     app.secret_key = os.environ['FLASK_KEY']
     login_manager.init_app(app)
     bcrypt.init_app(app)
-    sentry.init_app(app)
+    if sentry:
+        sentry.init_app(app)
     app.register_blueprint(api)
     app.register_blueprint(views)
     app.register_blueprint(auth)

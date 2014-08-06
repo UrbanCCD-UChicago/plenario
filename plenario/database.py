@@ -12,6 +12,7 @@ task_engine = create_engine(
     os.environ['WOPR_CONN'], 
     convert_unicode=True,
     poolclass=NullPool)
+
 session = scoped_session(sessionmaker(bind=app_engine,
                                       autocommit=False,
                                       autoflush=False))

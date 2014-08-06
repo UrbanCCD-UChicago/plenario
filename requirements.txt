@@ -12,3 +12,5 @@ blinker
 Flask-WTF
 Flask-Login
 flask-bcrypt
+csvkit
+redis
