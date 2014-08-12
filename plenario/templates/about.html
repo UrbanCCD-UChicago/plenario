@@ -3,5 +3,53 @@
 {% block content %}
   <div class='col-md-10 col-md-offset-1'>
     <h1>About Plenar.io</h1>
+
+    <p>Over the past few years, levels of government from the <a href="http://data.gov">federal administration</a> to individual municipalities like the <a href="http://data.cityofchicago.org">City of Chicago</a> have been moving toward an open data model, releasing their data publicly for free.</p>
+
+    <p><strong>Plenar.io</strong> tells a unified story of place by centralizing data from these various sources in order to increase accessibility and help ordinary citizens and researchers draw connections between datasets. Data can be viewed via a <a href="{{ url_for('views.explore_view') }}">map interface</a> and accessed by download or via an <a href="{{ url_for('views.api_docs_view') }}">API</a>.</p>
+
+    <h3 id='team'>Team and credits</h3>
+
+    <p>
+      This project is funded by the <a href="http://www.nsf.gov/dir/index.jsp?org=SBE">NSF Social, Behavioral, and Economics Research Directorate</a> through a grant to the University of Chicago Urban Center for Computation and Data (<a href="https://urbanccd.org/">UrbanCCD</a>). It is being implemented by UrbanCCD and <a href="http://datamade.us">DataMade</a>.
+    </p>
+
+    <h4>UrbanCCD</h4>
+    <ul>
+      <li><a href='http://en.wikipedia.org/wiki/Charlie_Catlett'>Charlie Catlett</a>, UrbanCCD</li>
+      <li><a href='https://twitter.com/bjgol'>Brett Goldstein</a>, UrbanCCD</li>
+      <li>Svetlozar Nestorov, UrbanCCD</li>
+      <li>Jonathan Giuffrida, University of Chicago</li>
+      <li>Maggie King, University of Chicago</li>
+      <li>Jiajun Shen, University of Chicago</li>
+    </ul>
+
+    <h4>DataMade</h4>
+    <ul>
+      <li><a href='https://twitter.com/evanzanten'>Eric van Zanten</a></li>
+      <li><a href='https://twitter.com/derekeder'>Derek Eder</a></li>
+      <li>Forest Gregg</li>
+    </ul>
+
+    <h3>Code</h3>
+
+    <p>All the <a href='https://github.com/datamade/plenario/'>code for this site is open source</a>. It was built with:</p>
+
+    <ul>
+      <li><a href='http://flask.pocoo.org/'>Flask</a> - python web framework</li>
+      <li><a href='http://postgis.net/'>PostGIS</a> - open source geospatial database</li>
+      <li><a href='http://flask.pocoo.org/'>SQL Alchemy</a> - Python SQL toolkit and Object Relational Mapper</li>
+      <li><a href='http://leafletjs.com'>Leaflet.js</a> - </li>
+      <li><a href='http://getbootstrap.com'>Bootstrap</a> - HTML and CSS scaffolding</li>
+    </ul>
+
+    <p>All the code for this project is <a href='https://github.com/datamade/plenario/'>available on Github</a></p>
+
+    <h3>Contact us</h3>
+
+    <p>Found a bug? Report it on our <a href='https://github.com/datamade/plenario/issues'>issue tracker</a>.</p>
+
+    <p>Have a suggestion? <a href='http://datamade.us/contact-us/'>Contact DataMade</a>.</p>
+
   </div>
 {% endblock content %}

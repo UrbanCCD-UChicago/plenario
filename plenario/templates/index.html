@@ -1,23 +1,38 @@
 {% extends 'base.html' %}
-{% block title %}About - Plenar.io{% endblock %}
+{% block title %}Plenar.io - A spatio-temporal open data platform{% endblock %}
 {% block content %}
   <div class='col-md-10 col-md-offset-1'>
-    <h1>Plenar.io: A spatio-temporal open data platform</h1>
-    <p>Levels of government from the <a href="http://data.gov">US Federal Government</a> to individual municipalities like <a href="http://data.cityofchicago.org">the City of Chicago</a> have started releasing open data to the public . 
+    <h1>Plenar.io <small>A spatio-temporal open data platform</small></h1>
 
-    Plenar.io tells a unified story of place by centralizing data from these various sources in order to increase accessibility and help ordinary citizens and researchers draw connections between datasets. Data can be viewed via a map interface and accessed by download or via a RESTful API. 
-    </p>
-    <h3>Applications (under development)</h3>
-    <p>
-      <ul>
-        <li><a href="{{ url_for('views.explore_view') }}">Data Explorer</a></li>
-        <li><a href="{{ url_for('views.api_docs_view') }}">API documentation</a></li>
-      </ul>
-    </p>
-    <hr />
-	<h3><a href="{{ url_for('views.about_view') }}">About</a></h3>
-	<p>
-    This project is funded by the <a href="http://www.nsf.gov/dir/index.jsp?org=SBE">NSF Social, Behavioral, and Economics Research Directorate</a> through a grant to the University of Chicago Urban Center for Computation and Data (<a href="https://urbanccd.org/">UrbanCCD</a>). It is being implemented by UrbanCCD and <a href="http://datamade.us">DataMade</a>.
-	</p>
+    <p>Over the past few years, levels of government from the <a href="http://data.gov">federal administration</a> to individual municipalities like the <a href="http://data.cityofchicago.org">City of Chicago</a> have been moving toward an open data model, releasing their data publicly for free.</p>
+
+    <p><strong>Plenar.io</strong> tells a unified story of place by centralizing data from these various sources in order to increase accessibility and help ordinary citizens and researchers draw connections between datasets. Data can be viewed via a <a href="{{ url_for('views.explore_view') }}">map interface</a> and accessed by download or via an <a href="{{ url_for('views.api_docs_view') }}">API</a>.</p>
+
+    <div class='row'>
+      <div class='col-md-6'>
+        <div class='well'>
+          <h3><a href="{{ url_for('views.explore_view') }}">Data Explorer</a></h3>
+          <p>Explore the data by drawing on a map.</p>
+          <a href="{{ url_for('views.explore_view') }}"><img src='/static/images/plenario-explorer.png' class='img-responsive img-thumbnail' alt='Plenar.io Data Explorer' /></a>
+        </div>
+      </div>
+      <div class='col-md-6'>
+        <div class='well'>
+          <h3><a href="{{ url_for('views.api_docs_view') }}">API</a></h3>
+          <p><strong>For programmers</strong>. Access all of our data in JSON format via a RESTful API. Includes support for geospatial queries and temporal aggregation.</p>
+
+          <p><strong>Here's an example</strong>: <a href='http://localhost:5001/api/master/?obs_date__gt=2007-1-1&obs_date__lt=2008-1-1&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints'>Chicago crime reports and environmental complaints from 2007 to 2008</a>.</p>
+
+          <p><a class='btn btn-info' href="{{ url_for('views.api_docs_view') }}">Read the documentation &raquo;</a></p>
+        </div>
+      </div>
+    </div>
+
+  	<h2>About</h2>
+  	<p>
+      This project is funded by the <a href="http://www.nsf.gov/dir/index.jsp?org=SBE">NSF Social, Behavioral, and Economics Research Directorate</a> through a grant to the University of Chicago Urban Center for Computation and Data (<a href="https://urbanccd.org/">UrbanCCD</a>). It is being implemented by UrbanCCD and <a href="http://datamade.us">DataMade</a>.
+  	</p>
+
+    <p><a href="{{ url_for('views.about_view') }}">Read more &raquo;</a></p>
   </div>
 {% endblock content %}
