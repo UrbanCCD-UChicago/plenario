@@ -4,7 +4,9 @@
   <div class='col-md-10 col-md-offset-1'>
       <h1>API documentation</h1>
 
-      <p><strong>For programmers.</strong> The Plenar.io API is a RESTful API. A few things to know:</p>
+      <p><strong>For programmers.</strong> The Plenar.io RESTful API can be used to perform custom geospatial and temporal queries.</p> 
+
+      <p>A few things to know:</p>
 
       <ul>
         <li>All API calls should be made with <code>HTTP GET</code></li>
@@ -25,7 +27,7 @@
 
       <hr />
       <h2 id='api'>/api/</h2>
-      <p>This is the “data about the data” endpoint. It contains a record for each dataset</p>
+      <p>This is the “data about the data” endpoint. It contains a record for each dataset.</p>
 
       <p><strong>Query Parameters</strong></p>
       <p>This API endpoint doesn't take in any query parameters.</p>
@@ -122,7 +124,7 @@
           <tr>
             <td><strong><code>location_geom</code></strong></td>
             <td>
-              <p>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest. Currently, the only query operator that can be applied to this is <code>within</code>.</p>
+              <p>A URL encoded <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest. Currently, the only query operator that can be applied to this is <code>within</code>.</p>
 
               <p><strong>Example GeoJSON</strong> before it is <a href='http://meyerweb.com/eric/tools/dencoder/'>encoded as a URL parameter</a>:</p>
               <pre>
