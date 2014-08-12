@@ -6,8 +6,9 @@ from plenario.database import task_session as session
 from plenario.utils.etl import PlenarioETL
 from raven.handlers.logging import SentryHandler
 from raven.conf import setup_logging
+import plenario.settings
 
-handler = SentryHandler(os.environ['PLENARIO_CELERY_SENTRY'])
+handler = SentryHandler(plenario.settings.CELERY_SENTRY_URL)
 setup_logging(handler)
 
 @celery_app.task

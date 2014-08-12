@@ -1,0 +1,8 @@
+SECRET_KEY = 'abcdefghijklmnop'
+PLENARIO_SENTRY_URL = ''
+CELERY_SENTRY_URL = ''
+DATABASE_CONN = 'postgresql://plenario:@localhost:5432/plenario_test'
+DATA_DIR = '/tmp'
+
+AWS_ACCESS_KEY = ''
+AWS_SECRET_KEY = ''

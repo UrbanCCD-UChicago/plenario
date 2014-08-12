@@ -9,8 +9,9 @@ import csv
 from cStringIO import StringIO
 from subprocess import call
 from sqlalchemy.exc import OperationalError
-os.environ['WOPR_CONN'] = 'postgresql://wopr:@localhost:5432/wopr_test'
-CONN = os.environ['WOPR_CONN']
+import plenario.settings
+
+CONN = plenario.settings.DATABASE_CONN
 
 from app import app
 

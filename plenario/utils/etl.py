@@ -15,8 +15,9 @@ from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.exc import NoSuchTableError
 from types import NoneType
+import plenario.settings
 
-DATA_DIR = os.environ['WOPR_DATA_DIR']
+DATA_DIR = plenario.settings.DATA_DIR
 
 COL_TYPES = {
     bool: Boolean,

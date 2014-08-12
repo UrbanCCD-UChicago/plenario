@@ -6,10 +6,11 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.declarative import declarative_base
 from psycopg2.extensions import adapt, register_adapter, AsIs
+import plenario.settings
 
-app_engine = create_engine(os.environ['WOPR_CONN'], convert_unicode=True)
+app_engine = create_engine(plenario.settings.DATABASE_CONN, convert_unicode=True)
 task_engine = create_engine(
-    os.environ['WOPR_CONN'], 
+    plenario.settings.DATABASE_CONN, 
     convert_unicode=True,
     poolclass=NullPool)
 

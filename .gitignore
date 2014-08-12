@@ -7,3 +7,5 @@ Icon?
 celerybeat-schedule
 data/
 notebooks/
+settings.py
+.env
