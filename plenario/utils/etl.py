@@ -16,6 +16,8 @@ from sqlalchemy.dialects.postgresql import TIMESTAMP, ARRAY
 from sqlalchemy.exc import NoSuchTableError
 from types import NoneType
 import plenario.settings
+from geoalchemy2.shape import from_shape
+from shapely.geometry import box
 
 DATA_DIR = plenario.settings.DATA_DIR
 
