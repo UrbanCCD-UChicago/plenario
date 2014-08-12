@@ -68,6 +68,7 @@ class PlenarioETL(object):
         self._dedupe_raw_data()
         self._make_src_table()
         new = self._find_new_records()
+        changes = False
         if new:
             self._update_dat_table()
             self._update_master()
@@ -390,6 +391,8 @@ class PlenarioETL(object):
                                func.min(obs_date_col), 
                                func.max(obs_date_col))\
                                .first()
+        md.obs_from = obs_from
+        md.obs_to = obs_to
         if self.latitude and self.longitude:
             lat_col = getattr(self.dat_table.c, slugify(self.latitude))
             lon_col = getattr(self.dat_table.c, slugify(self.longitude))

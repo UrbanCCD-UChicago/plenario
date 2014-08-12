@@ -35,7 +35,7 @@
                         <td></td>
                     {% endif %}
                     <td>{{ dataset.update_freq }}</td>
-                    <td>-</td>
+                    <td>{{ dataset.last_update }}</td>
                     <td><button class="btn btn-default btn-sm update-dataset" data-dataset="{{dataset.source_url}}"><i class='fa fa-refresh'></i> Update now</button></td>
                 </tr>
             {% endfor %}
