@@ -11,8 +11,8 @@ from csvkit.unicsv import UnicodeCSVReader
 from csvkit.typeinference import normalize_table
 import gzip
 from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
-    Integer, Table, text, func, select, or_, and_
-from sqlalchemy.dialects.postgresql import TIMESTAMP
+    Integer, Table, text, func, select, or_, and_, cast
+from sqlalchemy.dialects.postgresql import TIMESTAMP, ARRAY
 from sqlalchemy.exc import NoSuchTableError
 from types import NoneType
 import plenario.settings
@@ -53,6 +53,7 @@ class PlenarioETL(object):
         self._find_new_records()
         self._update_dat_table()
         self._update_master()
+        self._update_meta(added=True)
         self._cleanup_temp_tables()
     
     def update(self, fpath=None):
@@ -72,6 +73,7 @@ class PlenarioETL(object):
             if changes:
                 self._update_dat_current_flag()
                 self._update_master_current_flag()
+        self._update_meta()
         self._cleanup_temp_tables(changes=changes)
 
     def _download_csv(self):
@@ -297,7 +299,6 @@ class PlenarioETL(object):
                         getattr(self.dat_table.c, bk) == self.new_table.c.id)
                     )
             )
-        print ins
         conn = engine.connect()
         conn.execute(ins)
 
@@ -370,3 +371,46 @@ class PlenarioETL(object):
         conn.execute(update)
         return None
 
+    def _update_meta(self, added=False):
+        """ 
+        Update the meta_master table with obs_from, obs_to, 
+        updated_date, bbox, and (when appropriate) date_added
+        """
+        md = session.query(MetaTable)\
+            .filter(MetaTable.source_url == self.source_url)\
+            .first()
+        now = datetime.now()
+        md.last_update = now
+        if added:
+            md.date_added = now
+        obs_date_col = getattr(self.dat_table.c, slugify(self.observed_date))
+        obs_from, obs_to = session.query(
+                               func.min(obs_date_col), 
+                               func.max(obs_date_col))\
+                               .first()
+        if self.latitude and self.longitude:
+            lat_col = getattr(self.dat_table.c, slugify(self.latitude))
+            lon_col = getattr(self.dat_table.c, slugify(self.longitude))
+            xmin, ymin, xmax, ymax = session.query(
+                                         func.min(lat_col),
+                                         func.min(lon_col),
+                                         func.max(lat_col),
+                                         func.max(lon_col))\
+                                         .first()
+        elif self.location:
+            loc_col = getattr(self.dat_table.c, slugify(self.location))
+            subq = session.query(
+                cast(func.regexp_matches(loc_col, '\((.*),.*\)'), 
+                    ARRAY(Float)).label('lat'), 
+                cast(func.regexp_matches(loc_col, '\(.*,(.*)\)'), 
+                    ARRAY(Float)).label('lon'))\
+                .subquery()
+            xmin, ymin, xmax, ymax = session.query(func.min(subq.c.lat), 
+                                                   func.min(subq.c.lon), 
+                                                   func.max(subq.c.lat), 
+                                                   func.min(subq.c.lon))\
+                                            .first()
+            xmin, ymin, xmax, ymax = xmin[0], ymin[0], xmax[0], ymax[0]
+        md.bbox = from_shape(box(xmin, ymin, xmax, ymax), srid=4326)
+        session.add(md)
+        session.commit()

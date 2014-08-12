@@ -25,6 +25,8 @@ class MetaTable(Base):
     obs_to = Column(Date)
     bbox = Column(Geometry('POLYGON', srid=4326))
     update_freq = Column(String(100), nullable=False)
+    last_update = Column(DateTime)
+    date_added = Column(DateTime)
     # Store the names of fields in source data
     business_key = Column(String, nullable=False)
     observed_date = Column(String, nullable=False)

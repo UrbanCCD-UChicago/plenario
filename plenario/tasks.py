@@ -23,6 +23,7 @@ def daily_update():
     md = session.query(MetaTable)\
         .filter(MetaTable.update_freq == 'daily').all()
     for m in md:
+        print m
         update_dataset.delay(m.source_url)
     return 'yay'
 

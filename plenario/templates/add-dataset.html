@@ -133,8 +133,8 @@
                     console.log(data_types);
                     $.post('/api/submit-dataset/', data_types, function(resp){
                         console.log(resp);
+                        window.location = "/view-datasets/";
                     })
-                    window.location = "/view-datasets/";
                 }
             })
         })
