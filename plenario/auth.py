@@ -12,6 +12,8 @@ auth = Blueprint('auth', __name__)
 login_manager = LoginManager()
 csrf = CsrfProtect()
 
+login_manager.login_view = "users.login"
+
 class LoginForm(Form):
     email = TextField('email', validators=[DataRequired(), Email()])
     password = PasswordField('password', validators=[DataRequired()])
@@ -89,8 +91,8 @@ def login():
     email = form.email.data
     return render_template('login.html', form=form, email=email)
 
-@login_required
 @auth.route('/add-user/', methods=['GET', 'POST'])
+@login_required
 def add_user():
     form = AddUserForm()
     if form.validate_on_submit():
@@ -110,8 +112,8 @@ def add_user():
     }
     return render_template('add-user.html', **context)
 
-@login_required
 @auth.route('/reset-password/', methods=['GET', 'POST'])
+@login_required
 def reset_password():
     form = ResetPasswordForm()
     errors = []

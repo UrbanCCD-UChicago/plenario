@@ -7,6 +7,7 @@ from flask_login import login_required
 from datetime import datetime, timedelta
 from urlparse import urlparse
 import requests
+from flask_login import login_required
 
 views = Blueprint('views', __name__)
 
@@ -56,8 +57,8 @@ def api_docs_view():
 def about_view():
     return render_template('about.html')
 
-@login_required
 @views.route('/add-dataset', methods=['GET', 'POST'])
+@login_required
 def add_dataset():
     dataset_info = {}
     errors = []
@@ -78,8 +79,8 @@ def add_dataset():
     context = {'dataset_info': dataset_info, 'errors': errors}
     return render_template('add-dataset.html', **context)
 
-@login_required
 @views.route('/view-datasets')
+@login_required
 def view_datasets():
     datasets = session.query(MetaTable).all()
     return render_template('view-datasets.html', datasets=datasets)
