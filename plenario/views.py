@@ -3,6 +3,7 @@ from flask import make_response, request, render_template, current_app, g, \
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session
 from plenario.utils.helpers import get_socrata_data_info
+from flask_login import login_required
 from datetime import datetime, timedelta
 from urlparse import urlparse
 import requests
@@ -39,11 +40,11 @@ def grid_view():
     }
     return render_template('grid.html', **context)
 
-@views.route('/explore')
+@views.route('/explore/')
 def explore_view():
     return render_template('explore.html')
 
-@views.route('/explore/detail')
+@views.route('/explore/detail/')
 def explore_detail_view():
     return render_template('explore_detail.html')
 
@@ -52,6 +53,7 @@ def api_docs():
     return render_template('docs.html')
 
 @views.route('/add-dataset/', methods=['GET', 'POST'])
+@login_required
 def add_dataset():
     dataset_info = {}
     errors = []
@@ -73,6 +75,7 @@ def add_dataset():
     return render_template('add-dataset.html', **context)
 
 @views.route('/view-datasets/')
+@login_required
 def view_datasets():
     datasets = session.query(MetaTable).all()
     return render_template('view-datasets.html', datasets=datasets)
