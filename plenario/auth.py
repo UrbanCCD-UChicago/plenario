@@ -12,8 +12,6 @@ auth = Blueprint('auth', __name__)
 login_manager = LoginManager()
 csrf = CsrfProtect()
 
-login_manager.login_view = "users.login"
-
 class LoginForm(Form):
     email = TextField('email', validators=[DataRequired(), Email()])
     password = PasswordField('password', validators=[DataRequired()])
