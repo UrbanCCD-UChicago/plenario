@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}API documentation - Plenar.io{% endblock %}
 {% block content %}
-<div class="container">
   <div class='col-md-10 col-md-offset-1'>
       <h2>API documentation</h2>
       <p>
@@ -14,7 +13,7 @@
               <li>/api/detail/</li>
           </ul>
       </p>
-      <h3>/api/</h3>
+      <h3><a href='/api/'>plenar.io/api/</a></h3>
       <p>
           This is the “data about the data” endpoint. It contains a record for
           each dataset with the following attributes:
@@ -40,8 +39,9 @@
       <p>
           <strong><code>update_freq</code></strong> Update frequency.
       </p>
+
       <hr />
-      <h3>/api/master/</h3>
+      <h3><a href='/api/master'>/api/master/</a></h3>
       <p>
           This endpoint contains a record for every row in every dataset with
           brief temporal and spatial information about the row. The endpoint
@@ -50,7 +50,7 @@
           their constraints.
       </p>
       <p>
-          <strong>Possible query parameters</strong>
+          <strong>Query parameters</strong>
       </p>
       <p>
           <strong><code>agg</code></strong> Under the hood, this takes advantage of
@@ -119,10 +119,5 @@
           simple equality test, just leave out the double underscore part:
       </p>
       <pre>/api/master/?obs_date=2007-11-12</pre>
-      <hr />
-      <div class="footer">
-        <p>&copy; DataMade and UrbanCCD</p>
-      </div>
   </div>
-</div> <!-- /container -->
 {% endblock content %}

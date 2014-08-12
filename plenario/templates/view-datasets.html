@@ -5,7 +5,6 @@
     <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
 {% endblock %}
 {% block content %}
-<div class="container">
     {% if errors %}
         <h4>There were some problems with your submission: </h4>
         {% for error in errors %}
@@ -14,7 +13,7 @@
     {% endif %}
     <h2>
         {{ datasets|length }} datasets
-        <small><a href='/add-dataset/'>Add dataset &raquo;</a></small>
+        <small><a href='/add-dataset'>Add dataset &raquo;</a></small>
     </h2>
     <div id="errors"></div>
     <table id='datasets-table' class="table table-bordered table-condensed">
@@ -41,7 +40,6 @@
             {% endfor %}
         </tbody>
     </table>
-</div> <!-- /container -->
 {% endblock content %}
 {% block extra_javascript %}
     <script type="text/javascript" charset="utf8" src="//cdn.datatables.net/1.10.2/js/jquery.dataTables.js"></script>

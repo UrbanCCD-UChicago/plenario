@@ -14,7 +14,7 @@ views = Blueprint('views', __name__)
 def index():
     return render_template('index.html')
 
-@views.route('/grid/')
+@views.route('/grid')
 def grid_view():
     context = {}
     context['datasets'] = session.query(MetaTable).all()
@@ -44,16 +44,20 @@ def grid_view():
 def explore_view():
     return render_template('explore.html')
 
-@views.route('/explore/detail/')
+@views.route('/explore/detail')
 def explore_detail_view():
     return render_template('explore_detail.html')
 
-@views.route('/docs/')
-def api_docs():
-    return render_template('docs.html')
+@views.route('/api-docs')
+def api_docs_view():
+    return render_template('api-docs.html')
 
-@views.route('/add-dataset/', methods=['GET', 'POST'])
+@views.route('/about')
+def about_view():
+    return render_template('about.html')
+
 @login_required
+@views.route('/add-dataset', methods=['GET', 'POST'])
 def add_dataset():
     dataset_info = {}
     errors = []
@@ -74,8 +78,8 @@ def add_dataset():
     context = {'dataset_info': dataset_info, 'errors': errors}
     return render_template('add-dataset.html', **context)
 
-@views.route('/view-datasets/')
 @login_required
+@views.route('/view-datasets')
 def view_datasets():
     datasets = session.query(MetaTable).all()
     return render_template('view-datasets.html', datasets=datasets)
