@@ -3,6 +3,7 @@ from flask import make_response, request, render_template, current_app, g, \
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session
 from plenario.utils.helpers import get_socrata_data_info
+from plenario.tasks import update_dataset as update_dataset_task
 from flask_login import login_required
 from datetime import datetime, timedelta
 from urlparse import urlparse
@@ -11,6 +12,7 @@ from flask_wtf import Form
 from wtforms import TextField, PasswordField, DateField, SelectField
 from wtforms.validators import DataRequired, Email
 from dateutil import parser
+import json
 
 views = Blueprint('views', __name__)
 
@@ -130,3 +132,8 @@ def edit_dataset(four_by_four):
         'socrata_info': socrata_info
     }
     return render_template('edit-dataset.html', **context)
+
+@views.route('/update-dataset/<four_by_four>')
+def update_dataset(four_by_four):
+    update_dataset_task.delay(four_by_four)
+    return make_response(json.dumps({'status': 'success'}))

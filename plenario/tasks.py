@@ -24,8 +24,7 @@ def daily_update():
     md = session.query(MetaTable)\
         .filter(MetaTable.update_freq == 'daily').all()
     for m in md:
-        print m
-        update_dataset.delay(m.source_url)
+        update_dataset.delay(m.four_by_four)
     return 'yay'
 
 @celery_app.task
@@ -37,8 +36,9 @@ def hourly_update():
     return 'yay'
 
 @celery_app.task
-def update_dataset(source_url):
-    md = session.query(MetaTable).get(source_url)
+def update_dataset(four_by_four):
+    
+    md = session.query(MetaTable).get(four_by_four)
     etl = PlenarioETL(md.as_dict())
     etl.update()
     return 'yay'
