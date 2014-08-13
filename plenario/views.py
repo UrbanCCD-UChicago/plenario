@@ -104,7 +104,7 @@ class EditDatasetForm(Form):
 def edit_dataset(four_by_four):
     form = EditDatasetForm()
     meta = session.query(MetaTable).get(four_by_four)
-    view_url = meta.source_url.replace('resource', 'api/views')
+    view_url = 'http://%s/api/views/%s' % (urlparse(meta.source_url).netloc, four_by_four)
     socrata_info, errors, status_code = get_socrata_data_info(view_url)
     if form.validate_on_submit():
         upd = {
