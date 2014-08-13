@@ -466,6 +466,7 @@ def submit_dataset():
             md = session.query(MetaTable).get(source_url)
             if not md:
                 d = {
+                    'four_by_four': dataset_id,
                     'dataset_name': slugify(dataset_info['name'], delim=u'_'),
                     'human_name': dataset_info['name'],
                     'description': dataset_info['description'],

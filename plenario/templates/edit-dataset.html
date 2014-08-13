@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+{% block title %}Edit datasets - {{ meta.human_name }}{% endblock %}
+{% block extra_styles %}
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
+{% endblock %}
+{% block content %}
+    <h2>
+        Edit {{ meta.human_name }}
+    </h2>
+    <form role="form" method="POST">
+        {{ form.csrf_token }}
+        <div class="row">
+            <div class="col-sm-6">
+                {% if form.human_name.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_human_name">Human Name</label>
+                    <input type="text" class="form-control" id="id_human_name" name="human_name" value="{{ meta.human_name }}"/>
+                    {% if form.human_name.errors %}
+                        {% for error in form.human_name.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-sm-6">
+                {% if form.update_freq.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_update_freq">Update Frequency</label>
+                    <select id="id_update_freq" class="form-control" name="update_freq">
+                        {% for value, name in form.update_freq.choices %}
+                            {% if value == meta.update_freq %}
+                                <option selected="selected" value="{{ value }}">{{name}}</option>
+                            {% else %}
+                                <option value="{{ value }}">{{name}}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    {% if form.update_freq.errors %}
+                        {% for error in form.update_freq.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-12">
+                {% if form.description.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_description">Description</label>
+                    <textarea class="form-control" id="id_description" name="description">{{ meta.description }}</textarea>
+                    {% if form.description.errors %}
+                        {% for error in form.description.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="row">
+                    <div class="col-sm-6">
+                        {% if form.obs_from.errors %}
+                        <div class="form-group has-error has-feedback">
+                        {% else %}
+                        <div class="form-group">
+                        {% endif %}
+                            <label for="id_obs_from">Date Range</label>
+                            <input type="text" name="obs_from" class="form-control" id="id_obs_from" value="{{ meta.obs_from }}" />
+                            {% if form.obs_from.errors %}
+                                {% for error in form.obs_from.errors %}
+                                    <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        {% if form.obs_to.errors %}
+                        <div class="form-group has-error has-feedback">
+                        {% else %}
+                        <div class="form-group">
+                        {% endif %}
+                            <label for="id_obs_to">&nbsp;</label>
+                            <input type="text" name="obs_to" class="form-control" id="id_obs_to" value="{{ meta.obs_to }}" />
+                            {% if form.obs_to.errors %}
+                                {% for error in form.obs_to.errors %}
+                                    <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-6">
+                {% if form.business_key.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_business_key">Business Key Field Name</label>
+                    <select id="id_business_key" name="business_key" class="form-control">
+                        {% for column in socrata_info.columns %}
+                            {% if column.human_name == meta.business_key %}
+                                <option selected="selected" value="{{ column.human_name }}">{{column.human_name}}</option>
+                            {% else %}
+                                <option value="{{ column.human_name }}">{{column.human_name}}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    {% if form.business_key.errors %}
+                        {% for error in form.business_key.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-sm-6">
+                {% if form.location.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_location">Location Field Name</label>
+                    <select id="id_location" name="location" class="form-control">
+                        <option value="">------------</option>
+                        {% for column in socrata_info.columns %}
+                            {% if column.human_name == meta.location %}
+                                <option value="{{ column.human_name }}" selected="selected">{{column.human_name}}</option>
+                            {% else %}
+                                <option value="{{ column.human_name }}">{{column.human_name}}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    {% if form.location.errors %}
+                        {% for error in form.location.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-6">
+                {% if form.latitude.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_latitude">Latitude Field Name</label>
+                    <select id="id_latitude" name="latitude" class="form-control">
+                        {% for column in socrata_info.columns %}
+                            {% if column.human_name == meta.latitude %}
+                                <option selected="selected" value="{{ column.human_name }}">{{column.human_name}}</option>
+                            {% else %}
+                                <option value="{{ column.human_name }}">{{column.human_name}}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    {% if form.latitude.errors %}
+                        {% for error in form.latitude.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-sm-6">
+                {% if form.longitude.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_longitude">Longitude Field Name</label>
+                    <select id="id_longitude" name="longitude" class="form-control">
+                        <option value="">------------</option>
+                        {% for column in socrata_info.columns %}
+                            {% if column.human_name == meta.longitude %}
+                                <option value="{{ column.human_name }}" selected="selected">{{column.human_name}}</option>
+                            {% else %}
+                                <option value="{{ column.human_name }}">{{column.human_name}}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    {% if form.location.errors %}
+                        {% for error in form.location.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-default">Submit</button>
+    </form>
+{% endblock content %}
+{% block extra_javascript %}
+{% endblock %}

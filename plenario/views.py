@@ -1,5 +1,5 @@
 from flask import make_response, request, render_template, current_app, g, \
-    Blueprint
+    Blueprint, flash
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session
 from plenario.utils.helpers import get_socrata_data_info
@@ -7,7 +7,10 @@ from flask_login import login_required
 from datetime import datetime, timedelta
 from urlparse import urlparse
 import requests
-from flask_login import login_required
+from flask_wtf import Form
+from wtforms import TextField, PasswordField, DateField, SelectField
+from wtforms.validators import DataRequired, Email
+from dateutil import parser
 
 views = Blueprint('views', __name__)
 
@@ -54,3 +57,74 @@ def add_dataset():
 def view_datasets():
     datasets = session.query(MetaTable).all()
     return render_template('view-datasets.html', datasets=datasets)
+
+class EditDatasetForm(Form):
+    """ 
+    Form to edit meta_master information for a dataset
+    """
+    human_name = TextField('human_name', validators=[DataRequired()])
+    description = TextField('description', validators=[DataRequired()])
+    obs_from = DateField('obs_from', validators=[DataRequired(message="Start of date range must be a valid date")])
+    obs_to = DateField('obs_to', validators=[DataRequired(message="End of date range must be a valid date")])
+    update_freq = SelectField('update_freq', 
+                              choices=[('daily', 'Daily'),
+                                       ('houly', 'Hourly'),
+                                       ('weekly', 'Weekly'),
+                                       ('monthly', 'Monthly')], 
+                              validators=[DataRequired()])
+    business_key = TextField('business_key', validators=[DataRequired()])
+    latitude = TextField('latitude')
+    longitude = TextField('longitude')
+    location = TextField('location')
+
+    def validate(self):
+        rv = Form.validate(self)
+        if not rv:
+            return False
+        
+        valid = True
+        
+        if self.location.data and not self.latitude.data and not self.longitude.data:
+            valid = False
+            self.location.errors.append('You must either provide a Latitude and Longitude field name or a Location field name')
+        
+        if self.longitude.data and not self.latitude.data:
+            valid = False
+            self.latitude.errors.append('You must provide both a Latitude field name and a Longitude field name')
+        
+        if self.latitude.data and not self.longitude.data:
+            valid = False
+            self.longitude.errors.append('You must provide both a Latitude field name and a Longitude field name')
+
+        return valid
+
+@views.route('/edit-dataset/<four_by_four>', methods=['GET', 'POST'])
+@login_required
+def edit_dataset(four_by_four):
+    form = EditDatasetForm()
+    meta = session.query(MetaTable).get(four_by_four)
+    view_url = meta.source_url.replace('resource', 'api/views')
+    socrata_info, errors, status_code = get_socrata_data_info(view_url)
+    if form.validate_on_submit():
+        upd = {
+            'human_name': form.human_name.data,
+            'description': form.description.data,
+            'obs_from': form.obs_from.data,
+            'obs_to': form.obs_to.data,
+            'update_freq': form.update_freq.data,
+            'business_key': form.business_key.data,
+            'latitude': form.latitude.data,
+            'longitude': form.longitude.data,
+            'location': form.location.data,
+        }
+        session.query(MetaTable)\
+            .filter(MetaTable.four_by_four == four_by_four)\
+            .update(upd)
+        session.commit()
+        flash('%s updated successfully!' % meta.human_name)
+    context = {
+        'form': form,
+        'meta': meta,
+        'socrata_info': socrata_info
+    }
+    return render_template('edit-dataset.html', **context)

@@ -7,10 +7,10 @@ from plenario.api import api
 from plenario.auth import auth, login_manager
 from plenario.views import views
 from urllib import quote_plus
-import plenario.settings
+from plenario.settings import PLENARIO_SENTRY_URL
 
 try:
-    sentry = Sentry(dsn=plenario.settings.PLENARIO_SENTRY_URL)
+    sentry = Sentry(dsn=PLENARIO_SENTRY_URL)
 except KeyError:
     sentry = None
 

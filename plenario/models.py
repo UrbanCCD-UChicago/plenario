@@ -17,10 +17,11 @@ bcrypt = Bcrypt()
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
+    four_by_four = Column(String(9), primary_key=True)
     dataset_name = Column(String(100), nullable=False)
     human_name = Column(String(200), nullable=False)
     description = Column(Text)
-    source_url = Column(String(100), nullable=False, primary_key=True)
+    source_url = Column(String(100), nullable=False)
     obs_from = Column(Date)
     obs_to = Column(Date)
     bbox = Column(Geometry('POLYGON', srid=4326))
