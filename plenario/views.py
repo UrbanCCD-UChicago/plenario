@@ -87,7 +87,7 @@ class EditDatasetForm(Form):
         
         valid = True
         
-        if self.location.data and not self.latitude.data and not self.longitude.data:
+        if not self.location.data and not self.latitude.data and not self.longitude.data:
             valid = False
             self.location.errors.append('You must either provide a Latitude and Longitude field name or a Location field name')
         
