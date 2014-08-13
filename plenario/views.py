@@ -41,7 +41,7 @@ def grid_view():
     }
     return render_template('grid.html', **context)
 
-@views.route('/explore/')
+@views.route('/explore')
 def explore_view():
     return render_template('explore.html')
 
