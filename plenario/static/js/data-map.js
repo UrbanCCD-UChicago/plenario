@@ -10,7 +10,7 @@
 
         if ( ! template_cache.tmpl_cache[tmpl_name] ) {
             var tmpl_dir = '/static/js/templates';
-            var tmpl_url = tmpl_dir + '/' + tmpl_name + '.html?2';
+            var tmpl_url = tmpl_dir + '/' + tmpl_name + '.html';
 
             var tmpl_string;
             $.ajax({
@@ -211,10 +211,10 @@
             'change #spatial-agg-filter': 'changeSpatialAgg'
         },
         initialize: function(){
-            this.$el.html(template_cache('gridMapTemplate'));
             this.center = [41.880517,-87.644061];
             this.query = this.attributes.query;
             this.meta = this.attributes.meta;
+            this.$el.html(template_cache('gridMapTemplate', {query: this.query, meta: this.meta}));
             var map_options = {
                 scrollWheelZoom: false,
                 tapTolerance: 30,
