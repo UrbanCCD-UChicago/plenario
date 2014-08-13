@@ -126,6 +126,18 @@
                         spotRadius: 2,
                         width: "290px"
                       });
+
+                    $('#response-datasets').DataTable( {
+                        "aaSorting": [ [0,'asc'] ],
+                        "aoColumns": [
+                            null,
+                            null,
+                            { "bSortable": false }
+                        ],
+                        "paging": false,
+                        "searching": false,
+                        "info": false
+                    } );
                 }
             ).fail(function(resp){
                 new ErrorView({el: '#errorModal', model: resp});
@@ -169,6 +181,18 @@
                         dataObjs[obj['dataset_name']] = obj;
                     })
                     self.datasetsObj = dataObjs;
+
+                    $('#available-datasets').DataTable( {
+                        "aaSorting": [ [0,'asc'] ],
+                        "aoColumns": [
+                            null,
+                            null,
+                            { "bSortable": false }
+                        ],
+                        "paging": false,
+                        "searching": false,
+                        "info": false
+                    } );
                 }
             )
         },

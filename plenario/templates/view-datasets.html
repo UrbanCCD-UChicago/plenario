@@ -19,7 +19,7 @@
     <table id='datasets-table' class="table table-bordered table-condensed">
         <thead>
             <th>Name</th>
-            <th>Date range</th>
+            <th>Time span available</th>
             <th>Update frequency</th>
             <th>Last updated</th>
             <th></th>
@@ -39,7 +39,7 @@
                     <td><button class="btn btn-default btn-sm update-dataset" data-dataset="{{dataset.four_by_four}}"><i class='fa fa-refresh'></i> Update now</button></td>
                     <td>
                         <a href="{{ url_for('views.edit_dataset', four_by_four=dataset.four_by_four) }}"
-                            class="btn btn-danger btn-sm">
+                            class="btn btn-info btn-sm">
                             <i class='fa fa-edit'></i> Edit
                         </a>
                     </td>
@@ -60,6 +60,15 @@
                 })
             })
             $('#datasets-table').DataTable( {
+                "aaSorting": [ [0,'asc'] ],
+                "aoColumns": [
+                    null,
+                    null,
+                    null,
+                    null,
+                    { "bSortable": false },
+                    { "bSortable": false }
+                ],
                 "paging": false,
                 "searching": false,
                 "info": false

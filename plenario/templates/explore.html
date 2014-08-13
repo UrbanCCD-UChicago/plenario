@@ -4,6 +4,7 @@
     <link href="{{ url_for('static', filename='css/leaflet.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/leaflet.draw.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/leaflet.label.css') }}" rel="stylesheet">
+    <link href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css" rel="stylesheet">
 {% endblock %}
 {% block content %}
     <div class="row">
@@ -27,6 +28,7 @@
     <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.spin.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/leaflet.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/leaflet.draw.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/leaflet.label.js') }}" type="text/javascript"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/leaflet.label.js') }}"></script>
+    <script type="text/javascript" src="//cdn.datatables.net/1.10.2/js/jquery.dataTables.js"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/data-map.js') }}"></script>
 {% endblock %}
