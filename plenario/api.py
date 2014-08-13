@@ -463,7 +463,7 @@ def submit_dataset():
             source_domain = urlparse(dataset_info['view_url']).netloc
             dataset_id = dataset_info['view_url'].split('/')[-1]
             source_url = 'http://%s/resource/%s' % (source_domain, dataset_id)
-            md = session.query(MetaTable).get(source_url)
+            md = session.query(MetaTable).get(dataset_id)
             if not md:
                 d = {
                     'four_by_four': dataset_id,
@@ -481,7 +481,7 @@ def submit_dataset():
                 md = MetaTable(**d)
                 session.add(md)
                 session.commit()
-            add_dataset.delay(md.source_url)
+            add_dataset.delay(md.four_by_four)
             resp['message'] = 'Dataset %s submitted successfully' % md.human_name
     else:
         resp['status'] = 'error'

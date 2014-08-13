@@ -13,8 +13,8 @@ if CELERY_SENTRY_URL:
     setup_logging(handler)
 
 @celery_app.task
-def add_dataset(source_url):
-    md = session.query(MetaTable).get(source_url)
+def add_dataset(four_by_four):
+    md = session.query(MetaTable).get(four_by_four)
     etl = PlenarioETL(md.as_dict())
     etl.add()
     return 'yay'

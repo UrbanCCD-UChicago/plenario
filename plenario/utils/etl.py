@@ -59,11 +59,11 @@ class PlenarioETL(object):
         self._cleanup_temp_tables()
     
     def update(self, fpath=None):
-        self._get_or_create_data_table()
         if fpath:
             self.fpath = fpath
         else:
             self._download_csv()
+        self._get_or_create_data_table()
         self._insert_raw_data()
         self._dedupe_raw_data()
         self._make_src_table()
