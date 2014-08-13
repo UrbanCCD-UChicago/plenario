@@ -13,7 +13,7 @@
     <form role="form" method="POST">
         {{ form.csrf_token }}
         <div class="row">
-            <div class="col-sm-12">
+            <div class="col-sm-6">
                 {% if form.human_name.errors %}
                 <div class="form-group has-error has-feedback">
                 {% else %}
@@ -23,6 +23,29 @@
                     <input type="text" class="form-control" id="id_human_name" name="human_name" value="{{ meta.human_name }}"/>
                     {% if form.human_name.errors %}
                         {% for error in form.human_name.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-sm-6">
+                {% if form.update_freq.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_update_freq">Update Frequency</label>
+                    <select id="id_update_freq" class="form-control" name="update_freq">
+                        {% for value, name in form.update_freq.choices %}
+                            {% if value == meta.update_freq %}
+                                <option selected="selected" value="{{ value }}">{{name}}</option>
+                            {% else %}
+                                <option value="{{ value }}">{{name}}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    {% if form.update_freq.errors %}
+                        {% for error in form.update_freq.errors %}
                             <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
                         {% endfor %}
                     {% endif %}
@@ -47,6 +70,29 @@
             </div>
         </div>
         <div class="row">
+            <div class="col-sm-6">
+                {% if form.observed_date.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_obvervation_date">Observation Date Field Name</label>
+                    <select id="id_obvervation_date" name="observed_date" class="form-control">
+                        {% for column in socrata_info.columns %}
+                            {% if column.human_name == meta.observed_date %}
+                                <option selected="selected" value="{{ column.human_name }}">{{column.human_name}}</option>
+                            {% else %}
+                                <option value="{{ column.human_name }}">{{column.human_name}}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    {% if form.observed_date.errors %}
+                        {% for error in form.observed_date.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
             <div class="col-sm-6">
                 <div class="row">
                     <div class="col-sm-6">
@@ -79,29 +125,6 @@
                             {% endif %}
                         </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-sm-6">
-                {% if form.update_freq.errors %}
-                <div class="form-group has-error has-feedback">
-                {% else %}
-                <div class="form-group">
-                {% endif %}
-                    <label for="id_update_freq">Update Frequency</label>
-                    <select id="id_update_freq" class="form-control" name="update_freq">
-                        {% for value, name in form.update_freq.choices %}
-                            {% if value == meta.update_freq %}
-                                <option selected="selected" value="{{ value }}">{{name}}</option>
-                            {% else %}
-                                <option value="{{ value }}">{{name}}</option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
-                    {% if form.update_freq.errors %}
-                        {% for error in form.update_freq.errors %}
-                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
-                        {% endfor %}
-                    {% endif %}
                 </div>
             </div>
         </div>

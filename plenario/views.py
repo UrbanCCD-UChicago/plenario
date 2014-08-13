@@ -73,6 +73,7 @@ class EditDatasetForm(Form):
                                        ('monthly', 'Monthly')], 
                               validators=[DataRequired()])
     business_key = TextField('business_key', validators=[DataRequired()])
+    observed_date = TextField('observed_date', validators=[DataRequired()])
     latitude = TextField('latitude')
     longitude = TextField('longitude')
     location = TextField('location')
@@ -116,6 +117,7 @@ def edit_dataset(four_by_four):
             'latitude': form.latitude.data,
             'longitude': form.longitude.data,
             'location': form.location.data,
+            'observed_date': form.observed_date.data,
         }
         session.query(MetaTable)\
             .filter(MetaTable.four_by_four == four_by_four)\
