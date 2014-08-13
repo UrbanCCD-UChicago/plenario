@@ -251,8 +251,11 @@ class PlenarioETL(object):
             self.dat_table.c.end_date,
             self.dat_table.c.current_flag,
         ]
-        dat_cols.append(getattr(self.dat_table.c, slugify(self.location))\
-            .label('location'))
+        if self.location:
+            dat_cols.append(getattr(self.dat_table.c, slugify(self.location))\
+                .label('location'))
+        else:
+            dat_cols.append(text("NULL as location"))
         if self.latitude and self.longitude:
             dat_cols.append(getattr(self.dat_table.c, slugify(self.latitude))\
                 .label('latitude'))
