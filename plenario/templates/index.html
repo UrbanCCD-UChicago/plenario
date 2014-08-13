@@ -11,17 +11,21 @@
     <div class='row'>
       <div class='col-md-6'>
         <div class='well'>
-          <h3><a href="{{ url_for('views.explore_view') }}">Data Explorer</a></h3>
+          <h2><a href="{{ url_for('views.explore_view') }}">Data Explorer</a></h2>
           <p>Explore the data by drawing on a map.</p>
           <a href="{{ url_for('views.explore_view') }}"><img src='/static/images/plenario-explorer.png' class='img-responsive img-thumbnail' alt='Plenar.io Data Explorer' /></a>
         </div>
       </div>
       <div class='col-md-6'>
         <div class='well'>
-          <h3><a href="{{ url_for('views.api_docs_view') }}">API</a></h3>
+          <h2><a href="{{ url_for('views.api_docs_view') }}">API</a></h2>
           <p><strong>For programmers</strong>. Access all of our data in JSON format via a RESTful API. Includes support for geospatial queries and temporal aggregation.</p>
 
+          <br />
+
           <p><strong>Here's an example</strong>: <a href='http://localhost:5001/api/master/?obs_date__gt=2007-1-1&obs_date__lt=2008-1-1&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints'>Chicago crime reports and environmental complaints from 2007 to 2008</a>.</p>
+
+          <br />
 
           <p><a class='btn btn-info' href="{{ url_for('views.api_docs_view') }}">Read the documentation &raquo;</a></p>
         </div>
