@@ -1,19 +1,18 @@
 {% extends 'base.html' %}
-{% block title %}Explore - Plenar.io{% endblock %}
+{% block title %}Data Explorer - Plenar.io{% endblock %}
 {% block extra_styles %}
     <link href="{{ url_for('static', filename='css/leaflet.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/leaflet.draw.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/leaflet.label.css') }}" rel="stylesheet">
 {% endblock %}
 {% block content %}
     <div class="row">
         <div class="col-md-12">
             <div id="map-view"></div>
-            <div id="query"></div>
         </div>
         <div class="col-md-12">
-            <div id="about"></div>
-            <div id="detail"></div>
-            <div id="response"></div>
+            <div id="list-view"></div>
+            <div id="detail-view"></div>
         </div>
     </div>
     <div class="modal fade" id="errorModal" tabindex="-1" role="dialog" aria-labelledby="error" aria-hidden="true"></div>

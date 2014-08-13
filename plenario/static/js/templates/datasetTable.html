@@ -11,7 +11,7 @@
         <% $.each(objects, function(i, obj){ %>
             <% var points = "/api/detail/?" + $.param(query) + '&dataset_name=' + obj.meta.dataset_name %>
             <tr>
-                <td><%= obj.meta.human_name %></td>
+                <td><a href="javascript://" class="detail" data-dataset_name="<%= obj.meta.dataset_name %>"><%= obj.meta.human_name %></a></td>
                 <td><span class='sparkline' id="<%= obj.meta.dataset_name %>-sparkline"><%= obj.values %></span></td>
                 <td>
                     <a href="javascript://" class="detail btn btn-info btn-sm " data-dataset_name="<%= obj.meta.dataset_name %>">
