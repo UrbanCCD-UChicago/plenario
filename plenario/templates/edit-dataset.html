@@ -8,6 +8,8 @@
     <h2>
         Edit {{ meta.human_name }}
     </h2>
+    <p><strong>Source URL: </strong>{{ meta.source_url }}</p>
+    <p><strong>Machine name: </strong>{{ meta.dataset_name }}</p>
     <form role="form" method="POST">
         {{ form.csrf_token }}
         <div class="row">
@@ -35,7 +37,7 @@
                 <div class="form-group">
                 {% endif %}
                     <label for="id_description">Description</label>
-                    <textarea class="form-control" id="id_description" name="description">{{ meta.description }}</textarea>
+                    <textarea rows="10" class="form-control" id="id_description" name="description">{{ meta.description }}</textarea>
                     {% if form.description.errors %}
                         {% for error in form.description.errors %}
                             <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
