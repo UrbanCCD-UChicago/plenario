@@ -391,7 +391,7 @@
             }
         },
         resetForm: function(e){
-            window.location.reload();
+            window.location = "/explore";
         },
         drawCreate: function(e){
             this.drawnItems.clearLayers();
