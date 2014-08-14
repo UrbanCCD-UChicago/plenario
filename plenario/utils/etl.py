@@ -108,7 +108,12 @@ class PlenarioETL(object):
             with gzip.open(self.fpath, 'rb') as f:
                 reader = UnicodeCSVReader(f)
                 header = reader.next()
-                col_types,col_vals = normalize_table(reader)
+                row_count = 0
+                rows = []
+                while row_count < 100:
+                    rows.append(reader.next())
+                    row_count += 1
+                col_types,col_vals = normalize_table(rows)
                 for idx, col in enumerate(col_vals):
                     if None in col_vals:
                         has_nulls[header[idx]] = True
