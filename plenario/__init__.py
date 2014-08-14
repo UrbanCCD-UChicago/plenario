@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, render_template
 from raven.contrib.flask import Sentry
 from plenario.database import session as db_session
 from plenario.models import bcrypt
@@ -29,5 +29,13 @@ def create_app():
     @app.teardown_appcontext
     def shutdown_session(exception=None):
         db_session.remove()
+
+    @app.errorhandler(404)
+    def page_not_found(e):
+        return render_template('404.html'), 404
+
+    @app.errorhandler(500)
+    def page_not_found(e):
+        return render_template('error.html'), 500
     return app
 
