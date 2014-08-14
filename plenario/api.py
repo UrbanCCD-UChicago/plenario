@@ -478,6 +478,8 @@ def submit_dataset():
                     'longitude': post.get('longitude'),
                     'location': post.get('location')
                 }
+                if len(d['dataset_name']) > 49:
+                    d['dataset_name'] = d['dataset_name'][:50]
                 md = MetaTable(**d)
                 session.add(md)
                 session.commit()
