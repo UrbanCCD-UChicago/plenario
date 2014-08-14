@@ -413,6 +413,10 @@
                 }));
                 //this.map.fitBounds(this.map.drawnItems.getBounds());
             }
+
+            $("#dismiss-intro").click(function(){
+                $('#collapse-intro').collapse('hide');
+            });
         },
         resetForm: function(e){
             window.location = "/explore";
