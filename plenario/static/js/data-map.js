@@ -131,7 +131,7 @@
                         "aaSorting": [ [0,'asc'] ],
                         "aoColumns": [
                             null,
-                            null,
+                            { "bSortable": false },
                             { "bSortable": false }
                         ],
                         "paging": false,
