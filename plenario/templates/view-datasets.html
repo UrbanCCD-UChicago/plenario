@@ -29,11 +29,11 @@
             {% for dataset in datasets %}
                 <tr>
                     <td>{{ dataset.human_name }}</td>
-                    {% if dataset.obs_from and dataset.obs_to %}
-                        <td>{{ dataset.obs_from }}—{{dataset.obs_to}}</td>
-                    {% else %}
-                        <td></td>
-                    {% endif %}
+                    <td>
+                        {% if dataset.obs_from and dataset.obs_to %}
+                            <td>{{ dataset.obs_from }} — {{dataset.obs_to}}</td>
+                        {% endif %}
+                    </td>
                     <td>{{ dataset.update_freq }}</td>
                     <td>{{ dataset.last_update }}</td>
                     <td><button class="btn btn-default btn-sm update-dataset" data-dataset="{{dataset.four_by_four}}"><i class='fa fa-refresh'></i> Update now</button></td>

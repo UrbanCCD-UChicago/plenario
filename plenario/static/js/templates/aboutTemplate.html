@@ -13,7 +13,11 @@
         <td>
           <a href="javascript://" class='detail' data-dataset_name="<%= set.dataset_name %>"><%= set.human_name %></a>
         </td>
-        <td><strong><%= moment(set.obs_from).from(moment(set.obs_to), true) %></strong> (<%= moment(set.obs_from).format("M/D/YYYY") %> - <%= moment(set.obs_to).format("M/D/YYYY") %>)</td>
+        <td>
+          <% if (set.obs_from && set.obs_to) { %>
+          <strong><%= moment(set.obs_from).from(moment(set.obs_to), true) %></strong> (<%= moment(set.obs_from).format("M/D/YYYY") %> - <%= moment(set.obs_to).format("M/D/YYYY") %>)
+          <% } %>
+        </td>
         <td>
           <a href="javascript://" class="detail btn btn-info btn-sm" data-dataset_name="<%= set.dataset_name %>">
               <i class='fa fa-info-circle'></i>
