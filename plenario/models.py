@@ -62,9 +62,12 @@ class MasterTable(Base):
     def __repr__(self):
         return '<Master %r (%r)>' % (self.dataset_row_id, self.dataset_name)
 
+def get_uuid():
+    return unicode(uuid4())
+
 class User(Base):
     __tablename__ = 'plenario_user'
-    id = Column(String(36), default=unicode(uuid4()), primary_key=True)
+    id = Column(String(36), default=get_uuid, primary_key=True)
     name = Column(String, nullable=False, unique=True)
     email = Column(String, nullable=False)
     _password = Column('password', String(60), nullable=False)

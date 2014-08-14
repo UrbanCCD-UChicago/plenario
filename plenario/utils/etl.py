@@ -110,7 +110,7 @@ class PlenarioETL(object):
                 header = reader.next()
                 row_count = 0
                 rows = []
-                while row_count < 100:
+                while row_count < 1000:
                     rows.append(reader.next())
                     row_count += 1
                 col_types,col_vals = normalize_table(rows)
@@ -129,6 +129,11 @@ class PlenarioETL(object):
                 kwargs = {}
                 if has_nulls[col_name]:
                     kwargs['nullable'] = True
+                col_type = COL_TYPES[d_type]
+                if col_type == Integer:
+                    kwargs['server_default'] = text('0')
+                if col_type == Float:
+                    kwargs['server_default'] = text('0.0')
                 cols.append(Column(slugify(col_name), COL_TYPES[d_type], **kwargs))
             self.dat_table = Table('dat_%s' % self.dataset_name, Base.metadata, 
                           *cols, extend_existing=True)
