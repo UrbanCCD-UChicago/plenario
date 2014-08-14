@@ -31,7 +31,7 @@
                     <td>{{ dataset.human_name }}</td>
                     <td>
                         {% if dataset.obs_from and dataset.obs_to %}
-                            <td>{{ dataset.obs_from }} — {{dataset.obs_to}}</td>
+                            {{ dataset.obs_from }} — {{dataset.obs_to}}
                         {% endif %}
                     </td>
                     <td>{{ dataset.update_freq }}</td>
