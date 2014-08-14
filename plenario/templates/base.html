@@ -46,11 +46,12 @@
             {% if session.get('user_id') %}
                 <li class="dropdown">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown">
-                        Manage Data <span class="caret"></span>
+                        Admin <span class="caret"></span>
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a href="{{ url_for('views.add_dataset') }}">Add Dataset</a></li>
                         <li><a href="{{ url_for('views.view_datasets') }}">View datasets</a></li>
+                        <li><a href="{{ url_for('views.add_dataset') }}">Add Dataset</a></li>
+                        <li><a href="{{ url_for('auth.add_user') }}">Add user</a></li>
                     </ul>
                 </li>
                 <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
