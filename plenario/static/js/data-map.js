@@ -252,29 +252,34 @@
             this.legend = L.control({position: 'bottomright'});
             this.jenksCutoffs = {}
             var self = this;
-            this.legend.onAdd = function(map){
-                var div = L.DomUtil.create('div', 'legend')
-                var labels = [];
-                var from;
-                var to;
-                $.each(self.jenksCutoffs, function(i, grade){
-                    from = grade
-                    to = self.jenksCutoffs[i + 1];
-                    labels.push('<i style="background:' + self.getColor(from) + '"></i>' +
-                               from + (to ? '&ndash;' + to : '+'));
-                });
+
+            this.legend.onAdd = function (map) {
+                var div = L.DomUtil.create('div', 'legend'),
+                    grades = self.jenksCutoffs,
+                    labels = [],
+                    from, to;
+
+                labels.push('<i style="background-color:' + self.getColor(0) + '"></i> 0');
+                labels.push('<i style="background-color:' + self.getColor(1) + '"></i> 1 &ndash; ' + grades[2]);
+                for (var i = 2; i < grades.length; i++) {
+                    from = grades[i] + 1;
+                    to = grades[i + 1];
+                    labels.push(
+                        '<i style="background-color:' + self.getColor(from + 1) + '"></i> ' +
+                        from + (to ? '&ndash;' + to : '+'));
+                }
+
                 div.innerHTML = '<div><strong>' + self.meta['human_name'] + '</strong><br />' + labels.join('<br />') + '</div>';
-                return div
+                return div;
             };
+
             this.gridLayer = new L.FeatureGroup();
             this.mapColors = [
-                '#deebf7',
-                '#c6dbef',
-                '#9ecae1',
+                '#eff3ff',
+                '#bdd7e7',
                 '#6baed6',
-                '#4292c6',
-                '#2171b5',
-                '#084594'
+                '#3182bd',
+                '#08519c'
             ]
             this.render();
         },
@@ -329,18 +334,17 @@
             })
         },
         getCutoffs: function(values){
-            var j = jenks(values, 6);
-            j[0] = 0;
-            j.pop();
-            return j
+            var jenks_cutoffs = jenks(values, 4);
+            jenks_cutoffs.unshift(0); // set the bottom value to 0
+            jenks_cutoffs[1] = 1; // set the second value to 1
+            jenks_cutoffs.pop(); // last item is the max value, so dont use it
+            return jenks_cutoffs;
         },
         getColor: function(d){
-            return d >= this.jenksCutoffs[5] ? this.mapColors[6] :
-                   d >= this.jenksCutoffs[4] ? this.mapColors[5] :
-                   d >= this.jenksCutoffs[3] ? this.mapColors[4] :
-                   d >= this.jenksCutoffs[2] ? this.mapColors[3] :
-                   d >= this.jenksCutoffs[1] ? this.mapColors[2] :
-                   d >= this.jenksCutoffs[0] ? this.mapColors[1] :
+            return  d >  this.jenksCutoffs[4] ? this.mapColors[4] :
+                    d >  this.jenksCutoffs[3] ? this.mapColors[3] :
+                    d >  this.jenksCutoffs[2] ? this.mapColors[2] :
+                    d >= this.jenksCutoffs[1] ? this.mapColors[1] :
                                            this.mapColors[0];
         },
         styleGrid: function(feature){

@@ -24,14 +24,19 @@
 
 
         <form role="form">
-            <div class="form-group">
-                <label for="start-date-filter">Start Date</label>
-                <input id="start-date-filter" class="date-filter form-control" type="text" value="<%= start %>" />
-            </div>
-
-            <div class="form-group">
-                <label for="end-date-filter">End Date</label>
-                <input id="end-date-filter" class="date-filter form-control" type="text" value="<%= end %>"/>
+            <div class='row'>
+                <div class='col-md-6'>
+                    <div class="form-group">
+                        <label for="start-date-filter">Start Date</label>
+                        <input id="start-date-filter" class="date-filter form-control" type="text" value="<%= start %>" />
+                    </div>
+                </div>
+                <div class='col-md-6'>
+                    <div class="form-group">
+                        <label for="end-date-filter">End Date</label>
+                        <input id="end-date-filter" class="date-filter form-control" type="text" value="<%= end %>"/>
+                    </div>
+                </div>
             </div>
 
             <div class="form-group">
