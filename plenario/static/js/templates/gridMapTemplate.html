@@ -1,6 +1,6 @@
 <h3 class='detail-header'>
     <%= meta.human_name %> 
-    <small><%= moment(query.obs_date__le).format("M/D/YYYY") %> - <%= moment(query.obs_date__ge).format("M/D/YYYY") %></small>
+    <small><%= moment(query.obs_date__ge).format("M/D/YYYY") %> - <%= moment(query.obs_date__le).format("M/D/YYYY") %></small>
 </h3>
 <div id="map" class="col-md-12 half-height"></div>
 <div class='clearfix'></div>
