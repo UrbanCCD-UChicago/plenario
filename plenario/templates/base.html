@@ -50,8 +50,9 @@
                     </a>
                     <ul class="dropdown-menu">
                         <li><a href="{{ url_for('views.view_datasets') }}">View datasets</a></li>
-                        <li><a href="{{ url_for('views.add_dataset') }}">Add Dataset</a></li>
-                        <li><a href="{{ url_for('auth.add_user') }}">Add user</a></li>
+                        <li><a href="{{ url_for('views.add_dataset') }}">Add a dataset</a></li>
+                        <li><a href="{{ url_for('auth.add_user') }}">Add a user</a></li>
+                        <li><a href="{{ url_for('auth.reset_password') }}">Reset my password</a></li>
                     </ul>
                 </li>
                 <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
