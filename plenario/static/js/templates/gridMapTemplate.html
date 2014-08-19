@@ -9,7 +9,7 @@
     <form class='form-inline' role="form">
         <div class="row">
             <div class="col-md-12">
-              <div class="form-group">
+                <div class="form-group">
                     <label for="spatial-agg-filter">Grid resolution</label>
                     <select class='form-control' id="spatial-agg-filter">
                         <option value="100">100 meters</option>
@@ -19,6 +19,9 @@
                         <option value="500" selected=true>500 meters</option>
                         <option value="1000">1 kilometer</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <a id='download-geojson' class='btn btn-default' href="#"><i class='fa fa-download'></i> Grid as GeoJSON</a>
                 </div>
             </div>
         </div>

@@ -315,6 +315,7 @@
                         self.legend.addTo(self.map);
                         self.map.fitBounds(self.gridLayer.getBounds());
                     }
+                    $('#download-geojson').attr('href','/api/grid/?' + $.param(self.getQuery()))
                 }
             )
         },
@@ -322,11 +323,15 @@
             this.resolution = $(e.target).val()
             this.render()
         },
-        getGrid: function(){
+        getQuery: function(){
             var q = this.query;
             q['resolution'] = this.resolution
             q['center'] = this.center
             delete q['agg']
+            return q
+        },
+        getGrid: function(){
+            var q = this.getQuery()
             return $.ajax({
                 url: '/api/grid/',
                 dataType: 'json',
