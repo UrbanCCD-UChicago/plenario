@@ -175,6 +175,7 @@ class PlenarioETL(object):
         cursor = conn.cursor()
         s = StringIO()
         self.s3_key.get_contents_to_file(s)
+        s.seek(0)
         with gzip.GzipFile(fileobj=s, mode='rb') as f:
             cursor.copy_expert(copy_st, f)
         conn.commit()
