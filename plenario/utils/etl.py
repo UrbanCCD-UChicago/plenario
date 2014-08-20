@@ -6,6 +6,7 @@ from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.models import MetaTable, MasterTable
 from plenario.utils.helpers import slugify
+from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET
 from urlparse import urlparse
 from csvkit.unicsv import UnicodeCSVReader
 from csvkit.typeinference import normalize_table
@@ -18,8 +19,9 @@ from types import NoneType
 import plenario.settings
 from geoalchemy2.shape import from_shape
 from shapely.geometry import box
-
-DATA_DIR = plenario.settings.DATA_DIR
+from boto.s3.connection import S3Connection
+from boto.s3.key import Key
+from cStringIO import StringIO
 
 COL_TYPES = {
     bool: Boolean,
@@ -34,14 +36,19 @@ COL_TYPES = {
 
 class PlenarioETL(object):
     
-    def __init__(self, meta, data_dir=DATA_DIR):
+    def __init__(self, meta):
         for k,v in meta.items():
             setattr(self, k, v)
         domain = urlparse(self.source_url).netloc
         fourbyfour = self.source_url.split('/')[-1]
         self.view_url = 'http://%s/api/views/%s' % (domain, fourbyfour)
         self.dl_url = '%s/rows.csv?accessType=DOWNLOAD' % self.view_url
-        self.data_dir = data_dir
+        s3_path = '%s/%s.csv.gz' % (self.dataset_name, 
+            datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
+        s3conn = S3Connection(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+        bucket = s3conn.get_bucket(S3_BUCKET)
+        self.s3_key = Key(bucket)
+        self.s3_key.key = s3_path
     
     def add(self, fpath=None):
         if fpath:
@@ -81,13 +88,15 @@ class PlenarioETL(object):
 
     def _download_csv(self):
         r = requests.get(self.dl_url, stream=True)
-        self.fpath = '%s/%s_%s.csv.gz' % (self.data_dir, 
-              self.dataset_name, datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
-        with gzip.open(self.fpath, 'wb') as f:
+        s = StringIO()
+        with gzip.GzipFile(fileobj=s, mode='wb') as f:
             for chunk in r.iter_content(chunk_size=1024):
                 if chunk:
                     f.write(chunk)
                     f.flush()
+        s.seek(0)
+        self.s3_key.set_contents_from_file(s)
+        self.s3_key.make_public()
  
     def _cleanup_temp_tables(self, changes=False):
         self.raw_table.drop(bind=engine, checkfirst=True)
@@ -164,7 +173,9 @@ class PlenarioETL(object):
             copy_st += "FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
         conn = engine.raw_connection()
         cursor = conn.cursor()
-        with gzip.open(self.fpath, 'rb') as f:
+        s = StringIO()
+        self.s3_key.get_contents_to_file(s)
+        with gzip.GzipFile(fileobj=s, mode='rb') as f:
             cursor.copy_expert(copy_st, f)
         conn.commit()
 
