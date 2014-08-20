@@ -199,10 +199,15 @@
         <p><strong>Examples</strong></p>
         
         <p><a href='/api/master/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1'>http://plenar.io/api/master/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1</a>
-        <br />Chicago crime reports since Jan 1st 2012, aggregated by year</p>
+        <br />Count of all Chicago crime reports since Jan 1st 2012, aggregated by year</p>
 
-        <p><a href='/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints'>http://plenar.io/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints</a>
-        <br />Crime and environmental complaints that were observed after November 12, 2007 but before November 12, 2008</p>
+        <p><a href='/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints&agg=day'>http://plenar.io/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints&agg=day</a>
+        <br />Count of crime and environmental complaints that were observed after November 12, 2007 but before November 12, 2008, aggregated by day</p>
+
+        <p><a href='/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&agg=week'>http://plenar.io/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&agg=week</a>
+        <br />
+        Count available datasets from Feb 21, 2014 to Aug 20, 2014, aggregated by week.
+        </p>
 
         <p><a href='/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.65692949295044%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.86853817536259%5D%5D%5D%7D%7D&agg=week'>http://plenar.io/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.65692949295044%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.86853817536259%5D%5D%5D%7D%7D&agg=week</a>
         <br />
