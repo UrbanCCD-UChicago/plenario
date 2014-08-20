@@ -5,6 +5,7 @@ from unicodedata import normalize
 def get_socrata_data_info(view_url):
     errors = []
     status_code = None
+    dataset_info = {}
     try:
         r = requests.get(view_url)
         status_code = r.status_code
@@ -16,6 +17,9 @@ def get_socrata_data_info(view_url):
         resp = r.json()
     except AttributeError:
         errors.append('No Socrata views endpoint available for this dataset')
+        resp = None
+    except ValueError:
+        errors.append('The Socrata dataset you supplied is not available currently')
         resp = None
     if resp:
         columns = resp.get('columns')

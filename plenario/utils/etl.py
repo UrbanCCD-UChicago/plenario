@@ -9,7 +9,7 @@ from plenario.utils.helpers import slugify
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET
 from urlparse import urlparse
 from csvkit.unicsv import UnicodeCSVReader
-from csvkit.typeinference import normalize_table
+from csvkit.typeinference import normalize_column_type
 import gzip
 from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
     Integer, Table, text, func, select, or_, and_, cast
@@ -106,6 +106,16 @@ class PlenarioETL(object):
         if changes:
             self.chg_table.drop(bind=engine, checkfirst=True)
 
+    def iter_column(idx, f):
+        f.seek(0)
+        reader = UnicodeCSVReader(f)
+        header = reader.next()
+        col = []
+        for row in reader:
+            col.append(row[idx])
+        col_type, norm_vals = normalize_column_type(col)
+        del norm_vals
+        return col_type
 
     def _get_or_create_data_table(self):
         # Step One: Make a table where the data will eventually live
@@ -114,20 +124,15 @@ class PlenarioETL(object):
                 autoload=True, autoload_with=engine, extend_existing=True)
         except NoSuchTableError:
             has_nulls = {}
-            with gzip.open(self.fpath, 'rb') as f:
+            s = StringIO()
+            self.s3_key.get_contents_to_file(s)
+            s.seek(0)
+            col_types = []
+            with gzip.GzipFile(fileobj=s, mode='rb') as f:
                 reader = UnicodeCSVReader(f)
                 header = reader.next()
-                row_count = 0
-                rows = []
-                while row_count < 1000:
-                    rows.append(reader.next())
-                    row_count += 1
-                col_types,col_vals = normalize_table(rows)
-                for idx, col in enumerate(col_vals):
-                    if None in col_vals:
-                        has_nulls[header[idx]] = True
-                    else:
-                        has_nulls[header[idx]] = False
+                for col in range(len(header)):
+                    col_types.append(self.iter_column(col, f))
             cols = [
                 Column('start_date', TIMESTAMP, server_default=text('CURRENT_TIMESTAMP')),
                 Column('end_date', TIMESTAMP, server_default=text('NULL')),

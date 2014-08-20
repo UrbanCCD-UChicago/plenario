@@ -47,9 +47,8 @@ def add_dataset():
             view_url = '%s/%s/%s' % (host, path, fourbyfour)
             dataset_info, errors, status_code = get_socrata_data_info(view_url)
             if status_code is not None and status_code != 200:
-                errors.append('URL returns a %s status code' % status_code)
+                errors.append('URL returned a %s status code' % status_code)
             dataset_info['submitted_url'] = url
-            flash("'%s' added!" % dataset_info['name'], 'success')
         else:
             errors.append('Need a URL')
     context = {'dataset_info': dataset_info, 'errors': errors}
