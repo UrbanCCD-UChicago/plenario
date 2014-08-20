@@ -72,7 +72,7 @@
         </tbody>
       </table>
 
-      <div class='well'>
+      <div class='well examples'>
         <p><strong>Example</strong></p>
         <p>
           <a href='/api/'>http://plenar.io/api/</a><br />
@@ -195,14 +195,19 @@
         </tbody>
       </table>
 
-      <div class='well'>
+      <div class='well examples'>
         <p><strong>Examples</strong></p>
         
-        <p><a href='/api/master/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1'>http://plenar.io/api/master/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1</a><br />
-        Chicago crime reports since Jan 1st 2012, aggregated by year</p>
+        <p><a href='/api/master/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1'>http://plenar.io/api/master/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1</a>
+        <br />Chicago crime reports since Jan 1st 2012, aggregated by year</p>
 
-        <p><a href='/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints'>http://plenar.io/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints</a><br />Crime and environmental complaints that were
-          observed after November 12, 2007 but before November 12, 2008</p>
+        <p><a href='/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints'>http://plenar.io/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints</a>
+        <br />Crime and environmental complaints that were observed after November 12, 2007 but before November 12, 2008</p>
+
+        <p><a href='/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.65692949295044%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.86853817536259%5D%5D%5D%7D%7D&agg=week'>http://plenar.io/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.65692949295044%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.86853817536259%5D%5D%5D%7D%7D&agg=week</a>
+        <br />
+        All available datasets in a bounding box (downtown Chicago) from Feb 21, 2014 to Aug 20, 2014, aggregated by week.
+        </p>
       </div>
 
       <hr />
@@ -236,7 +241,7 @@
         </tbody>
       </table>
 
-      <div class='well'>
+      <div class='well examples'>
         <p><strong>Example</strong></p>
         
         <p><a href='/api/fields/chicago_crimes_all'>http://plenar.io/api/fields/chicago_crimes_all</a><br />
@@ -362,7 +367,7 @@
         </tbody>
       </table>
 
-      <div class='well'>
+      <div class='well examples'>
         <p><strong>Example</strong></p>
         
         <p><a href='/api/detail-aggregate/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1&iucr=0110'>http://plenar.io/api/detail-aggregate/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1&iucr=0110</a><br />
@@ -454,7 +459,7 @@
       <p><strong>Response Parameters</strong></p>
       <p>The API responds with a list of raw records for the particular dataset. The fields returned will vary per dataset.</p>
 
-      <div class='well'>
+      <div class='well examples'>
         <p><strong>Example</strong></p>
         
         <p><a href='/api/detail/?dataset_name=chicago_crimes_all&obs_date__ge=2014-1-1&iucr=0110'>http://plenar.io/api/detail/?dataset_name=chicago_crimes_all&obs_date__ge=2014-1-1&iucr=0110</a><br />

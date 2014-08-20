@@ -22,6 +22,8 @@ body {
 
 .well h2, .detail-header { margin-top: 0; }
 
+.examples { word-wrap: break-word; }
+
 /* Everything but the jumbotron gets side spacing for mobile first views */
 .header,
 .marketing,
