@@ -106,7 +106,7 @@ class PlenarioETL(object):
         if changes:
             self.chg_table.drop(bind=engine, checkfirst=True)
 
-    def iter_column(idx, f):
+    def iter_column(self, idx, f):
         f.seek(0)
         reader = UnicodeCSVReader(f)
         header = reader.next()
@@ -123,7 +123,6 @@ class PlenarioETL(object):
             self.dat_table = Table('dat_%s' % self.dataset_name, Base.metadata, 
                 autoload=True, autoload_with=engine, extend_existing=True)
         except NoSuchTableError:
-            has_nulls = {}
             s = StringIO()
             self.s3_key.get_contents_to_file(s)
             s.seek(0)
@@ -141,8 +140,6 @@ class PlenarioETL(object):
             ]
             for col_name,d_type in zip(header, col_types):
                 kwargs = {}
-                if has_nulls[col_name]:
-                    kwargs['nullable'] = True
                 col_type = COL_TYPES[d_type]
                 if col_type == Integer:
                     kwargs['server_default'] = text('0')

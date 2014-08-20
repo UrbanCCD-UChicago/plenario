@@ -135,5 +135,16 @@ def edit_dataset(four_by_four):
 
 @views.route('/update-dataset/<four_by_four>')
 def update_dataset(four_by_four):
-    update_dataset_task.delay(four_by_four)
-    return make_response(json.dumps({'status': 'success'}))
+    result = update_dataset_task.delay(four_by_four)
+    return make_response(json.dumps({'status': 'success', 'task_id': result.id}))
+
+@views.route('/check-update/<task_id>')
+def check_update(task_id):
+    result = update_dataset_task.AsyncResult(task_id)
+    if result.ready():
+        r = {'status': 'ready'}
+    else:
+        r = {'status': 'pending'}
+    resp = make_response(json.dumps(r))
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
