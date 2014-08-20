@@ -214,9 +214,9 @@ def dataset():
     else:
         del raw_query_params['agg']
     datatype = 'json'
-    if raw_query_params.get('datatype'):
-        datatype = raw_query_params['datatype']
-        del raw_query_params['datatype']
+    if raw_query_params.get('data_type'):
+        datatype = raw_query_params['data_type']
+        del raw_query_params['data_type']
     mt = MasterTable.__table__
     valid_query, query_clauses, resp, status_code = make_query(mt,raw_query_params)
     if valid_query:
@@ -280,7 +280,7 @@ def parse_join_query(params):
             queries['base'][key] = value
         elif key == 'agg':
             agg = value
-        elif key == 'datatype':
+        elif key == 'data_type':
             datatype = value
         else:
             queries['detail'][key] = value

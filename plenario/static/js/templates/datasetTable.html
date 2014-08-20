@@ -1,4 +1,4 @@
-<% var matrix = "/api/master/?" + $.param(query) + '&datatype=csv' %>
+<% var matrix = "/api/master/?" + $.param(query) + '&data_type=csv' %>
 <br />
 <table id='response-datasets' class="table table-condensed">
     <thead>
@@ -26,7 +26,7 @@
                             <span class="caret"></span>
                         </button>
                         <ul class="dropdown-menu" role="menu">
-                            <li><a href="<%= points + '&datatype=csv' %>" class="data-download" target="_blank">CSV</a></li>
+                            <li><a href="<%= points + '&data_type=csv' %>" class="data-download" target="_blank">CSV</a></li>
                             <li><a href="<%= points %>" class="data-download" target="_blank">JSON</a></li>
                         </ul>
                     </div>
