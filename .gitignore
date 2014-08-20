@@ -8,4 +8,5 @@ celerybeat-schedule
 data/
 notebooks/
 settings.py
+celery_settings.py
 .env
