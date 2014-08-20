@@ -54,10 +54,12 @@
         $(document).ready(function(){
             $('.update-dataset').on('click', function(e){
                 e.preventDefault()
-                var dataset_id = $(this).data('dataset')
+                var btn = $(this);
+                var dataset_id = btn.data('dataset')
                 $.getJSON('/update-dataset/' + dataset_id, function(resp){
                     console.log(resp);
-                    window.location.reload();
+                    btn.html("<i class='fa fa-refresh fa-spin'></i> Updating &hellip;");
+                    btn.attr('class','btn btn-success btn-sm');
                 })
             })
             $('#datasets-table').DataTable( {

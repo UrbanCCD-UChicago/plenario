@@ -137,5 +137,4 @@ def edit_dataset(four_by_four):
 @views.route('/update-dataset/<four_by_four>')
 def update_dataset(four_by_four):
     update_dataset_task.delay(four_by_four)
-    flash('Dataset will update in a few moments.', 'info')
     return make_response(json.dumps({'status': 'success'}))
