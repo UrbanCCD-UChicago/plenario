@@ -61,13 +61,13 @@ ChartHelper.chart = function(el, title, source, time_agg, data, iteration) {
 
 ChartHelper.sparkline = function(el, time_agg, data) {
   
-  console.log(el);
-  console.log(time_agg);
-  console.log(data);
+  // console.log(el);
+  // console.log(time_agg);
+  // console.log(data);
   return new Highcharts.Chart({
       chart: {
           renderTo: el,
-          type: 'line'
+          type: 'area'
       },
       title: {
           text: ''
@@ -75,11 +75,17 @@ ChartHelper.sparkline = function(el, time_agg, data) {
       legend: {
         enabled: false
       },
+      credits: {
+          enabled: false
+      },
       xAxis: {
           title: {
               text: ''
           },
-          type: 'datetime'
+          type: 'datetime',
+          labels: {
+            enabled: false
+          }
       },
       yAxis: {
           title: {
