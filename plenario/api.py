@@ -213,6 +213,12 @@ def dataset():
         agg = 'day'
     else:
         del raw_query_params['agg']
+    
+    # if no obs_date given, default to >= 180 days ago
+    obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
+    if not obs_dates:
+        six_months_ago = datetime.now() - timedelta(days=180)
+        raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
     datatype = 'json'
     if raw_query_params.get('data_type'):
         datatype = raw_query_params['data_type']
