@@ -57,6 +57,7 @@
                 var dataset_id = $(this).data('dataset')
                 $.getJSON('/update-dataset/' + dataset_id, function(resp){
                     console.log(resp);
+                    window.location.reload();
                 })
             })
             $('#datasets-table').DataTable( {

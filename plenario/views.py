@@ -49,6 +49,7 @@ def add_dataset():
             if status_code is not None and status_code != 200:
                 errors.append('URL returns a %s status code' % status_code)
             dataset_info['submitted_url'] = url
+            flash("'%s' added!" % dataset_info['name'], 'success')
         else:
             errors.append('Need a URL')
     context = {'dataset_info': dataset_info, 'errors': errors}
@@ -125,7 +126,7 @@ def edit_dataset(four_by_four):
             .filter(MetaTable.four_by_four == four_by_four)\
             .update(upd)
         session.commit()
-        flash('%s updated successfully!' % meta.human_name)
+        flash('%s updated successfully!' % meta.human_name, 'success')
     context = {
         'form': form,
         'meta': meta,
@@ -136,4 +137,5 @@ def edit_dataset(four_by_four):
 @views.route('/update-dataset/<four_by_four>')
 def update_dataset(four_by_four):
     update_dataset_task.delay(four_by_four)
+    flash('Dataset will update in a few moments.', 'info')
     return make_response(json.dumps({'status': 'success'}))
