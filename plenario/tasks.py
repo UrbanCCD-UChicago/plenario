@@ -17,7 +17,7 @@ def add_dataset(four_by_four, fpath=None):
     md = session.query(MetaTable).get(four_by_four)
     etl = PlenarioETL(md.as_dict())
     etl.add(fpath=fpath)
-    return 'yay'
+    return 'Finished adding %s' % md.human_name
 
 @celery_app.task
 def daily_update():
@@ -25,6 +25,7 @@ def daily_update():
         .filter(MetaTable.update_freq == 'daily').all()
     for m in md:
         update_dataset.delay(m.four_by_four)
+        print 'Updating %s' % m.human_name
     return 'yay'
 
 @celery_app.task
@@ -33,7 +34,8 @@ def hourly_update():
         .filter(MetaTable.update_freq == 'hourly').all()
     for m in md:
         update_dataset.delay(m.source_url)
-    return 'Finished adding %s' % md.human_name
+        print 'Updating %s' % m.human_name
+    return 'yay'
 
 @celery_app.task
 def update_dataset(four_by_four, fpath=None):
