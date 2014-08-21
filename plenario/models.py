@@ -141,13 +141,19 @@ def map_esri_type(esri_type):
     tl = esri_type.split(':')
     t = tl[0]
     l = tl[1] if len(tl) > 1 else None
-    if      t == 'int':        return Integer
-    elif    t == 'double':     return Float(precision=15)
-    elif    t == 'str':        return String(length=int(l) if l else 80)
-    elif    t == 'date':       return Date
-    elif    t == 'datetime':   return DateTime
-    elif    t == 'float':
-        if not l:              return Float
+    if t == 'int':
+        return Integer
+    elif t == 'double':
+        return Float(precision=15)
+    elif t == 'str':
+        return String(length=int(l) if l else 80)
+    elif t == 'date': 
+        return Date
+    elif t == 'datetime': 
+        return DateTime
+    elif t == 'float':
+        if not l:
+            return Float
         else:
             ps = l.split('.')
             return Numeric(int(ps[0]), int(ps[1]))
