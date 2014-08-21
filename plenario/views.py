@@ -137,3 +137,7 @@ def edit_dataset(four_by_four):
 def update_dataset(four_by_four):
     update_dataset_task.delay(four_by_four)
     return make_response(json.dumps({'status': 'success'}))
+
+@views.route('/license')
+def license_view():
+    return render_template('license.html')

@@ -1,11 +1,28 @@
 {% extends 'base.html' %}
-{% block title %}API documentation - Plenar.io{% endblock %}
+{% block title %}Plenario API{% endblock %}
+{% block extra_styles %}
+{% endblock %}
 {% block content %}
   <div class='col-md-10 col-md-offset-1'>
-      <h1>API documentation</h1>
-
-      <p><strong>For programmers.</strong> The Plenar.io RESTful API can be used to perform custom geospatial and temporal queries.</p> 
-
+      <h1>Get Data Now
+        <a class="btn btn-info pull-right" href="#docs"><i class='fa fa-angle-down'></i>&nbsp;&nbsp;Developers</a></h1>
+      <div class="well">
+        <p>[Form to build a custom API query should go here]</p>
+        <div class="row">
+          <div class="col-md-8 col-md-offset-1">
+            <textarea class="form-control input-lg" placeholder="http://plenar.io/<endpoint>/<some query>"></textarea>
+          </div>
+          <div class="col-md-3">
+            <p>&nbsp;</p>
+            <button class="btn btn-default"><i class="fa fa-external-link"></i>&nbsp;&nbsp;Run query</button>
+          </div>
+        </div>
+      </div>
+      <hr />
+      <h2 id="docs">For Developers<a class="btn btn-info pull-right" href="#top">
+        <i class='fa fa-angle-up'></i>&nbsp;&nbsp;Back to Top</a></h2>
+      <p><strong></strong> The Plenar.io RESTful API can be used to perform custom geospatial and temporal queries.</p>   
+      
       <p>A few things to know:</p>
 
       <ul>
@@ -461,4 +478,9 @@
         Chicago crime reports since Jan 1st 2014 with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)</p>
       </div>
   </div>
+  
 {% endblock content %}
+{% block extra_javascript %}
+<script src="{{ url_for('static', filename='js/jquery-ui.min.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/api.js') }}"></script>
+{% endblock %}

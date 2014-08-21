@@ -238,6 +238,9 @@ body {
 
 
 /* branding styles */
+.navbar-brand {
+	font-size: 21px;
+}
 .navbar-brand img {
 	position:relative; 
 	top: -2px; 
