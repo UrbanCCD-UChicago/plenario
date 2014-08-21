@@ -213,10 +213,16 @@ def dataset():
         agg = 'day'
     else:
         del raw_query_params['agg']
+    
+    # if no obs_date given, default to >= 180 days ago
+    obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
+    if not obs_dates:
+        six_months_ago = datetime.now() - timedelta(days=180)
+        raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
     datatype = 'json'
-    if raw_query_params.get('datatype'):
-        datatype = raw_query_params['datatype']
-        del raw_query_params['datatype']
+    if raw_query_params.get('data_type'):
+        datatype = raw_query_params['data_type']
+        del raw_query_params['data_type']
     mt = MasterTable.__table__
     valid_query, query_clauses, resp, status_code = make_query(mt,raw_query_params)
     if valid_query:
@@ -280,7 +286,7 @@ def parse_join_query(params):
             queries['base'][key] = value
         elif key == 'agg':
             agg = value
-        elif key == 'datatype':
+        elif key == 'data_type':
             datatype = value
         else:
             queries['detail'][key] = value
@@ -290,6 +296,13 @@ def parse_join_query(params):
 @crossdomain(origin="*")
 def detail():
     raw_query_params = request.args.copy()
+
+    # if no obs_date given, default to >= 30 days ago
+    obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
+    if not obs_dates:
+        six_months_ago = datetime.now() - timedelta(days=30)
+        raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
+
     agg, datatype, queries = parse_join_query(raw_query_params)
     limit = raw_query_params.get('limit')
     order_by = raw_query_params.get('order_by')
@@ -342,6 +355,13 @@ def detail():
 @crossdomain(origin="*")
 def detail_aggregate():
     raw_query_params = request.args.copy()
+
+    # if no obs_date given, default to >= 180 days ago
+    obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
+    if not obs_dates:
+        six_months_ago = datetime.now() - timedelta(days=180)
+        raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
+
     agg, datatype, queries = parse_join_query(raw_query_params)
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
@@ -463,9 +483,10 @@ def submit_dataset():
             source_domain = urlparse(dataset_info['view_url']).netloc
             dataset_id = dataset_info['view_url'].split('/')[-1]
             source_url = 'http://%s/resource/%s' % (source_domain, dataset_id)
-            md = session.query(MetaTable).get(source_url)
+            md = session.query(MetaTable).get(dataset_id)
             if not md:
                 d = {
+                    'four_by_four': dataset_id,
                     'dataset_name': slugify(dataset_info['name'], delim=u'_'),
                     'human_name': dataset_info['name'],
                     'description': dataset_info['description'],
@@ -477,10 +498,12 @@ def submit_dataset():
                     'longitude': post.get('longitude'),
                     'location': post.get('location')
                 }
+                if len(d['dataset_name']) > 49:
+                    d['dataset_name'] = d['dataset_name'][:50]
                 md = MetaTable(**d)
                 session.add(md)
                 session.commit()
-            add_dataset.delay(md.source_url)
+            add_dataset.delay(md.four_by_four)
             resp['message'] = 'Dataset %s submitted successfully' % md.human_name
     else:
         resp['status'] = 'error'
@@ -489,3 +512,4 @@ def submit_dataset():
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
+

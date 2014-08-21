@@ -5,7 +5,6 @@
     <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
 {% endblock %}
 {% block content %}
-<div class="container">
     {% if errors %}
         <h4>There were some problems with your submission: </h4>
         {% for error in errors %}
@@ -14,34 +13,40 @@
     {% endif %}
     <h2>
         {{ datasets|length }} datasets
-        <small><a href='/add-dataset/'>Add dataset &raquo;</a></small>
+        <small><a href='/add-dataset'>Add dataset &raquo;</a></small>
     </h2>
     <div id="errors"></div>
-    <table id='datasets-table' class="table table-bordered table-condensed">
+    <table id='datasets-table' class="table table-condensed">
         <thead>
             <th>Name</th>
-            <th>Date range</th>
+            <th>Time span available</th>
             <th>Update frequency</th>
             <th>Last updated</th>
+            <th></th>
             <th></th>
         </thead>
         <tbody>
             {% for dataset in datasets %}
                 <tr>
                     <td>{{ dataset.human_name }}</td>
-                    {% if dataset.obs_from and dataset.obs_to %}
-                        <td>{{ dataset.obs_from }}—{{dataset.obs_to}}</td>
-                    {% else %}
-                        <td></td>
-                    {% endif %}
+                    <td>
+                        {% if dataset.obs_from and dataset.obs_to %}
+                            {{ dataset.obs_from }} — {{dataset.obs_to}}
+                        {% endif %}
+                    </td>
                     <td>{{ dataset.update_freq }}</td>
-                    <td>-</td>
-                    <td><button class="btn btn-default btn-sm update-dataset" data-dataset="{{dataset.source_url}}"><i class='fa fa-refresh'></i> Update now</button></td>
+                    <td>{{ dataset.last_update }}</td>
+                    <td><button class="btn btn-default btn-sm update-dataset" data-dataset="{{dataset.four_by_four}}"><i class='fa fa-refresh'></i> Update now</button></td>
+                    <td>
+                        <a href="{{ url_for('views.edit_dataset', four_by_four=dataset.four_by_four) }}"
+                            class="btn btn-info btn-sm">
+                            <i class='fa fa-edit'></i> Edit
+                        </a>
+                    </td>
                 </tr>
             {% endfor %}
         </tbody>
     </table>
-</div> <!-- /container -->
 {% endblock content %}
 {% block extra_javascript %}
     <script type="text/javascript" charset="utf8" src="//cdn.datatables.net/1.10.2/js/jquery.dataTables.js"></script>
@@ -49,13 +54,43 @@
         $(document).ready(function(){
             $('.update-dataset').on('click', function(e){
                 e.preventDefault()
-                console.log($(this).data('dataset'))
+                var btn = $(this);
+                var dataset_id = btn.data('dataset')
+                $.getJSON('/update-dataset/' + dataset_id, function(resp){
+                    console.log(resp);
+                    check_update(resp.task_id);
+                    btn.html("<i class='fa fa-refresh fa-spin'></i> Updating &hellip;");
+                    btn.attr('class','btn btn-success btn-sm');
+                })
             })
             $('#datasets-table').DataTable( {
+                "aaSorting": [ [0,'asc'] ],
+                "aoColumns": [
+                    null,
+                    null,
+                    null,
+                    null,
+                    { "bSortable": false },
+                    { "bSortable": false }
+                ],
                 "paging": false,
                 "searching": false,
                 "info": false
             } );
         })
+        function check_update(task_id){
+            $.ajax({
+                url: '/check-update/' + task_id,
+                success: function(data){
+                    if(data.status == 'ready'){
+                        console.log(data)
+                    } else {
+                        setTimeout(function(){
+                            check_update(task_id);
+                        }, 3000)
+                    }
+                }
+            })
+        }
     </script>
 {% endblock %}

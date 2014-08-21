@@ -20,6 +20,12 @@ body {
     margin-top: 10px;
 }
 
+.well h2, .detail-header { margin-top: 0; }
+
+.examples { word-wrap: break-word; }
+
+.highcharts-sparkline { height: 80px; width: 350px;}
+
 /* Everything but the jumbotron gets side spacing for mobile first views */
 .header,
 .marketing,
@@ -88,9 +94,11 @@ body {
 .nowrap { white-space:nowrap; }
 
 /* MAP styles */
-#map {
-    min-height: 400px;
-}
+#map { min-height: 400px; }
+
+#list-view { min-height: 200px; }
+#detail-view { min-height: 200px; }
+
 .leaflet-top.leaflet-left{
     margin-left: 20px;
 }
@@ -230,4 +238,17 @@ body {
     float: left;
     margin-right: 8px;
     opacity: 0.7;
+}
+
+
+/* branding styles */
+.navbar-brand img {
+	position:relative; 
+	top: -2px; 
+	margin-right: 6px;
+	opacity: 0.85;
+}
+
+.navbar-brand:hover img {
+	opacity: 1;
 }

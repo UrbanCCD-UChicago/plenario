@@ -9,8 +9,9 @@ import csv
 from cStringIO import StringIO
 from subprocess import call
 from sqlalchemy.exc import OperationalError
-os.environ['WOPR_CONN'] = 'postgresql://wopr:@localhost:5432/wopr_test'
-CONN = os.environ['WOPR_CONN']
+import plenario.settings
+
+CONN = plenario.settings.DATABASE_CONN
 
 from app import app
 
@@ -122,7 +123,7 @@ class WoprTest(unittest.TestCase):
             'offset': 0,
             'limit': 100,
             'dataset_name': 'chicago_crimes_all',
-            'datatype': 'csv'
+            'data_type': 'csv'
         }
         resp = self.app.get('/api/master/?%s' % urlencode(query))
         observed_first_lines = resp.data.split('\r\n')[:2]
@@ -158,7 +159,7 @@ class WoprTest(unittest.TestCase):
             'limit': 100,
             'fbi_code__in': '10,11,12,13,14,15,16,17,18,19,20,22,24,26',
             'dataset_name': 'chicago_crimes_all',
-            'datatype': 'csv'
+            'data_type': 'csv'
         }
         path = '/api/detail/?%s' % urlencode(query)
         resp = self.app.get(path)

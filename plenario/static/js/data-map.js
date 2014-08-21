@@ -10,7 +10,7 @@
 
         if ( ! template_cache.tmpl_cache[tmpl_name] ) {
             var tmpl_dir = '/static/js/templates';
-            var tmpl_url = tmpl_dir + '/' + tmpl_name + '.html?2';
+            var tmpl_url = tmpl_dir + '/' + tmpl_name + '.html';
 
             var tmpl_string;
             $.ajax({
@@ -56,6 +56,8 @@
             this.render()
         },
         render: function(){
+            $('#list-view').hide();
+            $('#detail-view').show();
             this.$el.html(template_cache('detailTemplate', {query: this.query, meta: this.meta}));
         }
     })
@@ -65,6 +67,8 @@
             'click .detail': 'detailView'
         },
         render: function(){
+            $('#list-view').show();
+            $('#detail-view').hide();
             var self = this;
             this.query = this.attributes.query;
             if (typeof this.explore !== 'undefined'){
@@ -76,10 +80,9 @@
             this.getResults();
         },
         detailView: function(e){
-            this.$el.hide()
             var dataset_name = $(e.target).data('dataset_name')
             this.query['dataset_name'] = dataset_name
-            new DetailView({el:'#detail', attributes: {query: this.query, meta: this.meta[dataset_name]}})
+            var detail_view = new DetailView({el:'#detail-view', attributes: {query: this.query, meta: this.meta[dataset_name]}})
             $('#map-view').empty();
             new GridMapView({el: '#map-view', attributes: {query: this.query, meta: this.meta[dataset_name]}})
             var route = 'detail/' + $.param(this.query)
@@ -100,30 +103,32 @@
                     $.each(results, function(i, obj){
                         obj['values'] = []
                         $.each(obj.items, function(i, o){
-                            obj['values'].push(o.count);
+                            obj['values'].push([moment(o.group).valueOf(),o.count]);
                         });
                         obj['meta'] = self.meta[obj['dataset_name']]
                         objects.push(obj)
                     });
+
                     self.$el.html(template_cache('datasetTable', {
                         objects: objects,
                         query: self.query
                     }));
-                    $('#about').hide();
 
-                    // Sparklines
-                      $(".sparkline").sparkline("html", {
-                        chartRangeMin: 0,
-                        fillColor: "#ddf2fb",
-                        height: "30px",
-                        lineColor: "#518fc9",
-                        lineWidth: 1,
-                        minSpotColor: "#0b810b",
-                        maxSpotColor: "#c10202",
-                        spotColor: false,
-                        spotRadius: 2,
-                        width: "290px"
-                      });
+                    $.each(objects, function(i, obj){
+                        ChartHelper.sparkline((obj['dataset_name'] + '-sparkline'), obj.temporal_aggregate, obj['values']);
+                    });
+
+                    $('#response-datasets').DataTable( {
+                        "aaSorting": [ [0,'asc'] ],
+                        "aoColumns": [
+                            null,
+                            { "bSortable": false },
+                            { "bSortable": false }
+                        ],
+                        "paging": false,
+                        "searching": false,
+                        "info": false
+                    } );
                 }
             ).fail(function(resp){
                 new ErrorView({el: '#errorModal', model: resp});
@@ -152,6 +157,8 @@
             this.render();
         },
         render: function(){
+            $('#list-view').show();
+            $('#detail-view').hide();
             this.$el.empty();
             this.$el.spin('large');
             var self = this;
@@ -165,6 +172,18 @@
                         dataObjs[obj['dataset_name']] = obj;
                     })
                     self.datasetsObj = dataObjs;
+
+                    $('#available-datasets').DataTable( {
+                        "aaSorting": [ [0,'asc'] ],
+                        "aoColumns": [
+                            null,
+                            null,
+                            { "bSortable": false }
+                        ],
+                        "paging": false,
+                        "searching": false,
+                        "info": false
+                    } );
                 }
             )
         },
@@ -175,7 +194,6 @@
             })
         },
         detailView: function(e){
-            this.$el.hide()
 
             var query = {};
             var start = $('#start-date-filter').val();
@@ -195,7 +213,7 @@
             console.log(dataset_name);
             query['dataset_name'] = dataset_name
 
-            new DetailView({el:'#detail', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
+            new DetailView({el:'#detail-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
             $('#map-view').empty();
             new GridMapView({el: '#map-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
             var route = 'detail/' + $.param(query)
@@ -208,10 +226,10 @@
             'change #spatial-agg-filter': 'changeSpatialAgg'
         },
         initialize: function(){
-            this.$el.html(template_cache('gridMapTemplate'));
             this.center = [41.880517,-87.644061];
             this.query = this.attributes.query;
             this.meta = this.attributes.meta;
+            this.$el.html(template_cache('gridMapTemplate', {query: this.query, meta: this.meta}));
             var map_options = {
                 scrollWheelZoom: false,
                 tapTolerance: 30,
@@ -225,29 +243,34 @@
             this.legend = L.control({position: 'bottomright'});
             this.jenksCutoffs = {}
             var self = this;
-            this.legend.onAdd = function(map){
-                var div = L.DomUtil.create('div', 'legend')
-                var labels = [];
-                var from;
-                var to;
-                $.each(self.jenksCutoffs, function(i, grade){
-                    from = grade
-                    to = self.jenksCutoffs[i + 1];
-                    labels.push('<i style="background:' + self.getColor(from) + '"></i>' +
-                               from + (to ? '&ndash;' + to : '+'));
-                });
+
+            this.legend.onAdd = function (map) {
+                var div = L.DomUtil.create('div', 'legend'),
+                    grades = self.jenksCutoffs,
+                    labels = [],
+                    from, to;
+
+                labels.push('<i style="background-color:' + self.getColor(0) + '"></i> 0');
+                labels.push('<i style="background-color:' + self.getColor(1) + '"></i> 1 &ndash; ' + grades[2]);
+                for (var i = 2; i < grades.length; i++) {
+                    from = grades[i] + 1;
+                    to = grades[i + 1];
+                    labels.push(
+                        '<i style="background-color:' + self.getColor(from + 1) + '"></i> ' +
+                        from + (to ? '&ndash;' + to : '+'));
+                }
+
                 div.innerHTML = '<div><strong>' + self.meta['human_name'] + '</strong><br />' + labels.join('<br />') + '</div>';
-                return div
+                return div;
             };
+
             this.gridLayer = new L.FeatureGroup();
             this.mapColors = [
-                '#deebf7',
-                '#c6dbef',
-                '#9ecae1',
+                '#eff3ff',
+                '#bdd7e7',
                 '#6baed6',
-                '#4292c6',
-                '#2171b5',
-                '#084594'
+                '#3182bd',
+                '#08519c'
             ]
             this.render();
         },
@@ -283,6 +306,7 @@
                         self.legend.addTo(self.map);
                         self.map.fitBounds(self.gridLayer.getBounds());
                     }
+                    $('#download-geojson').attr('href','/api/grid/?' + $.param(self.getQuery()))
                 }
             )
         },
@@ -290,11 +314,15 @@
             this.resolution = $(e.target).val()
             this.render()
         },
-        getGrid: function(){
+        getQuery: function(){
             var q = this.query;
             q['resolution'] = this.resolution
             q['center'] = this.center
             delete q['agg']
+            return q
+        },
+        getGrid: function(){
+            var q = this.getQuery()
             return $.ajax({
                 url: '/api/grid/',
                 dataType: 'json',
@@ -302,18 +330,17 @@
             })
         },
         getCutoffs: function(values){
-            var j = jenks(values, 6);
-            j[0] = 0;
-            j.pop();
-            return j
+            var jenks_cutoffs = jenks(values, 4);
+            jenks_cutoffs.unshift(0); // set the bottom value to 0
+            jenks_cutoffs[1] = 1; // set the second value to 1
+            jenks_cutoffs.pop(); // last item is the max value, so dont use it
+            return jenks_cutoffs;
         },
         getColor: function(d){
-            return d >= this.jenksCutoffs[5] ? this.mapColors[6] :
-                   d >= this.jenksCutoffs[4] ? this.mapColors[5] :
-                   d >= this.jenksCutoffs[3] ? this.mapColors[4] :
-                   d >= this.jenksCutoffs[2] ? this.mapColors[3] :
-                   d >= this.jenksCutoffs[1] ? this.mapColors[2] :
-                   d >= this.jenksCutoffs[0] ? this.mapColors[1] :
+            return  d >  this.jenksCutoffs[4] ? this.mapColors[4] :
+                    d >  this.jenksCutoffs[3] ? this.mapColors[3] :
+                    d >  this.jenksCutoffs[2] ? this.mapColors[2] :
+                    d >= this.jenksCutoffs[1] ? this.mapColors[1] :
                                            this.mapColors[0];
         },
         styleGrid: function(feature){
@@ -338,8 +365,6 @@
             'click #reset': 'resetForm'
         },
         initialize: function(){
-            this.resp = this.attributes.resp;
-            this.resp.about = this.attributes.about;
             var then = moment().subtract('d', 180).format('MM/DD/YYYY');
             var now = moment().format('MM/DD/YYYY');
             this.$el.html(template_cache('mapTemplate', {end: now, start: then}));
@@ -388,9 +413,13 @@
                 }));
                 //this.map.fitBounds(this.map.drawnItems.getBounds());
             }
+
+            $("#dismiss-intro").click(function(){
+                $('#collapse-intro').collapse('hide');
+            });
         },
         resetForm: function(e){
-            window.location.reload();
+            window.location = "/explore";
         },
         drawCreate: function(e){
             this.drawnItems.clearLayers();
@@ -438,15 +467,13 @@
             }
             query['agg'] = $('#time-agg-filter').val();
             if(valid){
-                $('#refine').empty();
-                this.resp.undelegateEvents();
-                this.resp.delegateEvents();
-                this.resp.attributes = {query: query};
-                this.resp.render();
+                var resp = new ResponseView({el: '#list-view'})
+                resp.attributes = {query: query};
+                resp.render();
                 var route = "aggregate/" + $.param(query);
                 router.navigate(route);
             } else {
-                $('#response').spin(false);
+                $('#list-view').spin(false);
                 var error = {
                     header: 'Woops!',
                     body: message,
@@ -463,25 +490,15 @@
             "detail/:query": "detail"
         },
         defaultRoute: function(){
-
-            $('#map-view').empty();
-            $('#query').empty();
-
-            $('#about').empty();
-            $('#detail').empty();
-            $('#response').empty();
-
-            var resp = new ResponseView({el: '#response'});
-            var about = new AboutView({el: '#about', attributes: {resp: resp}});
-            var map = new MapView({el: '#map-view', attributes: {resp: resp}})
+            var about = new AboutView({el: '#list-view'});
+            var map = new MapView({el: '#map-view', attributes: {}})
         },
         aggregate: function(query){
             var q = parseParams(query);
-            var resp = new ResponseView({el: '#response', attributes: {query: q}});
+            var resp = new ResponseView({el: '#list-view', attributes: {query: q}});
             resp.render();
             var attrs = {
-                resp: resp,
-                about: about
+                resp: resp
             }
             if (typeof q['location_geom__within'] !== 'undefined'){
                 attrs['dataLayer'] = $.parseJSON(q['location_geom__within']);
@@ -489,19 +506,11 @@
             var map = new MapView({el: '#map-view', attributes: attrs});
         },
         detail: function(query){
-            if($('#response').is(':visible')){
-                $('#response').hide()
-            }
-            if(!$('#detail').is(':visible')){
-                $('#detail').show();
-            }
-          //$('#detail').show()
-          //$('#response').hide()
             var q = parseParams(query);
             var dataset = q['dataset_name']
             $.when($.getJSON('/api/', {dataset_name: dataset})).then(
                 function(resp){
-                    new DetailView({el: '#detail', attributes: {query: q, meta: resp[0]}});
+                    new DetailView({el: '#detail-view', attributes: {query: q, meta: resp[0]}});
                     new GridMapView({el: '#map-view', attributes: {query: q, meta: resp[0]}})
                 }
             )

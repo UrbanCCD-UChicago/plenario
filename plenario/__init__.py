@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, render_template
 from raven.contrib.flask import Sentry
 from plenario.database import session as db_session
 from plenario.models import bcrypt
@@ -7,17 +7,19 @@ from plenario.api import api
 from plenario.auth import auth, login_manager
 from plenario.views import views
 from urllib import quote_plus
+from plenario.settings import PLENARIO_SENTRY_URL
 
 try:
-    sentry = Sentry(dsn=os.environ['WOPR_SENTRY_URL'])
+    sentry = Sentry(dsn=PLENARIO_SENTRY_URL)
 except KeyError:
     sentry = None
 
 def create_app():
     app = Flask(__name__)
+    app.config.from_object('plenario.settings')
     app.url_map.strict_slashes = False
-    app.secret_key = os.environ['FLASK_KEY']
     login_manager.init_app(app)
+    login_manager.login_view = "auth.login"
     bcrypt.init_app(app)
     if sentry:
         sentry.init_app(app)
@@ -27,5 +29,13 @@ def create_app():
     @app.teardown_appcontext
     def shutdown_session(exception=None):
         db_session.remove()
+
+    @app.errorhandler(404)
+    def page_not_found(e):
+        return render_template('404.html'), 404
+
+    @app.errorhandler(500)
+    def page_not_found(e):
+        return render_template('error.html'), 500
     return app
 

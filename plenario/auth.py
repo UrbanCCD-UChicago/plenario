@@ -89,8 +89,8 @@ def login():
     email = form.email.data
     return render_template('login.html', form=form, email=email)
 
-@login_required
 @auth.route('/add-user/', methods=['GET', 'POST'])
+@login_required
 def add_user():
     form = AddUserForm()
     if form.validate_on_submit():
@@ -110,8 +110,8 @@ def add_user():
     }
     return render_template('add-user.html', **context)
 
-@login_required
 @auth.route('/reset-password/', methods=['GET', 'POST'])
+@login_required
 def reset_password():
     form = ResetPasswordForm()
     errors = []
@@ -122,7 +122,7 @@ def reset_password():
             user.password = form.new_password.data
             db_session.add(user)
             db_session.commit()
-            flash('Password reset successful!')
+            flash('Password reset successful!', 'success')
         else:
             errors.append('Password is not correct')
     return render_template('reset-password.html', form=form, errors=errors)

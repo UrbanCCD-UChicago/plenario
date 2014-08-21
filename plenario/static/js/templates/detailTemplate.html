@@ -6,12 +6,12 @@
         </tr>
         <tr>
             <td>Source:</td>
-            <td><a href="<%= meta.source_url %>" target="_blank">View</a></td>
+            <td><a href="<%= meta.source_url %>" target="_blank"><%= meta.source_url %></a></td>
         </tr>
         <% if(meta.obs_from && meta.obs_to){ %>
             <tr>
-                <td>Date range:</td>
-                <td><%= meta.obs_from %>&en;<%= meta.obs_to %></td>
+                <td>Time span available:</td>
+                <td><strong><%= moment(meta.obs_from).from(moment(meta.obs_to), true) %></strong> (<%= moment(meta.obs_from).format("M/D/YYYY") %> - <%= moment(meta.obs_to).format("M/D/YYYY") %>)</td>
             </tr>
         <% } %>
         <tr>
@@ -23,8 +23,8 @@
                 Download:
             </td>
             <td>
-                <a href="<%= points + '&datatype=csv' %>" class="data-download" target="_blank">CSV</a><br />
-                <a href="<%= points %>" class="data-download" target="_blank">JSON</a>
+                <a href="<%= points + '&data_type=csv' %>" class="data-download btn btn-default" target="_blank"><i class='fa fa-download'></i> CSV</a> 
+                <a href="<%= points %>" class="data-download btn btn-default" target="_blank"><i class='fa fa-download'></i> JSON</a>
             </td>
         </tr>
         <tr>

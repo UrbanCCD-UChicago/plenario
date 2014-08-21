@@ -17,14 +17,17 @@ bcrypt = Bcrypt()
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
+    four_by_four = Column(String(9), primary_key=True)
     dataset_name = Column(String(100), nullable=False)
     human_name = Column(String(200), nullable=False)
     description = Column(Text)
-    source_url = Column(String(100), nullable=False, primary_key=True)
+    source_url = Column(String(100), nullable=False)
     obs_from = Column(Date)
     obs_to = Column(Date)
     bbox = Column(Geometry('POLYGON', srid=4326))
     update_freq = Column(String(100), nullable=False)
+    last_update = Column(DateTime)
+    date_added = Column(DateTime)
     # Store the names of fields in source data
     business_key = Column(String, nullable=False)
     observed_date = Column(String, nullable=False)
@@ -59,9 +62,12 @@ class MasterTable(Base):
     def __repr__(self):
         return '<Master %r (%r)>' % (self.dataset_row_id, self.dataset_name)
 
+def get_uuid():
+    return unicode(uuid4())
+
 class User(Base):
     __tablename__ = 'plenario_user'
-    id = Column(String(36), default=unicode(uuid4()), primary_key=True)
+    id = Column(String(36), default=get_uuid, primary_key=True)
     name = Column(String, nullable=False, unique=True)
     email = Column(String, nullable=False)
     _password = Column('password', String(60), nullable=False)

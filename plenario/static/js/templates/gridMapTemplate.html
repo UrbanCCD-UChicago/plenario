@@ -1,23 +1,30 @@
+<h3 class='detail-header'>
+    <%= meta.human_name %> 
+    <small><%= moment(query.obs_date__ge).format("M/D/YYYY") %> - <%= moment(query.obs_date__le).format("M/D/YYYY") %></small>
+</h3>
 <div id="map" class="col-md-12 half-height"></div>
-
-<br />
-<h4>Select spatial aggregation resolution</h4>
+<div class='clearfix'></div>
+<hr />
 <div id="filters">
-    <form role="form">
+    <form class='form-inline' role="form">
         <div class="row">
             <div class="col-md-12">
-              <div class="form-group">
-                    <label for="spatial-agg-filter">Spatial resolution</label>
-                    <select id="spatial-agg-filter">
-                        <option value="100">~100m</option>
-                        <option value="200">~200m</option>
-                        <option value="300">~300m</option>
-                        <option value="400">~400m</option>
-                        <option value="500" selected=true>~500m</option>
+                <div class="form-group">
+                    <label for="spatial-agg-filter">Grid resolution</label>
+                    <select class='form-control' id="spatial-agg-filter">
+                        <option value="100">100 meters</option>
+                        <option value="200">200 meters</option>
+                        <option value="300">300 meters</option>
+                        <option value="400">400 meters</option>
+                        <option value="500" selected=true>500 meters</option>
+                        <option value="1000">1 kilometer</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <a id='download-geojson' class='btn btn-default' href="#"><i class='fa fa-download'></i> Grid as GeoJSON</a>
                 </div>
             </div>
         </div>
     </form>
 </div>
-
+<br />

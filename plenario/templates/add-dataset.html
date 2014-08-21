@@ -1,8 +1,6 @@
-
 {% extends 'base.html' %}
 {% block title %}Add a dataset - Plenar.io{% endblock %}
 {% block content %}
-<div class="container">
     <div class="row">
         <div class='col-md-10 col-md-offset-1'>
             <h2>Add a dataset</h2>
@@ -102,7 +100,6 @@
         </div>
     </div>
     {% endif %}
-</div> <!-- /container -->
 {% endblock content %}
 {% block extra_javascript %}
     <script type="text/javascript">
@@ -133,8 +130,8 @@
                     console.log(data_types);
                     $.post('/api/submit-dataset/', data_types, function(resp){
                         console.log(resp);
+                        window.location = "/view-datasets/";
                     })
-                    window.location = "/view-datasets/";
                 }
             })
         })

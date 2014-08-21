@@ -1,0 +1,23 @@
+from celery.schedules import crontab
+
+BROKER_URL = 'some://broker:@url/thing'
+CELERY_RESULT_BACKEND = 'redis://'
+
+CELERYBEAT_SCHEDULE = {
+    'daily_update': {
+        'task': 'plenario.tasks.daily_update',
+        'schedule': crontab(minute=0, hour=8),
+    },
+    'hourly_update': {
+        'task': 'plenario.tasks.hourly_update',
+        'schedule': crontab(minute=0)
+    }
+}
+
+CELERY_IMPORTS = ('plenario.tasks',)
+CELERYBEAT_SCHEDULE = CELERYBEAT_SCHEDULE
+CELERY_TIMEZONE = 'America/Chicago'
+CELERYD_HIJACK_ROOT_LOGGER = False
+CELERY_IGNORE_RESULT = True
+
+
