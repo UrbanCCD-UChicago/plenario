@@ -144,33 +144,3 @@ class PlenarioShapeETL(object):
         conn = engine.contextual_connect()
         conn.execute(ins, values)
         conn.close()
-
-def grouper(iterable, n, fillvalue=None):
-    args = [iter(iterable)] * n
-    return izip_longest(*args, fillvalue=fillvalue)
-
-def transform_proj(geom, source, target=4326):
-    """Transform a geometry's projection.
-
-    Keyword arguments:
-    geom -- a (nested) list of points (i.e. geojson coordinates)
-    source/target -- integer ESPG codes, or Proj4 strings
-    """
-    s_str = '+init=EPSG:{0}'.format(source) if type(source)==int else source
-    t_str = '+init=EPSG:{0}'.format(target) if type(target)==int else target
-    ps = pyproj.Proj(s_str, preserve_units=True)
-    pt = pyproj.Proj(t_str, preserve_units=True)
-    # This function works as a depth-first search, recursively calling itself until a
-    # point is found, and converted (base case)
-    if type(geom[0]) == list:
-        res = []
-        for r in geom:
-            res.append(transform_proj(r, source, target))
-        return res
-    else: # geom must be a point
-        res = pyproj.transform(ps, pt, geom[0], geom[1])
-        return list(res)
-   
-def grouper(iterable, n, fillvalue=None):
-    args = [iter(iterable)] * n
-    return izip_longest(*args, fillvalue=fillvalue)
