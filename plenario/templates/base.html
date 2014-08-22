@@ -49,10 +49,10 @@
                         Admin <span class="caret"></span>
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a href="{{ url_for('views.view_datasets') }}">View datasets</a></li>
-                        <li><a href="{{ url_for('views.add_dataset') }}">Add a dataset</a></li>
-                        <li><a href="{{ url_for('auth.add_user') }}">Add a user</a></li>
-                        <li><a href="{{ url_for('auth.reset_password') }}">Reset my password</a></li>
+                        <li><a href="{{ url_for('views.add_dataset') }}"><i class="fa fa-cube"></i>&nbsp;&nbsp;&nbsp;&nbsp;Add a dataset</a></li>
+                        <li><a href="{{ url_for('views.view_datasets') }}"><i class="fa fa-cubes"></i>&nbsp;&nbsp;&nbsp;View datasets</a></li>
+                        <li><a href="{{ url_for('auth.add_user') }}"><i class="fa fa-user"></i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Add a user</a></li>
+                        <li><a href="{{ url_for('auth.reset_password') }}"><i class="fa fa-unlock-alt"></i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Reset my password</a></li>
                     </ul>
                 </li>
                 <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
@@ -84,10 +84,11 @@
     </div>
 
     <div class='container-fluid'>
-      <div class="footer row">
-        <div class="col-md-4 pull-right text-right">
-          <a href="{{ url_for('views.license_view') }}">License</a>
-        </div>
+      <div class="footer">
+        <ul>
+          <li><a href="{{ url_for('views.terms_view') }}">Terms</a></li>
+          <li><a href="{{ url_for('views.license_view') }}">License</a></li>
+        </ul>
       </div>
     </div>
 
