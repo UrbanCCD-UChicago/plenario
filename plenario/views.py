@@ -141,3 +141,14 @@ def update_dataset(four_by_four):
 @views.route('/license')
 def license_view():
     return render_template('license.html')
+
+
+@views.route('/terms')
+def terms_view():
+    return render_template('terms.html')
+
+
+
+
+
+
