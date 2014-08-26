@@ -57,10 +57,8 @@
                 var btn = $(this);
                 var dataset_id = btn.data('dataset')
                 $.getJSON('/update-dataset/' + dataset_id, function(resp){
-                    console.log(resp);
+                    // console.log(resp);
                     check_update(resp.task_id);
-                    btn.html("<i class='fa fa-refresh fa-spin'></i> Updating &hellip;");
-                    btn.attr('class','btn btn-success btn-sm');
                 })
             })
             $('#datasets-table').DataTable( {
@@ -84,8 +82,12 @@
                 success: function(data){
                     if(data.status == 'ready'){
                         console.log(data)
+                        btn.html("<i class='fa fa-refresh'></i> Updated!");
+                        btn.attr('class','btn btn-success btn-sm');
                     } else {
                         setTimeout(function(){
+                            btn.html("<i class='fa fa-refresh fa-spin'></i> Updating &hellip;");
+                            btn.attr('class','btn btn-danger btn-sm');
                             check_update(task_id);
                         }, 3000)
                     }
