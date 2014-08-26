@@ -113,7 +113,6 @@
                         objects: objects,
                         query: self.query
                     }));
-
                     $.each(objects, function(i, obj){
                         ChartHelper.sparkline((obj['dataset_name'] + '-sparkline'), obj.temporal_aggregate, obj['values']);
                     });
@@ -424,8 +423,10 @@
                 //this.map.fitBounds(this.map.drawnItems.getBounds());
             }
 
-            $("#dismiss-intro").click(function(){
+            $("#dismiss-intro").click(function(e){
+                e.preventDefault();
                 $('#collapse-intro').collapse('hide');
+
             });
         },
         resetForm: function(e){
