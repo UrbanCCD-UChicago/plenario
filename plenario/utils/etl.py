@@ -12,7 +12,8 @@ from csvkit.unicsv import UnicodeCSVReader
 from csvkit.typeinference import normalize_column_type
 import gzip
 from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
-    Integer, Table, text, func, select, or_, and_, cast
+    Integer, Table, text, func, select, or_, and_, cast, UniqueConstraint, \
+    join, outerjoin
 from sqlalchemy.dialects.postgresql import TIMESTAMP, ARRAY
 from sqlalchemy.exc import NoSuchTableError
 from types import NoneType
@@ -50,20 +51,20 @@ class PlenarioETL(object):
         self.s3_key = Key(bucket)
         self.s3_key.key = s3_path
     
-    def add(self, fpath=None):
-        if fpath:
-            self.fpath = fpath
+    def add(self, s3_path=None):
+        if s3_path:
+            self.s3_key.key = s3_path
         else:
             self._download_csv()
         self._get_or_create_data_table()
-        self._insert_raw_data()
-        self._dedupe_raw_data()
         self._make_src_table()
-        self._find_new_records()
-        self._update_dat_table()
-        self._update_master()
-        self._update_meta(added=True)
-        self._cleanup_temp_tables()
+        self._insert_src_data()
+        self._make_new_and_dup_table()
+        self._find_dup_data()
+        #self._insert_data_table()
+        #self._update_master()
+        #self._update_meta(added=True)
+        #self._cleanup_temp_tables()
     
     def update(self, fpath=None):
         if fpath:
@@ -99,10 +100,7 @@ class PlenarioETL(object):
         self.s3_key.make_public()
  
     def _cleanup_temp_tables(self, changes=False):
-        self.raw_table.drop(bind=engine, checkfirst=True)
-        self.dedupe_table.drop(bind=engine, checkfirst=True)
         self.src_table.drop(bind=engine, checkfirst=True)
-        self.new_table.drop(bind=engine, checkfirst=True)
         if changes:
             self.chg_table.drop(bind=engine, checkfirst=True)
 
@@ -133,10 +131,11 @@ class PlenarioETL(object):
                 for col in range(len(header)):
                     col_types.append(self.iter_column(col, f))
             cols = [
+                Column('%s_row_id' % self.dataset_name, Integer, primary_key=True),
                 Column('start_date', TIMESTAMP, server_default=text('CURRENT_TIMESTAMP')),
                 Column('end_date', TIMESTAMP, server_default=text('NULL')),
                 Column('current_flag', Boolean, server_default=text('TRUE')),
-                Column('dataset_row_id', Integer, primary_key=True),
+                Column('dup_ver', Integer)
             ]
             for col_name,d_type in zip(header, col_types):
                 kwargs = {}
@@ -145,29 +144,37 @@ class PlenarioETL(object):
                     kwargs['server_default'] = text('0')
                 if col_type == Float:
                     kwargs['server_default'] = text('0.0')
-                cols.append(Column(slugify(col_name), COL_TYPES[d_type], **kwargs))
+                cols.append(Column(slugify(col_name), col_type, **kwargs))
+            cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver', name='uix_1'))
             self.dat_table = Table('dat_%s' % self.dataset_name, Base.metadata, 
                           *cols, extend_existing=True)
             self.dat_table.create(engine, checkfirst=True)
 
-    def _insert_raw_data(self):
-        # Step Two: Insert data directly from CSV
+    def _make_src_table(self):
+        # Step Two
         cols = []
-        skip_cols = ['start_date', 'end_date', 'current_flag', 'dataset_row_id']
+        skip_cols = ['%s_row_id' % self.dataset_name, 'start_date', 'end_date', 'current_flag', 'dup_ver']
         for col in self.dat_table.columns:
-            kwargs = {}
             if col.name not in skip_cols:
+                kwargs = {}
+                if col.server_default:
+                    kwargs['server_default'] = col.server_default
                 cols.append(Column(col.name, col.type, **kwargs))
-        self.raw_table = Table('raw_%s' % self.dataset_name, Base.metadata, 
+        cols.append(Column('line_num', Integer, primary_key=True))
+        self.src_table = Table('src_%s' % self.dataset_name, Base.metadata,
                           *cols, extend_existing=True)
-        self.raw_table.drop(bind=engine, checkfirst=True)
-        self.raw_table.append_column(Column('dup_row_id', Integer, primary_key=True))
-        self.raw_table.create(bind=engine, checkfirst=True)
-        names = [c.name for c in self.dat_table.columns]
-        copy_st = 'COPY raw_%s (' % self.dataset_name
+        self.src_table.drop(bind=engine, checkfirst=True)
+        self.src_table.create(bind=engine)
+
+    def _insert_src_data(self):
+        # Step Three: Insert data directly from CSV
+        cols = []
+        skip_cols = ['line_num']
+        names = [c.name for c in self.src_table.columns]
+        copy_st = 'COPY src_%s (' % self.dataset_name
         for idx, name in enumerate(names):
             if name not in skip_cols:
-                if idx < len(names) - 1:
+                if idx < len(names) - len(skip_cols) - 1:
                     copy_st += '%s, ' % name
                 else:
                     copy_st += '%s)' % name
@@ -182,74 +189,84 @@ class PlenarioETL(object):
             cursor.copy_expert(copy_st, f)
         conn.commit()
 
-    def _dedupe_raw_data(self):
-        # Step Three: Make sure to remove duplicates based upon what the user 
-        # said was the business key
-        self.dedupe_table = Table('dedupe_%s' % self.dataset_name, Base.metadata,
-                            Column('dup_row_id', Integer, primary_key=True), 
-                            extend_existing=True)
-        self.dedupe_table.drop(bind=engine, checkfirst=True)
-        self.dedupe_table.create(bind=engine)
-        bk = slugify(self.business_key)
-        ins = self.dedupe_table.insert()\
-            .from_select(
-                ['dup_row_id'],
-                select([func.max(self.raw_table.c.dup_row_id)])\
-                .group_by(getattr(self.raw_table.c, bk))
-            )
-        conn = engine.connect()
-        conn.execute(ins)
-
-    def _make_src_table(self):
-        # Step Four: Make a table with every unique record.
-        cols = []
-        skip_cols = ['start_date', 'end_date', 'current_flag', 'dataset_row_id']
-        for col in self.dat_table.columns:
-            if col.name not in skip_cols:
-                kwargs = {}
-                if col.name == slugify(self.business_key):
-                    kwargs['primary_key'] = True
-                if col.server_default:
-                    kwargs['server_default'] = col.server_default
-                cols.append(Column(col.name, col.type, **kwargs))
-        self.src_table = Table('src_%s' % self.dataset_name, Base.metadata, 
-                          *cols, extend_existing=True)
-        self.src_table.drop(bind=engine, checkfirst=True)
-        self.src_table.create(bind=engine)
-        ins = self.src_table.insert()\
-            .from_select(
-                [c for c in self.src_table.columns.keys()],
-                select([c for c in self.raw_table.columns if c.name != 'dup_row_id'])\
-                    .where(self.raw_table.c.dup_row_id == self.dedupe_table.c.dup_row_id)
-            )
-        conn = engine.connect()
-        conn.execute(ins)
-
-    def _find_new_records(self):
-        # Step Five: Find the new records
-        bk = slugify(self.business_key)
-        bk_type = getattr(self.dat_table.c, bk).type
+    def _make_new_and_dup_table(self):
+        # Step Four
+        bk_col = self.dat_table.c[slugify(self.business_key)]
+        cols = [
+            Column(slugify(self.business_key), bk_col.type, primary_key=True),
+            Column('line_num', Integer),
+            Column('dup_ver', Integer, primary_key=True)
+        ]
         self.new_table = Table('new_%s' % self.dataset_name, Base.metadata,
-                          Column('id', bk_type, primary_key=True),
-                          extend_existing=True)
+            *cols, extend_existing=True)
         self.new_table.drop(bind=engine, checkfirst=True)
         self.new_table.create(bind=engine)
-        ins = self.new_table.insert()\
-            .from_select(
-                ['id'],
-                select([getattr(self.src_table.c, bk)])\
-                    .select_from(self.src_table.join(self.dat_table, 
-                        getattr(self.src_table.c, bk) == \
-                            getattr(self.dat_table.c, bk), isouter=True))\
-                    .where(self.dat_table.c.dataset_row_id == None)
-            )
+        
+        cols = [
+            Column(slugify(self.business_key), bk_col.type, primary_key=True),
+            Column('line_num', Integer),
+            Column('dup_ver', Integer, primary_key=True)
+        ]
+        self.dup_table = Table('dup_%s' % self.dataset_name, Base.metadata,
+            *cols, extend_existing=True)
+        self.dup_table.drop(bind=engine, checkfirst=True)
+        self.dup_table.create(bind=engine)
+
+    def _find_dup_data(self):
+        # Step Five
+        cols = [
+            self.src_table.c[slugify(self.business_key)],
+            self.src_table.c['line_num'],
+        ]
+        cols.append(func.rank()\
+            .over(partition_by=getattr(self.src_table.c, slugify(self.business_key)), 
+                order_by=self.src_table.columns['line_num'].desc())\
+            .label('dup_ver'))
+        sel = select(cols, from_obj=self.src_table)
+        ins = self.dup_table.insert()\
+            .from_select([c for c in self.dup_table.columns], sel)
         conn = engine.connect()
-        try:
-            conn.execute(ins)
-            return True
-        except TypeError:
-            # No new records
-            return False
+        conn.execute(ins)
+
+    def _insert_new_data(self):
+        bk = slugify(self.business_key)
+        sel_cols = [
+            self.src_table.c[bk], 
+            self.src_table.c['line_num'], 
+            self.dup_table.c['dup_ver']
+        ]
+        j = join(self.src_table, self.dup_table, 
+            and_(self.src_table.c['line_num'] == self.dup_table.c['line_num'], 
+                self.src_table.c[bk] == self.dup_table.c[bk]))
+        dup_tablename = self.dup_table.name
+        outer = outerjoin(j, self.dat_table, 
+              and_(self.dat_table.c[bk] == j.c['%s_%s' % (dup_tablename, bk)], 
+                   self.dat_table.c['dup_ver'] == j.c['%s_dup_ver' % dup_tablename]))
+        sel = select(sel_cols).select_from(outer)\
+            .where(self.dat_table.c['%s_row_id' % self.dataset_name] != None)
+        ins = self.new_table.insert()\
+            .from_select([c for c in self.new_table.columns], sel)
+        print ins
+
+    def _insert_data_table(self):
+        from sqlalchemy import over
+
+        skip_cols = ['%s_row_id' %self.dataset_name,'end_date', 'current_flag']
+        skip_src_col = ['line_num']
+        from_vals = []
+        from_vals.append(text("'%s' AS start_date" % datetime.now().isoformat()))
+        from_vals.append(func.rank()\
+            .over(partition_by=getattr(self.src_table.c, slugify(self.business_key)), 
+                order_by=self.src_table.columns['line_num'].desc())\
+            .label('dup_ver'))
+        for c_src in self.src_table.columns.keys():
+            if c_src not in skip_src_col:
+                from_vals.append(c_src)
+        sel = select(from_vals, from_obj = self.src_table)
+        ins = self.dat_table.insert()\
+            .from_select([c for c in self.dat_table.columns.keys() if c not in skip_cols], sel)
+        conn = engine.connect()
+        conn.execute(ins)
 
     def _update_dat_table(self):
         # Step Six: Update the dat table
