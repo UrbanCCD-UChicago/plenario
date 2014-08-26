@@ -219,10 +219,10 @@
       <div class='well examples'>
         <p><strong>Examples</strong></p>
         
-        <p><a href='/api/master/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1'>http://plenar.io/api/master/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1</a>
+        <p><a href='/api/master/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1'>http://plenar.io/api/master/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1</a>
         <br />Count of all Chicago crime reports since Jan 1st 2012, aggregated by year</p>
 
-        <p><a href='/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints&agg=day'>http://plenar.io/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints&agg=day</a>
+        <p><a href='/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day'>http://plenar.io/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day</a>
         <br />Count of crime and environmental complaints that were observed after November 12, 2007 but before November 12, 2008, aggregated by day</p>
 
         <p><a href='/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&agg=week&data_type=csv'>http://plenar.io/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&agg=week&data_type=csv</a>
@@ -270,7 +270,7 @@
       <div class='well examples'>
         <p><strong>Example</strong></p>
         
-        <p><a href='/api/fields/chicago_crimes_all'>http://plenar.io/api/fields/chicago_crimes_all</a><br />
+        <p><a href='/api/fields/crimes_2001_to_present'>http://plenar.io/api/fields/crimes_2001_to_present</a><br />
         Field definitions for Chicago crime report dataset</p>
       </div>
 
@@ -415,7 +415,7 @@
       <div class='well examples'>
         <p><strong>Example</strong></p>
         
-        <p><a href='/api/detail-aggregate/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1&iucr=0110'>http://plenar.io/api/detail-aggregate/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1&iucr=0110</a><br />
+        <p><a href='/api/detail-aggregate/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1&iucr=0110'>http://plenar.io/api/detail-aggregate/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1&iucr=0110</a><br />
         Chicago crime reports since Jan 1st 2012, aggregated by year with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)</p>
       </div>
 
@@ -513,7 +513,7 @@
       <div class='well examples'>
         <p><strong>Example</strong></p>
         
-        <p><a href='/api/detail/?dataset_name=chicago_crimes_all&obs_date__ge=2014-1-1&iucr=0110'>http://plenar.io/api/detail/?dataset_name=chicago_crimes_all&obs_date__ge=2014-1-1&iucr=0110</a><br />
+        <p><a href='/api/detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110'>http://plenar.io/api/detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110</a><br />
         Chicago crime reports since Jan 1st 2014 with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)</p>
       </div>
   </div>
