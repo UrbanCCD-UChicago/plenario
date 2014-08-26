@@ -7,8 +7,8 @@
     <div class="jumbotron">
       <div class="row" style="display:inline-block"><img src='/static/images/logo-large.png' class='img-responsive' alt='Plenar.io logo' height="100px" width="100px"/></div>
       <h2 style="font-size: 40px;">The next stage in open data.</h2>
-      <p>Plenar.io is a centralized hub for open datasets from around the world, added by users like you.</p>
-      <p><a class="btn btn-primary btn-lg" role="button" href="{{ url_for('views.add_dataset') }}">Add a dataset</a></p>
+      <p>Plenar.io is a centralized hub for open datasets from around the world, all on the same map.</p>
+      <p><a class="btn btn-primary btn-lg" role="button" href="{{ url_for('views.explore_view') }}">Get Started</a></p>
     </div>
 
 
@@ -27,7 +27,7 @@
 
 
     <h3>Extremely easy to access.</h3>
-    <p class="lead">No coding, no NDAs, no navigating government websites older than you are. Accessing our API is as easy as selecting dates and drawing on a map. (<a href="{{ url_for('views.api_docs_view') }}#docs">You can still code</a>.)</p>
+    <p class="lead">No coding, no NDAs, no navigating government websites older than you are. Accessing the data is as easy as selecting dates and drawing on a map. (Don't worry, you can still 	<a href="{{ url_for('views.api_docs_view') }}#docs">code</a>.)</p>
     <div class="row">
       <div class="col-md-1"></div>
       <div class="col-md-10">
@@ -38,8 +38,6 @@
       </div>
     </div>
 
-          <p><strong>Here's an example</strong>: <a href='/api/master/?obs_date__gt=2007-1-1&obs_date__lt=2008-1-1&dataset_name__in=crimes_2001_to_present,311_service_requests_abandoned_vehicles'>Chicago crime reports and abandoned vehicles from 2007 to 2008</a>.</p>
-
 
     <h3>Enormous amounts of data.</h3>
     <p class="lead">City data portals, the federal government, nonprofit organizations, individual researchers&mdash;we have it all.</p>
@@ -47,7 +45,7 @@
       <div class="col-md-1"></div>
       <div class="col-md-10">
         <div class='well'>
-          <p class="text-center"><a href="{{ url_for('views.view_datasets') }}"><img src='/static/images/view-datasets.png' class='img-responsive img-thumbnail' alt='Plenar.io Data Explorer' /></a></p>
+          <p class="text-center"><a href="{{ url_for('views.explore_view') }}"><img src='/static/images/view-datasets.png' class='img-responsive img-thumbnail' alt='Plenar.io Data Explorer' /></a></p>
           <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.explore_view') }}">Take a look&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a></p>
         </div>
       </div>
