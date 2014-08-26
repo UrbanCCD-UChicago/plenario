@@ -365,9 +365,19 @@
             'click #reset': 'resetForm'
         },
         initialize: function(){
-            var then = moment().subtract('d', 180).format('MM/DD/YYYY');
-            var now = moment().format('MM/DD/YYYY');
-            this.$el.html(template_cache('mapTemplate', {end: now, start: then}));
+            var start = moment().subtract('d', 180).format('MM/DD/YYYY');
+            var end = moment().format('MM/DD/YYYY');
+
+            if (this.attributes.resp.query)
+            {
+                start = moment(this.attributes.resp.query.obs_date__ge).format('MM/DD/YYYY');
+                end = moment(this.attributes.resp.query.obs_date__le).format('MM/DD/YYYY');
+            }
+
+            this.$el.html(template_cache('mapTemplate', {end: end, start: start}));
+
+            if (this.attributes.resp.query.agg)
+                $('#time-agg-filter').val(this.attributes.resp.query.agg)
 
             // initialize the Leaflet map
             var map_options = {
