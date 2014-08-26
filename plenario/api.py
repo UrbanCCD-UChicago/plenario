@@ -213,10 +213,16 @@ def dataset():
         agg = 'day'
     else:
         del raw_query_params['agg']
+    
+    # if no obs_date given, default to >= 180 days ago
+    obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
+    if not obs_dates:
+        six_months_ago = datetime.now() - timedelta(days=180)
+        raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
     datatype = 'json'
-    if raw_query_params.get('datatype'):
-        datatype = raw_query_params['datatype']
-        del raw_query_params['datatype']
+    if raw_query_params.get('data_type'):
+        datatype = raw_query_params['data_type']
+        del raw_query_params['data_type']
     mt = MasterTable.__table__
     valid_query, query_clauses, resp, status_code = make_query(mt,raw_query_params)
     if valid_query:
@@ -280,7 +286,7 @@ def parse_join_query(params):
             queries['base'][key] = value
         elif key == 'agg':
             agg = value
-        elif key == 'datatype':
+        elif key == 'data_type':
             datatype = value
         else:
             queries['detail'][key] = value
@@ -290,6 +296,13 @@ def parse_join_query(params):
 @crossdomain(origin="*")
 def detail():
     raw_query_params = request.args.copy()
+
+    # if no obs_date given, default to >= 30 days ago
+    obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
+    if not obs_dates:
+        six_months_ago = datetime.now() - timedelta(days=30)
+        raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
+
     agg, datatype, queries = parse_join_query(raw_query_params)
     limit = raw_query_params.get('limit')
     order_by = raw_query_params.get('order_by')
@@ -342,6 +355,13 @@ def detail():
 @crossdomain(origin="*")
 def detail_aggregate():
     raw_query_params = request.args.copy()
+
+    # if no obs_date given, default to >= 180 days ago
+    obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
+    if not obs_dates:
+        six_months_ago = datetime.now() - timedelta(days=180)
+        raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
+
     agg, datatype, queries = parse_join_query(raw_query_params)
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])

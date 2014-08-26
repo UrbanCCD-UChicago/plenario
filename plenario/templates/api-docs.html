@@ -30,9 +30,9 @@
 
       <ul>
         <li>All API calls should be made with <code>HTTP GET</code></li>
-        <li>All API responses are in <a href='http://www.json.org/'>JSON format</a></li>
+        <li>All API responses are in <a href='http://www.json.org/'>JSON format</a> by default. Some responses support <a href='http://en.wikipedia.org/wiki/Comma-separated_values'>CSV format</a>.</li>
         <li>You can consider any non-200 HTTP response code an error - the returned data will contain more detailed information</li>
-        <li>All methods are accessed via: <code>http://plenar.io/SOME-ENDPOINT</code></li>
+        <li>All methods are accessed via: <code>http://plenar.io/api/SOME-ENDPOINT</code></li>
       </ul>
 
       <h2 id='endpoints'>Endpoints</h2>
@@ -92,7 +92,7 @@
         </tbody>
       </table>
 
-      <div class='well'>
+      <div class='well examples'>
         <p><strong>Example</strong></p>
         <p>
           <a href='/api/'>http://plenar.io/api/</a><br />
@@ -111,38 +111,58 @@
       </p>
       
       <p><strong>Query parameters</strong></p>
-
+      <p>All query parameters are optional</p>
       <table class='table table-bordered'>
         <thead>
           <tr>
             <th>Parameter</th>
+            <th>Default value</th>
             <th>Description</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td><strong><code>agg</code></strong></td>
-            <td>Under the hood, this takes advantage of
-          <a href="http://www.postgresql.org/docs/9.1/static/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC" target="_blank">
-              PostgreSQL’s <code>date_trunc</code> function
-          </a>
-          and can take any precision values that are valid there. If
-          not supplied, this defaults to <code>day</code>. If the supplied
-          value is of a higher resolution that the highest available
-          temporal resolution for the dataset, it will just aggregate by
-          the highest available resolution.</td>
+            <td>day</td>
+            <td>
+              <p>Under the hood, this takes advantage of
+              <a href="http://www.postgresql.org/docs/9.1/static/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC" target="_blank">
+                  PostgreSQL’s <code>date_trunc</code> function
+              </a>
+              and can take any precision values that are valid there. If
+              not supplied, this defaults to <code>day</code>. If the supplied
+              value is of a higher resolution that the highest available
+              temporal resolution for the dataset, it will just aggregate by
+              the highest available resolution.</p>
+
+              <p>Typical values:</p>
+              <ul>
+                <li>hour</li>
+                <li>day</li>
+                <li>week</li>
+                <li>month</li>
+                <li>quarter</li>
+                <li>year</li>
+              </ul>
+            </td>
           </tr>
           <tr>
             <td><strong><code>obs_date</code></strong></td>
+            <td>greater than or equal to 180 days ago</td>
             <td>Date of obversations. This can
           have filters applied such as <code>__gt</code> (greater than) and <code>__lt</code> (less than).</td>
           </tr>
           <tr>
             <td><strong><code>dataset_name</code></strong></td>
-            <td>Machine version of the dataset name as you get it from the <code>/api/</code> endpoint.</td>
+            <td>none</td>
+            <td>
+              <p>Machine version of the dataset name as you get it from the <code>/api/</code> endpoint. If not provided, returns all available datasets.</p>
+              <p>More than one dataset can be requested by using <code>dataset_name__in</code>  and listing multiple comma separated dataset names.</p>
+            </td>
           </tr>
           <tr>
             <td><strong><code>location_geom</code></strong></td>
+            <td>none</td>
             <td>
               <p>A URL encoded <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest. Currently, the only query operator that can be applied to this is <code>within</code>.</p>
 
@@ -183,8 +203,9 @@
             </td>
           </tr>
           <tr>
-            <td><strong><code>datatype</code></strong></td>
-            <td>Data format. Current options are <code>json</code> (default) and <code>csv</code>. </td>
+            <td><strong><code>data_type</code></strong></td>
+            <td>json</td>
+            <td>Response data format. Current options are <code>json</code> and <code>csv</code>. </td>
           </tr>
 
         </tbody>
@@ -215,14 +236,24 @@
         </tbody>
       </table>
 
-      <div class='well'>
+      <div class='well examples'>
         <p><strong>Examples</strong></p>
         
-        <p><a href='/api/master/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1'>http://plenar.io/api/master/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1</a><br />
-        Chicago crime reports since Jan 1st 2012, aggregated by year</p>
+        <p><a href='/api/master/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1'>http://plenar.io/api/master/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1</a>
+        <br />Count of all Chicago crime reports since Jan 1st 2012, aggregated by year</p>
 
-        <p><a href='/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints'>http://plenar.io/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=chicago_crimes_all,chicago_environmental_complaints</a><br />Crime and environmental complaints that were
-          observed after November 12, 2007 but before November 12, 2008</p>
+        <p><a href='/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day'>http://plenar.io/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day</a>
+        <br />Count of crime and environmental complaints that were observed after November 12, 2007 but before November 12, 2008, aggregated by day</p>
+
+        <p><a href='/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&agg=week&data_type=csv'>http://plenar.io/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&agg=week&data_type=csv</a>
+        <br />
+        Count available datasets from Feb 21, 2014 to Aug 20, 2014, aggregated by week in CSV format. You could also call this a <strong>time series matrix</strong>.
+        </p>
+
+        <p><a href='/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.65692949295044%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.86853817536259%5D%5D%5D%7D%7D&agg=week'>http://plenar.io/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.65692949295044%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.89716623689334%5D%2C%5B-87.62053728103638%2C41.86853817536259%5D%2C%5B-87.65692949295044%2C41.86853817536259%5D%5D%5D%7D%7D&agg=week</a>
+        <br />
+        All available datasets in a bounding box (downtown Chicago) from Feb 21, 2014 to Aug 20, 2014, aggregated by week.
+        </p>
       </div>
 
       <hr />
@@ -256,10 +287,10 @@
         </tbody>
       </table>
 
-      <div class='well'>
+      <div class='well examples'>
         <p><strong>Example</strong></p>
         
-        <p><a href='/api/fields/chicago_crimes_all'>http://plenar.io/api/fields/chicago_crimes_all</a><br />
+        <p><a href='/api/fields/crimes_2001_to_present'>http://plenar.io/api/fields/crimes_2001_to_present</a><br />
         Field definitions for Chicago crime report dataset</p>
       </div>
 
@@ -270,17 +301,24 @@
       </p>
 
       <p><strong>Query parameters</strong></p>
-
+      <p>All query parameters are optional except for <code>dataset_name</code>.</p>
       <table class='table table-bordered'>
         <thead>
           <tr>
             <th>Parameter</th>
+            <th>Default value</th>
             <th>Description</th>
           </tr>
         </thead>
         <tbody>
           <tr>
+            <td><strong><code>dataset_name</code></strong></td>
+            <td>none</td>
+            <td><strong>Required.</strong> Machine version of the dataset name as you get it from the <code>/api/</code> endpoint.</td>
+          </tr>
+          <tr>
             <td><strong><code>[dataset_field]*</code></strong></td>
+            <td>none</td>
             <td>
               <p>Any available dataset field. Discoverable via the <code>/api/fields/&lt;dataset_name&gt;/</code> endpoint. Any number of these query parameters can be chained together and are linked together with a SQL <code>AND</code> under the hood.</p>
 
@@ -326,32 +364,44 @@
           </tr>
           <tr>
             <td><strong><code>agg</code></strong></td>
-            <td>Under the hood, this takes advantage of
-          <a href="http://www.postgresql.org/docs/9.1/static/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC" target="_blank">
-              PostgreSQL’s <code>date_trunc</code> function
-          </a>
-          and can take any precision values that are valid there. If
-          not supplied, this defaults to <code>day</code>. If the supplied
-          value is of a higher resolution that the highest available
-          temporal resolution for the dataset, it will just aggregate by
-          the highest available resolution.</td>
+            <td>day</td>
+            <td>
+              <p>Under the hood, this takes advantage of
+              <a href="http://www.postgresql.org/docs/9.1/static/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC" target="_blank">
+                  PostgreSQL’s <code>date_trunc</code> function
+              </a>
+              and can take any precision values that are valid there. If
+              not supplied, this defaults to <code>day</code>. If the supplied
+              value is of a higher resolution that the highest available
+              temporal resolution for the dataset, it will just aggregate by
+              the highest available resolution.</p>
+
+              <p>Typical values:</p>
+              <ul>
+                <li>hour</li>
+                <li>day</li>
+                <li>week</li>
+                <li>month</li>
+                <li>quarter</li>
+                <li>year</li>
+              </ul>
+            </td>
           </tr>
           <tr>
             <td><strong><code>obs_date</code></strong></td>
+            <td>greater than or equal to 180 days ago</td>
             <td>Date of obversations. This can
           have filters applied such as <code>__gt</code> (greater than) and <code>__lt</code> (less than).</td>
           </tr>
           <tr>
-            <td><strong><code>dataset_name</code></strong></td>
-            <td>Machine version of the dataset name as you get it from the <code>/api/</code> endpoint.</td>
-          </tr>
-          <tr>
             <td><strong><code>location_geom</code></strong></td>
+            <td>none</td>
             <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest. Currently, the only query operator that can be applied to this is <code>within</code>.</td>
           </tr>
           <tr>
-            <td><strong><code>datatype</code></strong></td>
-            <td>Data format. Current options are <code>json</code> (default) and <code>csv</code>. </td>
+            <td><strong><code>data_type</code></strong></td>
+            <td>json</td>
+            <td>Response data format. Current options are <code>json</code> and <code>csv</code>. </td>
           </tr>
 
         </tbody>
@@ -382,10 +432,10 @@
         </tbody>
       </table>
 
-      <div class='well'>
+      <div class='well examples'>
         <p><strong>Example</strong></p>
         
-        <p><a href='/api/detail-aggregate/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1&iucr=0110'>http://plenar.io/api/detail-aggregate/?agg=year&dataset_name=chicago_crimes_all&obs_date__ge=2012-1-1&iucr=0110</a><br />
+        <p><a href='/api/detail-aggregate/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1&iucr=0110'>http://plenar.io/api/detail-aggregate/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1&iucr=0110</a><br />
         Chicago crime reports since Jan 1st 2012, aggregated by year with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)</p>
       </div>
 
@@ -396,17 +446,24 @@
       </p>
 
       <p><strong>Query parameters</strong></p>
-
+      <p>All query parameters are optional except for <code>dataset_name</code>.</p>
       <table class='table table-bordered'>
         <thead>
           <tr>
             <th>Parameter</th>
+            <th>Default value</th>
             <th>Description</th>
           </tr>
         </thead>
         <tbody>
           <tr>
+            <td><strong><code>dataset_name</code></strong></td>
+            <td>none</td>
+            <td><strong>Required.</strong> Machine version of the dataset name as you get it from the <code>/api/</code> endpoint.</td>
+          </tr>
+          <tr>
             <td><strong><code>[dataset_field]*</code></strong></td>
+            <td>none</td>
             <td>
               <p>Any available dataset field. Discoverable via the <code>/api/fields/&lt;dataset_name&gt;/</code> endpoint. Any number of these query parameters can be chained together and are linked together with a SQL <code>AND</code> under the hood.</p>
 
@@ -452,20 +509,19 @@
           </tr>
           <tr>
             <td><strong><code>obs_date</code></strong></td>
+            <td>greater than or equal to 30 days ago</td>
             <td>Date of obversations. This can
           have filters applied such as <code>__gt</code> (greater than) and <code>__lt</code> (less than).</td>
           </tr>
           <tr>
-            <td><strong><code>dataset_name</code></strong></td>
-            <td>Machine version of the dataset name as you get it from the <code>/api/</code> endpoint.</td>
-          </tr>
-          <tr>
             <td><strong><code>location_geom</code></strong></td>
+            <td>none</td>
             <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest. Currently, the only query operator that can be applied to this is <code>within</code>.</td>
           </tr>
           <tr>
-            <td><strong><code>datatype</code></strong></td>
-            <td>Data format. Current options are <code>json</code> (default) and <code>csv</code>. </td>
+            <td><strong><code>data_type</code></strong></td>
+            <td>json</td>
+            <td>Response data format. Current options are <code>json</code> and <code>csv</code>. </td>
           </tr>
 
         </tbody>
@@ -474,10 +530,10 @@
       <p><strong>Response Parameters</strong></p>
       <p>The API responds with a list of raw records for the particular dataset. The fields returned will vary per dataset.</p>
 
-      <div class='well'>
+      <div class='well examples'>
         <p><strong>Example</strong></p>
         
-        <p><a href='/api/detail/?dataset_name=chicago_crimes_all&obs_date__ge=2014-1-1&iucr=0110'>http://plenar.io/api/detail/?dataset_name=chicago_crimes_all&obs_date__ge=2014-1-1&iucr=0110</a><br />
+        <p><a href='/api/detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110'>http://plenar.io/api/detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110</a><br />
         Chicago crime reports since Jan 1st 2014 with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)</p>
       </div>
   </div>

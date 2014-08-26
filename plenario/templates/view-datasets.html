@@ -54,9 +54,13 @@
         $(document).ready(function(){
             $('.update-dataset').on('click', function(e){
                 e.preventDefault()
-                var dataset_id = $(this).data('dataset')
+                var btn = $(this);
+                var dataset_id = btn.data('dataset')
                 $.getJSON('/update-dataset/' + dataset_id, function(resp){
                     console.log(resp);
+                    check_update(resp.task_id);
+                    btn.html("<i class='fa fa-refresh fa-spin'></i> Updating &hellip;");
+                    btn.attr('class','btn btn-success btn-sm');
                 })
             })
             $('#datasets-table').DataTable( {
@@ -74,5 +78,19 @@
                 "info": false
             } );
         })
+        function check_update(task_id){
+            $.ajax({
+                url: '/check-update/' + task_id,
+                success: function(data){
+                    if(data.status == 'ready'){
+                        console.log(data)
+                    } else {
+                        setTimeout(function(){
+                            check_update(task_id);
+                        }, 3000)
+                    }
+                }
+            })
+        }
     </script>
 {% endblock %}

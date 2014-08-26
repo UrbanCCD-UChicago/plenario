@@ -103,29 +103,20 @@
                     $.each(results, function(i, obj){
                         obj['values'] = []
                         $.each(obj.items, function(i, o){
-                            obj['values'].push(o.count);
+                            obj['values'].push([moment(o.group).valueOf(),o.count]);
                         });
                         obj['meta'] = self.meta[obj['dataset_name']]
                         objects.push(obj)
                     });
+
                     self.$el.html(template_cache('datasetTable', {
                         objects: objects,
                         query: self.query
                     }));
 
-                    // Sparklines
-                      $(".sparkline").sparkline("html", {
-                        chartRangeMin: 0,
-                        fillColor: "#ddf2fb",
-                        height: "30px",
-                        lineColor: "#518fc9",
-                        lineWidth: 1,
-                        minSpotColor: "#0b810b",
-                        maxSpotColor: "#c10202",
-                        spotColor: false,
-                        spotRadius: 2,
-                        width: "290px"
-                      });
+                    $.each(objects, function(i, obj){
+                        ChartHelper.sparkline((obj['dataset_name'] + '-sparkline'), obj.temporal_aggregate, obj['values']);
+                    });
 
                     $('#response-datasets').DataTable( {
                         "aaSorting": [ [0,'asc'] ],

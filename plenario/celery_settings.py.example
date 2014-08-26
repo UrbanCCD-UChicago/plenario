@@ -1,6 +1,7 @@
 from celery.schedules import crontab
 
 BROKER_URL = 'some://broker:@url/thing'
+CELERY_RESULT_BACKEND = 'redis://'
 
 CELERYBEAT_SCHEDULE = {
     'daily_update': {
