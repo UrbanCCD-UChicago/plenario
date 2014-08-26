@@ -1,55 +1,95 @@
 {% extends 'base.html' %}
 {% block title %}About - Plenar.io{% endblock %}
 {% block content %}
-  <div class='col-md-10 col-md-offset-1'>
+  <div class='col-md-8 col-md-offset-2'>
+    <br/>
     <h1>About Plenar.io</h1>
 
-    <p>Over the past few years, levels of government from the <a href="http://data.gov">federal administration</a> to individual municipalities like the <a href="http://data.cityofchicago.org">City of Chicago</a> have been moving toward an open data model, releasing their data publicly for free.</p>
+    <p>Plenar.io makes it possible to rethink the way we use open data. Instead of being constrained by the data that is accessible and usable, let&rsquo;s start by formulating our questions and then find the data to answer them. Plenar.io makes this easy by tying together all datasets on one map and one timeline&mdash;because in the real world, everything affects everything else.</p>
+    <br>
 
-    <p><strong>Plenar.io</strong> tells a unified story of place by centralizing data from these various sources in order to increase accessibility and help ordinary citizens and researchers draw connections between datasets. Data can be viewed via a <a href="{{ url_for('views.explore_view') }}">map interface</a> and accessed by download or via an <a href="{{ url_for('views.api_docs_view') }}">API</a>.</p>
+    <h2 id="mission">Mission</h2>
+    <h3>The problem</h3>
+    <p>Over the past few years, levels of government from the <a href="http://data.gov">federal administration</a> to individual municipalities like the <a href="http://data.cityofchicago.org">City of Chicago</a> have begun embracing <a href="http://en.wikipedia.org/wiki/Open_data">open data</a>, releasing datasets publicly for free. This movement has vastly increased the amount of data available, but existing platforms and technologies are designed mainly to view and access individual datasets one at a time. This restriction contradicts decades of research contending that no aspect of the urban landscape is truly isolated; in today's cities, everything is connected to everything else.</p>
+    <p>Furthermore, researchers are often limited in the questions they can ask by the data available to answer them. It is not uncommon to spend 75% of one&rsquo;s time locating, downloading, cleaning, and standardizing the relevant datasets&mdash;leaving precious little resources for the important work.</p>
+    <h3>What we do</h3>
+    <p>Plenar.io is designed to take us from "spreadsheets on the web"<a href="#f1"><sup>1</sup></a> to truly smart open data. This rests on two fundamental breakthroughs:</p>
+    <div class="row">
+      <div class="col-md-10 col-md-offset-1">
+        <p>1)&nbsp;&nbsp;Allow users to assemble and download data from multiple, independent data sources, such as two different municipal data portals, or the federal government and a privately curated dataset. </p>
+        <p>2)&nbsp;&nbsp;Unite all datasets along a single spatial and temporal index, making it possible to do complex aggregations with one query.</p>
+      </div>
+    </div>
+    <p>With these advances, Plenar.io allows users to study regions over specified time periods using all relevant data, regardless of original source, and represent the data as a single time series. By providing a single, centralized hub for open data, the Plenar.io platform enables urban scientists to ask the right questions with as few constraints as possible.</p>
+    <hr>
+    <p id="f1" class="small" style="font-size:80%;"><sup>1</sup> &ldquo;<a href="https://twitter.com/UofCResearch">@UofCResearch</a>: Goldstein: need to take data and make it more useable so it's not just spreadsheets on the web <a href="http://twubs.com/UChiDiscovery">#UChiDiscovery</a>&rdquo;</p>
+    <br>
+    
+    <h2 id="platform">The Plenar.io Platform</h2>
+    <h3>Automatically import datasets</h3>
+    <p>Plenar.io is more than just a tool or a website: it provides an infrastructure for working with open data. At its heart is an automated <a href="http://en.wikipedia.org/wiki/Extract,_transform,_load">ETL builder</a> to extract data from other sources, run custom transformations (to clean and standardize the data, and to align its field definitions with those of similar datasets), and load it into the database. Users can thus expand the universe of accessible data by importing open datasets from a variety of sources&mdash;such as data portals that run using <a href="http://www.socrata.com/">Socrata</a> or <a href="http://ckan.org/">CKAN</a>, or datasets assembled by independent academics and organizations. Plenar.io then makes the datasets available to all users of the platform for download and analysis.</p>
+    <h3>One spatio-temporal index</h3>
+    <p>If a dataset has spatial and temporal attributes, then it can be added to the platform and merged into the map and timeline along with all the other datasets. A single query can access all datasets in Plenar.io, and even perform joins and find relationships between them, by using these indices.</p>
+    <h3>An open platform</h3>
+    <p>At its heart, Plenar.io is driven by the philosophy <em>build it and they will come</em>. Our <a href="{{ url_for('views.api_docs_view') }}">API</a> supports third-party apps and tools built on top of the Plenar.io infrastructure, which is a model that has been shown to work well for open data. Examples range from <a href="http://projects.nytimes.com/crime/homicides/map">tracking crime</a> to <a href="http://lookatcook.com/">visualizing municipal budgets</a>, and from <a href="http://adopt-a-hydrant.herokuapp.com/">adopting fire hydrants</a> to <a href="http://istheresewageinthechicagoriver.com/">alerting residents about sewage overflow</a>.</p>
+    <p>Plenar.io is built as a collaborative project, and the entire platform is open source, extensible to all locations, and ready to deploy. The source code is actively maintained on <a href="https://github.com/datamade/plenario">GitHub</a>, and the entire project can be forked for private or customized use. Furthermore, the Plenar.io API can be used with multiple front-end frameworks, from custom mobile and web apps to a complex ESRI application.</p>
+    <br>
 
-    <h3 id='team'>Team and credits</h3>
-
-    <p>
-      This project is funded by the <a href="http://www.nsf.gov/dir/index.jsp?org=SBE">NSF Social, Behavioral, and Economics Research Directorate</a> through a grant to the University of Chicago Urban Center for Computation and Data (<a href="https://urbanccd.org/">UrbanCCD</a>). It is being implemented by UrbanCCD and <a href="http://datamade.us">DataMade</a>.
-    </p>
-
-    <h4>UrbanCCD</h4>
+    <h2 id="roadmap">Roadmap</h2>
+    <p>Plenar.io is currently in the alpha phase; there’s a lot more we want to accomplish. The platform is ultimately hoped to serve as the backend for urban analytics software around the world, used both by city managers and researchers. Upcoming features will include:</p>
     <ul>
-      <li><a href='http://en.wikipedia.org/wiki/Charlie_Catlett'>Charlie Catlett</a>, UrbanCCD</li>
-      <li><a href='https://twitter.com/bjgol'>Brett Goldstein</a>, UrbanCCD</li>
-      <li>Svetlozar Nestorov, UrbanCCD</li>
-      <li>Jonathan Giuffrida, University of Chicago</li>
-      <li>Maggie King, University of Chicago</li>
-      <li>Jiajun Shen, University of Chicago</li>
+      <li>Sophisticated units of aggregation, on one or many variables of interest</li>
+      <li>Support for private datasets, such as 911 data and mortgage data</li>
+      <li>Unstructured data such as tweets and crowdsourced observations</li>
     </ul>
+    <br>
 
-    <h4>DataMade</h4>
-    <ul>
-      <li><a href='https://twitter.com/evanzanten'>Eric van Zanten</a></li>
-      <li><a href='https://twitter.com/derekeder'>Derek Eder</a></li>
-      <li>Forest Gregg</li>
-    </ul>
-
-    <h3>Code</h3>
-
-    <p>All the code for this site is <a href='http://en.wikipedia.org/wiki/Open_source'>open source</a>. It was built with:</p>
-
-    <ul>
-      <li><a href='http://flask.pocoo.org/'>Flask</a> - Python web framework</li>
-      <li><a href='http://postgis.net/'>PostGIS</a> - Open source geospatial database</li>
-      <li><a href='http://pythonhosted.org/Flask-SQLAlchemy/'>SQL Alchemy</a> - Python SQL toolkit and Object Relational Mapper</li>
-      <li><a href='http://leafletjs.com'>Leaflet.js</a> - Javascript mapping library</li>
-      <li><a href='http://getbootstrap.com'>Bootstrap</a> - HTML and CSS scaffolding</li>
-    </ul>
-
-    <p>You can view our code and suggest changes, fixes, and feature improvements on <a href='https://github.com/datamade/plenario/'>Github</a>.</p>
-
-    <h3>Contact us</h3>
-
-    <p>Found a bug? Report it on our <a href='https://github.com/datamade/plenario/issues'>issue tracker</a>.</p>
-
-    <p>Have a suggestion? <a href='http://datamade.us/contact-us/'>Contact DataMade</a>.</p>
-
+    <h2 id="funders">Funders</h2>
+    <p>Plenar.io is primarily funded by the <a href="http://www.nsf.gov/dir/index.jsp?org=SBE">National Science Foundation Social, Behavioral, and Economics Research Directorate</a> through a grant to the University of Chicago.</p>
+    <p class="text-center"><a class="btn btn-info" href="http://www.nsf.gov/awardsearch/showAward?AWD_ID=1348865&HistoricalAwards=false">Read the original grant&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a></p>
+    <p>Plenar.io is also supported by the <a href="http://www.macfound.org/">MacArthur Foundation</a> through a grant to the University of Chicago&rsquo;s <a href="http://harrisschool.uchicago.edu/">Harris School for Public Policy.</a></p>
+    <br>
+    
+    <h2 id="team">Team</h2>
+    <p>Plenar.io is being implemented by the <a href="https://urbanccd.org/">Urban Center for Computation and Data</a>, <a href="http://datamade.us">DataMade</a>, and the <a href="http://dspplab.com">University of Chicago Center for Data Science and Public Policy</a>.</p>
+    <br>
+    
+    <h2 id="get-involved">Get Involved</h2>
+    <p>Have a dataset you want to see in Plenar.io? &nbsp;&nbsp;<a class='btn btn-info' href="{{ url_for('views.add_dataset') }}">Add it now&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a>
+    <p>You can also help improve Plenar.io by joining the project on <a href='https://github.com/datamade/plenario'>GitHub</a>.</p>
+    <p>Found a bug? Report it in the <a href='https://github.com/datamade/plenario/issues'>issue tracker</a> or contact <a href="http://datamade.us/contact-us/index.html">DataMade</a> directly.</p>
+    <br>
+    <br>
   </div>
 {% endblock content %}
+{% block extra_javascript %}
+<script>
+// smooth scrolling from http://stackoverflow.com/questions/16534851/jquery-smooth-scrolling-on-page-load
+(function(){
+  var jump=function(e){
+    //e.preventDefault();
+     if (e){
+         var target = jQuery(this).attr("href").replace('/', '');
+     }else{
+         var target = location.hash;
+     }
+     jQuery('html,body').animate(
+     {
+         scrollTop: (jQuery(target).offset().top)
+     },1000,function(){});
+  }
+  jQuery('html, body').hide();
+  jQuery(document).ready(function($){
+    $(document).on('click', 'a[href*=#]', jump);
+    if (location.hash){
+        setTimeout(function(){
+            $('html, body').scrollTop(0).show();
+            jump();
+        }, 0);
+    }else{
+        $('html, body').show();
+    }
+  });
+})()
+</script>
+{% endblock %}
