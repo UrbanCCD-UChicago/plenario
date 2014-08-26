@@ -100,6 +100,7 @@ ChartHelper.sparkline = function(el, time_agg, data) {
       plotOptions: {
           series: {
             marker: {
+              fillColor: "#518fc9",
               radius: 0,
               states: {
                 hover: {
@@ -117,7 +118,9 @@ ChartHelper.sparkline = function(el, time_agg, data) {
           }
       },
       series: [{
-          data: data
+          data: data,
+          lineColor: "#518fc9",
+          color: "#ddf2fb"
       }]
   });
 }
