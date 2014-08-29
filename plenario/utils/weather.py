@@ -14,7 +14,7 @@ from plenario.database import task_session as session, task_engine as engine, \
 from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float, VARCHAR
 from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
-DATA_DIR = "/Users/mcc/src/weather_data"
+DATA_DIR = os.environ['WOPR_DATA_DIR']
 
 class WeatherError(Exception):
     def __init__(self, message):
@@ -73,7 +73,7 @@ class WeatherETL(object):
 
     # WeatherETL.initialize_last(): for debugging purposes, only initialize the most recent month of weather data.
     def initialize_last(self, start_line=0, end_line=None):
-        self._make_table()
+        self.make_tables()
         fname = self._extract_last_fname()
         raw_hourly, raw_daily, file_type = self._extract(fname)
         t_daily = self._transform_daily(raw_daily, file_type, start_line=start_line, end_line=end_line)
@@ -82,24 +82,28 @@ class WeatherETL(object):
         self._load_hourly(t_hourly)
 
     def initialize(self): 
-        self._make_table()
+        self.make_tables()
         fnames = self._extract_fnames()
         for fname in fnames:
             if (self.debug==True):
                 print "INITIALIZE: doing fname", fname
             self._do_etl(fname)
 
-    def initialize_month(self, year, month):
-        # NOTE: assumes tables have already been made via make_tables()
+    def initialize_month(self, year, month, no_daily=False, no_hourly=False):
+        self.make_tables()
         fname = self._extract_fname(year,month)
-        self._do_etl(fname)
+        self._do_etl(fname, no_daily, no_hourly)
         
-    def _do_etl(self, fname):
+    def _do_etl(self, fname, no_daily=False, no_hourly=False):
         raw_hourly, raw_daily, file_type = self._extract(fname)
-        t_daily = self._transform_daily(raw_daily, file_type)
-        t_hourly = self._transform_hourly(raw_hourly, file_type)             # this returns a StringIO with all the transformed data
-        self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
-        self._load_hourly(t_hourly)                          # this actually imports the transformed StringIO csv
+        if (not no_daily):
+            t_daily = self._transform_daily(raw_daily, file_type)
+        if (not no_hourly):
+            t_hourly = self._transform_hourly(raw_hourly, file_type)             # this returns a StringIO with all the transformed data
+        if (not no_daily):
+            self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
+        if (not no_hourly):
+            self._load_hourly(t_hourly)                          # this actually imports the transformed StringIO csv
 
 
     def _transform_hourly(self, raw, file_type, start_line=0, end_line=None):
@@ -226,14 +230,18 @@ class WeatherETL(object):
                       max2_windspeed, max2_winddirection, max2_winddirection_cardinal])
         return self.clean_observations_daily
         
-    def _transform_tarfile_hourly(self, start_line = 0):
-        return 'bluh'
+    def _transform_tarfile_hourly(self, raw_weather, start_line = 0, end_line=None):
+        # XX: _transform_tarfile_hourly and _transform_zipfile_hourly should really just be one function that takes 
+        # a file_type parameter instead..
+        pass
+        
+    
 
     def _transform_zipfile_hourly(self, raw_weather, start_line = 0, end_line=None):
-        station_table = Table('weather_stations', Base.metadata, autoload=True, autoload_with=engine)
-        wban_list = session.query(station_table.c.wban_code.distinct()). \
-                    order_by(station_table.c.wban_code).all()
-        station_observations = Table('weather_observations_hourly', Base.metadata, autoload=True, autoload_with=engine)
+        #station_table = Table('weather_stations', Base.metadata, autoload=True, autoload_with=engine)
+        #wban_list = session.query(station_table.c.wban_code.distinct()). \
+        #            order_by(station_table.c.wban_code).all()
+        #station_observations = Table('weather_observations_hourly', Base.metadata, autoload=True, autoload_with=engine)
 
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
@@ -552,15 +560,18 @@ class WeatherStationsETL(object):
     def initialize(self):
         self._extract()
         self._transform()
-        self._make_table()
+        self.make_table()
         self._load()
 
     def update(self):
         self._extract()
         self._transform()
         # Doing this just so self.station_table is defined
-        self._make_table()
+        self.make_table()
         self._update_stations()
+
+    def make_table(self):
+        self._make_station_table()
 
     def _extract(self):
         """ Download CSV of station info from NOAA """
@@ -607,7 +618,7 @@ class WeatherStationsETL(object):
         writer.writerows(all_rows)
         self.clean_station_info.seek(0)
 
-    def _make_table(self):
+    def _make_station_table(self):
         self.station_table = Table('weather_stations', Base.metadata,
                 Column('wban_code', String(5), primary_key=True),
                 Column('station_name', String(50), nullable=False),
