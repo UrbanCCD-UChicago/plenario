@@ -67,7 +67,8 @@ class WeatherETL(object):
         self.base_url = 'http://cdo.ncdc.noaa.gov/qclcd_ascii'
         self.data_dir = data_dir
         self.debug_outfile = sys.stdout
-        if (debug == True):
+        self.debug = debug
+        if (self.debug == True):
             self.debug_outfile = open(os.path.join(self.data_dir, 'weather_etl_debug_out.txt'), 'w')
 
     # WeatherETL.initialize_last(): for debugging purposes, only initialize the most recent month of weather data.
@@ -84,13 +85,27 @@ class WeatherETL(object):
         self._make_table()
         fnames = self._extract_fnames()
         for fname in fnames:
-            if (debug==True):
+            if (self.debug==True):
                 print "INITIALIZE: doing fname", fname
+            self._do_etl(fname)
             raw_hourly, raw_daily, file_type = self._extract(fname)
-            #t_daily = self._transform_daily(raw_daily, file_type)
+            t_daily = self._transform_daily(raw_daily, file_type)
             t_hourly = self._transform_hourly(raw_hourly, file_type)             # this returns a StringIO with all the transformed data
-            #self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
+            self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
             self._load_hourly(t_hourly)                          # this actually imports the transformed StringIO csv
+
+    def initialize_month(self, year, month):
+        # NOTE: assumes tables have already been made via make_tables()
+        fname = self._extract_fname(year,month)
+        self._do_etl(fname)
+        
+    def _do_etl(self, fname):
+        raw_hourly, raw_daily, file_type = self._extract(fname)
+        t_daily = self._transform_daily(raw_daily, file_type)
+        t_hourly = self._transform_hourly(raw_hourly, file_type)             # this returns a StringIO with all the transformed data
+        self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
+        self._load_hourly(t_hourly)                          # this actually imports the transformed StringIO csv
+            
 
     def _transform_hourly(self, raw, file_type, start_line=0, end_line=None):
         t = getattr(self, '_transform_%s_hourly' % file_type)(raw, start_line, end_line)
@@ -100,7 +115,7 @@ class WeatherETL(object):
         t = getattr(self, '_transform_%s_daily' % file_type)(raw, start_line, end_line)
         return t
             
-    def _make_table(self):
+    def make_tables(self):
         self._make_daily_table()
         self._make_hourly_table()
 
@@ -113,7 +128,7 @@ class WeatherETL(object):
         raw_weather_daily = StringIO()
         if not os.path.exists(fpath):
             url = '%s/%s' % (self.base_url, fname)
-            if (debug==True):
+            if (self.debug==True):
                 self.debug_outfile.write("Extracting: %s\n" % url)
             r = requests.get(url, stream=True)
             with open(fpath, 'wb') as f:
@@ -130,7 +145,7 @@ class WeatherETL(object):
                     elif tarinfo.name.endswith('daily.txt'):
                         raw_weather_daily.write(tar.extractfile(tarinfo).read())
         else:
-            if (debug==True):
+            if (self.debug==True):
                 self.debug_outfile.write("extract: fpath is %s\n" % fpath)
             with zipfile.ZipFile(fpath, 'r') as zf:
                 for name in zf.namelist():
@@ -166,8 +181,9 @@ class WeatherETL(object):
         row_count = 0
         for row in reader:
             if (row_count % 100 == 0):
-                sys.stdout.write( "\rdaily parsing: row_count=%06d" % row_count)
-                sys.stdout.flush()
+                if (self.debug == True):
+                    self.debug_outfile.write("\rdaily parsing: row_count=%06d" % row_count)
+                    self.debug_outfile.flush()
 
             if (start_line > row_count):
                 row_count +=1
@@ -226,7 +242,6 @@ class WeatherETL(object):
 
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
-        #header = ['WBAN','Date','Time','StationType','SkyCondition','SkyConditionFlag','Visibility','VisibilityFlag','WeatherType','WeatherTypeFlag','DryBulbFarenheit','DryBulbFarenheitFlag','DryBulbCelsius','DryBulbCelsiusFlag','WetBulbFarenheit','WetBulbFarenheitFlag','WetBulbCelsius','WetBulbCelsiusFlag','DewPointFarenheit','DewPointFarenheitFlag','DewPointCelsius','DewPointCelsiusFlag','RelativeHumidity','RelativeHumidityFlag','WindSpeed','WindSpeedFlag','WindDirection','WindDirectionFlag','ValueForWindCharacter','ValueForWindCharacterFlag','StationPressure','StationPressureFlag','PressureTendency','PressureTendencyFlag','PressureChange','PressureChangeFlag','SeaLevelPressure','SeaLevelPressureFlag','RecordType','RecordTypeFlag','HourlyPrecip','HourlyPrecipFlag','Altimeter','AltimeterFlag']
         header= reader.next()
 
         self.clean_observations_hourly_info = StringIO()
@@ -243,8 +258,9 @@ class WeatherETL(object):
         row_count = 0
         for row in reader:
             if (row_count % 1000 == 0):
-                sys.stdout.write( "\rparsing: row_count=%06d" % row_count)
-                sys.stdout.flush()
+                if (self.debug==True):
+                    self.debug_outfile.write( "\rparsing: row_count=%06d" % row_count)
+                    self.debug_outfile.flush()
 
             if (start_line > row_count):
                 row_count +=1
@@ -322,7 +338,7 @@ class WeatherETL(object):
             try:
                 wind_direction_int = int(wind_direction)
             except ValueError, e:
-                if (debug==True):
+                if (self.debug==True):
                     self.debug_outfile.write("ValueError: [%s], could not convert wind_direction '%s' to int\n" % (e, wind_direction))
                 return None, None
             wind_cardinal = self.degToCardinal(int(wind_direction))
@@ -359,7 +375,7 @@ class WeatherETL(object):
             try:
                 fval = float(val)
             except ValueError, e:
-                if (debug==True):
+                if (self.debug==True):
                     self.debug_outfile.write("ValueError: [%s], could not convert '%s' to float\n" % (e, val))
                 return None
             return fval
@@ -378,7 +394,7 @@ class WeatherETL(object):
             try: 
                 ival = int(val)
             except ValueError, e:
-                if (debug==True):
+                if (self.debug==True):
                     self.debug_outfile.write("ValueError [%s] could not convert '%s' to int\n" % (e, val))
                 return None
             return ival
@@ -410,8 +426,9 @@ class WeatherETL(object):
                             Column('max5_direction_cardinal', String(3)), # e.g. NNE, NNW
                             Column('max2_windspeed', Float), 
                             Column('max2_winddirection', String(3)), # 000 through 360, M for missing
-                            Column('max2_direction_cardinal', String(3))) # e.g. NNE, NNW
-        self.daily_table.create(engine, checkfirst=True)                                   
+                            Column('max2_direction_cardinal', String(3)), # e.g. NNE, NNW
+                            extend_existing=True) 
+        self.daily_table.create(engine, checkfirst=True)
 
     def _make_hourly_table(self):
         self.table = Table('weather_observations_hourly', Base.metadata,
@@ -440,22 +457,32 @@ class WeatherETL(object):
                 Column('station_pressure', Float),
                 Column('sealevel_pressure', Float),
                 Column('report_type', String), # Either 'AA' or 'SP'
-                Column('hourly_precip', Float))
+                Column('hourly_precip', Float),
+                extend_existing=True)
 
         self.table.create(engine, checkfirst=True)
 
 
     def _extract_last_fname(self):
         # XX: not currently parsing tar files
-        # tar_last = 
+        #tar_last = 
         #tar_last = datetime(2007, 5, 1, 0, 0)
         #tar_filename = '%s.tar.gz' % tar_last.strftime('%Y%m') 
         #print 'tar_filename'
-        #self.add_dump(tar_filename)
 
         zip_last = datetime.now()
         zip_filename = 'QCLCD%s.zip' % zip_last.strftime('%Y%m') 
         return zip_filename
+
+    def _extract_fname(self, year_num, month_num):
+        curr_dt = datetime(year_num, month_num, 1, 0, 0)
+        if ((year_num < 2007) or (year_num == 2007 and month_num < 5)):
+            tar_filename =  '%s.tar.gz' % (curr_dt.strftime('%Y%m'))
+            # do not parse tars for now
+            return None
+        else:
+            zip_filename = 'QCLCD%s.zip' % curr_dt.strftime('%Y%m')
+            return zip_filename
 
     def _extract_fnames(self):
         tar_start = datetime(1996, 7, 1, 0, 0)
@@ -470,7 +497,7 @@ class WeatherETL(object):
         return zip_filenames
 
     def _load_hourly(self, transformed_input):
-        if (debug==True):
+        if (self.debug==True):
             transformed_input.seek(0) 
             f = open(os.path.join(self.data_dir, 'weather_etl_dump_hourly.txt'), 'w')
             f.write(transformed_input.getvalue())
@@ -483,12 +510,12 @@ class WeatherETL(object):
         cursor.copy_expert(ins_st, transformed_input)
 
         conn.commit()
-        if (debug==True):
+        if (self.debug==True):
             print ("committed", sys.stdout)
 
 
     def _load_daily(self, transformed_input): 
-        if (debug==True):
+        if (self.debug==True):
             transformed_input.seek(0) 
             f = open(os.path.join(self.data_dir, 'weather_etl_dump_daily.txt'), 'w')
             f.write(transformed_input.getvalue())
@@ -501,7 +528,7 @@ class WeatherETL(object):
         cursor.copy_expert(ins_st, transformed_input)
 
         conn.commit()
-        if (debug == True):
+        if (self.debug == True):
             print ("committed", sys.stdout)
 
     def _date_span(self, start, end):
