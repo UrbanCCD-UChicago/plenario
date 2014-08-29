@@ -88,11 +88,6 @@ class WeatherETL(object):
             if (self.debug==True):
                 print "INITIALIZE: doing fname", fname
             self._do_etl(fname)
-            raw_hourly, raw_daily, file_type = self._extract(fname)
-            t_daily = self._transform_daily(raw_daily, file_type)
-            t_hourly = self._transform_hourly(raw_hourly, file_type)             # this returns a StringIO with all the transformed data
-            self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
-            self._load_hourly(t_hourly)                          # this actually imports the transformed StringIO csv
 
     def initialize_month(self, year, month):
         # NOTE: assumes tables have already been made via make_tables()
