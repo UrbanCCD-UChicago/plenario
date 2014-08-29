@@ -100,7 +100,7 @@ class WeatherETL(object):
         t_hourly = self._transform_hourly(raw_hourly, file_type)             # this returns a StringIO with all the transformed data
         self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
         self._load_hourly(t_hourly)                          # this actually imports the transformed StringIO csv
-            
+
 
     def _transform_hourly(self, raw, file_type, start_line=0, end_line=None):
         t = getattr(self, '_transform_%s_hourly' % file_type)(raw, start_line, end_line)
@@ -426,7 +426,7 @@ class WeatherETL(object):
         self.daily_table.create(engine, checkfirst=True)
 
     def _make_hourly_table(self):
-        self.table = Table('weather_observations_hourly', Base.metadata,
+        self.hourly_table = Table('weather_observations_hourly', Base.metadata,
                 Column('wban_code', String(5), primary_key=True),
                 Column('datetime', DateTime, nullable=False, primary_key=True),
                 # AO1: without precipitation discriminator, AO2: with precipitation discriminator
@@ -455,7 +455,7 @@ class WeatherETL(object):
                 Column('hourly_precip', Float),
                 extend_existing=True)
 
-        self.table.create(engine, checkfirst=True)
+        self.hourly_table.create(engine, checkfirst=True)
 
 
     def _extract_last_fname(self):
@@ -498,7 +498,7 @@ class WeatherETL(object):
             f.write(transformed_input.getvalue())
             f.close()
         transformed_input.seek(0)
-        names = [c.name for c in self.table.columns]
+        names = [c.name for c in self.hourly_table.columns]
         ins_st = "COPY weather_observations_hourly FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
         conn = engine.raw_connection()
         cursor = conn.cursor()
@@ -516,7 +516,7 @@ class WeatherETL(object):
             f.write(transformed_input.getvalue())
             f.close()
         transformed_input.seek(0)
-        names = [c.name for c in self.table.columns]
+        names = [c.name for c in self.daily_table.columns]
         ins_st = "COPY weather_observations_daily FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
         conn = engine.raw_connection()
         cursor = conn.cursor()
@@ -558,7 +558,7 @@ class WeatherStationsETL(object):
     def update(self):
         self._extract()
         self._transform()
-        # Doing this just so self.table is defined
+        # Doing this just so self.station_table is defined
         self._make_table()
         self._update_stations()
 
@@ -608,7 +608,7 @@ class WeatherStationsETL(object):
         self.clean_station_info.seek(0)
 
     def _make_table(self):
-        self.table = Table('weather_stations', Base.metadata,
+        self.station_table = Table('weather_stations', Base.metadata,
                 Column('wban_code', String(5), primary_key=True),
                 Column('station_name', String(50), nullable=False),
                 Column('country', String(2), nullable=False),
@@ -618,10 +618,10 @@ class WeatherStationsETL(object):
                 Column('elevation', Float),
                 Column('begin', Date),
                 Column('end', Date))
-        self.table.create(engine, checkfirst=True)
+        self.station_table.create(engine, checkfirst=True)
 
     def _load(self):
-        names = [c.name for c in self.table.columns]
+        names = [c.name for c in self.station_table.columns]
         ins_st = "COPY weather_stations FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
         conn = engine.raw_connection()
         cursor = conn.cursor()
@@ -633,7 +633,7 @@ class WeatherStationsETL(object):
         reader = UnicodeCSVDictReader(self.clean_station_info)
         conn = engine.connect()
         for row in reader:
-            station = session.query(self.table).filter(self.table.c.wban_code == row['wban_code']).all()
+            station = session.query(self.station_table).filter(self.station_table.c.wban_code == row['wban_code']).all()
             if not station:
-                ins = self.table.insert().values(**row)
+                ins = self.station_table.insert().values(**row)
                 conn.execute(ins)
