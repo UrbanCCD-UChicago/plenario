@@ -24,7 +24,7 @@
     <![endif]-->
   </head>
 
-  <body style="height: 100%">
+  <body style="height: 100%" id="top">
     <div class="navbar navbar-default navbar-static-top" role="navigation">
       <div class="container-fluid">
         <div class="navbar-header">
@@ -35,13 +35,13 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand" href="/"><img src="/static/images/logo.png" height="20px" width="20px"/>Plenar.io</a>
+          <a class="navbar-brand" href="/"><img src="/static/images/logo.png" height="22px" width="22px"/>Plenar.io</a>
         </div>
         <div class="navbar-collapse collapse pull-right">
           <ul class="nav navbar-nav">
           	<li class="{% if request.path == '/' %}active{% endif %}"><a href="{{ url_for('views.index') }}">Home</a></li>
-            <li class="{% if request.path == '/explore' %}active{% endif %}"><a href="{{ url_for('views.explore_view') }}">Explore</a></li>
             <li class="{% if request.path == '/api-docs' %}active{% endif %}"><a href="{{ url_for('views.api_docs_view') }}">API</a></li>
+            <li class="{% if request.path == '/explore' %}active{% endif %}"><a href="{{ url_for('views.explore_view') }}">Explore</a></li>
             <li class="{% if request.path == '/about' %}active{% endif %}"><a href="{{ url_for('views.about_view') }}">About</a></li>
             {% if session.get('user_id') %}
                 <li class="dropdown">
@@ -49,10 +49,10 @@
                         Admin <span class="caret"></span>
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a href="{{ url_for('views.view_datasets') }}">View datasets</a></li>
-                        <li><a href="{{ url_for('views.add_dataset') }}">Add a dataset</a></li>
-                        <li><a href="{{ url_for('auth.add_user') }}">Add a user</a></li>
-                        <li><a href="{{ url_for('auth.reset_password') }}">Reset my password</a></li>
+                        <li><a href="{{ url_for('views.add_dataset') }}"><i class="fa fa-cube fa-fw"></i>&nbsp;&nbsp;Add a dataset</a></li>
+                        <li><a href="{{ url_for('views.view_datasets') }}"><i class="fa fa-cubes fa-fw"></i>&nbsp;&nbsp;View datasets</a></li>
+                        <li><a href="{{ url_for('auth.add_user') }}"><i class="fa fa-user fa-fw"></i>&nbsp;&nbsp;Add a user</a></li>
+                        <li><a href="{{ url_for('auth.reset_password') }}"><i class="fa fa-unlock-alt fa-fw"></i>&nbsp;&nbsp;Reset my password</a></li>
                     </ul>
                 </li>
                 <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
@@ -87,7 +87,10 @@
 
     <div class='container-fluid'>
       <div class="footer">
-        <p class='pull-right'>Built by <a href='http://www.uchicago.edu/'>The University of Chicago</a> and <a href='http://datamade.us'>DataMade</a></p>
+        <ul>
+          <li><a href="{{ url_for('views.terms_view') }}">Terms</a></li>
+          <li><a href="{{ url_for('views.license_view') }}">License</a></li>
+        </ul>
       </div>
     </div>
 
