@@ -27,3 +27,7 @@ Base.query = session.query_property()
 def init_db():
     import plenario.models
     Base.metadata.create_all(bind=app_engine)
+    if plenario.settings.DEFAULT_USER:
+        user = plenario.models.User(**plenario.settings.DEFAULT_USER)
+        session.add(user)
+        session.commit()

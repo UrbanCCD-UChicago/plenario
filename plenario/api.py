@@ -486,7 +486,6 @@ def submit_dataset():
             md = session.query(MetaTable).get(dataset_id)
             if not md:
                 d = {
-                    'four_by_four': dataset_id,
                     'dataset_name': slugify(dataset_info['name'], delim=u'_'),
                     'human_name': dataset_info['name'],
                     'description': dataset_info['description'],
@@ -503,7 +502,7 @@ def submit_dataset():
                 md = MetaTable(**d)
                 session.add(md)
                 session.commit()
-            add_dataset.delay(md.four_by_four)
+            add_dataset.delay(md.source_url)
             resp['message'] = 'Dataset %s submitted successfully' % md.human_name
     else:
         resp['status'] = 'error'
