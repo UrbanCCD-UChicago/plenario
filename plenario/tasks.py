@@ -13,10 +13,10 @@ if CELERY_SENTRY_URL:
     setup_logging(handler)
 
 @celery_app.task
-def add_dataset(four_by_four, fpath=None):
-    md = session.query(MetaTable).get(four_by_four)
+def add_dataset(source_url, s3_path=None):
+    md = session.query(MetaTable).get(source_url)
     etl = PlenarioETL(md.as_dict())
-    etl.add(fpath=fpath)
+    etl.add(s3_path=s3_path)
     return 'Finished adding %s' % md.human_name
 
 @celery_app.task
@@ -24,7 +24,7 @@ def daily_update():
     md = session.query(MetaTable)\
         .filter(MetaTable.update_freq == 'daily').all()
     for m in md:
-        update_dataset.delay(m.four_by_four)
+        update_dataset.delay(m.source_url)
         print 'Updating %s' % m.human_name
     return 'yay'
 
@@ -38,9 +38,9 @@ def hourly_update():
     return 'yay'
 
 @celery_app.task
-def update_dataset(four_by_four, fpath=None):
+def update_dataset(source_url, fpath=None):
     
-    md = session.query(MetaTable).get(four_by_four)
+    md = session.query(MetaTable).get(source_url)
     etl = PlenarioETL(md.as_dict())
     etl.update(fpath=fpath)
     return 'Finished updating %s' % md.human_name

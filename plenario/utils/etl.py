@@ -9,11 +9,11 @@ from plenario.utils.helpers import slugify
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET
 from urlparse import urlparse
 from csvkit.unicsv import UnicodeCSVReader
-from csvkit.typeinference import normalize_column_type
+from plenario.utils.typeinference import normalize_column_type
 import gzip
 from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
     Integer, Table, text, func, select, or_, and_, cast, UniqueConstraint, \
-    join, outerjoin
+    join, outerjoin, over
 from sqlalchemy.dialects.postgresql import TIMESTAMP, ARRAY
 from sqlalchemy.exc import NoSuchTableError
 from types import NoneType
@@ -24,20 +24,42 @@ from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from cStringIO import StringIO
 
-COL_TYPES = {
-    bool: Boolean,
-    int: Integer,
-    float: Float, 
-    datetime: TIMESTAMP, 
-    date: Date,
-    time: Time,
-    NoneType: String,
-    unicode: String
-}
-
 class PlenarioETL(object):
     
     def __init__(self, meta):
+        """ 
+        Initializes with a dictionary representation of a
+        row from the meta_master table.  If you include
+        keys for all of the columns in the meta_master
+        table, it doen't hurt anything but the only keys
+        that are required are:
+
+        dataset_name:  Machine version of the dataset name.
+                       This is used to name the primary key field of the
+                       data table for the dataset as well as the table
+                       itself.  Should be lowercase with words seperated
+                       by underscores. Truncated to the first 50
+                       characters.
+
+        source_url:    This is used to download the raw data.
+
+        business_key:  Name of the user identified business key from the
+                       source data.
+
+        observed_date: Name of the user identified observed date column 
+                       from the source data
+
+        latitude:      Name of the user identified latitude column
+                       from the source data
+
+        logitude:      Name of the user identified longitude column 
+                       from the source data
+
+        location:      Name of the user identified location column from
+                       from the source data. The values in this column
+                       should be formatted like so 
+                       "(<latitude decimal degrees>, <longitude decimal degrees>)"
+        """
         for k,v in meta.items():
             setattr(self, k, v)
         domain = urlparse(self.source_url).netloc
@@ -51,6 +73,24 @@ class PlenarioETL(object):
         self.s3_key = Key(bucket)
         self.s3_key.key = s3_path
     
+    def _get_tables(self, table_name=None, all_tables=False):
+        if all_tables:
+            table_names = ['src', 'dup', 'new', 'dat']
+            for table in table_names:
+                try:
+                    t = Table('%s_%s' % (table, self.dataset_name), Base.metadata,
+                        autoload=True, autoload_with=engine, extend_existing=True)
+                    setattr(self, '%s_table' % table, t)
+                except NoSuchTableError:
+                    pass
+        else:
+            try:
+                t = Table('%s_%s' % (table_name, self.dataset_name), Base.metadata,
+                    autoload=True, autoload_with=engine, extend_existing=True)
+                setattr(self, '%s_table' % table_name, t)
+            except NoSuchTableError:
+                pass
+
     def add(self, s3_path=None):
         if s3_path:
             self.s3_key.key = s3_path
@@ -61,24 +101,26 @@ class PlenarioETL(object):
         self._insert_src_data()
         self._make_new_and_dup_table()
         self._find_dup_data()
-        #self._insert_data_table()
-        #self._update_master()
-        #self._update_meta(added=True)
-        #self._cleanup_temp_tables()
+        self._insert_new_data(added=True)
+        self._insert_data_table()
+        self._update_master()
+        self._update_meta(added=True)
+        self._cleanup_temp_tables()
     
-    def update(self, fpath=None):
-        if fpath:
-            self.fpath = fpath
+    def update(self, s3_path=None):
+        if s3_path:
+            self.s3_key.key = s3_path
         else:
             self._download_csv()
         self._get_or_create_data_table()
-        self._insert_raw_data()
-        self._dedupe_raw_data()
         self._make_src_table()
-        new = self._find_new_records()
+        self._insert_src_data()
+        self._make_new_and_dup_table()
+        self._find_dup_data()
+        new = self._insert_new_data()
         changes = False
         if new:
-            self._update_dat_table()
+            self._insert_data_table()
             self._update_master()
             changes = self._find_changes()
             if changes:
@@ -101,6 +143,8 @@ class PlenarioETL(object):
  
     def _cleanup_temp_tables(self, changes=False):
         self.src_table.drop(bind=engine, checkfirst=True)
+        self.new_table.drop(bind=engine, checkfirst=True)
+        self.dup_table.drop(bind=engine, checkfirst=True)
         if changes:
             self.chg_table.drop(bind=engine, checkfirst=True)
 
@@ -111,8 +155,7 @@ class PlenarioETL(object):
         col = []
         for row in reader:
             col.append(row[idx])
-        col_type, norm_vals = normalize_column_type(col)
-        del norm_vals
+        col_type = normalize_column_type(col)
         return col_type
 
     def _get_or_create_data_table(self):
@@ -138,13 +181,7 @@ class PlenarioETL(object):
                 Column('dup_ver', Integer)
             ]
             for col_name,d_type in zip(header, col_types):
-                kwargs = {}
-                col_type = COL_TYPES[d_type]
-                if col_type == Integer:
-                    kwargs['server_default'] = text('0')
-                if col_type == Float:
-                    kwargs['server_default'] = text('0.0')
-                cols.append(Column(slugify(col_name), col_type, **kwargs))
+                cols.append(Column(slugify(col_name), d_type))
             cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver', name='uix_1'))
             self.dat_table = Table('dat_%s' % self.dataset_name, Base.metadata, 
                           *cols, extend_existing=True)
@@ -228,7 +265,8 @@ class PlenarioETL(object):
         conn = engine.connect()
         conn.execute(ins)
 
-    def _insert_new_data(self):
+    def _insert_new_data(self, added=False):
+        # Step Six
         bk = slugify(self.business_key)
         sel_cols = [
             self.src_table.c[bk], 
@@ -242,16 +280,22 @@ class PlenarioETL(object):
         outer = outerjoin(j, self.dat_table, 
               and_(self.dat_table.c[bk] == j.c['%s_%s' % (dup_tablename, bk)], 
                    self.dat_table.c['dup_ver'] == j.c['%s_dup_ver' % dup_tablename]))
-        sel = select(sel_cols).select_from(outer)\
-            .where(self.dat_table.c['%s_row_id' % self.dataset_name] != None)
+        sel = select(sel_cols).select_from(outer)
+        if not added:
+            sel = sel.where(self.dat_table.c['%s_row_id' % self.dataset_name] == None)
         ins = self.new_table.insert()\
             .from_select([c for c in self.new_table.columns], sel)
-        print ins
+        conn = engine.connect()
+        try:
+            conn.execute(ins)
+            return True
+        except TypeError:
+            # There are no new records
+            return False
 
     def _insert_data_table(self):
-        from sqlalchemy import over
-
-        skip_cols = ['%s_row_id' %self.dataset_name,'end_date', 'current_flag']
+        # Step Seven
+        skip_cols = ['%s_row_id' % self.dataset_name,'end_date', 'current_flag']
         skip_src_col = ['line_num']
         from_vals = []
         from_vals.append(text("'%s' AS start_date" % datetime.now().isoformat()))
@@ -268,25 +312,8 @@ class PlenarioETL(object):
         conn = engine.connect()
         conn.execute(ins)
 
-    def _update_dat_table(self):
-        # Step Six: Update the dat table
-        skip_cols = ['end_date', 'current_flag', 'dataset_row_id']
-        dat_cols = [c for c in self.dat_table.columns.keys() if c not in skip_cols]
-        src_cols = [text("'%s' AS start_date" % datetime.now().isoformat())]
-        src_cols.extend([c for c in self.src_table.columns if c.name not in skip_cols])
-        bk = slugify(self.business_key)
-        ins = self.dat_table.insert()\
-            .from_select(
-                dat_cols,
-                select(src_cols)\
-                    .select_from(self.src_table.join(self.new_table,
-                        getattr(self.src_table.c, bk) == self.new_table.c.id))
-            )
-        conn = engine.connect()
-        conn.execute(ins)
-
-    def _update_master(self):
-        # Step Seven: Insert new records into master table
+    def _update_master(self, added=False):
+        # Step Eight: Insert new records into master table
         dat_cols = [
             self.dat_table.c.start_date,
             self.dat_table.c.end_date,
@@ -312,7 +339,7 @@ class PlenarioETL(object):
         dat_cols.append(text("NULL AS geotag2"))
         dat_cols.append(text("NULL AS geotag3"))
         dat_cols.append(text("'%s' AS dataset_name" % self.dataset_name))
-        dat_cols.append(self.dat_table.c.dataset_row_id)
+        dat_cols.append(getattr(self.dat_table.c, '%s_row_id' % self.dataset_name))
         if self.latitude and self.longitude:
             dat_cols.append(text(
                 "ST_PointFromText('POINT(' || dat_%s.%s || ' ' || dat_%s.%s || ')', 4326) \
@@ -338,14 +365,25 @@ class PlenarioETL(object):
                       )))
         mt = MasterTable.__table__
         bk = slugify(self.business_key)
-        ins = mt.insert()\
-            .from_select(
-                [c for c in mt.columns.keys() if c != 'master_row_id'],
-                select(dat_cols)\
-                    .select_from(self.dat_table.join(self.new_table, 
-                        getattr(self.dat_table.c, bk) == self.new_table.c.id)
+        if added:
+            ins = mt.insert()\
+                .from_select(
+                    [c for c in mt.columns.keys() if c != 'master_row_id'], 
+                    select(dat_cols)
+                )
+        else:
+            ins = mt.insert()\
+                .from_select(
+                    [c for c in mt.columns.keys() if c != 'master_row_id'],
+                    select(dat_cols)\
+                        .select_from(self.dat_table.join(self.new_table, 
+                            and_(
+                                getattr(self.dat_table.c, bk) == getattr(self.new_table.c, bk),
+                                self.dat_table.c.dup_ver == self.new_table.c.dup_ver
+                            )
+                        )
                     )
-            )
+                )
         conn = engine.connect()
         conn.execute(ins)
 
@@ -359,7 +397,7 @@ class PlenarioETL(object):
         self.chg_table.drop(bind=engine, checkfirst=True)
         self.chg_table.create(bind=engine)
         bk = slugify(self.business_key)
-        skip_cols = ['start_date', 'end_date', 'current_flag', bk, 'dataset_row_id']
+        skip_cols = ['start_date', 'end_date', 'current_flag', bk, '%s_row_id' % self.dataset_name]
         src_cols = [c for c in self.src_table.columns if c.name != bk]
         dat_cols = [c for c in self.dat_table.columns if c.name not in skip_cols]
         and_args = []
@@ -411,7 +449,7 @@ class PlenarioETL(object):
         mt = MasterTable.__table__
         update = mt.update()\
             .values(current_flag=False, end_date=datetime.now().strftime('%Y-%m-%d'))\
-            .where(mt.c.dataset_row_id == self.dat_table.c.dataset_row_id)\
+            .where(mt.c.dataset_row_id == getattr(self.dat_table.c, '%s_row_id' % self.dataset_name))\
             .where(self.dat_table.c.current_flag == False)\
             .where(self.dat_table.c.end_date == datetime.now().strftime('%Y-%m-%d'))
         conn = engine.connect()

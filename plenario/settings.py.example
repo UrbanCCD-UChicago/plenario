@@ -8,3 +8,8 @@ REDIS_CONFIG = {'host': 'hostname', 'port': 'port_number'}
 AWS_ACCESS_KEY = ''
 AWS_SECRET_KEY = ''
 S3_BUCKET = ''
+
+# Optional dict with attributes for a default user 
+# that gets created when init_db is run from database module.
+# Just needs 'name', 'email', and 'password' keys.
+DEFAULT_USER = {}
