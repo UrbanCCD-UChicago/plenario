@@ -5,25 +5,19 @@
 {% block content %}
   <div class='col-md-10 col-md-offset-1'>
       <br/>
-      <h1>Get Data Now
-        <a class="btn btn-info pull-right" href="#docs"><i class='fa fa-angle-down'></i>&nbsp;&nbsp;Developers</a></h1>
-      <div class="well">
-        <p>[Form to build a custom API query should go here]</p>
-        <div class="row">
-          <div class="col-md-8 col-md-offset-1">
-            <textarea class="form-control input-lg" placeholder="http://plenar.io/<endpoint>/<some query>"></textarea>
+      <div class="col-md-8 col-md-offset-2">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h1 class="panel-title">Note</h1>
+            </div>
+            <div class="panel-body">
+              <p class="lead">The easiest way to access Plenar.io&rsquo;s data and to build your own queries is via the <a href="{{ url_for('views.explore_view') }}">Data Explorer</a>.</p>
+            </div>
           </div>
-          <div class="col-md-3">
-            <p>&nbsp;</p>
-            <button class="btn btn-default"><i class="fa fa-external-link"></i>&nbsp;&nbsp;Run query</button>
-          </div>
-        </div>
       </div>
-      <br />
-      
-      <hr />
-      <h2 id="docs">For Developers<a class="btn btn-info pull-right" href="#top">
-        <i class='fa fa-angle-up'></i>&nbsp;&nbsp;Back to Top</a></h2>
+  <div class="row"></div>
+  <hr>
+        <h2 id="docs">For Developers</h2>
       <p><strong></strong> The Plenar.io RESTful API can be used to perform custom geospatial and temporal queries.</p>   
       
       <p>A few things to know:</p>
