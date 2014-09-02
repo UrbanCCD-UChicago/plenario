@@ -4,6 +4,7 @@ from functools import update_wrapper
 import os
 import math
 from datetime import date, datetime, timedelta
+from dateutil.parser import parse
 from datetime_truncate import truncate
 import time
 import json
@@ -223,12 +224,10 @@ def dataset():
 
     # init from and to dates ad python datetimes
     if 'obs_date__ge' in raw_query_params.keys():
-        from_date = datetime.strptime(raw_query_params['obs_date__ge'], '%Y-%m-%d')
-    else:
-        from_date = datetime(2000, 01, 01)
+        from_date = parse(raw_query_params['obs_date__ge'])
     from_date = truncate(from_date, agg)
     if 'obs_date__le' in raw_query_params.keys():
-        to_date = datetime.strptime(raw_query_params['obs_date__le'], '%Y-%m-%d')
+        to_date = parse(raw_query_params['obs_date__le'])
     else:
         to_date = datetime.now()
 
@@ -256,6 +255,8 @@ def dataset():
         for k,g in groupby(results, key=itemgetter(2)):
             d = {'dataset_name': k}
             d['temporal_aggregate'] = agg
+            d['start_date'] = from_date
+            d['end_date'] = to_date
 
             items = []
             dense_matrix = []

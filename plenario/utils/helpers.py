@@ -80,6 +80,7 @@ def slugify(text, delim=u'_'):
         return text
 
 def increment_datetime_aggregate(sourcedate, time_agg):
+    # TODO: add hour and quarter
     if time_agg == 'day':
         days_to_add = 1
     elif time_agg == 'week':
