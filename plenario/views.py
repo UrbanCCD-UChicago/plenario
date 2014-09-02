@@ -47,7 +47,7 @@ def add_dataset():
             view_url = '%s/%s/%s' % (host, path, fourbyfour)
             dataset_info, errors, status_code = get_socrata_data_info(view_url)
             if status_code is not None and status_code != 200:
-                errors.append('URL returned a %s status code' % status_code)
+                errors.append('URL returns a %s status code' % status_code)
             dataset_info['submitted_url'] = url
         else:
             errors.append('Need a URL')
@@ -125,7 +125,7 @@ def edit_dataset(four_by_four):
             .filter(MetaTable.four_by_four == four_by_four)\
             .update(upd)
         session.commit()
-        flash('%s updated successfully!' % meta.human_name, 'success')
+        flash('%s updated successfully!' % meta.human_name)
     context = {
         'form': form,
         'meta': meta,
@@ -135,19 +135,8 @@ def edit_dataset(four_by_four):
 
 @views.route('/update-dataset/<four_by_four>')
 def update_dataset(four_by_four):
-    result = update_dataset_task.delay(four_by_four)
-    return make_response(json.dumps({'status': 'success', 'task_id': result.id}))
-
-@views.route('/check-update/<task_id>')
-def check_update(task_id):
-    result = update_dataset_task.AsyncResult(task_id)
-    if result.ready():
-        r = {'status': 'ready'}
-    else:
-        r = {'status': 'pending'}
-    resp = make_response(json.dumps(r))
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
+    update_dataset_task.delay(four_by_four)
+    return make_response(json.dumps({'status': 'success'}))
 
 @views.route('/license')
 def license_view():
@@ -157,3 +146,9 @@ def license_view():
 @views.route('/terms')
 def terms_view():
     return render_template('terms.html')
+
+
+
+
+
+

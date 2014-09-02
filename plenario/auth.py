@@ -122,7 +122,7 @@ def reset_password():
             user.password = form.new_password.data
             db_session.add(user)
             db_session.commit()
-            flash('Password reset successful!', 'success')
+            flash('Password reset successful!')
         else:
             errors.append('Password is not correct')
     return render_template('reset-password.html', form=form, errors=errors)

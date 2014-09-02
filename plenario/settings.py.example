@@ -7,4 +7,3 @@ REDIS_CONFIG = {'host': 'hostname', 'port': 'port_number'}
 
 AWS_ACCESS_KEY = ''
 AWS_SECRET_KEY = ''
-S3_BUCKET = ''

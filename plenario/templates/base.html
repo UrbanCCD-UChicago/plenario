@@ -66,21 +66,19 @@
 
     <div class="container-fluid">
       <div class="row">
-          <div class='col-md-10'>
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{category}} alert-dismissible" role="alert">
-                            <button type="button" class="close" data-dismiss="alert">
-                                <span aria-hidden="true">&times;</span>
-                                <span class="sr-only">Close</span>
-                            </button>
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-          </div>
+          {% with messages = get_flashed_messages() %}
+              {% if messages %}
+                  {% for message in messages %}
+                      <div class="alert alert-danger alert-dismissible" role="alert">
+                          <button type="button" class="close" data-dismiss="alert">
+                              <span aria-hidden="true">&times;</span>
+                              <span class="sr-only">Close</span>
+                          </button>
+                          {{ message }}
+                      </div>
+                  {% endfor %}
+              {% endif %}
+          {% endwith %}
       </div>
       {% block content %}{% endblock %}
     </div>

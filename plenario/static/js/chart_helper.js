@@ -1,5 +1,5 @@
 var ChartHelper = {};
-ChartHelper.chart = function(el, title, source, time_agg, data, iteration) {
+ChartHelper.create = function(el, title, source, time_agg, data, iteration) {
   
   return new Highcharts.Chart({
       chart: {
@@ -54,69 +54,6 @@ ChartHelper.chart = function(el, title, source, time_agg, data, iteration) {
       series: [{
           color: ChartHelper.colors[iteration],
           name: title,
-          data: data
-      }]
-  });
-}
-
-ChartHelper.sparkline = function(el, time_agg, data) {
-  
-  // console.log(el);
-  // console.log(time_agg);
-  // console.log(data);
-  return new Highcharts.Chart({
-      chart: {
-          renderTo: el,
-          type: 'area'
-      },
-      title: {
-          text: ''
-      },
-      legend: {
-        enabled: false
-      },
-      credits: {
-          enabled: false
-      },
-      xAxis: {
-          title: {
-              text: ''
-          },
-          type: 'datetime',
-          labels: {
-            enabled: false
-          }
-      },
-      yAxis: {
-          title: {
-              text: ''
-          }
-      },
-      tooltip: {
-          formatter: function() {
-              return ChartHelper.toolTipDateFormat(time_agg, this.x) +': '+ this.y;
-          }
-      },
-      plotOptions: {
-          series: {
-            marker: {
-              radius: 0,
-              states: {
-                hover: {
-                  enabled: true,
-                  radius: 5
-                }
-              }
-            },
-            shadow: false,
-            states: {
-               hover: {
-                  lineWidth: 3
-               }
-            }
-          }
-      },
-      series: [{
           data: data
       }]
   });

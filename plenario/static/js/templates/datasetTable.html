@@ -1,4 +1,4 @@
-<% var matrix = "/api/master/?" + $.param(query) + '&data_type=csv' %>
+<% var matrix = "/api/master/?" + $.param(query) + '&datatype=csv' %>
 <br />
 <table id='response-datasets' class="table table-condensed">
     <thead>
@@ -13,7 +13,7 @@
             <% var points = "/api/detail/?" + $.param(query) + '&dataset_name=' + obj.meta.dataset_name %>
             <tr>
                 <td><a href="javascript://" class="detail" data-dataset_name="<%= obj.meta.dataset_name %>"><%= obj.meta.human_name %></a></td>
-                <td><div class='highcharts-sparkline' id="<%= obj.meta.dataset_name %>-sparkline"></div></td>
+                <td><span class='sparkline' id="<%= obj.meta.dataset_name %>-sparkline"><%= obj.values %></span></td>
                 <td>
                     <a href="javascript://" class="detail btn btn-info btn-sm " data-dataset_name="<%= obj.meta.dataset_name %>">
                         <i class='fa fa-info-circle'></i>
@@ -26,7 +26,7 @@
                             <span class="caret"></span>
                         </button>
                         <ul class="dropdown-menu" role="menu">
-                            <li><a href="<%= points + '&data_type=csv' %>" class="data-download" target="_blank">CSV</a></li>
+                            <li><a href="<%= points + '&datatype=csv' %>" class="data-download" target="_blank">CSV</a></li>
                             <li><a href="<%= points %>" class="data-download" target="_blank">JSON</a></li>
                         </ul>
                     </div>
