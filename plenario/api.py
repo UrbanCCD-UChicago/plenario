@@ -4,6 +4,7 @@ from functools import update_wrapper
 import os
 import math
 from datetime import date, datetime, timedelta
+from datetime_truncate import truncate
 import time
 import json
 from sqlalchemy import func, distinct, Column, Float, Table
@@ -22,7 +23,7 @@ from urlparse import urlparse
 
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
-from plenario.utils.helpers import get_socrata_data_info, slugify
+from plenario.utils.helpers import get_socrata_data_info, slugify, increment_datetime_aggregate
 from plenario.tasks import add_dataset
 
 api = Blueprint('api', __name__)
@@ -219,6 +220,18 @@ def dataset():
     if not obs_dates:
         six_months_ago = datetime.now() - timedelta(days=180)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
+
+    # init from and to dates ad python datetimes
+    if 'obs_date__ge' in raw_query_params.keys():
+        from_date = datetime.strptime(raw_query_params['obs_date__ge'], '%Y-%m-%d')
+    else:
+        from_date = datetime(2000, 01, 01)
+    from_date = truncate(from_date, agg)
+    if 'obs_date__le' in raw_query_params.keys():
+        to_date = datetime.strptime(raw_query_params['obs_date__le'], '%Y-%m-%d')
+    else:
+        to_date = datetime.now()
+
     datatype = 'json'
     if raw_query_params.get('data_type'):
         datatype = raw_query_params['data_type']
@@ -237,21 +250,41 @@ def dataset():
             .group_by(time_agg)\
             .order_by(time_agg)
         values = [o for o in base_query.all()]
-        results = []
-        for value in values:
-            d = {
-                'dataset_name': value[2],
-                'group': value[0],
-                'count': value[1],
-                }
-            results.append(d)
-        results = sorted(results, key=itemgetter('dataset_name'))
-        for k,g in groupby(results, key=itemgetter('dataset_name')):
+
+        # build the response
+        results = sorted(values, key=itemgetter(2))
+        for k,g in groupby(results, key=itemgetter(2)):
             d = {'dataset_name': k}
             d['temporal_aggregate'] = agg
-            d['items'] = list(g)
+
+            items = []
+            dense_matrix = []
+            cursor = from_date
+            v_index = 0
+            dataset_values = list(g)
+            while cursor <= to_date:
+                if v_index < len(dataset_values) and \
+                    dataset_values[v_index][0].replace(tzinfo=None) == cursor:
+                    dense_matrix.append((cursor, dataset_values[v_index][1]))
+                    v_index += 1
+                else:
+                    dense_matrix.append((cursor, 0))
+
+                cursor = increment_datetime_aggregate(cursor, agg)
+
+            dense_matrix = OrderedDict(dense_matrix)
+            for k in dense_matrix:
+                i = {
+                    'datetime': k,
+                    'count': dense_matrix[k],
+                    }
+                items.append(i)
+
+            d['items'] = items
             resp['objects'].append(d)
+
         resp['meta']['status'] = 'ok'
+    
     if datatype == 'json':
         resp = make_response(json.dumps(resp, default=dthandler), status_code)
         resp.headers['Content-Type'] = 'application/json'

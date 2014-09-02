@@ -1,6 +1,8 @@
 import requests
 import re
 from unicodedata import normalize
+import calendar
+from datetime import timedelta
 
 def get_socrata_data_info(view_url):
     errors = []
@@ -76,3 +78,14 @@ def slugify(text, delim=u'_'):
         return unicode(delim.join(result))
     else:
         return text
+
+def increment_datetime_aggregate(sourcedate, time_agg):
+    if time_agg == 'day':
+        days_to_add = 1
+    elif time_agg == 'week':
+        days_to_add = 7
+    elif time_agg == 'month':
+        _, days_to_add = calendar.monthrange(sourcedate.year, sourcedate.month)
+    elif time_agg == 'year':
+        days_to_add = 366 if calendar.isleap(sourcedate.year) else 365
+    return sourcedate + timedelta(days=days_to_add)
