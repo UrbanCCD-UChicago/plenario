@@ -396,10 +396,8 @@ class PlenarioETL(object):
     def _find_changes(self):
         # Step Eight: Find changes
         bk = slugify(self.business_key)
-        bk_type = getattr(self.dat_table.c, bk).type
         self.chg_table = Table('chg_%s' % self.dataset_name, Base.metadata,
-                      Column('id', bk_type, primary_key=True), 
-                      Column('dup_ver', Integer, primary_key=True), 
+                      Column('id', Integer), 
                       extend_existing=True)
         self.chg_table.drop(bind=engine, checkfirst=True)
         self.chg_table.create(bind=engine)
@@ -413,14 +411,17 @@ class PlenarioETL(object):
             ors = or_(s != None, d != None)
             ands = and_(ors, s != d)
             and_args.append(ands)
+        pk = getattr(self.dat_table.c, '%s_row_id' % self.dataset_name)
         ins = self.chg_table.insert()\
             .from_select(
-                ['id', 'dup_ver'],
-                select([getattr(self.src_table.c, bk), self.dat_table.c.dup_ver])\
-                    .select_from(self.src_table.join(self.dat_table,
-                        getattr(self.src_table.c, bk) == \
-                        getattr(self.dat_table.c, bk)))\
-                    .where(or_(*and_args))
+                ['id'],
+                select([pk])\
+                    .select_from(
+                        join(self.dat_table, self.src_table, 
+                            self.dat_table.c.service_request_number == \
+                                self.src_table.c.service_request_number)\
+                        .join(self.dup_table, self.src_table.c.line_num == self.dup_table.c.line_num))\
+                    .where(or_(*and_args))\
                     .where(and_(self.dat_table.c.current_flag == True, 
                         or_(getattr(self.src_table.c, bk) != None, 
                             getattr(self.dat_table.c, bk) != None)))
@@ -439,10 +440,10 @@ class PlenarioETL(object):
         # Need to figure out how to make the end_date more granular than a day. 
         # For datasets that update more frequently than every day, this will be
         # crucial so that we are updating the current_flag on the correct records.
-        bk = slugify(self.business_key)
+        pk = getattr(self.dat_table.c, '%s_row_id' % self.dataset_name)
         update = self.dat_table.update()\
             .values(current_flag=False, end_date=datetime.now().strftime('%Y-%m-%d'))\
-            .where(getattr(self.dat_table.c, bk) == self.chg_table.c.id)\
+            .where(pk == self.chg_table.c.id)\
             .where(self.dat_table.c.current_flag == True)
         conn = engine.connect()
         conn.execute(update)
