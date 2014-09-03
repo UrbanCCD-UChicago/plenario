@@ -15,7 +15,7 @@
     </div>
     <div class="row"></div>
       <hr>
-      <h2 id="docs">For Developers</h2>
+      <h2 id="docs">For developers</h2>
       <p><strong></strong> The Plenar.io RESTful API can be used to perform custom geospatial and temporal queries.</p>  
 
       <p>A few things to know:</p>
@@ -23,9 +23,78 @@
       <ul>
         <li>All API calls should be made with <code>HTTP GET</code></li>
         <li>All API responses are in <a href='http://www.json.org/'>JSON format</a> by default. Some responses support <a href='http://en.wikipedia.org/wiki/Comma-separated_values'>CSV format</a>.</li>
-        <li>You can consider any non-200 HTTP response code an error - the returned data will contain more detailed information</li>
         <li>All methods are accessed via: <code>http://plenar.io/api/SOME-ENDPOINT</code></li>
       </ul>
+
+      <h2 id='responses'>API responses</h2>
+      <p>All JSON API calls return their data in the <code>objects</code> block. Additional information is returned in the <code>meta</code> block:</p>
+
+      <table class='table table-bordered'>
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong><code>status</code></strong></td>
+            <td><strong>ok</strong> if query was sucessful, <strong>error</strong> if not.</td>
+          </tr>
+          <tr>
+            <td><strong><code>query</code></strong></td>
+            <td>Original query parameters passed in.</td>
+          </tr>
+          <tr>
+            <td><strong><code>message</code></strong></td>
+            <td>If <code>status</code> is <strong>error</strong>, a detailed message as to what went wrong.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      Here's an example response from the /api/master/ endpoint:
+
+      <pre>
+{
+   "meta":{
+      "status":"ok",
+      "query":{
+         "agg":"week",
+         "dataset_name__in":"cdph_environmental_complaints",
+         "obs_date__ge":"2007-12-12",
+         "obs_date__le":"2008-01-12"
+      },
+      "message":""
+   },
+   "objects":[
+      {
+         "items":[
+            {
+               "count":8,
+               "datetime":"2007-12-10T00:00:00"
+            },
+            {
+               "count":8,
+               "datetime":"2007-12-17T00:00:00"
+            },
+            {
+               "count":5,
+               "datetime":"2007-12-24T00:00:00"
+            },
+            {
+               "count":7,
+               "datetime":"2007-12-31T00:00:00"
+            },
+            {
+               "count":22,
+               "datetime":"2008-01-07T00:00:00"
+            }
+         ],
+         "dataset_name":"cdph_environmental_complaints"
+      }
+   ]
+}
+      </pre>
 
       <h2 id='endpoints'>Endpoints</h2>
       <p>Currently there are five API endpoints:</p>
@@ -196,7 +265,7 @@
       </table>
 
       <p><strong>Response Parameters</strong></p>
-      <p>The API responds with a list of counts grouped by temporal aggregation and dataset name.</p>
+      <p>The API responds with a list of datasets with counts grouped by temporal aggregation.</p>
       <table class='table table-bordered'>
         <thead>
           <tr>
@@ -206,34 +275,11 @@
         </thead>
         <tbody>
           <tr>
-            <td><strong><code>meta</code></strong></td>
-            <td>
-              <table class='table table-bordered'>
-                <thead>
-                  <tr>
-                    <th>Parameter</th>
-                    <th>Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><strong><code>status</code></strong></td>
-                    <td><strong>ok</strong> if query was sucessful, <strong>error</strong> if not</td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>query</code></strong></td>
-                    <td>Original query parameters passed in</td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>message</code></strong></td>
-                    <td>If <code>status</code> is <strong>error</strong>, a detailed message as to what went wrong</td>
-                  </tr>
-                </tbody>
-              </table>
-            </td>
+            <td><strong><code>dataset_name</code></strong></td>
+            <td>Machine version of the dataset name</td>
           </tr>
           <tr>
-            <td><strong><code>objects</code></strong></td>
+            <td><strong><code>items</code></strong></td>
             <td>
               <table class='table table-bordered'>
                 <thead>
@@ -244,31 +290,12 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td><strong><code>dataset_name</code></strong></td>
-                    <td>Machine version of the dataset name</td>
+                    <td><strong><code>count</code></strong></td>
+                    <td>Record count</td>
                   </tr>
                   <tr>
-                    <td><strong><code>items</code></strong></td>
-                    <td>
-                      <table class='table table-bordered'>
-                        <thead>
-                          <tr>
-                            <th>Parameter</th>
-                            <th>Description</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td><strong><code>count</code></strong></td>
-                            <td>Record count</td>
-                          </tr>
-                          <tr>
-                            <td><strong><code>datetime</code></strong></td>
-                            <td>Temporal aggregation group</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </td>
+                    <td><strong><code>datetime</code></strong></td>
+                    <td>Temporal aggregation group</td>
                   </tr>
                 </tbody>
               </table>
@@ -283,7 +310,7 @@
         <p><a href='/api/master/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1'>http://plenar.io/api/master/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1</a>
         <br />Count of all Chicago crime reports since Jan 1st 2012, aggregated by year</p>
 
-        <p><a href='/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day'>http://plenar.io/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day</a>
+        <p><a href='/api/master/?obs_date__ge=2007-11-12&obs_date__le=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day'>http://plenar.io/api/master/?obs_date__ge=2007-11-12&obs_date__le=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day</a>
         <br />Count of crime and environmental complaints that were observed after November 12, 2007 but before November 12, 2008, aggregated by day</p>
 
         <p><a href='/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&agg=week&data_type=csv'>http://plenar.io/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&agg=week&data_type=csv</a>

@@ -172,7 +172,8 @@ def dataset_fields(dataset_name):
         data = {
             'meta': {
                 'status': 'ok',
-                'message': ''
+                'message': '',
+                'query': { 'dataset_name': dataset_name } 
             },
             'objects': []
         }
@@ -223,9 +224,7 @@ def dataset():
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
 
     # init from and to dates ad python datetimes
-    if 'obs_date__ge' in raw_query_params.keys():
-        from_date = parse(raw_query_params['obs_date__ge'])
-    from_date = truncate(from_date, agg)
+    from_date = truncate(parse(raw_query_params['obs_date__ge']), agg)
     if 'obs_date__le' in raw_query_params.keys():
         to_date = parse(raw_query_params['obs_date__le'])
     else:
@@ -294,13 +293,16 @@ def dataset():
     elif datatype == 'csv':
         csv_resp = []
         fields = ['temporal_group']
-        results = sorted(results, key=itemgetter('group'))
-        for k,g in groupby(results, key=itemgetter('group')):
-            d = [k]
-            for row in list(g):
-                if row['dataset_name'] not in fields:
-                    fields.append(row['dataset_name'])
+
+        i = 0
+        for k,g in groupby(resp['objects'], key=itemgetter('dataset_name')):
+            l_g = list(g)[0]
+            d = [l_g['items'][i]['datetime']] # step across the list to get temp_agg
+            i += 1
+            fields.append(l_g['dataset_name'])
+            for row in l_g['items']:
                 d.append(row['count'])
+
             csv_resp.append(d)
         csv_resp[0] = fields
         csv_resp = make_csv(csv_resp)
@@ -372,7 +374,13 @@ def detail():
             for k,v in zip(fieldnames, value[1:]):
                 d[k] = v
             resp['objects'].append(d)
+
+        resp['meta']['query'] = raw_query_params
+        loc = resp['meta']['query'].get('location_geom__within')
+        if loc:
+            resp['meta']['query']['location_geom__within'] = json.loads(loc)
         resp['meta']['total'] = len(resp['objects'])
+
     if datatype == 'json':
         resp = make_response(json.dumps(resp, default=dthandler), status_code)
         resp.headers['Content-Type'] = 'application/json'
@@ -422,7 +430,7 @@ def detail_aggregate():
             items = []
             for value in values:
                 d = {
-                    'group': value[0],
+                    'datetime': value[0],
                     'count': value[1]
                 }
                 items.append(d)
