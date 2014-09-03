@@ -211,6 +211,8 @@ def make_csv(data):
 @crossdomain(origin="*")
 def dataset():
     raw_query_params = request.args.copy()
+
+    # set default value for temporal aggregation
     agg = raw_query_params.get('agg')
     if not agg:
         agg = 'day'
@@ -406,11 +408,19 @@ def detail_aggregate():
         six_months_ago = datetime.now() - timedelta(days=180)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
 
+    # init from and to dates ad python datetimes
+    from_date = truncate(parse(raw_query_params['obs_date__ge']), agg)
+    if 'obs_date__le' in raw_query_params.keys():
+        to_date = parse(raw_query_params['obs_date__le'])
+    else:
+        to_date = datetime.now()
+
     agg, datatype, queries = parse_join_query(raw_query_params)
+    if not agg:
+        agg = 'day'
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
     if valid_query:
-        resp['meta']['status'] = 'ok'
         time_agg = func.date_trunc(agg, mt.c['obs_date'])
         base_query = session.query(time_agg, func.count(mt.c.dataset_row_id))
         dname = raw_query_params['dataset_name']
@@ -419,7 +429,6 @@ def detail_aggregate():
             extend_existing=True)
         valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
         if valid_query:
-            resp['meta']['status'] = 'ok'
             pk = [p.name for p in dataset.primary_key][0]
             base_query = base_query.join(dataset, mt.c.dataset_row_id == dataset.c[pk])
             for clause in base_clauses:
@@ -427,18 +436,38 @@ def detail_aggregate():
             for clause in detail_clauses:
                 base_query = base_query.filter(clause)
             values = [r for r in base_query.group_by(time_agg).order_by(time_agg).all()]
+            
             items = []
-            for value in values:
-                d = {
-                    'datetime': value[0],
-                    'count': value[1]
-                }
-                items.append(d)
-            resp['objects'].append({
-                'temporal_aggregate': agg,
-                'dataset_name': ' '.join(dname.split('_')).title(),
-                'items': items
-            })
+            dense_matrix = []
+            cursor = from_date
+            v_index = 0
+            while cursor <= to_date:
+                if v_index < len(values) and \
+                    values[v_index][0].replace(tzinfo=None) == cursor:
+                    dense_matrix.append((cursor, values[v_index][1]))
+                    v_index += 1
+                else:
+                    dense_matrix.append((cursor, 0))
+
+                cursor = increment_datetime_aggregate(cursor, agg)
+
+            dense_matrix = OrderedDict(dense_matrix)
+            for k in dense_matrix:
+                i = {
+                    'datetime': k,
+                    'count': dense_matrix[k],
+                    }
+                items.append(i)
+
+            resp['objects'] = items
+            # populate meta block
+            resp['meta']['status'] = 'ok'
+            resp['meta']['query'] = raw_query_params
+            loc = resp['meta']['query'].get('location_geom__within')
+            if loc:
+                resp['meta']['query']['location_geom__within'] = json.loads(loc)
+            resp['meta']['query']['agg'] = agg
+
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp

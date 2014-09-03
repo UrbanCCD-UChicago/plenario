@@ -165,9 +165,7 @@
       <h2 id='api-master'>/api/master/</h2>
       <p>
           This endpoint contains a record for every row in every dataset with
-          brief temporal and spatial information about the row. The endpoint
-          should only be called using query parameters. This can give a user
-          of the platform a quick overview about what is available within
+          brief temporal and spatial information about the row. This can give a user of the platform a quick overview about what is available within
           their constraints.
       </p>
       
@@ -269,7 +267,7 @@
       </table>
 
       <p><strong>Response Parameters</strong></p>
-      <p>The API responds with a list of datasets with counts grouped by temporal aggregation.</p>
+      <p>The API responds with a list of datasets with a dense matrix of counts grouped by temporal aggregation.</p>
       <table class='table table-bordered'>
         <thead>
           <tr>
@@ -369,7 +367,7 @@
       <hr />
       <h2 id='api-detail-aggregate'>/api/detail-aggregate/</h2>
       <p>
-          Query a particular dataset and get back a temporally aggregated response.
+          Very similar to the /api/master/ API endpoint, but for one dataset. Additional dataset-specific query parameters can be used to filter the results.
       </p>
 
       <p><strong>Query parameters</strong></p>
@@ -452,10 +450,14 @@
             </td>
           </tr>
           <tr>
-            <td><strong><code>obs_date</code></strong></td>
-            <td>greater than or equal to 180 days ago</td>
-            <td>Date of obversations. This can
-          have filters applied such as <code>__gt</code> (greater than) and <code>__lt</code> (less than).</td>
+            <td><strong><code>obs_date__ge</code></strong></td>
+            <td>180 days ago</td>
+            <td>Obversations greater than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
+          </tr>
+          <tr>
+            <td><strong><code>obs_date__le</code></strong></td>
+            <td>today's date</td>
+            <td>Obversations less than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
           </tr>
           <tr>
             <td><strong><code>location_geom</code></strong></td>
