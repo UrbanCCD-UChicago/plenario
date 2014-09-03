@@ -103,8 +103,9 @@
                     $.each(results, function(i, obj){
                         obj['values'] = []
                         $.each(obj.items, function(i, o){
-                            obj['values'].push([moment(o.datetime).valueOf(),o.count]);
+                            obj['values'].push([moment(o.datetime + "+0000").valueOf(),o.count]);
                         });
+                        console.log(obj['values'])
                         obj['meta'] = self.meta[obj['dataset_name']]
                         objects.push(obj)
                     });

@@ -80,13 +80,23 @@ def slugify(text, delim=u'_'):
         return text
 
 def increment_datetime_aggregate(sourcedate, time_agg):
-    # TODO: add hour and quarter
-    if time_agg == 'day':
-        days_to_add = 1
+    delta = None
+    if time_agg == 'hour':
+        delta = timedelta(hours=1)
+    elif time_agg == 'day':
+        delta = timedelta(days=1)
     elif time_agg == 'week':
-        days_to_add = 7
+        delta = timedelta(days=7)
     elif time_agg == 'month':
         _, days_to_add = calendar.monthrange(sourcedate.year, sourcedate.month)
+        delta = timedelta(days=days_to_add)
+    elif time_agg == 'quarter':
+        _, days_to_add_1 = calendar.monthrange(sourcedate.year, sourcedate.month)
+        _, days_to_add_2 = calendar.monthrange(sourcedate.year, sourcedate.month+1)
+        _, days_to_add_3 = calendar.monthrange(sourcedate.year, sourcedate.month+2)
+        delta = timedelta(days=(days_to_add_1 + days_to_add_2 + days_to_add_3))
     elif time_agg == 'year':
         days_to_add = 366 if calendar.isleap(sourcedate.year) else 365
-    return sourcedate + timedelta(days=days_to_add)
+        delta = timedelta(days=days_to_add)
+
+    return sourcedate + delta
