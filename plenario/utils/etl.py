@@ -118,16 +118,15 @@ class PlenarioETL(object):
         self._make_new_and_dup_table()
         self._find_dup_data()
         new = self._insert_new_data()
-        changes = False
         if new:
             self._insert_data_table()
             self._update_master()
-            changes = self._find_changes()
-            if changes:
-                self._update_dat_current_flag()
-                self._update_master_current_flag()
+           #changes = self._find_changes()
+           #if changes:
+           #    self._update_dat_current_flag()
+           #    self._update_master_current_flag()
         self._update_meta()
-        self._cleanup_temp_tables(changes=changes)
+        self._cleanup_temp_tables()
 
     def _download_csv(self):
         r = requests.get(self.dl_url, stream=True)
@@ -141,12 +140,14 @@ class PlenarioETL(object):
         self.s3_key.set_contents_from_file(s)
         self.s3_key.make_public()
  
-    def _cleanup_temp_tables(self, changes=False):
+    def _cleanup_temp_tables(self):
         self.src_table.drop(bind=engine, checkfirst=True)
         self.new_table.drop(bind=engine, checkfirst=True)
         self.dup_table.drop(bind=engine, checkfirst=True)
-        if changes:
+        try:
             self.chg_table.drop(bind=engine, checkfirst=True)
+        except AttributeError:
+            pass
 
     def iter_column(self, idx, f):
         f.seek(0)
@@ -295,20 +296,25 @@ class PlenarioETL(object):
 
     def _insert_data_table(self):
         # Step Seven
-        skip_cols = ['%s_row_id' % self.dataset_name,'end_date', 'current_flag']
-        skip_src_col = ['line_num']
+        bk = slugify(self.business_key)
+        skip_cols = ['%s_row_id' % self.dataset_name,'end_date', 'current_flag', 'line_num']
         from_vals = []
         from_vals.append(text("'%s' AS start_date" % datetime.now().isoformat()))
-        from_vals.append(func.rank()\
-            .over(partition_by=getattr(self.src_table.c, slugify(self.business_key)), 
-                order_by=self.src_table.columns['line_num'].desc())\
-            .label('dup_ver'))
-        for c_src in self.src_table.columns.keys():
-            if c_src not in skip_src_col:
+        from_vals.append(self.new_table.c.dup_ver)
+        for c_src in self.src_table.columns:
+            if c_src.name not in skip_cols:
                 from_vals.append(c_src)
         sel = select(from_vals, from_obj = self.src_table)
         ins = self.dat_table.insert()\
-            .from_select([c for c in self.dat_table.columns.keys() if c not in skip_cols], sel)
+            .from_select(
+                [c for c in self.dat_table.columns if c.name not in skip_cols], 
+                sel.select_from(self.src_table.join(self.new_table, 
+                        and_(
+                            self.src_table.c.line_num == self.new_table.c.line_num,
+                            getattr(self.src_table.c, bk) == getattr(self.new_table.c, bk),
+                        )
+                    ))
+            )
         conn = engine.connect()
         conn.execute(ins)
 
@@ -393,11 +399,13 @@ class PlenarioETL(object):
         bk_type = getattr(self.dat_table.c, bk).type
         self.chg_table = Table('chg_%s' % self.dataset_name, Base.metadata,
                       Column('id', bk_type, primary_key=True), 
+                      Column('dup_ver', Integer, primary_key=True), 
                       extend_existing=True)
         self.chg_table.drop(bind=engine, checkfirst=True)
         self.chg_table.create(bind=engine)
         bk = slugify(self.business_key)
-        skip_cols = ['start_date', 'end_date', 'current_flag', bk, '%s_row_id' % self.dataset_name]
+        skip_cols = ['start_date', 'end_date', 'current_flag', bk, 
+            '%s_row_id' % self.dataset_name, 'dup_ver']
         src_cols = [c for c in self.src_table.columns if c.name != bk]
         dat_cols = [c for c in self.dat_table.columns if c.name not in skip_cols]
         and_args = []
@@ -407,8 +415,8 @@ class PlenarioETL(object):
             and_args.append(ands)
         ins = self.chg_table.insert()\
             .from_select(
-                ['id'],
-                select([getattr(self.src_table.c, bk)])\
+                ['id', 'dup_ver'],
+                select([getattr(self.src_table.c, bk), self.dat_table.c.dup_ver])\
                     .select_from(self.src_table.join(self.dat_table,
                         getattr(self.src_table.c, bk) == \
                         getattr(self.dat_table.c, bk)))\
