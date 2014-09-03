@@ -117,17 +117,9 @@
             <td><strong><code>agg</code></strong></td>
             <td>day</td>
             <td>
-              <p>Under the hood, this takes advantage of
-              <a href="http://www.postgresql.org/docs/9.1/static/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC" target="_blank">
-                  PostgreSQL’s <code>date_trunc</code> function
-              </a>
-              and can take any precision values that are valid there. If
-              not supplied, this defaults to <code>day</code>. If the supplied
-              value is of a higher resolution that the highest available
-              temporal resolution for the dataset, it will just aggregate by
-              the highest available resolution.</p>
+              <p>Time resolution to aggregate observation counts by.</p>
 
-              <p>Typical values:</p>
+              <p>Supported values:</p>
               <ul>
                 <li>hour</li>
                 <li>day</li>
@@ -214,16 +206,73 @@
         </thead>
         <tbody>
           <tr>
-            <td><strong><code>count</code></strong></td>
-            <td>Record count</td>
+            <td><strong><code>meta</code></strong></td>
+            <td>
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>status</code></strong></td>
+                    <td><strong>ok</strong> if query was sucessful, <strong>error</strong> if not</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>query</code></strong></td>
+                    <td>Original query parameters passed in</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>message</code></strong></td>
+                    <td>If <code>status</code> is <strong>error</strong>, a detailed message as to what went wrong</td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
           </tr>
           <tr>
-            <td><strong><code>datetime</code></strong></td>
-            <td>Temporal aggregation group</td>
-          </tr>
-          <tr>
-            <td><strong><code>dataset_name</code></strong></td>
-            <td>Dataset name for aggregation</td>
+            <td><strong><code>objects</code></strong></td>
+            <td>
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>dataset_name</code></strong></td>
+                    <td>Machine version of the dataset name</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>items</code></strong></td>
+                    <td>
+                      <table class='table table-bordered'>
+                        <thead>
+                          <tr>
+                            <th>Parameter</th>
+                            <th>Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td><strong><code>count</code></strong></td>
+                            <td>Record count</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>datetime</code></strong></td>
+                            <td>Temporal aggregation group</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -358,17 +407,9 @@
             <td><strong><code>agg</code></strong></td>
             <td>day</td>
             <td>
-              <p>Under the hood, this takes advantage of
-              <a href="http://www.postgresql.org/docs/9.1/static/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC" target="_blank">
-                  PostgreSQL’s <code>date_trunc</code> function
-              </a>
-              and can take any precision values that are valid there. If
-              not supplied, this defaults to <code>day</code>. If the supplied
-              value is of a higher resolution that the highest available
-              temporal resolution for the dataset, it will just aggregate by
-              the highest available resolution.</p>
+              <p>Time resolution to aggregate observation counts by.</p>
 
-              <p>Typical values:</p>
+              <p>Supported values:</p>
               <ul>
                 <li>hour</li>
                 <li>day</li>

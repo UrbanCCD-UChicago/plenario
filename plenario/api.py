@@ -254,9 +254,6 @@ def dataset():
         results = sorted(values, key=itemgetter(2))
         for k,g in groupby(results, key=itemgetter(2)):
             d = {'dataset_name': k}
-            d['temporal_aggregate'] = agg
-            d['start_date'] = from_date
-            d['end_date'] = to_date
 
             items = []
             dense_matrix = []
@@ -284,6 +281,11 @@ def dataset():
             d['items'] = items
             resp['objects'].append(d)
 
+        resp['meta']['query'] = raw_query_params
+        loc = resp['meta']['query'].get('location_geom__within')
+        if loc:
+            resp['meta']['query']['location_geom__within'] = json.loads(loc)
+        resp['meta']['query']['agg'] = agg
         resp['meta']['status'] = 'ok'
     
     if datatype == 'json':
