@@ -15,3 +15,4 @@ flask-bcrypt
 csvkit
 redis
 pytz
+datetime_truncate
