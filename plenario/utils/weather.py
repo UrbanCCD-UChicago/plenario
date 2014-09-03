@@ -560,18 +560,15 @@ class WeatherStationsETL(object):
     def initialize(self):
         self._extract()
         self._transform()
-        self.make_table()
+        self._make_station_table()
         self._load()
 
     def update(self):
         self._extract()
         self._transform()
         # Doing this just so self.station_table is defined
-        self.make_table()
-        self._update_stations()
-
-    def make_table(self):
         self._make_station_table()
+        self._update_stations()
 
     def _extract(self):
         """ Download CSV of station info from NOAA """
