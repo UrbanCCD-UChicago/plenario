@@ -200,10 +200,14 @@
             </td>
           </tr>
           <tr>
-            <td><strong><code>obs_date</code></strong></td>
-            <td>greater than or equal to 180 days ago</td>
-            <td>Date of obversations. This can
-          have filters applied such as <code>__gt</code> (greater than) and <code>__lt</code> (less than).</td>
+            <td><strong><code>obs_date__ge</code></strong></td>
+            <td>180 days ago</td>
+            <td>Obversations greater than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
+          </tr>
+          <tr>
+            <td><strong><code>obs_date__le</code></strong></td>
+            <td>today's date</td>
+            <td>Obversations less than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
           </tr>
           <tr>
             <td><strong><code>dataset_name</code></strong></td>
