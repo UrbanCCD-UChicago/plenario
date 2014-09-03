@@ -1,10 +1,22 @@
 {% extends 'base.html' %}
-{% block title %}API documentation - Plenar.io{% endblock %}
+{% block title %}API Documentation - Plenar.io{% endblock %}
 {% block content %}
-  <div class='col-md-10 col-md-offset-1'>
-      <h1>API documentation</h1>
-
-      <p><strong>For programmers.</strong> The Plenar.io RESTful API can be used to perform custom geospatial and temporal queries.</p> 
+<div class='col-md-10 col-md-offset-1'>
+    <br/>
+    <div class="col-md-8 col-md-offset-2">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h1 class="panel-title">Note</h1>
+        </div>
+        <div class="panel-body">
+          <p class="lead">The easiest way to access Plenar.io&rsquo;s data and to build your own queries is via the <a href="{{ url_for('views.explore_view') }}">Data Explorer</a>.</p>
+        </div>
+      </div>
+    </div>
+    <div class="row"></div>
+      <hr>
+      <h2 id="docs">For Developers</h2>
+      <p><strong></strong> The Plenar.io RESTful API can be used to perform custom geospatial and temporal queries.</p>  
 
       <p>A few things to know:</p>
 
