@@ -11,9 +11,11 @@ from datetime import datetime, date, timedelta
 import calendar
 from plenario.database import task_session as session, task_engine as engine, \
     Base
-from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float, VARCHAR
+from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float, \
+    VARCHAR, BigInteger, UniqueConstraint, and_, select
 from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
+from uuid import uuid4
 DATA_DIR = os.environ['WOPR_DATA_DIR']
 
 class WeatherError(Exception):
@@ -102,9 +104,46 @@ class WeatherETL(object):
             t_hourly = self._transform_hourly(raw_hourly, file_type)             # this returns a StringIO with all the transformed data
         if (not no_daily):
             self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
+            self._update_daily()
         if (not no_hourly):
-            self._load_hourly(t_hourly)                          # this actually imports the transformed StringIO csv
+            self._load_hourly(t_hourly)    # this actually imports the transformed StringIO csv
 
+    def _update_hourly(self):
+        self.new_hourly_table = self._get_hourly_table(name='new')
+        self.new_hourly_table.drop(engine, checkfirst=True)
+        self.new_hourly_table.create(engine)
+    
+    def _update_daily(self):
+        self.new_daily_table = Table('new_weather_observations_daily', Base.metadata,
+                                    Column('wban_code', String(5)),
+                                    Column('date', Date), extend_existing=True)
+        self.new_daily_table.drop(engine, checkfirst=True)
+        self.new_daily_table.create(engine)
+        ins = self.new_daily_table.insert()\
+                .from_select(['wban_code', 'date'], 
+                    select([self.src_daily_table.c.wban_code, self.src_daily_table.c.date])\
+                        .select_from(self.src_daily_table.join(self.daily_table,
+                            and_(self.src_daily_table.c.wban_code == self.daily_table.c.wban_code,
+                                 self.src_daily_table.c.date == self.daily_table.c.date),
+                            isouter=True)
+                    ).where(self.daily_table.c.id == None)
+                )
+        conn = engine.contextual_connect()
+        try:
+            conn.execute(ins)
+            new = True
+        except TypeError:
+            new = False
+        if new:
+            ins = self.daily_table.insert()\
+                    .from_select([c for c in self.daily_table.columns if c.name != 'id'], 
+                        select([c for c in self.src_daily_table.columns])\
+                            .select_from(self.src_daily_table.join(self.new_daily_table,
+                                and_(self.src_daily_table.c.wban_code == self.new_daily_table.c.wban_code,
+                                     self.src_daily_table.c.date == self.new_daily_table.c.date)
+                            ))
+                    )
+            conn.execute(ins)
 
     def _transform_hourly(self, raw, file_type, start_line=0, end_line=None):
         t = getattr(self, '_transform_%s_hourly' % file_type)(raw, start_line, end_line)
@@ -158,7 +197,6 @@ class WeatherETL(object):
         station_table = Table('weather_stations', Base.metadata, autoload=True, autoload_with=engine)
         wban_list = session.query(station_table.c.wban_code.distinct()). \
                     order_by(station_table.c.wban_code).all()
-        observations_daily = Table('weather_observations_daily', Base.metadata, autoload=True, autoload_with=engine)
         
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
@@ -401,11 +439,21 @@ class WeatherETL(object):
                     self.debug_outfile.write("ValueError [%s] could not convert '%s' to int\n" % (e, val))
                 return None
             return ival
-
+    
     def _make_daily_table(self):
-        self.daily_table = Table('weather_observations_daily', Base.metadata,
-                            Column('wban_code', String(5), primary_key=True),
-                            Column('date', Date, nullable=False, primary_key=True),
+        self.daily_table = self._get_daily_table()
+        self.daily_table.append_column(Column('id', BigInteger, primary_key=True))
+        self.daily_table.create(engine, checkfirst=True)
+
+    def _make_hourly_table(self):
+        self.hourly_table = self._get_hourly_table()
+        self.hourly_table.append_column(Column('id', BigInteger, primary_key=True))
+        self.hourly_table.create(engine, checkfirst=True)
+
+    def _get_daily_table(self, name='dat'):
+        return Table('%s_weather_observations_daily' % name, Base.metadata,
+                            Column('wban_code', String(5), nullable=False),
+                            Column('date', Date, nullable=False),
                             Column('temp_max', Float),
                             Column('temp_min', Float),
                             Column('temp_avg', Float),
@@ -430,13 +478,13 @@ class WeatherETL(object):
                             Column('max2_windspeed', Float), 
                             Column('max2_winddirection', String(3)), # 000 through 360, M for missing
                             Column('max2_direction_cardinal', String(3)), # e.g. NNE, NNW
+                            UniqueConstraint('wban_code', 'date', name='%s_wban_date_ix' % name),
                             extend_existing=True) 
-        self.daily_table.create(engine, checkfirst=True)
 
-    def _make_hourly_table(self):
-        self.hourly_table = Table('weather_observations_hourly', Base.metadata,
-                Column('wban_code', String(5), primary_key=True),
-                Column('datetime', DateTime, nullable=False, primary_key=True),
+    def _get_hourly_table(self, name='dat'):
+        return Table('%s_weather_observations_hourly' % name, Base.metadata,
+                Column('wban_code', String(5), nullable=False),
+                Column('datetime', DateTime, nullable=False),
                 # AO1: without precipitation discriminator, AO2: with precipitation discriminator
                 Column('old_station_type', String(3)),
                 Column('station_type', Integer),
@@ -461,10 +509,8 @@ class WeatherETL(object):
                 Column('sealevel_pressure', Float),
                 Column('report_type', String), # Either 'AA' or 'SP'
                 Column('hourly_precip', Float),
+                UniqueConstraint('wban_code', 'datetime', name='%s_wban_datetime_ix' % name),
                 extend_existing=True)
-
-        self.hourly_table.create(engine, checkfirst=True)
-
 
     def _extract_last_fname(self):
         # XX: not currently parsing tar files
@@ -506,8 +552,18 @@ class WeatherETL(object):
             f.write(transformed_input.getvalue())
             f.close()
         transformed_input.seek(0)
-        names = [c.name for c in self.hourly_table.columns]
-        ins_st = "COPY weather_observations_hourly FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
+        self.src_hourly_table = self._get_hourly_table(name='src')
+        self.src_hourly_table.drop(engine, checkfirst=True)
+        self.src_hourly_table.create(engine)
+        names = [c.name for c in self.hourly_table.columns if c.name != 'id']
+        ins_st = "COPY src_weather_observations_hourly ("
+        for idx, name in enumerate(names):
+            if idx < len(names) - 1:
+                ins_st += '%s, ' % name
+            else:
+                ins_st += '%s)' % name
+        else:
+            ins_st += "FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
         conn = engine.raw_connection()
         cursor = conn.cursor()
         cursor.copy_expert(ins_st, transformed_input)
@@ -524,8 +580,18 @@ class WeatherETL(object):
             f.write(transformed_input.getvalue())
             f.close()
         transformed_input.seek(0)
-        names = [c.name for c in self.daily_table.columns]
-        ins_st = "COPY weather_observations_daily FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
+        names = [c.name for c in self.daily_table.columns if c.name != 'id']
+        self.src_daily_table = self._get_daily_table(name='src')
+        self.src_daily_table.drop(engine, checkfirst=True)
+        self.src_daily_table.create(engine)
+        ins_st = "COPY src_weather_observations_daily ("
+        for idx, name in enumerate(names):
+            if idx < len(names) - 1:
+                ins_st += '%s, ' % name
+            else:
+                ins_st += '%s)' % name
+        else:
+            ins_st += "FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
         conn = engine.raw_connection()
         cursor = conn.cursor()
         cursor.copy_expert(ins_st, transformed_input)
