@@ -18,6 +18,43 @@
                     </div>
                 </div>
             </div>
+            Filter query
+            <div class='row'>
+                <div class='col-md-5'>
+                    <div class="form-group">
+                        <select class='form-control' id="filter-field">
+                            <option value="">Select a field&hellip;</option>
+                            <option value="ward">Ward</option>
+                        </select>
+                    </div>
+                </div>
+                <div class='col-md-2'>
+                    <div class="form-group">
+                        <select class='form-control' id="filter-operator">
+                            <option value="">=</option>
+                            <option value="__gt">&gt;</option>
+                            <option value="__ge">&gt;=</option>
+                            <option value="__lt">&lt;</option>
+                            <option value="__le">&lt;=</option>
+                            <option value="__ne">!=</option>
+                            <option value="__in">in</option>
+                        </select>
+                    </div>
+                </div>
+                <div class='col-md-5'>
+                    <div class="form-group">
+                        <input id="filter-value" class="form-control" type="text" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="detail-filter">Filter</label>
+                <select class='form-control' id="spatial-agg-filter">
+                    <option value="100">100 meters</option>
+                    
+                </select>
+            </div>
             <div class="form-group">
                 <label for="spatial-agg-filter">Grid resolution</label>
                 <select class='form-control' id="spatial-agg-filter">

@@ -354,10 +354,19 @@
             }
             query['obs_date__le'] = end;
             query['obs_date__ge'] = start;
+
+            var filters = []
+            var filter_field = $('#filter-field').val();
+            var filter_operator = $('#filter-operator').val();
+            var filter_value = $('#filter-value').val();
+            if (filter_value) {
+                query[filter_field + filter_operator] = filter_value;
+            }
             
             if(valid){
                 this.undelegateEvents();
                 new GridMapView({el: '#map-view', attributes: {query: query, meta: this.meta}})
+                console.log(query);
                 var route = 'detail/' + $.param(query)
                 router.navigate(route)
             } else {
