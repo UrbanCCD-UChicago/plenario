@@ -104,29 +104,49 @@ class WeatherETL(object):
             t_hourly = self._transform_hourly(raw_hourly, file_type)             # this returns a StringIO with all the transformed data
         if (not no_daily):
             self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
-            self._update_daily()
+            self._update(span='daily')
         if (not no_hourly):
             self._load_hourly(t_hourly)    # this actually imports the transformed StringIO csv
+            self._update(span='hourly')
+        self._cleanup_temp_tables()
 
-    def _update_hourly(self):
-        self.new_hourly_table = self._get_hourly_table(name='new')
-        self.new_hourly_table.drop(engine, checkfirst=True)
-        self.new_hourly_table.create(engine)
-    
-    def _update_daily(self):
-        self.new_daily_table = Table('new_weather_observations_daily', Base.metadata,
-                                    Column('wban_code', String(5)),
-                                    Column('date', Date), extend_existing=True)
-        self.new_daily_table.drop(engine, checkfirst=True)
-        self.new_daily_table.create(engine)
-        ins = self.new_daily_table.insert()\
-                .from_select(['wban_code', 'date'], 
-                    select([self.src_daily_table.c.wban_code, self.src_daily_table.c.date])\
-                        .select_from(self.src_daily_table.join(self.daily_table,
-                            and_(self.src_daily_table.c.wban_code == self.daily_table.c.wban_code,
-                                 self.src_daily_table.c.date == self.daily_table.c.date),
+    def _cleanup_temp_tables(self):
+        for span in ['daily', 'hourly']:
+            for tname in ['src', 'new']:
+                try:
+                    table = getattr(self, '%s_%s_table' % (tname, span))
+                    table.drop(engine, checkfirst=True)
+                except AttributeError:
+                    continue
+
+    def _update(self, span=None):
+        new_table = Table('new_weather_observations_%s' % span, Base.metadata,
+                          Column('wban_code', String(5)), extend_existing=True)
+        dat_table = getattr(self, '%s_table' % span)
+        src_table = getattr(self, 'src_%s_table' % span)
+        from_sel_cols = ['wban_code']
+        if span == 'daily':
+            from_sel_cols.append('date')
+            src_date_col = src_table.c.date
+            dat_date_col = dat_table.c.date
+            new_table.append_column(Column('date', Date))
+            new_date_col = new_table.c.date
+        elif span == 'hourly':
+            from_sel_cols.append('datetime')
+            src_date_col = src_table.c.datetime
+            dat_date_col = dat_table.c.datetime
+            new_table.append_column(Column('datetime', DateTime))
+            new_date_col = new_table.c.datetime
+        new_table.drop(engine, checkfirst=True)
+        new_table.create(engine)
+        ins = new_table.insert()\
+                .from_select(from_sel_cols, 
+                    select([src_table.c.wban_code, src_date_col])\
+                        .select_from(src_table.join(dat_table,
+                            and_(src_table.c.wban_code == dat_table.c.wban_code,
+                                 src_date_col == dat_date_col),
                             isouter=True)
-                    ).where(self.daily_table.c.id == None)
+                    ).where(dat_table.c.id == None)
                 )
         conn = engine.contextual_connect()
         try:
@@ -135,12 +155,12 @@ class WeatherETL(object):
         except TypeError:
             new = False
         if new:
-            ins = self.daily_table.insert()\
-                    .from_select([c for c in self.daily_table.columns if c.name != 'id'], 
-                        select([c for c in self.src_daily_table.columns])\
-                            .select_from(self.src_daily_table.join(self.new_daily_table,
-                                and_(self.src_daily_table.c.wban_code == self.new_daily_table.c.wban_code,
-                                     self.src_daily_table.c.date == self.new_daily_table.c.date)
+            ins = dat_table.insert()\
+                    .from_select([c for c in dat_table.columns if c.name != 'id'], 
+                        select([c for c in src_table.columns])\
+                            .select_from(src_table.join(new_table,
+                                and_(src_table.c.wban_code == new_table.c.wban_code,
+                                     src_date_col == new_date_col)
                             ))
                     )
             conn.execute(ins)
