@@ -355,7 +355,18 @@
             query['obs_date__le'] = end;
             query['obs_date__ge'] = start;
 
-            var filters = []
+            // var filters = []
+            // filters.append({
+            //     'field': $('#filter-field').val(),
+            //     'operator': $('#filter-operator').val(),
+            //     'value': $('#filter-value').val()
+            // })
+
+            // if (filters.length > 0) {
+            //     query[filters[0]['field'] + filters[0]['operator']] = filters[0]['value'];
+            // }
+
+            // test filter
             var filter_field = $('#filter-field').val();
             var filter_operator = $('#filter-operator').val();
             var filter_value = $('#filter-value').val();
