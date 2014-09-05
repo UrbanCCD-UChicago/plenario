@@ -15,7 +15,7 @@
     </div>
     <div class="row"></div>
       <hr>
-      <h2 id="docs">For Developers</h2>
+      <h2 id="docs">For developers</h2>
       <p><strong></strong> The Plenar.io RESTful API can be used to perform custom geospatial and temporal queries.</p>  
 
       <p>A few things to know:</p>
@@ -23,9 +23,78 @@
       <ul>
         <li>All API calls should be made with <code>HTTP GET</code></li>
         <li>All API responses are in <a href='http://www.json.org/'>JSON format</a> by default. Some responses support <a href='http://en.wikipedia.org/wiki/Comma-separated_values'>CSV format</a>.</li>
-        <li>You can consider any non-200 HTTP response code an error - the returned data will contain more detailed information</li>
         <li>All methods are accessed via: <code>http://plenar.io/api/SOME-ENDPOINT</code></li>
       </ul>
+
+      <h2 id='responses'>API responses</h2>
+      <p>All JSON API calls return their data in the <code>objects</code> block. Additional information is returned in the <code>meta</code> block:</p>
+
+      <table class='table table-bordered'>
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong><code>status</code></strong></td>
+            <td><strong>ok</strong> if query was sucessful, <strong>error</strong> if not.</td>
+          </tr>
+          <tr>
+            <td><strong><code>query</code></strong></td>
+            <td>Original query parameters passed in.</td>
+          </tr>
+          <tr>
+            <td><strong><code>message</code></strong></td>
+            <td>If <code>status</code> is <strong>error</strong>, a detailed message as to what went wrong.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      Here's an example response from the /api/master/ endpoint:
+
+      <pre>
+{
+   "meta":{
+      "status":"ok",
+      "query":{
+         "agg":"week",
+         "dataset_name__in":"cdph_environmental_complaints",
+         "obs_date__ge":"2007-12-12",
+         "obs_date__le":"2008-01-12"
+      },
+      "message":""
+   },
+   "objects":[
+      {
+         "items":[
+            {
+               "count":8,
+               "datetime":"2007-12-10T00:00:00"
+            },
+            {
+               "count":8,
+               "datetime":"2007-12-17T00:00:00"
+            },
+            {
+               "count":5,
+               "datetime":"2007-12-24T00:00:00"
+            },
+            {
+               "count":7,
+               "datetime":"2007-12-31T00:00:00"
+            },
+            {
+               "count":22,
+               "datetime":"2008-01-07T00:00:00"
+            }
+         ],
+         "dataset_name":"cdph_environmental_complaints"
+      }
+   ]
+}
+      </pre>
 
       <h2 id='endpoints'>Endpoints</h2>
       <p>Currently there are five API endpoints:</p>
@@ -96,9 +165,7 @@
       <h2 id='api-master'>/api/master/</h2>
       <p>
           This endpoint contains a record for every row in every dataset with
-          brief temporal and spatial information about the row. The endpoint
-          should only be called using query parameters. This can give a user
-          of the platform a quick overview about what is available within
+          brief temporal and spatial information about the row. This can give a user of the platform a quick overview about what is available within
           their constraints.
       </p>
       
@@ -117,17 +184,9 @@
             <td><strong><code>agg</code></strong></td>
             <td>day</td>
             <td>
-              <p>Under the hood, this takes advantage of
-              <a href="http://www.postgresql.org/docs/9.1/static/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC" target="_blank">
-                  PostgreSQL’s <code>date_trunc</code> function
-              </a>
-              and can take any precision values that are valid there. If
-              not supplied, this defaults to <code>day</code>. If the supplied
-              value is of a higher resolution that the highest available
-              temporal resolution for the dataset, it will just aggregate by
-              the highest available resolution.</p>
+              <p>Time resolution to aggregate observation counts by.</p>
 
-              <p>Typical values:</p>
+              <p>Supported values:</p>
               <ul>
                 <li>hour</li>
                 <li>day</li>
@@ -139,10 +198,14 @@
             </td>
           </tr>
           <tr>
-            <td><strong><code>obs_date</code></strong></td>
-            <td>greater than or equal to 180 days ago</td>
-            <td>Date of obversations. This can
-          have filters applied such as <code>__gt</code> (greater than) and <code>__lt</code> (less than).</td>
+            <td><strong><code>obs_date__ge</code></strong></td>
+            <td>180 days ago</td>
+            <td>Obversations greater than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
+          </tr>
+          <tr>
+            <td><strong><code>obs_date__le</code></strong></td>
+            <td>today's date</td>
+            <td>Obversations less than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
           </tr>
           <tr>
             <td><strong><code>dataset_name</code></strong></td>
@@ -204,7 +267,7 @@
       </table>
 
       <p><strong>Response Parameters</strong></p>
-      <p>The API responds with a list of counts grouped by temporal aggregation and dataset name.</p>
+      <p>The API responds with a list of datasets with a dense matrix of counts grouped by temporal aggregation.</p>
       <table class='table table-bordered'>
         <thead>
           <tr>
@@ -214,16 +277,31 @@
         </thead>
         <tbody>
           <tr>
-            <td><strong><code>count</code></strong></td>
-            <td>Record count</td>
-          </tr>
-          <tr>
-            <td><strong><code>datetime</code></strong></td>
-            <td>Temporal aggregation group</td>
-          </tr>
-          <tr>
             <td><strong><code>dataset_name</code></strong></td>
-            <td>Dataset name for aggregation</td>
+            <td>Machine version of the dataset name</td>
+          </tr>
+          <tr>
+            <td><strong><code>items</code></strong></td>
+            <td>
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>count</code></strong></td>
+                    <td>Record count</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>datetime</code></strong></td>
+                    <td>Temporal aggregation group</td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -234,7 +312,7 @@
         <p><a href='/api/master/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1'>http://plenar.io/api/master/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1</a>
         <br />Count of all Chicago crime reports since Jan 1st 2012, aggregated by year</p>
 
-        <p><a href='/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day'>http://plenar.io/api/master/?obs_date__gt=2007-11-12&obs_date__lt=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day</a>
+        <p><a href='/api/master/?obs_date__ge=2007-11-12&obs_date__le=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day'>http://plenar.io/api/master/?obs_date__ge=2007-11-12&obs_date__le=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day</a>
         <br />Count of crime and environmental complaints that were observed after November 12, 2007 but before November 12, 2008, aggregated by day</p>
 
         <p><a href='/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&agg=week&data_type=csv'>http://plenar.io/api/master/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&agg=week&data_type=csv</a>
@@ -289,7 +367,7 @@
       <hr />
       <h2 id='api-detail-aggregate'>/api/detail-aggregate/</h2>
       <p>
-          Query a particular dataset and get back a temporally aggregated response.
+          Very similar to the /api/master/ API endpoint, but for one dataset. Additional dataset-specific query parameters can be used to filter the results.
       </p>
 
       <p><strong>Query parameters</strong></p>
@@ -358,17 +436,9 @@
             <td><strong><code>agg</code></strong></td>
             <td>day</td>
             <td>
-              <p>Under the hood, this takes advantage of
-              <a href="http://www.postgresql.org/docs/9.1/static/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC" target="_blank">
-                  PostgreSQL’s <code>date_trunc</code> function
-              </a>
-              and can take any precision values that are valid there. If
-              not supplied, this defaults to <code>day</code>. If the supplied
-              value is of a higher resolution that the highest available
-              temporal resolution for the dataset, it will just aggregate by
-              the highest available resolution.</p>
+              <p>Time resolution to aggregate observation counts by.</p>
 
-              <p>Typical values:</p>
+              <p>Supported values:</p>
               <ul>
                 <li>hour</li>
                 <li>day</li>
@@ -380,10 +450,14 @@
             </td>
           </tr>
           <tr>
-            <td><strong><code>obs_date</code></strong></td>
-            <td>greater than or equal to 180 days ago</td>
-            <td>Date of obversations. This can
-          have filters applied such as <code>__gt</code> (greater than) and <code>__lt</code> (less than).</td>
+            <td><strong><code>obs_date__ge</code></strong></td>
+            <td>180 days ago</td>
+            <td>Obversations greater than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
+          </tr>
+          <tr>
+            <td><strong><code>obs_date__le</code></strong></td>
+            <td>today's date</td>
+            <td>Obversations less than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
           </tr>
           <tr>
             <td><strong><code>location_geom</code></strong></td>
@@ -414,12 +488,8 @@
             <td>Record count</td>
           </tr>
           <tr>
-            <td><strong><code>group</code></strong></td>
+            <td><strong><code>datetime</code></strong></td>
             <td>Temporal aggregation group</td>
-          </tr>
-          <tr>
-            <td><strong><code>dataset_name</code></strong></td>
-            <td>Dataset name for aggregation</td>
           </tr>
         </tbody>
       </table>
