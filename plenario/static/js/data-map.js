@@ -105,7 +105,7 @@
                         $.each(obj.items, function(i, o){
                             obj['values'].push([moment(o.datetime + "+0000").valueOf(),o.count]);
                         });
-                        console.log(obj['values'])
+                        // console.log(obj['values'])
                         obj['meta'] = self.meta[obj['dataset_name']]
                         objects.push(obj)
                     });
@@ -167,7 +167,7 @@
                     self.$el.spin(false);
                     self.$el.html(template_cache('aboutTemplate', {datasets:resp}));
                     var dataObjs = {}
-                    console.log(resp);
+                    // console.log(resp);
                     $.each(resp, function(i, obj){
                         dataObjs[obj['dataset_name']] = obj;
                     })
@@ -210,7 +210,7 @@
             query['agg'] = $('#time-agg-filter').val();
 
             var dataset_name = $(e.target).data('dataset_name')
-            console.log(dataset_name);
+            // console.log(dataset_name);
             query['dataset_name'] = dataset_name
 
             new DetailView({el:'#detail-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
@@ -227,7 +227,6 @@
             'click #submit-detail-query': 'submitForm'
         },
         initialize: function(){
-            this.$el.empty();
             this.center = [41.880517,-87.644061];
             this.query = this.attributes.query;
             this.meta = this.attributes.meta;
@@ -357,9 +356,8 @@
             query['obs_date__ge'] = start;
             
             if(valid){
-
+                this.undelegateEvents();
                 new GridMapView({el: '#map-view', attributes: {query: query, meta: this.meta}})
-                console.log(query)
                 var route = 'detail/' + $.param(query)
                 router.navigate(route)
             } else {
@@ -581,7 +579,7 @@
             $.when($.getJSON('/api/', {dataset_name: dataset})).then(
                 function(resp){
                     new DetailView({el: '#detail-view', attributes: {query: q, meta: resp[0]}});
-                    new MapView({el: '#map-view', attributes: {query: q, meta: resp[0]}})
+                    new GridMapView({el: '#map-view', attributes: {query: q, meta: resp[0]}})
                 }
             )
         }
