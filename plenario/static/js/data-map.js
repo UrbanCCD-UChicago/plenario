@@ -223,13 +223,25 @@
 
     var GridMapView = Backbone.View.extend({
         events: {
-            'change #spatial-agg-filter': 'changeSpatialAgg'
+            'change #spatial-agg-filter': 'changeSpatialAgg',
+            'click #submit-detail-query': 'submitForm'
         },
         initialize: function(){
+            this.$el.empty();
             this.center = [41.880517,-87.644061];
             this.query = this.attributes.query;
             this.meta = this.attributes.meta;
-            this.$el.html(template_cache('gridMapTemplate', {query: this.query, meta: this.meta}));
+
+            var start = moment().subtract('d', 180).format('MM/DD/YYYY');
+            var end = moment().format('MM/DD/YYYY');
+
+            if (this.query)
+            {
+                start = moment(this.query.obs_date__ge).format('MM/DD/YYYY');
+                end = moment(this.query.obs_date__le).format('MM/DD/YYYY');
+            }
+
+            this.$el.html(template_cache('gridMapTemplate', {query: this.query, meta: this.meta, start: start, end: end}));
             var map_options = {
                 scrollWheelZoom: false,
                 tapTolerance: 30,
@@ -307,6 +319,11 @@
                         self.map.fitBounds(self.gridLayer.getBounds());
                     }
                     $('#download-geojson').attr('href','/api/grid/?' + $.param(self.getQuery()))
+                    $('.date-filter').datepicker({
+                        dayNamesMin: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                        prevText: '',
+                        nextText: ''
+                    });
                 }
             )
         },
@@ -314,6 +331,47 @@
             this.resolution = $(e.target).val()
             this.render()
         },
+
+        submitForm: function(e){
+            var message = null;
+            var query = this.query;
+            var start = $('#start-date-filter').val();
+            var end = $('#end-date-filter').val();
+            start = moment(start);
+            if (!start){
+                start = moment().subtract('days', 180);
+            }
+            end = moment(end)
+            if(!end){
+                end = moment();
+            }
+            var valid = true;
+            if (start.isValid() && end.isValid()){
+                start = start.startOf('day').format('YYYY/MM/DD');
+                end = end.endOf('day').format('YYYY/MM/DD');
+            } else {
+                valid = false;
+                message = 'Your dates are not entered correctly';
+            }
+            query['obs_date__le'] = end;
+            query['obs_date__ge'] = start;
+            
+            if(valid){
+
+                new GridMapView({el: '#map-view', attributes: {query: query, meta: this.meta}})
+                console.log(query)
+                var route = 'detail/' + $.param(query)
+                router.navigate(route)
+            } else {
+                $('#map-view').spin(false);
+                var error = {
+                    header: 'Woops!',
+                    body: message,
+                }
+                new ErrorView({el: '#errorModal', model: resp});
+            }
+        },
+
         getQuery: function(){
             var q = this.query;
             q['resolution'] = this.resolution
@@ -523,7 +581,7 @@
             $.when($.getJSON('/api/', {dataset_name: dataset})).then(
                 function(resp){
                     new DetailView({el: '#detail-view', attributes: {query: q, meta: resp[0]}});
-                    new GridMapView({el: '#map-view', attributes: {query: q, meta: resp[0]}})
+                    new MapView({el: '#map-view', attributes: {query: q, meta: resp[0]}})
                 }
             )
         }

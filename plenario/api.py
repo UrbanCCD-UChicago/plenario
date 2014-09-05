@@ -401,6 +401,9 @@ def detail():
 @crossdomain(origin="*")
 def detail_aggregate():
     raw_query_params = request.args.copy()
+    agg, datatype, queries = parse_join_query(raw_query_params)
+    if not agg:
+        agg = 'day'
 
     # if no obs_date given, default to >= 180 days ago
     obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
@@ -415,9 +418,6 @@ def detail_aggregate():
     else:
         to_date = datetime.now()
 
-    agg, datatype, queries = parse_join_query(raw_query_params)
-    if not agg:
-        agg = 'day'
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
     if valid_query:
