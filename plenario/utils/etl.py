@@ -105,6 +105,7 @@ class PlenarioETL(object):
         self._insert_data_table()
         self._update_master()
         self._update_meta(added=True)
+        self._update_geotags()
         self._cleanup_temp_tables()
     
     def update(self, s3_path=None):
@@ -126,6 +127,7 @@ class PlenarioETL(object):
            #    self._update_dat_current_flag()
            #    self._update_master_current_flag()
         self._update_meta()
+        self._update_geotags()
         self._cleanup_temp_tables()
 
     def _download_csv(self):
@@ -183,7 +185,8 @@ class PlenarioETL(object):
             ]
             for col_name,d_type in zip(header, col_types):
                 cols.append(Column(slugify(col_name), d_type))
-            cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver', name='uix_1'))
+            cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver', 
+                    name='%s_ix' % self.dataset_name[:50]))
             self.dat_table = Table('dat_%s' % self.dataset_name, Base.metadata, 
                           *cols, extend_existing=True)
             self.dat_table.create(engine, checkfirst=True)
@@ -392,6 +395,39 @@ class PlenarioETL(object):
                 )
         conn = engine.connect()
         conn.execute(ins)
+
+    def _update_geotags(self):
+        """ 
+        This is just adding the weather station id to the master table right now.
+        In the future we can modify it to do all the geo tagging we need for the
+        master table.
+
+        The update below assumes the weather stations table has already been
+        created and populated. I have no idea how to do it in SQLAlchemy, 
+        mainly because of the geometry distance operator ('<->')
+        """
+
+        # Yo dawg, I heard you like subqueries. 
+        # I put a subquery in your subquery.
+        upd = text(
+            """ 
+            UPDATE dat_master SET weather_station_id=subq.wban_code 
+                FROM (
+                    SELECT a.master_row_id as row_id, (
+                        SELECT b.wban_code 
+                            FROM weather_stations AS b 
+                            ORDER BY a.location_geom <-> b.location 
+                            LIMIT 1
+                        ) AS wban_code 
+                        FROM dat_master AS a
+                    ) AS subq 
+                WHERE dat_master.master_row_id = subq.row_id 
+                    AND dat_master.location_geom IS NOT NULL
+                    AND dat_master.weather_station_id IS NULL
+            """
+        )
+        conn = engine.connect()
+        conn.execute(upd)
 
     def _find_changes(self):
         # Step Eight: Find changes
