@@ -37,15 +37,6 @@
             return this;
         }
     });
-    var QueryView = Backbone.View.extend({
-        initialize: function(){
-            this.render()
-        },
-        render: function(){
-            var query = this.attributes.query;
-            this.$el.html(template_cache('queryTemplate', {query: query}));
-        }
-    })
 
     var DetailView = Backbone.View.extend({
         initialize: function(){
@@ -323,6 +314,13 @@
                         prevText: '',
                         nextText: ''
                     });
+
+                    $.when($.get('/api/fields/' + self.query['dataset_name'])).then(
+                        function(resp){
+                            $.each(resp['objects'], function(i, val){
+                                $('#filter-field').append("<option value='" + val['field_name'] + "'>" + val['field_name'] + "</option>");
+                            });
+                    });
                 }
             )
         },
@@ -403,6 +401,12 @@
                 url: '/api/grid/',
                 dataType: 'json',
                 data: q
+            })
+        },
+        getFields: function(){
+            var q = this.getQuery()
+            return $.ajax({
+                url: ('/api/fields/' + q['dataset_name'])
             })
         },
         getCutoffs: function(values){
