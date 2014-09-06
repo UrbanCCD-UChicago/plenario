@@ -492,12 +492,20 @@ def grid():
     raw_query_params = request.args.copy()
 
     buff = request.args.get('buffer', 100)
+    
     resolution = request.args.get('resolution')
+    if not resolution:
+        resolution = 500
+    else:
+        del raw_query_params['resolution']
+    
     center = request.args.getlist('center[]')
+    if not center:
+        center = [41.880517,-87.644061]
+    else:
+        del raw_query_params['center[]']
+    print center
     location_geom = request.args.get('location_geom__within')
-
-    del raw_query_params['resolution']
-    del raw_query_params['center[]']
 
     if raw_query_params.get('buffer'):
         del raw_query_params['buffer']
