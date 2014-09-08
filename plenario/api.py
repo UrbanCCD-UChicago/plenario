@@ -401,6 +401,9 @@ def detail():
 @crossdomain(origin="*")
 def detail_aggregate():
     raw_query_params = request.args.copy()
+    agg, datatype, queries = parse_join_query(raw_query_params)
+    if not agg:
+        agg = 'day'
 
     # if no obs_date given, default to >= 180 days ago
     obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
@@ -415,9 +418,6 @@ def detail_aggregate():
     else:
         to_date = datetime.now()
 
-    agg, datatype, queries = parse_join_query(raw_query_params)
-    if not agg:
-        agg = 'day'
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
     if valid_query:
@@ -489,14 +489,29 @@ def getSizeInDegrees(meters, latitude):
 @api.route('/api/grid/')
 @crossdomain(origin="*")
 def grid():
-    dataset_name = request.args.get('dataset_name')
-    resolution = request.args.get('resolution')
-    obs_to = request.args.get('obs_date__le')
-    obs_from = request.args.get('obs_date__ge')
-    location_geom = request.args.get('location_geom__within')
+    raw_query_params = request.args.copy()
+
     buff = request.args.get('buffer', 100)
+    
+    resolution = request.args.get('resolution')
+    if not resolution:
+        resolution = 500
+    else:
+        del raw_query_params['resolution']
+    
     center = request.args.getlist('center[]')
-    resp = {'type': 'FeatureCollection', 'features': []}
+    if not center:
+        center = [41.880517,-87.644061]
+    else:
+        del raw_query_params['center[]']
+    print center
+    location_geom = request.args.get('location_geom__within')
+
+    if raw_query_params.get('buffer'):
+        del raw_query_params['buffer']
+
+    agg, datatype, queries = parse_join_query(raw_query_params)
+
     size_x, size_y = getSizeInDegrees(float(resolution), float(center[0]))
     if location_geom:
         location_geom = json.loads(location_geom)['geometry']
@@ -509,32 +524,43 @@ def grid():
             location_geom = shape.buffer(y).__geo_interface__
         location_geom['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
     mt = MasterTable.__table__
-    query = session.query(func.count(mt.c.dataset_row_id), 
-            func.ST_SnapToGrid(mt.c.location_geom, size_x, size_y))\
-            .filter(mt.c.dataset_name == dataset_name)
-    if obs_from:
-        query = query.filter(mt.c.obs_date >= obs_from)
-    if obs_to:
-        query = query.filter(mt.c.obs_date <= obs_to)
-    if location_geom:
-        query = query.filter(mt.c.location_geom\
-                .ST_Within(func.ST_GeomFromGeoJSON(json.dumps(location_geom))))
-    query = query.group_by(func.ST_SnapToGrid(mt.c.location_geom, size_x, size_y))
-    values = [d for d in query.all()]
-    for value in values:
-        d = {
-            'type': 'Feature', 
-            'properties': {
-                'count': value[0], 
-            },
-        }
-        if value[1]:
-            pt = loads(value[1].decode('hex'))
-            south, west = (pt.x - (size_x / 2)), (pt.y - (size_y /2))
-            north, east = (pt.x + (size_x / 2)), (pt.y + (size_y / 2))
-            d['geometry'] = box(south, west, north, east).__geo_interface__
-        resp['features'].append(d)
-    resp = make_response(json.dumps(resp, default=dthandler))
+    valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
+
+    if valid_query:
+        base_query = session.query(func.count(mt.c.dataset_row_id), 
+                func.ST_SnapToGrid(mt.c.location_geom, size_x, size_y))
+        dname = raw_query_params['dataset_name']
+        dataset = Table('dat_%s' % dname, Base.metadata,
+            autoload=True, autoload_with=engine,
+            extend_existing=True)
+        valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
+        if valid_query:
+            pk = [p.name for p in dataset.primary_key][0]
+            base_query = base_query.join(dataset, mt.c.dataset_row_id == dataset.c[pk])
+            for clause in base_clauses:
+                base_query = base_query.filter(clause)
+            for clause in detail_clauses:
+                base_query = base_query.filter(clause)
+
+            base_query = base_query.group_by(func.ST_SnapToGrid(mt.c.location_geom, size_x, size_y))
+            values = [d for d in base_query.all()]
+            resp = {'type': 'FeatureCollection', 'features': []}
+            for value in values:
+                d = {
+                    'type': 'Feature', 
+                    'properties': {
+                        'count': value[0], 
+                    },
+                }
+                if value[1]:
+                    pt = loads(value[1].decode('hex'))
+                    south, west = (pt.x - (size_x / 2)), (pt.y - (size_y /2))
+                    north, east = (pt.x + (size_x / 2)), (pt.y + (size_y / 2))
+                    d['geometry'] = box(south, west, north, east).__geo_interface__
+                
+                resp['features'].append(d)
+    
+    resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 

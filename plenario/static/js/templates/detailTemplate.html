@@ -1,3 +1,4 @@
+<h2>Dataset details</h2>
 <table class="table">
     <tbody>
         <tr>
@@ -14,19 +15,6 @@
                 <td><strong><%= moment(meta.obs_from).from(moment(meta.obs_to), true) %></strong> (<%= moment(meta.obs_from).format("M/D/YYYY") %> - <%= moment(meta.obs_to).format("M/D/YYYY") %>)</td>
             </tr>
         <% } %>
-        <tr>
-            <% var points_query = query %>
-            <% delete points_query['resolution'] %>
-            <% delete points_query['center'] %>
-            <% var points = "/api/detail/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
-            <td>
-                Download:
-            </td>
-            <td>
-                <a href="<%= points + '&data_type=csv' %>" class="data-download btn btn-default" target="_blank"><i class='fa fa-download'></i> CSV</a> 
-                <a href="<%= points %>" class="data-download btn btn-default" target="_blank"><i class='fa fa-download'></i> JSON</a>
-            </td>
-        </tr>
         <tr>
             <td>Update frequency:</td>
             <td><%= meta.update_freq %></td>

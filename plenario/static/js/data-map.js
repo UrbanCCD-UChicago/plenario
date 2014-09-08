@@ -37,15 +37,6 @@
             return this;
         }
     });
-    var QueryView = Backbone.View.extend({
-        initialize: function(){
-            this.render()
-        },
-        render: function(){
-            var query = this.attributes.query;
-            this.$el.html(template_cache('queryTemplate', {query: query}));
-        }
-    })
 
     var DetailView = Backbone.View.extend({
         initialize: function(){
@@ -105,7 +96,7 @@
                         $.each(obj.items, function(i, o){
                             obj['values'].push([moment(o.datetime + "+0000").valueOf(),o.count]);
                         });
-                        console.log(obj['values'])
+                        // console.log(obj['values'])
                         obj['meta'] = self.meta[obj['dataset_name']]
                         objects.push(obj)
                     });
@@ -167,7 +158,7 @@
                     self.$el.spin(false);
                     self.$el.html(template_cache('aboutTemplate', {datasets:resp}));
                     var dataObjs = {}
-                    console.log(resp);
+                    // console.log(resp);
                     $.each(resp, function(i, obj){
                         dataObjs[obj['dataset_name']] = obj;
                     })
@@ -210,7 +201,7 @@
             query['agg'] = $('#time-agg-filter').val();
 
             var dataset_name = $(e.target).data('dataset_name')
-            console.log(dataset_name);
+            // console.log(dataset_name);
             query['dataset_name'] = dataset_name
 
             new DetailView({el:'#detail-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
@@ -223,13 +214,24 @@
 
     var GridMapView = Backbone.View.extend({
         events: {
-            'change #spatial-agg-filter': 'changeSpatialAgg'
+            'change #spatial-agg-filter': 'changeSpatialAgg',
+            'click #submit-detail-query': 'submitForm'
         },
         initialize: function(){
             this.center = [41.880517,-87.644061];
             this.query = this.attributes.query;
             this.meta = this.attributes.meta;
-            this.$el.html(template_cache('gridMapTemplate', {query: this.query, meta: this.meta}));
+
+            var start = moment().subtract('d', 180).format('MM/DD/YYYY');
+            var end = moment().format('MM/DD/YYYY');
+
+            if (this.query)
+            {
+                start = moment(this.query.obs_date__ge).format('MM/DD/YYYY');
+                end = moment(this.query.obs_date__le).format('MM/DD/YYYY');
+            }
+
+            this.$el.html(template_cache('gridMapTemplate', {query: this.query, meta: this.meta, start: start, end: end}));
             var map_options = {
                 scrollWheelZoom: false,
                 tapTolerance: 30,
@@ -307,6 +309,18 @@
                         self.map.fitBounds(self.gridLayer.getBounds());
                     }
                     $('#download-geojson').attr('href','/api/grid/?' + $.param(self.getQuery()))
+                    $('.date-filter').datepicker({
+                        dayNamesMin: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                        prevText: '',
+                        nextText: ''
+                    });
+
+                    $.when($.get('/api/fields/' + self.query['dataset_name'])).then(
+                        function(resp){
+                            $.each(resp['objects'], function(i, val){
+                                $('#filter-field').append("<option value='" + val['field_name'] + "'>" + val['field_name'] + "</option>");
+                            });
+                    });
                 }
             )
         },
@@ -314,6 +328,66 @@
             this.resolution = $(e.target).val()
             this.render()
         },
+
+        submitForm: function(e){
+            var message = null;
+            var query = this.query;
+            var start = $('#start-date-filter').val();
+            var end = $('#end-date-filter').val();
+            start = moment(start);
+            if (!start){
+                start = moment().subtract('days', 180);
+            }
+            end = moment(end)
+            if(!end){
+                end = moment();
+            }
+            var valid = true;
+            if (start.isValid() && end.isValid()){
+                start = start.startOf('day').format('YYYY/MM/DD');
+                end = end.endOf('day').format('YYYY/MM/DD');
+            } else {
+                valid = false;
+                message = 'Your dates are not entered correctly';
+            }
+            query['obs_date__le'] = end;
+            query['obs_date__ge'] = start;
+
+            // var filters = []
+            // filters.append({
+            //     'field': $('#filter-field').val(),
+            //     'operator': $('#filter-operator').val(),
+            //     'value': $('#filter-value').val()
+            // })
+
+            // if (filters.length > 0) {
+            //     query[filters[0]['field'] + filters[0]['operator']] = filters[0]['value'];
+            // }
+
+            // test filter
+            var filter_field = $('#filter-field').val();
+            var filter_operator = $('#filter-operator').val();
+            var filter_value = $('#filter-value').val();
+            if (filter_value) {
+                query[filter_field + filter_operator] = filter_value;
+            }
+            
+            if(valid){
+                this.undelegateEvents();
+                new GridMapView({el: '#map-view', attributes: {query: query, meta: this.meta}})
+                console.log(query);
+                var route = 'detail/' + $.param(query)
+                router.navigate(route)
+            } else {
+                $('#map-view').spin(false);
+                var error = {
+                    header: 'Woops!',
+                    body: message,
+                }
+                new ErrorView({el: '#errorModal', model: resp});
+            }
+        },
+
         getQuery: function(){
             var q = this.query;
             q['resolution'] = this.resolution
@@ -327,6 +401,12 @@
                 url: '/api/grid/',
                 dataType: 'json',
                 data: q
+            })
+        },
+        getFields: function(){
+            var q = this.getQuery()
+            return $.ajax({
+                url: ('/api/fields/' + q['dataset_name'])
             })
         },
         getCutoffs: function(values){

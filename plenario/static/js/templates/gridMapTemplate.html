@@ -1,30 +1,97 @@
-<h3 class='detail-header'>
-    <%= meta.human_name %> 
-    <small><%= moment(query.obs_date__ge).format("M/D/YYYY") %> - <%= moment(query.obs_date__le).format("M/D/YYYY") %></small>
-</h3>
-<div id="map" class="col-md-12 half-height"></div>
-<div class='clearfix'></div>
-<hr />
-<div id="filters">
-    <form class='form-inline' role="form">
-        <div class="row">
-            <div class="col-md-12">
-                <div class="form-group">
-                    <label for="spatial-agg-filter">Grid resolution</label>
-                    <select class='form-control' id="spatial-agg-filter">
-                        <option value="100">100 meters</option>
-                        <option value="200">200 meters</option>
-                        <option value="300">300 meters</option>
-                        <option value="400">400 meters</option>
-                        <option value="500" selected=true>500 meters</option>
-                        <option value="1000">1 kilometer</option>
-                    </select>
+<div class='col-md-4'>
+    <div id="filters">
+        <h3 class='detail-header'>
+            <%= meta.human_name %>
+        </h3>
+        <form class='form' role="form">
+            <div class='row'>
+                <div class='col-md-6'>
+                    <div class="form-group">
+                        <label for="start-date-filter">Start date</label>
+                        <input id="start-date-filter" class="date-filter form-control" type="text" value="<%= start %>" />
+                    </div>
                 </div>
-                <div class="form-group">
-                    <a id='download-geojson' class='btn btn-default' href="#"><i class='fa fa-download'></i> Grid as GeoJSON</a>
+                <div class='col-md-6'>
+                    <div class="form-group">
+                        <label for="end-date-filter">End date</label>
+                        <input id="end-date-filter" class="date-filter form-control" type="text" value="<%= end %>"/>
+                    </div>
                 </div>
             </div>
-        </div>
-    </form>
+            Filters
+            <div class='row'>
+                <div class='col-md-5'>
+                    <div class="form-group">
+                        <select class='form-control' id="filter-field">
+                            <option value="">Select a field&hellip;</option>
+                        </select>
+                    </div>
+                </div>
+                <div class='col-md-2'>
+                    <div class="form-group">
+                        <select class='form-control' id="filter-operator">
+                            <option value="">=</option>
+                            <option value="__gt">&gt;</option>
+                            <option value="__ge">&gt;=</option>
+                            <option value="__lt">&lt;</option>
+                            <option value="__le">&lt;=</option>
+                            <option value="__ne">!=</option>
+                            <option value="__in">in</option>
+                        </select>
+                    </div>
+                </div>
+                <div class='col-md-5'>
+                    <div class="form-group">
+                        <input id="filter-value" class="form-control" type="text" />
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="spatial-agg-filter">Grid resolution</label>
+                <select class='form-control' id="spatial-agg-filter">
+                    <option value="100">100 meters</option>
+                    <option value="200">200 meters</option>
+                    <option value="300">300 meters</option>
+                    <option value="400">400 meters</option>
+                    <option value="500" selected=true>500 meters</option>
+                    <option value="1000">1 kilometer</option>
+                </select>
+            </div>
+            <button type="button" id="submit-detail-query" class="btn btn-primary">
+                <i class='fa fa-search'></i>
+                Refine query
+            </button>
+        </form>
+        <h4>Download</h4>
+        <% var points_query = query %>
+        <% delete points_query['resolution'] %>
+        <% delete points_query['center'] %>
+        <% var points = "/api/detail/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
+        <% var time_series = "/api/detail-aggregate/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
+        <table class='table table-condensed'>
+            <tbody>
+                <tr>
+                    <td>Map grid</td>
+                    <td><a id='download-geojson' class='btn btn-default btn-sm' href="#"><i class='fa fa-download'></i> GeoJSON</a></td>
+                </tr>
+                <tr>
+                    <td>Time series</td>
+                    <td>
+                        <a href="<%= time_series + '&data_type=csv' %>" class="data-download btn btn-default btn-sm" target="_blank"><i class='fa fa-download'></i> CSV</a> 
+                        <a href="<%= time_series %>" class="data-download btn btn-default btn-sm" target="_blank"><i class='fa fa-download'></i> JSON</a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Raw data</td>
+                    <td>
+                        <a href="<%= points + '&data_type=csv' %>" class="data-download btn btn-default btn-sm" target="_blank"><i class='fa fa-download'></i> CSV</a> 
+                        <a href="<%= points %>" class="data-download btn btn-default btn-sm" target="_blank"><i class='fa fa-download'></i> JSON</a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </div>
-<br />
+<div id="map" class="col-md-8 half-height"></div>
+<div class='clearfix'></div>
+<hr />
