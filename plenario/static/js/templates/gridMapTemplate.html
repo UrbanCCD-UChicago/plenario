@@ -1,4 +1,4 @@
-<div class='col-md-4'>
+<div class='col-md-5'>
     <div id="filters">
         <h3 class='detail-header'>
             <%= meta.human_name %>
@@ -19,33 +19,7 @@
                 </div>
             </div>
             Filters
-            <div class='row'>
-                <div class='col-md-5'>
-                    <div class="form-group">
-                        <select class='form-control' id="filter-field">
-                            <option value="">Select a field&hellip;</option>
-                        </select>
-                    </div>
-                </div>
-                <div class='col-md-2'>
-                    <div class="form-group">
-                        <select class='form-control' id="filter-operator">
-                            <option value="">=</option>
-                            <option value="__gt">&gt;</option>
-                            <option value="__ge">&gt;=</option>
-                            <option value="__lt">&lt;</option>
-                            <option value="__le">&lt;=</option>
-                            <option value="__ne">!=</option>
-                            <option value="__in">in</option>
-                        </select>
-                    </div>
-                </div>
-                <div class='col-md-5'>
-                    <div class="form-group">
-                        <input id="filter-value" class="form-control" type="text" />
-                    </div>
-                </div>
-            </div>
+            <div id='filter_builder'></div>
             <div class="form-group">
                 <label for="spatial-agg-filter">Grid resolution</label>
                 <select class='form-control' id="spatial-agg-filter">
@@ -92,6 +66,6 @@
         </table>
     </div>
 </div>
-<div id="map" class="col-md-8 half-height"></div>
+<div id="map" class="col-md-7 half-height"></div>
 <div class='clearfix'></div>
 <hr />

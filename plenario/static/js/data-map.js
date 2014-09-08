@@ -315,12 +315,75 @@
                         nextText: ''
                     });
 
+                    console.log(self.query)
+
+                    var filter_template = '\
+                        <div class="row">\
+                            <div class="col-md-5">\
+                                <div class="form-group">\
+                                    <select class="form-control" id="filter_field_{{id}}">\
+                                        <option value="">Select a field&hellip;</option>\
+                                    </select>\
+                                </div>\
+                            </div>\
+                            <div class="col-md-2">\
+                                <div class="form-group">\
+                                    <select class="form-control" id="filter_operator_{{id}}">\
+                                        <option value="">=</option>\
+                                        <option value="gt">&gt;</option>\
+                                        <option value="ge">&gt;=</option>\
+                                        <option value="lt">&lt;</option>\
+                                        <option value="le">&lt;=</option>\
+                                        <option value="ne">!=</option>\
+                                        <option value="in">in</option>\
+                                    </select>\
+                                </div>\
+                            </div>\
+                            <div class="col-md-5">\
+                                <div class="form-group">\
+                                    <input id="filter_value_{{id}}" class="form-control" type="text" value="{{field_value}}"/>\
+                                </div>\
+                            </div>\
+                        </div>';
+
+                    // grab a list of dataset fields from the /api/fields/ endpoint
                     $.when($.get('/api/fields/' + self.query['dataset_name'])).then(
-                        function(resp){
-                            $.each(resp['objects'], function(i, val){
-                                $('#filter-field').append("<option value='" + val['field_name'] + "'>" + val['field_name'] + "</option>");
+                        function(field_options){
+                            // render filters based on self.query
+                            var i = 0;
+                            $.each(self.query, function(key, val){
+                                // create a dict for each field for mustache to process
+                                var field_and_operator = key.split("__");
+                                var field = "";
+                                var operator = "";
+                                if (field_and_operator.length < 2) {
+                                    field = field_and_operator[0];
+                                    operator = "";
+                                } else {
+                                    field = field_and_operator[0];
+                                    operator = field_and_operator[1];
+                                }
+                                var filter_dict = {"id" : i, "field_name" : field, "field_value" : val, "field_operator" : operator };
+                                console.log(filter_dict);
+                                $("#filter_builder").append(Mustache.render(filter_template, filter_dict));
+                                
+                                $.each(field_options['objects'], function(k, v){
+                                    $('#filter_field_' + i).append("<option value='" + v['field_name'] + "'>" + v['field_name'] + "</option>");
+                                });
+
+                                // select dropdowns
+                                $("#filter_field_" + i).val(field);
+                                $("#filter_operator_" + i).val(operator);
+
+                                i += 1;
                             });
+
+                            // create a new empty filter
+                            $("#filter_builder").append(Mustache.render(filter_template, {"id" : i, "field_name" : "", "field_value" : "", "field_operator" : "" }));
                     });
+
+
+                    
                 }
             )
         },
