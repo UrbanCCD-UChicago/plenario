@@ -207,6 +207,73 @@ def make_csv(data):
     writer.writerows(data)
     return outp.getvalue()
 
+@api.route('/api/weather-stations/')
+@crossdomain(origin="*")
+def weather_stations():
+    raw_query_params = request.args.copy()
+    stations_table = Table('weather_stations', Base.metadata, 
+        autoload=True, autoload_with=engine, extend_existing=True)
+    valid_query, query_clauses, resp, status_code = make_query(stations_table,raw_query_params)
+    if valid_query:
+        resp['meta']['status'] = 'ok'
+        base_query = session.query(stations_table)
+        for clause in query_clauses:
+            base_query = base_query.filter(clause)
+        values = [r for r in base_query.all()]
+        fieldnames = [f for f in stations_table.columns.keys()]
+        for value in values:
+            d = {f:getattr(value, f) for f in fieldnames}
+            loc = str(value.location)
+            d['location'] = loads(loc.decode('hex')).__geo_interface__
+            resp['objects'].append(d)
+    resp['meta']['query'] = raw_query_params
+    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+@api.route('/api/weather/<table>/')
+@crossdomain(origin="*")
+def weather(table):
+    raw_query_params = request.args.copy()
+    weather_table = Table('dat_weather_observations_%s' % table, Base.metadata,
+        autoload=True, autoload_with=engine, extend_existing=True)
+    stations_table = Table('weather_stations', Base.metadata, 
+        autoload=True, autoload_with=engine, extend_existing=True)
+    valid_query, query_clauses, resp, status_code = make_query(weather_table,raw_query_params)
+    if valid_query:
+        resp['meta']['status'] = 'ok'
+        base_query = session.query(weather_table, stations_table)\
+            .join(stations_table, 
+            weather_table.c.wban_code == stations_table.c.wban_code)
+        for clause in query_clauses:
+            base_query = base_query.filter(clause)
+        values = [r for r in base_query.all()]
+        weather_fields = weather_table.columns.keys()
+        station_fields = stations_table.columns.keys()
+        weather_data = {}
+        station_data = {}
+        for value in values:
+            wd = {f: getattr(value, f) for f in weather_fields}
+            sd = {f: getattr(value, f) for f in station_fields}
+            if weather_data.get(value.wban_code):
+                weather_data[value.wban_code].append(wd)
+            else:
+                weather_data[value.wban_code] = [wd]
+            loc = str(value.location)
+            sd['location'] = loads(loc.decode('hex')).__geo_interface__
+            station_data[value.wban_code] = sd
+        for station_id in weather_data.keys():
+            d = {
+                'station_info': station_data[station_id],
+                'observations': weather_data[station_id],
+            }
+            resp['objects'].append(d)
+    resp['meta']['query'] = raw_query_params
+    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
 @api.route('/api/master/')
 @crossdomain(origin="*")
 def dataset():
