@@ -315,36 +315,7 @@
                         nextText: ''
                     });
 
-                    console.log(self.query)
-
-                    var filter_template = '\
-                        <div class="row">\
-                            <div class="col-md-5">\
-                                <div class="form-group">\
-                                    <select class="form-control" id="filter_field_{{id}}">\
-                                        <option value="">Select a field&hellip;</option>\
-                                    </select>\
-                                </div>\
-                            </div>\
-                            <div class="col-md-2">\
-                                <div class="form-group">\
-                                    <select class="form-control" id="filter_operator_{{id}}">\
-                                        <option value="">=</option>\
-                                        <option value="gt">&gt;</option>\
-                                        <option value="ge">&gt;=</option>\
-                                        <option value="lt">&lt;</option>\
-                                        <option value="le">&lt;=</option>\
-                                        <option value="ne">!=</option>\
-                                        <option value="in">in</option>\
-                                    </select>\
-                                </div>\
-                            </div>\
-                            <div class="col-md-5">\
-                                <div class="form-group">\
-                                    <input id="filter_value_{{id}}" class="form-control" type="text" value="{{field_value}}"/>\
-                                </div>\
-                            </div>\
-                        </div>';
+                    // populate filters from query
 
                     var params_to_exclude = ['obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center'];
 
@@ -367,31 +338,17 @@
                                         field = field_and_operator[0];
                                         operator = field_and_operator[1];
                                     }
-                                    var filter_dict = {"id" : i, "field_name" : field, "field_value" : val, "field_operator" : operator };
-                                    console.log(filter_dict);
-                                    $("#filter_builder").append(Mustache.render(filter_template, filter_dict));
-                                    
-                                    $.each(field_options['objects'], function(k, v){
-                                        $('#filter_field_' + i).append("<option value='" + v['field_name'] + "'>" + v['field_name'] + "</option>");
-                                    });
-
-                                    // select dropdowns
-                                    $("#filter_field_" + i).val(field);
-                                    $("#filter_operator_" + i).val(operator);
+                                    var filter_dict = {"id" : i, "field" : field, "value" : val, "operator" : operator };
+                                    // console.log(filter_dict);
+                                    new FilterView({el: '#filter_builder', attributes: {filter_dict: filter_dict, field_options: field_options}})
 
                                     i += 1;
                                 }
                             });
 
                             // create a new empty filter
-                            $("#filter_builder").append(Mustache.render(filter_template, {"id" : i, "field_name" : "", "field_value" : "", "field_operator" : "" }));
-                            $.each(field_options['objects'], function(k, v){
-                                $('#filter_field_' + i).append("<option value='" + v['field_name'] + "'>" + v['field_name'] + "</option>");
-                            });
+                            new FilterView({el: '#filter_builder', attributes: {filter_dict: {"id" : i, "field" : "", "value" : "", "operator" : "" }, field_options: field_options}})
                     });
-
-
-                    
                 }
             )
         },
@@ -434,6 +391,10 @@
             // if (filters.length > 0) {
             //     query[filters[0]['field'] + filters[0]['operator']] = filters[0]['value'];
             // }
+
+            $(".filter_row").each(function (key, val) { 
+                console.log(key); console.log(val); 
+            });
 
             // test filter
             var filter_field = $('#filter-field').val();
@@ -508,7 +469,34 @@
             var content = '<h4>Count: ' + feature.properties.count + '</h4>';
             layer.bindLabel(content);
         }
-    })
+    });
+
+    var FilterView = Backbone.View.extend({
+        events: {
+            'click .remove-filter': 'clear',
+        },
+        initialize: function(){
+            console.log(this.attributes);
+            this.filter_dict = this.attributes.filter_dict;
+            this.field_options = this.attributes.field_options;
+            this.render();
+        },
+        render: function(){
+            this.$el.append(template_cache('filterTemplate', this.filter_dict));
+
+            var filter_dict_id = this.filter_dict.id;
+            $.each(this.field_options['objects'], function(k, v){
+                $('#field_' + filter_dict_id).append("<option value='" + v['field_name'] + "'>" + v['field_name'] + "</option>");
+            });
+
+            // select dropdowns
+            $("#field_" + this.filter_dict.id).val(this.filter_dict.field);
+            $("#operator_" + this.filter_dict.id).val(this.filter_dict.operator);
+        },
+        clear: function(){
+            console.log('clear filter');
+        }
+    });
 
     var MapView = Backbone.View.extend({
         events: {
