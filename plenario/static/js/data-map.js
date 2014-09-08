@@ -3,30 +3,37 @@
     var geojson = null;
     var results = null;
     var resp;
+
+    function get_template(tmpl_name){
+        var tmpl_dir = '/static/js/templates';
+        var tmpl_url = tmpl_dir + '/' + tmpl_name + '.html';
+
+        var tmpl_string = "";
+        $.ajax({
+            url: tmpl_url,
+            method: 'GET',
+            async: false,
+            success: function(data) {
+                tmpl_string = data;
+            }
+        });
+
+        return tmpl_string;
+    }
+
     function template_cache(tmpl_name, tmpl_data){
         if ( !template_cache.tmpl_cache ) {
             template_cache.tmpl_cache = {};
         }
 
         if ( ! template_cache.tmpl_cache[tmpl_name] ) {
-            var tmpl_dir = '/static/js/templates';
-            var tmpl_url = tmpl_dir + '/' + tmpl_name + '.html';
-
-            var tmpl_string;
-            $.ajax({
-                url: tmpl_url,
-                method: 'GET',
-                async: false,
-                success: function(data) {
-                    tmpl_string = data;
-                }
-            });
-
+            var tmpl_string = get_template(tmpl_name);
             template_cache.tmpl_cache[tmpl_name] = _.template(tmpl_string);
         }
 
         return template_cache.tmpl_cache[tmpl_name](tmpl_data);
     }
+
     var ErrorView = Backbone.View.extend({
         initialize: function(){
             this.render()
@@ -215,6 +222,7 @@
     var GridMapView = Backbone.View.extend({
         events: {
             'change #spatial-agg-filter': 'changeSpatialAgg',
+            'click #add-filter': 'addFilter',
             'click #submit-detail-query': 'submitForm'
         },
         initialize: function(){
@@ -274,7 +282,13 @@
                 '#3182bd',
                 '#08519c'
             ]
-            this.render();
+
+            // grab the field options before we move on to the render step
+            self.field_options = {}
+            $.when($.get('/api/fields/' + self.query['dataset_name'])).then(function(field_options){
+                self.field_options = field_options;
+                self.render();
+            });
         },
         render: function(){
             var self = this;
@@ -317,41 +331,47 @@
 
                     // populate filters from query
 
-                    var params_to_exclude = ['obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center'];
+                    var params_to_exclude = ['obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center', 'buffer'];
 
                     // grab a list of dataset fields from the /api/fields/ endpoint
-                    $.when($.get('/api/fields/' + self.query['dataset_name'])).then(
-                        function(field_options){
-                            // render filters based on self.query
-                            var i = 0;
-                            $.each(self.query, function(key, val){
-                                //exclude reserved query parameters
-                                if ($.inArray(key, params_to_exclude) == -1) {
-                                    // create a dict for each field for mustache to process
-                                    var field_and_operator = key.split("__");
-                                    var field = "";
-                                    var operator = "";
-                                    if (field_and_operator.length < 2) {
-                                        field = field_and_operator[0];
-                                        operator = "";
-                                    } else {
-                                        field = field_and_operator[0];
-                                        operator = field_and_operator[1];
-                                    }
-                                    var filter_dict = {"id" : i, "field" : field, "value" : val, "operator" : operator };
-                                    // console.log(filter_dict);
-                                    new FilterView({el: '#filter_builder', attributes: {filter_dict: filter_dict, field_options: field_options}})
+                    // create a new empty filter
+                    new FilterView({el: '#filter_builder', attributes: {filter_dict: {"id" : 0, "field" : "", "value" : "", "operator" : "", "removable": false }, field_options: self.field_options}})
 
-                                    i += 1;
-                                }
-                            });
+                    // render filters based on self.query
+                    var i = 1;
+                    $.each(self.query, function(key, val){
+                        //exclude reserved query parameters
+                        if ($.inArray(key, params_to_exclude) == -1) {
+                            // create a dict for each field for mustache to process
+                            var field_and_operator = key.split("__");
+                            var field = "";
+                            var operator = "";
+                            if (field_and_operator.length < 2) {
+                                field = field_and_operator[0];
+                                operator = "";
+                            } else {
+                                field = field_and_operator[0];
+                                operator = field_and_operator[1];
+                            }
+                            var filter_dict = {"id" : i, "field" : field, "value" : val, "operator" : operator, "removable": true };
+                            // console.log(filter_dict);
+                            new FilterView({el: '#filter_builder', attributes: {filter_dict: filter_dict, field_options: self.field_options}})
 
-                            // create a new empty filter
-                            new FilterView({el: '#filter_builder', attributes: {filter_dict: {"id" : i, "field" : "", "value" : "", "operator" : "" }, field_options: field_options}})
+                            i += 1;
+                        }
                     });
                 }
             )
         },
+
+        addFilter: function(e){
+            var filter_ids = []
+            $(".filter_row").each(function (key, val) { 
+                filter_ids.push(parseInt($(val).attr("data-id")));
+            });
+            new FilterView({el: '#filter_builder', attributes: {filter_dict: {"id" : (Math.max.apply(null, filter_ids) + 1), "field" : "", "value" : "", "operator" : "", "removable": true }, field_options: this.field_options}});
+        },
+
         changeSpatialAgg: function(e){
             this.resolution = $(e.target).val()
             this.render()
@@ -359,7 +379,12 @@
 
         submitForm: function(e){
             var message = null;
-            var query = this.query;
+            var query = {};
+            query['dataset_name'] = this.query['dataset_name'];
+            query['center'] = this.query['center'];
+            query['resolution'] = this.query['resolution'];
+            //query['buffer'] = this.query['buffer'];
+
             var start = $('#start-date-filter').val();
             var end = $('#end-date-filter').val();
             start = moment(start);
@@ -381,33 +406,25 @@
             query['obs_date__le'] = end;
             query['obs_date__ge'] = start;
 
-            // var filters = []
-            // filters.append({
-            //     'field': $('#filter-field').val(),
-            //     'operator': $('#filter-operator').val(),
-            //     'value': $('#filter-value').val()
-            // })
-
-            // if (filters.length > 0) {
-            //     query[filters[0]['field'] + filters[0]['operator']] = filters[0]['value'];
-            // }
-
+            // update query from filters
             $(".filter_row").each(function (key, val) { 
-                console.log(key); console.log(val); 
+
+                val = $(val);
+                // console.log(val)
+                var field = val.find("[id^=field]").val();
+                var operator = val.find("[id^=operator]").val();
+                var value = val.find("[id^=value]").val();
+                // console.log(field)
+                if (value) {
+                    if (operator != "") operator = "__" + operator;
+                    query[field + operator] = value;
+                }
             });
 
-            // test filter
-            var filter_field = $('#filter-field').val();
-            var filter_operator = $('#filter-operator').val();
-            var filter_value = $('#filter-value').val();
-            if (filter_value) {
-                query[filter_field + filter_operator] = filter_value;
-            }
-            
             if(valid){
                 this.undelegateEvents();
                 new GridMapView({el: '#map-view', attributes: {query: query, meta: this.meta}})
-                console.log(query);
+                // console.log(query);
                 var route = 'detail/' + $.param(query)
                 router.navigate(route)
             } else {
@@ -473,28 +490,28 @@
 
     var FilterView = Backbone.View.extend({
         events: {
-            'click .remove-filter': 'clear',
+            'click .remove-filter': 'clear'
         },
         initialize: function(){
-            console.log(this.attributes);
+            // console.log(this.attributes);
             this.filter_dict = this.attributes.filter_dict;
             this.field_options = this.attributes.field_options;
             this.render();
         },
         render: function(){
-            this.$el.append(template_cache('filterTemplate', this.filter_dict));
+            this.$el.append(_.template(get_template('filterTemplate'))(this.filter_dict));
 
             var filter_dict_id = this.filter_dict.id;
             $.each(this.field_options['objects'], function(k, v){
-                $('#field_' + filter_dict_id).append("<option value='" + v['field_name'] + "'>" + v['field_name'] + "</option>");
+                $('#field_' + filter_dict_id).prepend("<option value='" + v['field_name'] + "'>" + v['field_name'] + "</option>");
             });
 
             // select dropdowns
             $("#field_" + this.filter_dict.id).val(this.filter_dict.field);
             $("#operator_" + this.filter_dict.id).val(this.filter_dict.operator);
         },
-        clear: function(){
-            console.log('clear filter');
+        clear: function(e){
+            $("#row_" + $(e.currentTarget).attr("data-id")).remove();
         }
     });
 
