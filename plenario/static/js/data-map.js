@@ -221,7 +221,6 @@
 
     var GridMapView = Backbone.View.extend({
         events: {
-            'change #spatial-agg-filter': 'changeSpatialAgg',
             'click #add-filter': 'addFilter',
             'click #submit-detail-query': 'submitForm'
         },
@@ -233,13 +232,19 @@
             var start = moment().subtract('d', 180).format('MM/DD/YYYY');
             var end = moment().format('MM/DD/YYYY');
 
-            if (this.query)
-            {
+            if (this.query) {
                 start = moment(this.query.obs_date__ge).format('MM/DD/YYYY');
                 end = moment(this.query.obs_date__le).format('MM/DD/YYYY');
             }
 
-            this.$el.html(template_cache('gridMapTemplate', {query: this.query, meta: this.meta, start: start, end: end}));
+            if (typeof this.query['resolution'] == 'undefined')
+                this.query['resolution'] = "500";
+
+            var points_query = $.extend(true, [], this.query);
+            this.$el.html(template_cache('gridMapTemplate', {query: this.query, points_query: points_query, meta: this.meta, start: start, end: end}));
+
+            $('#spatial-agg-filter').val(this.query['resolution']);
+
             var map_options = {
                 scrollWheelZoom: false,
                 tapTolerance: 30,
@@ -249,7 +254,6 @@
             L.tileLayer('https://{s}.tiles.mapbox.com/v3/derekeder.hehblhbj/{z}/{x}/{y}.png', {
               attribution: '<a href="http://www.mapbox.com/about/maps/" target="_blank">Terms &amp; Feedback</a>'
             }).addTo(this.map);
-            this.resolution = 500;
             this.legend = L.control({position: 'bottomright'});
             this.jenksCutoffs = {}
             var self = this;
@@ -292,6 +296,45 @@
         },
         render: function(){
             var self = this;
+
+            $('#download-geojson').attr('href','/api/grid/?' + $.param(self.getQuery()))
+            $('.date-filter').datepicker({
+                dayNamesMin: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                prevText: '',
+                nextText: ''
+            });
+
+            // populate filters from query
+            var params_to_exclude = ['obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center', 'buffer'];
+
+            // grab a list of dataset fields from the /api/fields/ endpoint
+            // create a new empty filter
+            new FilterView({el: '#filter_builder', attributes: {filter_dict: {"id" : 0, "field" : "", "value" : "", "operator" : "", "removable": false }, field_options: self.field_options}})
+
+            // render filters based on self.query
+            var i = 1;
+            $.each(self.query, function(key, val){
+                //exclude reserved query parameters
+                if ($.inArray(key, params_to_exclude) == -1) {
+                    // create a dict for each field for mustache to process
+                    var field_and_operator = key.split("__");
+                    var field = "";
+                    var operator = "";
+                    if (field_and_operator.length < 2) {
+                        field = field_and_operator[0];
+                        operator = "";
+                    } else {
+                        field = field_and_operator[0];
+                        operator = field_and_operator[1];
+                    }
+                    var filter_dict = {"id" : i, "field" : field, "value" : val, "operator" : operator, "removable": true };
+                    // console.log(filter_dict);
+                    new FilterView({el: '#filter_builder', attributes: {filter_dict: filter_dict, field_options: self.field_options}})
+
+                    i += 1;
+                }
+            });
+
             this.$el.spin('large');
             $.when(this.getGrid()).then(
                 function(resp){
@@ -322,44 +365,6 @@
                         self.legend.addTo(self.map);
                         self.map.fitBounds(self.gridLayer.getBounds());
                     }
-                    $('#download-geojson').attr('href','/api/grid/?' + $.param(self.getQuery()))
-                    $('.date-filter').datepicker({
-                        dayNamesMin: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-                        prevText: '',
-                        nextText: ''
-                    });
-
-                    // populate filters from query
-
-                    var params_to_exclude = ['obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center', 'buffer'];
-
-                    // grab a list of dataset fields from the /api/fields/ endpoint
-                    // create a new empty filter
-                    new FilterView({el: '#filter_builder', attributes: {filter_dict: {"id" : 0, "field" : "", "value" : "", "operator" : "", "removable": false }, field_options: self.field_options}})
-
-                    // render filters based on self.query
-                    var i = 1;
-                    $.each(self.query, function(key, val){
-                        //exclude reserved query parameters
-                        if ($.inArray(key, params_to_exclude) == -1) {
-                            // create a dict for each field for mustache to process
-                            var field_and_operator = key.split("__");
-                            var field = "";
-                            var operator = "";
-                            if (field_and_operator.length < 2) {
-                                field = field_and_operator[0];
-                                operator = "";
-                            } else {
-                                field = field_and_operator[0];
-                                operator = field_and_operator[1];
-                            }
-                            var filter_dict = {"id" : i, "field" : field, "value" : val, "operator" : operator, "removable": true };
-                            // console.log(filter_dict);
-                            new FilterView({el: '#filter_builder', attributes: {filter_dict: filter_dict, field_options: self.field_options}})
-
-                            i += 1;
-                        }
-                    });
                 }
             )
         },
@@ -372,21 +377,16 @@
             new FilterView({el: '#filter_builder', attributes: {filter_dict: {"id" : (Math.max.apply(null, filter_ids) + 1), "field" : "", "value" : "", "operator" : "", "removable": true }, field_options: this.field_options}});
         },
 
-        changeSpatialAgg: function(e){
-            this.resolution = $(e.target).val()
-            this.render()
-        },
-
         submitForm: function(e){
             var message = null;
             var query = {};
             query['dataset_name'] = this.query['dataset_name'];
-            query['center'] = this.query['center'];
-            query['resolution'] = this.query['resolution'];
+            //query['center'] = this.query['center'];
             //query['buffer'] = this.query['buffer'];
 
             var start = $('#start-date-filter').val();
             var end = $('#end-date-filter').val();
+
             start = moment(start);
             if (!start){
                 start = moment().subtract('days', 180);
@@ -405,6 +405,7 @@
             }
             query['obs_date__le'] = end;
             query['obs_date__ge'] = start;
+            query['resolution'] = $('#spatial-agg-filter').val();
 
             // update query from filters
             $(".filter_row").each(function (key, val) { 
@@ -421,10 +422,10 @@
                 }
             });
 
+            this.query = query;
             if(valid){
                 this.undelegateEvents();
                 new GridMapView({el: '#map-view', attributes: {query: query, meta: this.meta}})
-                // console.log(query);
                 var route = 'detail/' + $.param(query)
                 router.navigate(route)
             } else {
@@ -439,8 +440,6 @@
 
         getQuery: function(){
             var q = this.query;
-            q['resolution'] = this.resolution
-            q['center'] = this.center
             delete q['agg']
             return q
         },

@@ -28,7 +28,7 @@
                     <option value="200">200 meters</option>
                     <option value="300">300 meters</option>
                     <option value="400">400 meters</option>
-                    <option value="500" selected=true>500 meters</option>
+                    <option value="500">500 meters</option>
                     <option value="1000">1 kilometer</option>
                 </select>
             </div>
@@ -38,9 +38,6 @@
             </button>
         </form>
         <h4>Download</h4>
-        <% var points_query = query %>
-        <% delete points_query['resolution'] %>
-        <% delete points_query['center'] %>
         <% var points = "/api/detail/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
         <% var time_series = "/api/detail-aggregate/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
         <table class='table table-condensed'>
