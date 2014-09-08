@@ -50,7 +50,7 @@ class MasterTable(Base):
     latitude = Column(DOUBLE_PRECISION(precision=53))
     longitude = Column(DOUBLE_PRECISION(precision=53))
     obs_date = Column(TIMESTAMP, index=True)
-    weather_station_id = Column(String(50))
+    weather_observation_id = Column(BigInteger, index=True)
     geotag2 = Column(String(50))
     geotag3 = Column(String(50))
     dataset_name = Column(String(100))

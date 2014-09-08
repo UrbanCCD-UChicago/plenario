@@ -397,7 +397,7 @@ class PlenarioETL(object):
 
     def _update_geotags(self):
         """ 
-        This is just adding the weather station id to the master table right now.
+        This is just adding the weather observation id to the master table right now.
         In the future we can modify it to do all the geo tagging we need for the
         master table.
 
@@ -408,25 +408,37 @@ class PlenarioETL(object):
 
         # Yo dawg, I heard you like subqueries. 
         # I put a subquery in your subquery.
+        date_type = str(getattr(self.dat_table.c, slugify(self.observed_date)).type)
+        if 'timestamp' in date_type.lower():
+            weather_table = 'dat_weather_observations_hourly'
+        else:
+            weather_table = 'dat_weather_observations_daily'
         upd = text(
             """ 
-            UPDATE dat_master SET weather_station_id=subq.wban_code 
+            UPDATE dat_master SET weather_observation_id=subq.weather_id
                 FROM (
-                    SELECT a.master_row_id as row_id, (
-                        SELECT b.wban_code 
-                            FROM weather_stations AS b 
-                            ORDER BY a.location_geom <-> b.location 
+                SELECT DISTINCT ON (d.master_row_id) 
+                    d.master_row_id AS master_id, 
+                    w.id as weather_id, 
+                    ABS(EXTRACT(EPOCH FROM w.datetime) - EXTRACT(EPOCH FROM d.obs_date)) as diff 
+                    FROM dat_master AS d 
+                    JOIN %s AS w 
+                        ON w.wban_code = (
+                            SELECT b.wban_code 
+                                FROM weather_stations AS b 
+                            ORDER BY d.location_geom <-> b.location 
                             LIMIT 1
-                        ) AS wban_code 
-                        FROM dat_master AS a
-                    ) AS subq 
-                WHERE dat_master.master_row_id = subq.row_id 
-                    AND dat_master.location_geom IS NOT NULL
-                    AND dat_master.weather_station_id IS NULL
-            """
+                        )
+                    WHERE d.location_geom IS NOT NULL 
+                        AND d.weather_observation_id IS NULL 
+                        AND d.dataset_name = :dname
+                    ORDER BY d.master_row_id, diff
+                ) as subq
+                WHERE dat_master.master_row_id = subq.master_id
+            """ % weather_table
         )
         conn = engine.connect()
-        conn.execute(upd)
+        conn.execute(upd, dname=self.dataset_name)
 
     def _find_changes(self):
         # Step Eight: Find changes
