@@ -25,6 +25,7 @@ body {
 .examples { word-wrap: break-word; }
 
 .highcharts-sparkline { height: 80px; width: 350px;}
+#detail-chart { height: 150px;}
 
 /* Everything but the jumbotron gets side spacing for mobile first views */
 .header,

@@ -240,8 +240,10 @@
             if (typeof this.query['resolution'] == 'undefined')
                 this.query['resolution'] = "500";
 
-            var points_query = $.extend(true, [], this.query);
-            this.$el.html(template_cache('gridMapTemplate', {query: this.query, points_query: points_query, meta: this.meta, start: start, end: end}));
+            this.points_query = $.extend(true, {}, this.query);
+            delete this.points_query['resolution'];
+            delete this.points_query['center'];
+            this.$el.html(template_cache('gridMapTemplate', {query: this.query, points_query: this.points_query, meta: this.meta, start: start, end: end}));
 
             var map_options = {
                 scrollWheelZoom: false,
@@ -304,7 +306,14 @@
 
             $('#spatial-agg-filter').val(this.query['resolution']);
 
-            // ChartHelper.sparkline((obj['dataset_name'] + '-sparkline'), obj.temporal_aggregate, obj['values']);
+            $.when(this.getTimeSeries()).then( function(resp){
+                console.log(resp)
+                chart_vals = [];
+                $.each(resp['objects'], function(i, o){
+                    chart_vals.push([moment(o.datetime + "+0000").valueOf(),o.count]);
+                });
+                ChartHelper.sparkline("detail-chart", "day", chart_vals);
+            });
 
             // populate filters from query
             var params_to_exclude = ['obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center', 'buffer'];
@@ -444,6 +453,14 @@
             var q = this.query;
             delete q['agg']
             return q
+        },
+        getTimeSeries: function(){
+            var q = this.points_query;
+            return $.ajax({
+                url: '/api/detail-aggregate/',
+                dataType: 'json',
+                data: q
+            })
         },
         getGrid: function(){
             var q = this.getQuery()
