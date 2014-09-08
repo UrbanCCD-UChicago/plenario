@@ -346,40 +346,48 @@
                             </div>\
                         </div>';
 
+                    var params_to_exclude = ['obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center'];
+
                     // grab a list of dataset fields from the /api/fields/ endpoint
                     $.when($.get('/api/fields/' + self.query['dataset_name'])).then(
                         function(field_options){
                             // render filters based on self.query
                             var i = 0;
                             $.each(self.query, function(key, val){
-                                // create a dict for each field for mustache to process
-                                var field_and_operator = key.split("__");
-                                var field = "";
-                                var operator = "";
-                                if (field_and_operator.length < 2) {
-                                    field = field_and_operator[0];
-                                    operator = "";
-                                } else {
-                                    field = field_and_operator[0];
-                                    operator = field_and_operator[1];
+                                //exclude reserved query parameters
+                                if ($.inArray(key, params_to_exclude) == -1) {
+                                    // create a dict for each field for mustache to process
+                                    var field_and_operator = key.split("__");
+                                    var field = "";
+                                    var operator = "";
+                                    if (field_and_operator.length < 2) {
+                                        field = field_and_operator[0];
+                                        operator = "";
+                                    } else {
+                                        field = field_and_operator[0];
+                                        operator = field_and_operator[1];
+                                    }
+                                    var filter_dict = {"id" : i, "field_name" : field, "field_value" : val, "field_operator" : operator };
+                                    console.log(filter_dict);
+                                    $("#filter_builder").append(Mustache.render(filter_template, filter_dict));
+                                    
+                                    $.each(field_options['objects'], function(k, v){
+                                        $('#filter_field_' + i).append("<option value='" + v['field_name'] + "'>" + v['field_name'] + "</option>");
+                                    });
+
+                                    // select dropdowns
+                                    $("#filter_field_" + i).val(field);
+                                    $("#filter_operator_" + i).val(operator);
+
+                                    i += 1;
                                 }
-                                var filter_dict = {"id" : i, "field_name" : field, "field_value" : val, "field_operator" : operator };
-                                console.log(filter_dict);
-                                $("#filter_builder").append(Mustache.render(filter_template, filter_dict));
-                                
-                                $.each(field_options['objects'], function(k, v){
-                                    $('#filter_field_' + i).append("<option value='" + v['field_name'] + "'>" + v['field_name'] + "</option>");
-                                });
-
-                                // select dropdowns
-                                $("#filter_field_" + i).val(field);
-                                $("#filter_operator_" + i).val(operator);
-
-                                i += 1;
                             });
 
                             // create a new empty filter
                             $("#filter_builder").append(Mustache.render(filter_template, {"id" : i, "field_name" : "", "field_value" : "", "field_operator" : "" }));
+                            $.each(field_options['objects'], function(k, v){
+                                $('#filter_field_' + i).append("<option value='" + v['field_name'] + "'>" + v['field_name'] + "</option>");
+                            });
                     });
 
 
