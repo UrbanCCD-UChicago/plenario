@@ -243,8 +243,6 @@
             var points_query = $.extend(true, [], this.query);
             this.$el.html(template_cache('gridMapTemplate', {query: this.query, points_query: points_query, meta: this.meta, start: start, end: end}));
 
-            $('#spatial-agg-filter').val(this.query['resolution']);
-
             var map_options = {
                 scrollWheelZoom: false,
                 tapTolerance: 30,
@@ -304,6 +302,10 @@
                 nextText: ''
             });
 
+            $('#spatial-agg-filter').val(this.query['resolution']);
+
+            // ChartHelper.sparkline((obj['dataset_name'] + '-sparkline'), obj.temporal_aggregate, obj['values']);
+
             // populate filters from query
             var params_to_exclude = ['obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center', 'buffer'];
 
@@ -316,7 +318,7 @@
             $.each(self.query, function(key, val){
                 //exclude reserved query parameters
                 if ($.inArray(key, params_to_exclude) == -1) {
-                    // create a dict for each field for mustache to process
+                    // create a dict for each field
                     var field_and_operator = key.split("__");
                     var field = "";
                     var operator = "";
