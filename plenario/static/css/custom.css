@@ -106,8 +106,8 @@ body {
 /* MAP styles */
 #map { min-height: 400px; }
 
-#list-view { min-height: 200px; }
-#detail-view { min-height: 200px; }
+#list-view { min-height: 100px; }
+#detail-view { min-height: 100px; }
 
 .leaflet-top.leaflet-left{
     margin-left: 20px;

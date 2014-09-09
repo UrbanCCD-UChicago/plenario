@@ -45,21 +45,6 @@
         }
     });
 
-    var DetailView = Backbone.View.extend({
-        initialize: function(){
-            window.scrollTo(0, 0);
-            this.$el.empty()
-            this.query = this.attributes.query;
-            this.meta = this.attributes.meta;
-            this.render()
-        },
-        render: function(){
-            $('#list-view').hide();
-            $('#detail-view').show();
-            this.$el.html(template_cache('detailTemplate', {query: this.query, meta: this.meta}));
-        }
-    })
-
     var ResponseView = Backbone.View.extend({
         events: {
             'click .detail': 'detailView'
@@ -80,7 +65,6 @@
         detailView: function(e){
             var dataset_name = $(e.target).data('dataset_name')
             this.query['dataset_name'] = dataset_name
-            var detail_view = new DetailView({el:'#detail-view', attributes: {query: this.query, meta: this.meta[dataset_name]}})
             $('#map-view').empty();
             new GridMapView({el: '#map-view', attributes: {query: this.query, meta: this.meta[dataset_name]}})
             var route = 'detail/' + $.param(this.query)
@@ -211,7 +195,6 @@
             // console.log(dataset_name);
             query['dataset_name'] = dataset_name
 
-            new DetailView({el:'#detail-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
             $('#map-view').empty();
             new GridMapView({el: '#map-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
             var route = 'detail/' + $.param(query)
@@ -296,6 +279,8 @@
         },
         render: function(){
             var self = this;
+            $('#detail-view').hide();
+            $('#list-view').hide();
 
             $('#download-geojson').attr('href','/api/grid/?' + $.param(self.getQuery()))
             $('.date-filter').datepicker({
@@ -306,12 +291,16 @@
 
             $('#spatial-agg-filter').val(this.query['resolution']);
 
+            $("#detail-chart").spin('large');
             $.when(this.getTimeSeries()).then( function(resp){
-                console.log(resp)
-                chart_vals = [];
+                $("#detail-chart").spin(false);
+                var chart_vals = [];
+                var record_count = 0;
                 $.each(resp['objects'], function(i, o){
                     chart_vals.push([moment(o.datetime + "+0000").valueOf(),o.count]);
+                    record_count += o.count;
                 });
+                $("#record-count").html(record_count + " records")
                 ChartHelper.sparkline("detail-chart", "day", chart_vals);
             });
 
@@ -346,10 +335,10 @@
                 }
             });
 
-            this.$el.spin('large');
+            $("#map").spin('large');
             $.when(this.getGrid()).then(
                 function(resp){
-                    self.$el.spin(false);
+                    $("#map").spin(false);
                     var values = [];
                     $.each(resp['features'], function(i, val){
                         values.push(val['properties']['count']);
@@ -696,7 +685,6 @@
             var dataset = q['dataset_name']
             $.when($.getJSON('/api/', {dataset_name: dataset})).then(
                 function(resp){
-                    new DetailView({el: '#detail-view', attributes: {query: q, meta: resp[0]}});
                     new GridMapView({el: '#map-view', attributes: {query: q, meta: resp[0]}})
                 }
             )
