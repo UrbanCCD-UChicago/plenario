@@ -62,6 +62,7 @@ var AboutView = Backbone.View.extend({
         // console.log(dataset_name);
         query['dataset_name'] = dataset_name
 
+        this.undelegateEvents();
         $('#map-view').empty();
         new DetailView({el: '#map-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
         var route = 'detail/' + $.param(query)

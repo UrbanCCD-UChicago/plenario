@@ -96,7 +96,7 @@ var DetailView = Backbone.View.extend({
                 chart_vals.push([moment(o.datetime + "+0000").valueOf(),o.count]);
                 record_count += o.count;
             });
-            $("#record-count").html(record_count + " records")
+            $("#record-count").html(addCommas(record_count) + " records")
             ChartHelper.sparkline("detail-chart", "day", chart_vals);
         });
 
