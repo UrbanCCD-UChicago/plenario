@@ -38,8 +38,10 @@ var ResponseView = Backbone.View.extend({
                 })
                 $.each(results, function(i, obj){
                     obj['values'] = []
+                    obj['count'] = 0;
                     $.each(obj.items, function(i, o){
                         obj['values'].push([moment(o.datetime + "+0000").valueOf(),o.count]);
+                        obj['count'] += o.count;
                     });
                     // console.log(obj['values'])
                     obj['meta'] = self.meta[obj['dataset_name']]
@@ -55,8 +57,9 @@ var ResponseView = Backbone.View.extend({
                 });
 
                 $('#response-datasets').DataTable( {
-                    "aaSorting": [ [0,'asc'] ],
+                    "aaSorting": [ [1,'desc'] ],
                     "aoColumns": [
+                        null,
                         null,
                         { "bSortable": false },
                         { "bSortable": false }
