@@ -217,7 +217,6 @@ class WeatherETL(object):
         station_table = Table('weather_stations', Base.metadata, autoload=True, autoload_with=engine)
         wban_list = session.query(station_table.c.wban_code.distinct()). \
                     order_by(station_table.c.wban_code).all()
-        observations_daily = Table('weather_observations_daily', Base.metadata, autoload=True, autoload_with=engine)
         
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
