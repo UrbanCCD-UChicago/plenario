@@ -16,6 +16,9 @@ var DetailView = Backbone.View.extend({
             end = moment(this.query.obs_date__le).format('MM/DD/YYYY');
         }
 
+        if (typeof this.query['agg'] == 'undefined')
+            this.query['agg'] = "week";
+
         if (typeof this.query['resolution'] == 'undefined')
             this.query['resolution'] = "500";
 
@@ -85,6 +88,7 @@ var DetailView = Backbone.View.extend({
             nextText: ''
         });
 
+        $('#time-agg-filter').val(this.query['agg']);
         $('#spatial-agg-filter').val(this.query['resolution']);
 
         $("#detail-chart").spin('large');
@@ -101,7 +105,7 @@ var DetailView = Backbone.View.extend({
         });
 
         // populate filters from query
-        var params_to_exclude = ['obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center', 'buffer'];
+        var params_to_exclude = ['obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center', 'buffer', 'agg'];
 
         // grab a list of dataset fields from the /api/fields/ endpoint
         // create a new empty filter
@@ -204,6 +208,7 @@ var DetailView = Backbone.View.extend({
         }
         query['obs_date__le'] = end;
         query['obs_date__ge'] = start;
+        query['agg'] = $('#time-agg-filter').val();
         query['resolution'] = $('#spatial-agg-filter').val();
 
         // update query from filters
@@ -224,6 +229,7 @@ var DetailView = Backbone.View.extend({
         this.query = query;
         if(valid){
             this.undelegateEvents();
+            // console.log(this.query)
             new DetailView({el: '#map-view', attributes: {query: query, meta: this.meta}})
             var route = 'detail/' + $.param(query)
             router.navigate(route)
@@ -239,7 +245,6 @@ var DetailView = Backbone.View.extend({
 
     getQuery: function(){
         var q = this.query;
-        delete q['agg']
         return q
     },
     getTimeSeries: function(){
