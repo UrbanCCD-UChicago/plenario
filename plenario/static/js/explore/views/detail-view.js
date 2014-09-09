@@ -144,22 +144,25 @@ var DetailView = Backbone.View.extend({
                 if (typeof self.gridLayer !== 'undefined'){
                     self.map.removeLayer(self.gridLayer);
                 }
-                self.jenksCutoffs = self.getCutoffs(values);
-                if (values.length > 0){
-                    self.gridLayer.addLayer(L.geoJson(resp, {
-                        style: function(feature){
-                            return {
-                                fillColor: self.getColor(feature.properties.count),
-                                weight: 0.3,
-                                opacity: 1,
-                                color: 'white',
-                                fillOpacity: 0.7
-                            }
-                        },
-                        onEachFeature: self.onEachFeature
-                    })).addTo(self.map);
-                    self.legend.addTo(self.map);
-                    self.map.fitBounds(self.gridLayer.getBounds());
+                //check to see if we get any data back
+                if (values.length > 0) {
+                    self.jenksCutoffs = self.getCutoffs(values);
+                    if (values.length > 0){
+                        self.gridLayer.addLayer(L.geoJson(resp, {
+                            style: function(feature){
+                                return {
+                                    fillColor: self.getColor(feature.properties.count),
+                                    weight: 0.3,
+                                    opacity: 1,
+                                    color: 'white',
+                                    fillOpacity: 0.7
+                                }
+                            },
+                            onEachFeature: self.onEachFeature
+                        })).addTo(self.map);
+                        self.legend.addTo(self.map);
+                        self.map.fitBounds(self.gridLayer.getBounds());
+                    }
                 }
             }
         )
