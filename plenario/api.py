@@ -501,7 +501,6 @@ def detail():
                             pass
                         t_fname = WEATHER_COL_LOOKUP[weather_tname].get(fname, fname)
                         w_q['__'.join([t_fname, operator])] = v
-                        print w_q
                 valid_query, weather_clauses, resp, status_code = make_query(weather_table, w_q)
                 if valid_query:
                     base_query = base_query.join(weather_table, mt.c.weather_observation_id == weather_table.c.id)

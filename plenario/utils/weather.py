@@ -124,7 +124,7 @@ class WeatherETL(object):
 
     def _update(self, span=None):
         new_table = Table('new_weather_observations_%s' % span, Base.metadata,
-                          Column('wban_code', String(5)), extend_existing=True)
+                          Column('wban_code', String(5)), keep_existing=True)
         dat_table = getattr(self, '%s_table' % span)
         src_table = getattr(self, 'src_%s_table' % span)
         from_sel_cols = ['wban_code']
@@ -769,7 +769,7 @@ class WeatherETL(object):
                             Column('max2_winddirection', String(3)), # 000 through 360, M for missing
                             Column('max2_direction_cardinal', String(3)), # e.g. NNE, NNW
                             UniqueConstraint('wban_code', 'date', name='%s_wban_date_ix' % name),
-                            extend_existing=True) 
+                            keep_existing=True) 
 
     def _get_hourly_table(self, name='dat'):
         return Table('%s_weather_observations_hourly' % name, Base.metadata,
@@ -800,7 +800,7 @@ class WeatherETL(object):
                 Column('report_type', String), # Either 'AA' or 'SP'
                 Column('hourly_precip', Float, index=True),
                 UniqueConstraint('wban_code', 'datetime', name='%s_wban_datetime_ix' % name),
-                extend_existing=True)
+                keep_existing=True)
 
     def _extract_last_fname(self):
         # XX: tar files are all old and not recent.
@@ -842,7 +842,7 @@ class WeatherETL(object):
         transformed_input.seek(0)
         self.src_hourly_table = self._get_hourly_table(name='src')
         self.src_hourly_table.drop(engine, checkfirst=True)
-        self.src_hourly_table.create(engine)
+        self.src_hourly_table.create(engine, checkfirst=True)
         names = [c.name for c in self.hourly_table.columns if c.name != 'id']
         ins_st = "COPY src_weather_observations_hourly ("
         for idx, name in enumerate(names):
@@ -871,7 +871,7 @@ class WeatherETL(object):
         names = [c.name for c in self.daily_table.columns if c.name != 'id']
         self.src_daily_table = self._get_daily_table(name='src')
         self.src_daily_table.drop(engine, checkfirst=True)
-        self.src_daily_table.create(engine)
+        self.src_daily_table.create(engine, checkfirst=True)
         ins_st = "COPY src_weather_observations_daily ("
         for idx, name in enumerate(names):
             if idx < len(names) - 1:
