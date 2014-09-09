@@ -411,31 +411,46 @@ class PlenarioETL(object):
         date_type = str(getattr(self.dat_table.c, slugify(self.observed_date)).type)
         if 'timestamp' in date_type.lower():
             weather_table = 'dat_weather_observations_hourly'
+            date_col_name = 'datetime'
+            temp_col = 'drybulb_fahrenheit'
         else:
             weather_table = 'dat_weather_observations_daily'
+            date_col_name = 'date'
+            temp_col = 'temp_avg'
         upd = text(
-            """ 
+            """
             UPDATE dat_master SET weather_observation_id=subq.weather_id
                 FROM (
                 SELECT DISTINCT ON (d.master_row_id) 
-                    d.master_row_id AS master_id, 
-                    w.id as weather_id, 
-                    ABS(EXTRACT(EPOCH FROM w.datetime) - EXTRACT(EPOCH FROM d.obs_date)) as diff 
-                    FROM dat_master AS d 
-                    JOIN %s AS w 
-                        ON w.wban_code = (
-                            SELECT b.wban_code 
-                                FROM weather_stations AS b 
-                            ORDER BY d.location_geom <-> b.location 
-                            LIMIT 1
-                        )
-                    WHERE d.location_geom IS NOT NULL 
-                        AND d.weather_observation_id IS NULL 
-                        AND d.dataset_name = :dname
-                    ORDER BY d.master_row_id, diff
-                ) as subq
-                WHERE dat_master.master_row_id = subq.master_id
-            """ % weather_table
+                d.master_row_id AS master_id, 
+                w.id as weather_id, 
+                abs(extract(epoch from d.obs_date) - extract(epoch from w.%s)) as diff 
+                FROM dat_master AS d 
+                JOIN %s as w 
+                  ON w.wban_code = (
+                    SELECT b.wban_code 
+                      FROM weather_stations AS b 
+                      ORDER BY d.location_geom <-> b.location LIMIT 1
+                    ) 
+                WHERE d.location_geom IS NOT NULL 
+                  AND d.weather_observation_id IS NULL 
+                  AND d.dataset_name = :dname 
+                  AND d.obs_date > (
+                    SELECT MIN(%s) 
+                      FROM %s 
+                      WHERE %s IS NOT NULL
+                    ) 
+                  AND d.obs_date < (
+                    SELECT MAX(%s) 
+                      FROM %s 
+                      WHERE %s IS NOT NULL
+                    ) 
+                ORDER BY d.master_row_id, diff
+              ) as subq
+            WHERE dat_master.master_row_id = subq.master_id
+            """ % (date_col_name, weather_table, 
+                   date_col_name, weather_table, temp_col,
+                   date_col_name, weather_table, temp_col,)
         )
         conn = engine.connect()
         conn.execute(upd, dname=self.dataset_name)

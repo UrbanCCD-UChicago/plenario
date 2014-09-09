@@ -474,9 +474,9 @@ class WeatherETL(object):
         return Table('%s_weather_observations_daily' % name, Base.metadata,
                             Column('wban_code', String(5), nullable=False),
                             Column('date', Date, nullable=False),
-                            Column('temp_max', Float),
-                            Column('temp_min', Float),
-                            Column('temp_avg', Float),
+                            Column('temp_max', Float, index=True),
+                            Column('temp_min', Float, index=True),
+                            Column('temp_avg', Float, index=True),
                             Column('departure_from_normal', Float),
                             Column('dewpoint_avg', Float),
                             Column('wetbulb_avg', Float),
@@ -485,7 +485,7 @@ class WeatherETL(object):
                             # XX: Not sure about meaning of 'Cool' and 'Heat' columns in daily table,
                             #     based on documentation.
                             Column('snowfall', Float),
-                            Column('precip_total', Float),
+                            Column('precip_total', Float, index=True),
                             Column('station_pressure', Float),
                             Column('sealevel_pressure', Float),
                             Column('resultant_windspeed', Float),
@@ -518,7 +518,7 @@ class WeatherETL(object):
                 # XX in R: unique(unlist(strsplit(unlist(as.character(unique(x$WeatherType))), ' ')))
                 #Column('weather_types', ARRAY(String(16))),
                 Column('weather_types', ARRAY(String)),
-                Column('drybulb_fahrenheit', Float), # These can be NULL bc of missing data
+                Column('drybulb_fahrenheit', Float, index=True), # These can be NULL bc of missing data
                 Column('wetbulb_fahrenheit', Float), # These can be NULL bc of missing data
                 Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
                 Column('relative_humidity', Integer),
@@ -528,7 +528,7 @@ class WeatherETL(object):
                 Column('station_pressure', Float),
                 Column('sealevel_pressure', Float),
                 Column('report_type', String), # Either 'AA' or 'SP'
-                Column('hourly_precip', Float),
+                Column('hourly_precip', Float, index=True),
                 UniqueConstraint('wban_code', 'datetime', name='%s_wban_datetime_ix' % name),
                 extend_existing=True)
 
