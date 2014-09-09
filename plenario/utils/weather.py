@@ -12,12 +12,12 @@ from datetime import datetime, date, timedelta
 import calendar
 from plenario.database import task_session as session, task_engine as engine, \
     Base
+from plenario.settings import DATA_DIR
 from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float, \
     VARCHAR, BigInteger, UniqueConstraint, and_, select
 from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
 from uuid import uuid4
-DATA_DIR = os.environ['WOPR_DATA_DIR']
 
 import pdb
 
