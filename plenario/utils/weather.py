@@ -3,6 +3,7 @@ import os
 import sys
 import tarfile
 import zipfile
+import re
 from cStringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader, UnicodeCSVWriter, \
     UnicodeCSVDictReader
@@ -17,6 +18,8 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
 from uuid import uuid4
 DATA_DIR = os.environ['WOPR_DATA_DIR']
+
+import pdb
 
 class WeatherError(Exception):
     def __init__(self, message):
@@ -165,14 +168,6 @@ class WeatherETL(object):
                     )
             conn.execute(ins)
 
-    def _transform_hourly(self, raw, file_type, start_line=0, end_line=None):
-        t = getattr(self, '_transform_%s_hourly' % file_type)(raw, start_line, end_line)
-        return t
-
-    def _transform_daily(self, raw, file_type, start_line=0, end_line=None):
-        t = getattr(self, '_transform_%s_daily' % file_type)(raw, start_line, end_line)
-        return t
-            
     def make_tables(self):
         self._make_daily_table()
         self._make_hourly_table()
@@ -213,20 +208,28 @@ class WeatherETL(object):
                         raw_weather_daily.write(zf.open(name).read())
         return raw_weather_hourly, raw_weather_daily, file_type
 
-    def _transform_zipfile_daily(self, raw_weather, start_line=0, end_line=None):
+    ########################################
+    ########################################
+    # Transformations of daily data e.g. '200704daily.txt' (from tarfile) or '201101daily.txt' (from zipfile)
+    ########################################
+    ########################################
+    def _transform_daily(self, raw_weather, file_type, start_line=0, end_line=None):
         station_table = Table('weather_stations', Base.metadata, autoload=True, autoload_with=engine)
         wban_list = session.query(station_table.c.wban_code.distinct()). \
                     order_by(station_table.c.wban_code).all()
+        observations_daily = Table('weather_observations_daily', Base.metadata, autoload=True, autoload_with=engine)
         
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
         header = reader.next()
+        header = [x.strip() for x in header]
 
         self.clean_observations_daily = StringIO()
         writer = UnicodeCSVWriter(self.clean_observations_daily)
         out_header = ["wban_code","date","temp_max","temp_min",
                       "temp_avg","departure_from_normal",
                       "dewpoint_avg", "wetbulb_avg","weather_types",
+                      "snowice_depth", "snowice_waterequiv",
                       "snowfall","precip_total", "station_pressure",
                       "sealevel_pressure", 
                       "resultant_windspeed", "resultant_winddirection", "resultant_winddirection_cardinal",
@@ -249,70 +252,107 @@ class WeatherETL(object):
                 break
 
             row_count += 1
+            #print len(header)
+            #print len(row)
             #print zip(header,row)
 
-            wban_code = row[header.index('WBAN')]
-            date = row[header.index('YearMonthDay')] # e.g. 20140801
-            temp_max = self.floatOrNA(row[header.index('Tmax')])
-            temp_min = self.floatOrNA(row[header.index('Tmin')])
-            temp_avg = self.floatOrNA(row[header.index('Tavg')])
-            departure_from_normal = self.floatOrNA(row[header.index('Depart')])
-            dewpoint_avg = self.floatOrNA(row[header.index('DewPoint')])
-            wetbulb_avg = self.floatOrNA(row[header.index('WetBulb')])
-            weather_types = row[header.index('CodeSum')]
-            if (weather_types.strip() == ''):
-                weather_types_list = None
-            else:
-                weather_types_list = weather_types.split(' ')
-                weather_types_list = self.list_to_postgres_array(weather_types_list)
-            snowfall = self.getPrecip(row[header.index('SnowFall')])
-            precip_total= self.getPrecip(row[header.index('PrecipTotal')])
-            station_pressure=self.floatOrNA(row[header.index('StnPressure')])
-            sealevel_pressure=self.floatOrNA(row[header.index('SeaLevel')])
-            resultant_windspeed = self.floatOrNA(row[header.index('ResultSpeed')])
-            resultant_winddirection, resultant_winddirection_cardinal=self.getWind(resultant_windspeed, row[header.index('ResultDir')])
-            avg_windspeed=self.floatOrNA(row[header.index('AvgSpeed')])            
-            max5_windspeed=self.floatOrNA(row[header.index('Max5Speed')])
-            max5_winddirection, max5_winddirection_cardinal=self.getWind(max5_windspeed, row[header.index('Max5Dir')])
-            max2_windspeed=self.floatOrNA(row[header.index('Max2Speed')])
-            max2_winddirection, max2_winddirection_cardinal=self.getWind(max2_windspeed, row[header.index('Max2Dir')])
+            row_vals = getattr(self, '_parse_%s_row_daily' % file_type)(row, header)
 
-            writer.writerow([wban_code,date,temp_max,temp_min,
+            writer.writerow(row_vals)
+        return self.clean_observations_daily
+
+
+    def _parse_zipfile_row_daily(self, row, header):
+        wban_code = row[header.index('WBAN')]
+        date = row[header.index('YearMonthDay')] # e.g. 20140801
+        temp_max = self.floatOrNA(row[header.index('Tmax')])
+        temp_min = self.floatOrNA(row[header.index('Tmin')])
+        temp_avg = self.floatOrNA(row[header.index('Tavg')])
+        departure_from_normal = self.floatOrNA(row[header.index('Depart')])
+        dewpoint_avg = self.floatOrNA(row[header.index('DewPoint')])
+        wetbulb_avg = self.floatOrNA(row[header.index('WetBulb')])
+        weather_types_list = self._parse_weather_types(row[header.index('CodeSum')])
+        snowice_depth = self.getPrecip(row[header.index('Depth')])
+        snowice_waterequiv = self.getPrecip(row[header.index('Water1')]) # predict 'heart-attack snow'!
+        snowfall = self.getPrecip(row[header.index('SnowFall')])
+        precip_total= self.getPrecip(row[header.index('PrecipTotal')])
+        station_pressure=self.floatOrNA(row[header.index('StnPressure')])
+        sealevel_pressure=self.floatOrNA(row[header.index('SeaLevel')])
+        resultant_windspeed = self.floatOrNA(row[header.index('ResultSpeed')])
+        resultant_winddirection, resultant_winddirection_cardinal=self.getWind(resultant_windspeed, row[header.index('ResultDir')])
+        avg_windspeed=self.floatOrNA(row[header.index('AvgSpeed')])            
+        max5_windspeed=self.floatOrNA(row[header.index('Max5Speed')])
+        max5_winddirection, max5_winddirection_cardinal=self.getWind(max5_windspeed, row[header.index('Max5Dir')])
+        max2_windspeed=self.floatOrNA(row[header.index('Max2Speed')])
+        max2_winddirection, max2_winddirection_cardinal=self.getWind(max2_windspeed, row[header.index('Max2Dir')])
+
+        return [wban_code,date,temp_max,temp_min,
                       temp_avg,departure_from_normal,
                       dewpoint_avg, wetbulb_avg,weather_types_list,
+                      snowice_depth, snowice_waterequiv,
                       snowfall,precip_total, station_pressure,
                       sealevel_pressure, 
                       resultant_windspeed, resultant_winddirection, resultant_winddirection_cardinal,
                       avg_windspeed,
                       max5_windspeed, max5_winddirection,max5_winddirection_cardinal,
-                      max2_windspeed, max2_winddirection, max2_winddirection_cardinal])
-        return self.clean_observations_daily
-        
-    def _transform_tarfile_hourly(self, raw_weather, start_line = 0, end_line=None):
-        # XX: _transform_tarfile_hourly and _transform_zipfile_hourly should really just be one function that takes 
-        # a file_type parameter instead..
-        pass
-        
-    
+                      max2_windspeed, max2_winddirection, max2_winddirection_cardinal]
 
-    def _transform_zipfile_hourly(self, raw_weather, start_line = 0, end_line=None):
-        #station_table = Table('weather_stations', Base.metadata, autoload=True, autoload_with=engine)
-        #wban_list = session.query(station_table.c.wban_code.distinct()). \
-        #            order_by(station_table.c.wban_code).all()
-        #station_observations = Table('weather_observations_hourly', Base.metadata, autoload=True, autoload_with=engine)
+    def _parse_tarfile_row_daily(self, row, header):
+        wban_code = row[header.index('Wban Number')]
+        date = row[header.index('YearMonthDay')] # e.g. 20140801
+        temp_max = self.floatOrNA(row[header.index('Max Temp')])
+        temp_min = self.floatOrNA(row[header.index('Min Temp')])
+        temp_avg = self.floatOrNA(row[header.index('Avg Temp')])
+        departure_from_normal = self.floatOrNA(row[header.index('Dep from Normal')])
+        dewpoint_avg = self.floatOrNA(row[header.index('Avg Dew Pt')])
+        wetbulb_avg = self.floatOrNA(row[header.index('Avg Wet Bulb')])
+        weather_types_list = self._parse_weather_types(row[header.index('Significant Weather')])
+        snowice_depth = self.getPrecip(row[header.index('Snow/Ice Depth')])
+        snowice_waterequiv = self.getPrecip(row[header.index('Snow/Ice Water Equiv')]) # predict 'heart-attack snow'!
+        snowfall = self.getPrecip(row[header.index('Precipitation Snowfall')])
+        precip_total= self.getPrecip(row[header.index('Precipitation Water Equiv')])
+        station_pressure=self.floatOrNA(row[header.index('Pressue Avg Station')]) # XXX Not me -- typo in header!
+        sealevel_pressure=self.floatOrNA(row[header.index('Pressure Avg Sea Level')])
+        resultant_windspeed = self.floatOrNA(row[header.index('Wind Speed')])
+        resultant_winddirection, resultant_winddirection_cardinal=self.getWind(resultant_windspeed, row[header.index('Wind Direction')])
+        avg_windspeed=self.floatOrNA(row[header.index('Wind Avg Speed')])            
+        max5_windspeed=self.floatOrNA(row[header.index('Max 5 sec speed')])
+        max5_winddirection, max5_winddirection_cardinal=self.getWind(max5_windspeed, row[header.index('Max 5 sec Dir')])
+        max2_windspeed=self.floatOrNA(row[header.index('Max 2 min speed')])
+        max2_winddirection, max2_winddirection_cardinal=self.getWind(max2_windspeed, row[header.index('Max 2 min Dir')])
 
+        return [wban_code,date,temp_max,temp_min,
+                      temp_avg,departure_from_normal,
+                      dewpoint_avg, wetbulb_avg,weather_types_list,
+                      snowice_depth, snowice_waterequiv,
+                      snowfall,precip_total, station_pressure,
+                      sealevel_pressure, 
+                      resultant_windspeed, resultant_winddirection, resultant_winddirection_cardinal,
+                      avg_windspeed,
+                      max5_windspeed, max5_winddirection,max5_winddirection_cardinal,
+                      max2_windspeed, max2_winddirection, max2_winddirection_cardinal]
+
+
+    ########################################
+    ########################################
+    # Transformations of hourly data e.g. 200704hourly.txt (from tarfile) or 201101hourly.txt (from zipfile)
+    ########################################
+    ########################################
+    def _transform_hourly(self, raw_weather, file_type, start_line=0, end_line=None):
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
         header= reader.next()
+        # strip leading and trailing whitespace from header (e.g. from tarfiles)
+        header = [x.strip() for x in header]
 
-        self.clean_observations_hourly_info = StringIO()
-        writer = UnicodeCSVWriter(self.clean_observations_hourly_info)
+        self.clean_observations_hourly = StringIO()
+        writer = UnicodeCSVWriter(self.clean_observations_hourly)
         out_header = ["wban_code","datetime","old_station_type","station_type", \
                       "sky_condition","sky_condition_top","visibility",\
-                      "weather_type","drybulb_fahrenheit","wetbulb_fahrenheit",\
+                      "weather_types","drybulb_fahrenheit","wetbulb_fahrenheit",\
                       "dewpoint_fahrenheit","relative_humidity",\
-                      "wind_speed","wind_direction","wind_cardinal",\
-                      "station_pressure","sealevel_pressure","record_type",\
+                      "wind_speed","wind_direction","wind_direction_cardinal",\
+                      "station_pressure","sealevel_pressure","report_type",\
                       "hourly_precip"]
         writer.writerow(out_header)
 
@@ -331,57 +371,273 @@ class WeatherETL(object):
 
             row_count += 1
 
-            wban_code = row[header.index('WBAN')]
-            date = row[header.index('Date')] # e.g. 20140801
-            time = row[header.index('Time')] # e.g. '0601' 6:01am
-            weather_date = datetime.strptime('%s %s' % (date, time), '%Y%m%d %H%M')
-            station_type = row[header.index('StationType')]
-            old_station_type = None
-            sky_condition = row[header.index('SkyCondition')]
-            # Take the topmost atmospheric observation of clouds (e.g. in 'SCT013 BKN021 OVC029'
-            # (scattered at 1300 feet, broken clouds at 2100 feet, overcast at 2900)
-            # take OVC29 as the top layer.
-            sky_condition_top = sky_condition.split(' ')[-1]
-            visibility = self.floatOrNA(row[header.index('Visibility')])
-            visibility_flag = row[header.index('VisibilityFlag')]
-            # XX mcc consider handling visibility_flag =='s' for 'suspect'
-            weather_types = row[header.index('WeatherType')]
-            weather_types_flag = row[header.index('WeatherTypeFlag')]
-            # XX mcc consider handling weather_type_flag =='s' for 'suspect'
-            if (weather_types.strip() == ''):
-                weather_types_list = None
-            else:
-                weather_types_list = weather_types.split(' ')
-                weather_types_list = self.list_to_postgres_array(weather_types_list)
-            drybulb_F = self.floatOrNA(row[header.index('DryBulbFarenheit')])
-            wetbulb_F = self.floatOrNA(row[header.index('WetBulbFarenheit')])
-            dewpoint_F = self.floatOrNA(row[header.index('DewPointFarenheit')])
-            rel_humidity = self.integerOrNA(row[header.index('RelativeHumidity')])
-            wind_speed = self.integerOrNA(row[header.index('WindSpeed')])
-            # XX mcc consider handling WindSpeedFlag == 's' for 'suspect'
-            wind_direction, wind_cardinal = self.getWind(wind_speed, row[header.index('WindDirection')])
-            station_pressure = self.floatOrNA(row[header.index('StationPressure')])
-            sealevel_pressure = self.floatOrNA(row[header.index('SeaLevelPressure')])
-            hourly_precip = self.getPrecip(row[header.index('HourlyPrecip')])
-            record_type = row[header.index('RecordType')]
-            
-            # There are two types of report types (column is called "RecordType" for some reason).
-            # 1) AA - METAR (AVIATION ROUTINE WEATHER REPORT) - HOURLY
-            # 2) SP - METAR SPECIAL REPORT
-            # Special reports seem to occur at the same time (and have
-            # largely the same content) as hourly reports, but under certain
-            # adverse conditions (e.g. low visibility). 
-            # As such, I believe it is sufficient to just use the 'AA' reports and keep
-            # our composite primary key of (wban_code, datetime).
-            if (record_type == 'SP'):
+            # this calls either self._parse_zipfile_row_hourly
+            # or self._parse_tarfile_row_hourly
+            row_vals = getattr(self, '_parse_%s_row_hourly' % file_type)(row, header)
+            if (not row_vals):
                 continue
 
-            writer.writerow([wban_code, weather_date, old_station_type, station_type, sky_condition, \
-                             sky_condition_top, visibility, weather_types_list, \
-                             drybulb_F, wetbulb_F, dewpoint_F,\
-                             rel_humidity, wind_speed, wind_direction, wind_cardinal,\
-                             station_pressure, sealevel_pressure, record_type, hourly_precip])
-        return  self.clean_observations_hourly_info
+            writer.writerow(row_vals)
+        return self.clean_observations_hourly
+
+    def _parse_zipfile_row_hourly(self, row, header):
+        # There are two types of report types (column is called "RecordType" for some reason).
+        # 1) AA - METAR (AVIATION ROUTINE WEATHER REPORT) - HOURLY
+        # 2) SP - METAR SPECIAL REPORT
+        # Special reports seem to occur at the same time (and have
+        # largely the same content) as hourly reports, but under certain
+        # adverse conditions (e.g. low visibility). 
+        # As such, I believe it is sufficient to just use the 'AA' reports and keep
+        # our composite primary key of (wban_code, datetime).
+        report_type = row[header.index('RecordType')]
+        if (report_type == 'SP'):
+            return None
+
+        wban_code = row[header.index('WBAN')]
+        date = row[header.index('Date')] # e.g. 20140801
+        time = row[header.index('Time')] # e.g. '601' 6:01am
+        # pad this into a four digit number:
+        time_str = None
+        if (time):
+            time_int =  self.integerOrNA(time, str(row))
+            time_str = '%04d' % time_int
+        
+        weather_date = datetime.strptime('%s %s' % (date, time_str), '%Y%m%d %H%M')
+        station_type = row[header.index('StationType')]
+        old_station_type = None
+        sky_condition = row[header.index('SkyCondition')]
+        # Take the topmost atmospheric observation of clouds (e.g. in 'SCT013 BKN021 OVC029'
+        # (scattered at 1300 feet, broken clouds at 2100 feet, overcast at 2900)
+        # take OVC29 as the top layer.
+        sky_condition_top = sky_condition.split(' ')[-1]
+        visibility = self.floatOrNA(row[header.index('Visibility')])
+        visibility_flag = row[header.index('VisibilityFlag')]
+        # XX mcc consider handling visibility_flag =='s' for 'suspect'
+        weather_types_list = self._parse_weather_types(row[header.index('WeatherType')])
+        weather_types_flag = row[header.index('WeatherTypeFlag')]
+        # XX mcc consider handling weather_type_flag =='s' for 'suspect'
+        drybulb_F = self.floatOrNA(row[header.index('DryBulbFarenheit')])
+        wetbulb_F = self.floatOrNA(row[header.index('WetBulbFarenheit')])
+        dewpoint_F = self.floatOrNA(row[header.index('DewPointFarenheit')])
+        rel_humidity = self.integerOrNA(row[header.index('RelativeHumidity')])
+        wind_speed = self.integerOrNA(row[header.index('WindSpeed')])
+        # XX mcc consider handling WindSpeedFlag == 's' for 'suspect'
+        wind_direction, wind_cardinal = self.getWind(wind_speed, row[header.index('WindDirection')])
+        station_pressure = self.floatOrNA(row[header.index('StationPressure')])
+        sealevel_pressure = self.floatOrNA(row[header.index('SeaLevelPressure')])
+        hourly_precip = self.getPrecip(row[header.index('HourlyPrecip')])
+            
+        # return hourly zipfile params
+        return [wban_code,
+                weather_date, 
+                old_station_type,
+                station_type,
+                sky_condition, sky_condition_top,
+                visibility, 
+                weather_types_list,
+                drybulb_F,
+                wetbulb_F,
+                dewpoint_F,
+                rel_humidity,
+                wind_speed, wind_direction, wind_cardinal,
+                station_pressure, sealevel_pressure,
+                report_type,
+                hourly_precip]
+
+    def _parse_tarfile_row_hourly(self, row, header):
+        report_type = row[header.index('Record Type')]
+        if (report_type == 'SP'):
+            return None
+
+        wban_code = row[header.index('Wban Number')]
+        wban_code = wban_code.lstrip('0') # remove leading zeros from WBAN
+        date = row[header.index('YearMonthDay')] # e.g. 20140801
+        time = row[header.index('Time')] # e.g. '601' 6:01am
+        # pad this into a four digit number:
+        time_str = None
+        if (time): 
+            time_int = self.integerOrNA(time, str(row))
+            if not time_int:
+                time_str = None
+                # XX: maybe just continue and bail if this doesn't work
+                return None
+            time_str = '%04d' % time_int
+
+        weather_date = datetime.strptime('%s %s' % (date, time_str), '%Y%m%d %H%M')
+        old_station_type = row[header.index('Station Type')].strip() # either AO1, AO2, or '-' (XX: why '-'??)
+        station_type = None
+        sky_condition = row[header.index('Sky Conditions')].strip()
+        sky_condition_top = sky_condition.split(' ')[-1]
+        
+        visibility = self._parse_old_visibility(row[header.index('Visibility')])
+
+        weather_types_list = self._parse_weather_types(row[header.index('Weather Type')])
+        
+        drybulb_F = self.floatOrNA(row[header.index('Dry Bulb Temp')])
+        wetbulb_F = self.floatOrNA(row[header.index('Wet Bulb Temp')])
+        dewpoint_F = self.floatOrNA(row[header.index('Dew Point Temp')])
+        rel_humidity = self.integerOrNA(row[header.index('% Relative Humidity')], str(row))
+        wind_speed = self.integerOrNA(row[header.index('Wind Speed (kt)')], str(row))
+        wind_direction, wind_cardinal = self.getWind(wind_speed, row[header.index('Wind Direction')])
+        station_pressure = self.floatOrNA(row[header.index('Station Pressure')])
+        sealevel_pressure = self.floatOrNA(row[header.index('Sea Level Pressure')])
+        hourly_precip = self.getPrecip(row[header.index('Precip. Total')])
+        
+        return [wban_code,
+                weather_date, 
+                old_station_type,station_type,
+                sky_condition, sky_condition_top,
+                visibility, 
+                weather_types_list,
+                drybulb_F,
+                wetbulb_F,
+                dewpoint_F,
+                rel_humidity,
+                wind_speed, wind_direction, wind_cardinal,
+                station_pressure, sealevel_pressure,
+                report_type,
+                hourly_precip]
+
+    # Help parse a 'present weather' string like 'FZFG' (freezing fog) or 'BLSN' (blowing snow) or '-RA' (light rain)
+    # When we are doing precip slurp as many as possible
+    def _do_weather_parse(self, pw, mapping, multiple=False, local_debug=False):
+
+        # Grab as many of the keys as possible consecutively in the string
+        retvals = []
+        while (multiple == True):
+            (pw, key) = self._do_weather_parse(pw, mapping, multiple=False, local_debug=True)
+            #print "got pw, key=", pw,key
+            retvals.append(key)
+            if ((pw == '') or (key == 'NULL')):
+                return pw, retvals
+                break
+            else:
+                continue
+
+        if (len(pw) == 0): 
+            return ('', 'NULL')
+
+        # 2nd parse for descriptors
+        for (key, val) in mapping:
+            #print "key is '%s'" % key
+            q = pw[0:len(key)]
+            if (q == key):
+                #print "key found: ", q
+                pw2=pw[len(key):]
+                #print "returning", l2
+                #return (l2, val)
+                return (pw2, key)
+        return (pw, 'NULL')
+
+    # Parse a 'present weather' string like 'FZFG' (freezing fog) or 'BLSN' (blowing snow) or '-RA' (light rain)
+    def _parse_present_weather(self, pw):
+        orig_pw = pw
+        l = pw
+
+        intensities =  [('-','Light'),
+                        ('+','Heavy')]
+
+        (l, intensity) = self._do_weather_parse(l, intensities)
+
+        vicinities = [('VC','Vicinity')]
+        (l, vicinity) = self._do_weather_parse(l, vicinities)
+        
+        descriptors = [('MI','Shallow'),
+                       ('PR','Partial'),
+                       ('BC','Patches'),
+                       ('DR','Low Drifting'),
+                       ('BL','Blowing'),
+                       ('SH','Shower(s)'),
+                       ('TS','Thunderstorm'),
+                       ('FZ','Freezing')]
+            
+        (l, desc)= self._do_weather_parse(l, descriptors)
+        
+        # 3rd parse for phenomena
+        precip_phenoms= [('DZ','Drizzle'),
+                         ('RA','Rain'),
+                         ('SN','Snow'),
+                         ('SG','Snow Grains'),
+                         ('IC','Ice Crystals'),
+                         ('PE','Ice Pellets'),
+                         ('PL','Ice Pellets'),
+                         ('GR','Hail'),
+                         ('GS','Small Hail'),
+                         ('UP','Unknown Precipitation')]
+        # We use arrays instead of hashmaps because we want to look for FG+ before FG (sigh)
+        obscuration_phenoms  = [('BR','Mist'),
+                                ('FG+','Heavy Fog'),
+                                ('FG','Fog'),
+                                ('FU','Smoke'),
+                                ('VA','Volcanic Ash'),
+                                ('DU','Widespread Dust'),
+                                ('SA','Sand'),
+                                ('HZ','Haze'),
+                                ('PY','Spray')]
+        other_phenoms = [('PO','Dust Devils'),
+                         ('SQ','Squalls'),
+                         ('FC','Funnel Cloud'),
+                         ('+FC','Tornado Waterspout'),
+                         ('SS','Sandstorm'),
+                         ('DS','Duststorm')]
+                
+        (l, precips) = self._do_weather_parse(l, precip_phenoms, multiple =True)
+        (l, obscuration) = self._do_weather_parse(l, obscuration_phenoms)
+        (l, other) = self._do_weather_parse(l, other_phenoms)
+
+        # if l still has a length let's print it out and see what went wrong
+        if (self.debug==True):
+            if (len(l) > 0):
+                self.debug_outfile.write("could not fully parse present weather : '%s' '%s'\n\n" % ( orig_pw, l))
+
+        wt_list = [intensity, vicinity, desc, precips[0], obscuration, other]
+    
+        ret_wt_lists = []
+        ret_wt_lists.append(wt_list)
+        
+        #if (len(precips) > 1):
+        #    print "first precip: ", wt_list
+        for p in precips[1:]:
+            if p != 'NULL':
+                #print "extra precip!", p, orig_pw
+                wt_list = ['NULL', 'NULL', 'NULL', p, 'NULL', 'NULL']
+                #print "extra precip (precip):", wt_list
+                ret_wt_lists.append(wt_list)
+        
+        return ret_wt_lists
+        
+
+
+    # Parse a list of 'present weather' strings and convert to multidimensional postgres array.
+    def _parse_weather_types(self, wt_str):
+        wt_str = wt_str.strip()
+        if ((wt_str == '') or (wt_str == '-')):
+            return None
+        if (not wt_str):
+            return None
+        else:
+            wt_list = wt_str.split(' ')
+            wt_list = [wt.strip() for wt in wt_list]
+            pw_lists = []
+
+            for wt in wt_list:
+                wts = self._parse_present_weather(wt)
+                # make all weather reports have the same length..
+                for obsv in wts:
+                    wt_list3 = self.list_to_postgres_array(obsv)
+                    pw_lists.append(wt_list3)
+            list_of_lists = "{" +  ', '.join(pw_lists) + "}"
+            #print "list_of_lists: "  , list_of_lists
+            return list_of_lists
+
+    def _parse_old_visibility(self, visibility_str):
+        visibility_str = visibility_str.strip()
+        
+        visibility_str = re.sub('SM', '', visibility_str)
+        # has_slash = re.match('\/'), visibility_str)
+        # XX This is not worth it, too many weird, undocumented special cases on this particular column
+        return None
+
 
     # list_to_postgres_array(list_string): convert to {blah, blah2, blah3} format for postgres.
     def list_to_postgres_array(self, l):
@@ -389,10 +645,11 @@ class WeatherETL(object):
 
     def getWind(self, wind_speed, wind_direction):
         wind_cardinal = None
-        if (wind_direction == 'VR ' or wind_direction =='M'):
+        wind_direction = wind_direction.strip()
+        if (wind_direction == 'VR' or wind_direction =='M' or wind_direction=='VRB'):
             wind_direction='VRB'
             wind_cardinal = 'VRB'
-        elif (wind_direction.strip() == ''):
+        elif (wind_direction == '' or wind_direction == '-'):
             wind_direction =None
             wind_cardinal = None
         else:
@@ -422,28 +679,37 @@ class WeatherETL(object):
         precip_total = self.floatOrNA(precip_total)
         return precip_total
                         
-    def floatOrNA(self, val):
-        val_str = str(val)
+    def floatOrNA(self, val, row=None):
+        val_str = str(val).strip()
         if (val_str == 'M'):
+            return None
+        if (val_str == '-'):
             return None
         if (val_str == 'err'):
             return None
         if (val_str == 'null'):
             return None
-        if (val_str.strip() == ''):  # WindSpeed line
+        if (val_str == ''):  # WindSpeed line
             return None
         else:
             try:
-                fval = float(val)
+                fval = float(val_str)
             except ValueError, e:
                 if (self.debug==True):
-                    self.debug_outfile.write("ValueError: [%s], could not convert '%s' to float\n" % (e, val))
+                    self.debug_outfile.write("ValueError: [%s], could not convert '%s' to float\n" % (e, val_str))
+                    if row:
+                        self.debug_outfile.write(row)
+                    #pdb.set_trace()
                 return None
             return fval
 
-    def integerOrNA(self, val):
-        val_str = str(val)
-        if (val == 'M'):
+    def integerOrNA(self, val, row=None):
+        val_str = str(val).strip()
+        if (val_str == 'M'):
+            return None
+        if (val_str == '-'):
+            return None
+        if (val_str == 'VRB'):
             return None
         if (val_str == 'err'):
             return None
@@ -457,6 +723,8 @@ class WeatherETL(object):
             except ValueError, e:
                 if (self.debug==True):
                     self.debug_outfile.write("ValueError [%s] could not convert '%s' to int\n" % (e, val))
+                    if row:
+                        self.debug_outfile.write(row)
                 return None
             return ival
     
@@ -482,6 +750,8 @@ class WeatherETL(object):
                             Column('wetbulb_avg', Float),
                             #Column('weather_types', ARRAY(String(16))), # column 'CodeSum',
                             Column('weather_types', ARRAY(String)), # column 'CodeSum',
+                            Column("snowice_depth", Float),
+                            Column("snowice_waterequiv", Float),
                             # XX: Not sure about meaning of 'Cool' and 'Heat' columns in daily table,
                             #     based on documentation.
                             Column('snowfall', Float),
@@ -533,7 +803,7 @@ class WeatherETL(object):
                 extend_existing=True)
 
     def _extract_last_fname(self):
-        # XX: not currently parsing tar files
+        # XX: tar files are all old and not recent.
         #tar_last = 
         #tar_last = datetime(2007, 5, 1, 0, 0)
         #tar_filename = '%s.tar.gz' % tar_last.strftime('%Y%m') 
@@ -547,8 +817,7 @@ class WeatherETL(object):
         curr_dt = datetime(year_num, month_num, 1, 0, 0)
         if ((year_num < 2007) or (year_num == 2007 and month_num < 5)):
             tar_filename =  '%s.tar.gz' % (curr_dt.strftime('%Y%m'))
-            # do not parse tars for now
-            return None
+            return tar_filename
         else:
             zip_filename = 'QCLCD%s.zip' % curr_dt.strftime('%Y%m')
             return zip_filename
@@ -562,8 +831,7 @@ class WeatherETL(object):
             self._date_span(tar_start, tar_end)]
         zip_filenames = ['QCLCD%s.zip' % d.strftime('%Y%m') for d in \
             self._date_span(zip_start, zip_end)]
-        # XX: ignoring tars for now
-        return zip_filenames
+        return tar_filenames + zip_filenames
 
     def _load_hourly(self, transformed_input):
         if (self.debug==True):
