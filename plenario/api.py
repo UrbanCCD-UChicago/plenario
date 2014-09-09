@@ -268,6 +268,7 @@ def weather(table):
                 'observations': weather_data[station_id],
             }
             resp['objects'].append(d)
+        resp['meta']['total'] = sum([len(r['observations']) for r in resp['objects']])
     resp['meta']['query'] = raw_query_params
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
@@ -389,7 +390,13 @@ def parse_join_query(params):
     agg = 'day'
     datatype = 'json'
     for key, value in params.items():
-        if key.split('__')[0] in ['obs_date', 'location_geom', 'dataset_name']:
+        master_columns = [
+            'obs_date', 
+            'location_geom', 
+            'dataset_name',
+            'weather_observation_id',
+        ]
+        if key.split('__')[0] in master_columns:
             queries['base'][key] = value
         elif key == 'agg':
             agg = value
@@ -403,7 +410,6 @@ def parse_join_query(params):
 @crossdomain(origin="*")
 def detail():
     raw_query_params = request.args.copy()
-
     # if no obs_date given, default to >= 30 days ago
     obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
     if not obs_dates:
@@ -415,18 +421,30 @@ def detail():
     order_by = raw_query_params.get('order_by')
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
+    if not raw_query_params.get('dataset_name'):
+        valid_query = False
+        resp['meta'] = {
+            'status': 'error',
+            'message': "'dataset_name' is required"
+        }
+        resp['objects'] = []
     if valid_query:
         resp['meta']['status'] = 'ok'
         dname = raw_query_params['dataset_name']
         dataset = Table('dat_%s' % dname, Base.metadata,
             autoload=True, autoload_with=engine,
             extend_existing=True)
-        base_query = session.query(mt.c.obs_date, dataset)
+        
+        # TODO: need to figure out whether to use the daily data or the hourly data here...
+        weather = Table('dat_weather_observations_hourly', Base.metadata, 
+            autoload=True, autoload_with=engine, extend_existing=True)
+        base_query = session.query(mt, dataset, weather)
         valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
         if valid_query:
             resp['meta']['status'] = 'ok'
             pk = [p.name for p in dataset.primary_key][0]
             base_query = base_query.join(dataset, mt.c.dataset_row_id == dataset.c[pk])
+            base_query = base_query.join(weather, mt.c.weather_observation_id == weather.c.id)
         for clause in base_clauses:
             base_query = base_query.filter(clause)
         if order_by:
@@ -437,13 +455,14 @@ def detail():
         if limit:
             base_query = base_query.limit(limit)
         values = [r for r in base_query.all()]
-        fieldnames = dataset.columns.keys()
+        dataset_fields = dataset.columns.keys()
+        weather_fields = weather.columns.keys()
         for value in values:
-            d = {}
-            for k,v in zip(fieldnames, value[1:]):
-                d[k] = v
+            d = {
+                'observation': {f:getattr(value, f) for f in dataset_fields},
+                'weather': {f:getattr(value, f) for f in weather_fields}
+            }
             resp['objects'].append(d)
-
         resp['meta']['query'] = raw_query_params
         loc = resp['meta']['query'].get('location_geom__within')
         if loc:
@@ -484,7 +503,6 @@ def detail_aggregate():
         to_date = parse(raw_query_params['obs_date__le'])
     else:
         to_date = datetime.now()
-
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
     if valid_query:
