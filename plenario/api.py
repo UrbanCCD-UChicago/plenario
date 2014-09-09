@@ -207,6 +207,74 @@ def make_csv(data):
     writer.writerows(data)
     return outp.getvalue()
 
+@api.route('/api/weather-stations/')
+@crossdomain(origin="*")
+def weather_stations():
+    raw_query_params = request.args.copy()
+    stations_table = Table('weather_stations', Base.metadata, 
+        autoload=True, autoload_with=engine, extend_existing=True)
+    valid_query, query_clauses, resp, status_code = make_query(stations_table,raw_query_params)
+    if valid_query:
+        resp['meta']['status'] = 'ok'
+        base_query = session.query(stations_table)
+        for clause in query_clauses:
+            base_query = base_query.filter(clause)
+        values = [r for r in base_query.all()]
+        fieldnames = [f for f in stations_table.columns.keys()]
+        for value in values:
+            d = {f:getattr(value, f) for f in fieldnames}
+            loc = str(value.location)
+            d['location'] = loads(loc.decode('hex')).__geo_interface__
+            resp['objects'].append(d)
+    resp['meta']['query'] = raw_query_params
+    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+@api.route('/api/weather/<table>/')
+@crossdomain(origin="*")
+def weather(table):
+    raw_query_params = request.args.copy()
+    weather_table = Table('dat_weather_observations_%s' % table, Base.metadata,
+        autoload=True, autoload_with=engine, extend_existing=True)
+    stations_table = Table('weather_stations', Base.metadata, 
+        autoload=True, autoload_with=engine, extend_existing=True)
+    valid_query, query_clauses, resp, status_code = make_query(weather_table,raw_query_params)
+    if valid_query:
+        resp['meta']['status'] = 'ok'
+        base_query = session.query(weather_table, stations_table)\
+            .join(stations_table, 
+            weather_table.c.wban_code == stations_table.c.wban_code)
+        for clause in query_clauses:
+            base_query = base_query.filter(clause)
+        values = [r for r in base_query.all()]
+        weather_fields = weather_table.columns.keys()
+        station_fields = stations_table.columns.keys()
+        weather_data = {}
+        station_data = {}
+        for value in values:
+            wd = {f: getattr(value, f) for f in weather_fields}
+            sd = {f: getattr(value, f) for f in station_fields}
+            if weather_data.get(value.wban_code):
+                weather_data[value.wban_code].append(wd)
+            else:
+                weather_data[value.wban_code] = [wd]
+            loc = str(value.location)
+            sd['location'] = loads(loc.decode('hex')).__geo_interface__
+            station_data[value.wban_code] = sd
+        for station_id in weather_data.keys():
+            d = {
+                'station_info': station_data[station_id],
+                'observations': weather_data[station_id],
+            }
+            resp['objects'].append(d)
+        resp['meta']['total'] = sum([len(r['observations']) for r in resp['objects']])
+    resp['meta']['query'] = raw_query_params
+    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
 @api.route('/api/master/')
 @crossdomain(origin="*")
 def dataset():
@@ -318,12 +386,27 @@ def parse_join_query(params):
     queries = {
         'base' : {},
         'detail': {},
+        'weather': {},
     }
     agg = 'day'
     datatype = 'json'
+    master_columns = [
+        'obs_date', 
+        'location_geom', 
+        'dataset_name',
+        'weather_observation_id',
+    ]
+    weather_columns = [
+        'temp_hi',
+        'temp_lo',
+        'temp_avg',
+        'precip_amount',
+    ]
     for key, value in params.items():
-        if key.split('__')[0] in ['obs_date', 'location_geom', 'dataset_name']:
+        if key.split('__')[0] in master_columns:
             queries['base'][key] = value
+        elif key.split('__')[0] in weather_columns:
+            queries['weather'][key] = value
         elif key == 'agg':
             agg = value
         elif key == 'data_type':
@@ -332,57 +415,117 @@ def parse_join_query(params):
             queries['detail'][key] = value
     return agg, datatype, queries
 
+WEATHER_COL_LOOKUP = {
+    'daily': {
+        'temp_lo': 'temp_min',
+        'temp_hi': 'temp_max',
+        'temp_avg': 'temp_avg',
+        'precip_amount': 'precip_total',
+    },
+    'hourly': {
+        'temp_lo': 'drybulb_fahrenheit',
+        'temp_hi': 'drybulb_fahrenheit',
+        'temp_avg': 'drybulb_fahrenheit',
+        'precip_amount': 'hourly_precip',
+    },
+}
+
 @api.route('/api/detail/')
 @crossdomain(origin="*")
 def detail():
     raw_query_params = request.args.copy()
-
     # if no obs_date given, default to >= 30 days ago
     obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
     if not obs_dates:
         six_months_ago = datetime.now() - timedelta(days=30)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
-
+    
+    include_weather = False
+    if raw_query_params.get('weather') is not None:
+        include_weather = raw_query_params['weather']
+        del raw_query_params['weather']
     agg, datatype, queries = parse_join_query(raw_query_params)
     limit = raw_query_params.get('limit')
     order_by = raw_query_params.get('order_by')
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
+    if not raw_query_params.get('dataset_name'):
+        valid_query = False
+        resp['meta'] = {
+            'status': 'error',
+            'message': "'dataset_name' is required"
+        }
+        resp['objects'] = []
     if valid_query:
         resp['meta']['status'] = 'ok'
         dname = raw_query_params['dataset_name']
         dataset = Table('dat_%s' % dname, Base.metadata,
             autoload=True, autoload_with=engine,
             extend_existing=True)
-        base_query = session.query(mt.c.obs_date, dataset)
+        dataset_fields = dataset.columns.keys()
+        base_query = session.query(mt, dataset)
+        if include_weather:
+            date_col_name = 'date'
+            try:
+                date_col_name = slugify(session.query(MetaTable)\
+                    .filter(MetaTable.dataset_name == dname)\
+                    .first().observed_date)
+            except AttributeError:
+                pass
+            date_col_type = str(getattr(dataset.c, date_col_name).type).lower()
+            if 'timestamp' in date_col_type:
+                weather_tname = 'hourly'
+            else:
+                weather_tname = 'daily'
+            weather_table = Table('dat_weather_observations_%s' % weather_tname, Base.metadata, 
+                autoload=True, autoload_with=engine, extend_existing=True)
+            weather_fields = weather_table.columns.keys()
+            base_query = session.query(mt, dataset, weather_table)
         valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
         if valid_query:
             resp['meta']['status'] = 'ok'
             pk = [p.name for p in dataset.primary_key][0]
             base_query = base_query.join(dataset, mt.c.dataset_row_id == dataset.c[pk])
-        for clause in base_clauses:
-            base_query = base_query.filter(clause)
-        if order_by:
-            col, order = order_by.split(',')
-            base_query = base_query.order_by(getattr(mt.c[col], order)())
-        for clause in detail_clauses:
-            base_query = base_query.filter(clause)
-        if limit:
-            base_query = base_query.limit(limit)
-        values = [r for r in base_query.all()]
-        fieldnames = dataset.columns.keys()
-        for value in values:
-            d = {}
-            for k,v in zip(fieldnames, value[1:]):
-                d[k] = v
-            resp['objects'].append(d)
-
-        resp['meta']['query'] = raw_query_params
-        loc = resp['meta']['query'].get('location_geom__within')
-        if loc:
-            resp['meta']['query']['location_geom__within'] = json.loads(loc)
-        resp['meta']['total'] = len(resp['objects'])
-
+            for clause in base_clauses:
+                base_query = base_query.filter(clause)
+            for clause in detail_clauses:
+                base_query = base_query.filter(clause)
+            if include_weather:
+                w_q = {}
+                if queries['weather']:
+                    for k,v in queries['weather'].items():
+                        try:
+                            fname, operator = k.split('__')
+                        except ValueError:
+                            operator = 'eq'
+                            pass
+                        t_fname = WEATHER_COL_LOOKUP[weather_tname].get(fname, fname)
+                        w_q['__'.join([t_fname, operator])] = v
+                valid_query, weather_clauses, resp, status_code = make_query(weather_table, w_q)
+                if valid_query:
+                    base_query = base_query.join(weather_table, mt.c.weather_observation_id == weather_table.c.id)
+                    for clause in weather_clauses:
+                        base_query = base_query.filter(clause)
+            if valid_query:
+                if order_by:
+                    col, order = order_by.split(',')
+                    base_query = base_query.order_by(getattr(mt.c[col], order)())
+                if limit:
+                    base_query = base_query.limit(limit)
+                values = [r for r in base_query.all()]
+                for value in values:
+                    d = {f:getattr(value, f) for f in dataset_fields}
+                    if include_weather:
+                        d = {
+                            'observation': {f:getattr(value, f) for f in dataset_fields},
+                            'weather': {f:getattr(value, f) for f in weather_fields},
+                        }
+                    resp['objects'].append(d)
+                resp['meta']['query'] = raw_query_params
+                loc = resp['meta']['query'].get('location_geom__within')
+                if loc:
+                    resp['meta']['query']['location_geom__within'] = json.loads(loc)
+                resp['meta']['total'] = len(resp['objects'])
     if datatype == 'json':
         resp = make_response(json.dumps(resp, default=dthandler), status_code)
         resp.headers['Content-Type'] = 'application/json'
@@ -417,7 +560,6 @@ def detail_aggregate():
         to_date = parse(raw_query_params['obs_date__le'])
     else:
         to_date = datetime.now()
-
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
     if valid_query:

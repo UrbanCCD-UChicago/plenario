@@ -1,6 +1,6 @@
 import os
 from sqlalchemy import Column, Integer, String, Boolean, Table, Date, DateTime, \
-    Float, Numeric, Text, TypeDecorator
+    Float, Numeric, Text, TypeDecorator, BigInteger
 from sqlalchemy.dialects.postgresql import TIMESTAMP, DOUBLE_PRECISION, TIME,\
     DATE
 from geoalchemy2 import Geometry
@@ -42,16 +42,15 @@ class MetaTable(Base):
 
 class MasterTable(Base):
     __tablename__ = 'dat_master'
-    master_row_id = Column(Integer, primary_key=True)
+    master_row_id = Column(BigInteger, primary_key=True)
     start_date = Column(TIMESTAMP)
     end_date = Column(TIMESTAMP)
     current_flag = Column(Boolean, default=True)
     location = Column(String(100))
     latitude = Column(DOUBLE_PRECISION(precision=53))
     longitude = Column(DOUBLE_PRECISION(precision=53))
-    obs_date = Column(Date, index=True)
-    obs_ts = Column(TIMESTAMP, default=None)
-    geotag1 = Column(String(50))
+    obs_date = Column(TIMESTAMP, index=True)
+    weather_observation_id = Column(BigInteger, index=True)
     geotag2 = Column(String(50))
     geotag3 = Column(String(50))
     dataset_name = Column(String(100))

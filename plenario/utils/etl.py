@@ -105,6 +105,7 @@ class PlenarioETL(object):
         self._insert_data_table()
         self._update_master()
         self._update_meta(added=True)
+        self._update_geotags()
         self._cleanup_temp_tables()
     
     def update(self, s3_path=None):
@@ -126,6 +127,7 @@ class PlenarioETL(object):
            #    self._update_dat_current_flag()
            #    self._update_master_current_flag()
         self._update_meta()
+        self._update_geotags()
         self._cleanup_temp_tables()
 
     def _download_csv(self):
@@ -183,7 +185,8 @@ class PlenarioETL(object):
             ]
             for col_name,d_type in zip(header, col_types):
                 cols.append(Column(slugify(col_name), d_type))
-            cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver', name='uix_1'))
+            cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver', 
+                    name='%s_ix' % self.dataset_name[:50]))
             self.dat_table = Table('dat_%s' % self.dataset_name, Base.metadata, 
                           *cols, extend_existing=True)
             self.dat_table.create(engine, checkfirst=True)
@@ -340,8 +343,7 @@ class PlenarioETL(object):
             dat_cols.append(text("NULL AS longitude"))
         dat_cols.append(getattr(self.dat_table.c, slugify(self.observed_date))\
             .label('obs_date'))
-        dat_cols.append(text("NULL AS obs_ts"))
-        dat_cols.append(text("NULL AS geotag1"))
+        dat_cols.append(text("NULL AS weather_station_id"))
         dat_cols.append(text("NULL AS geotag2"))
         dat_cols.append(text("NULL AS geotag3"))
         dat_cols.append(text("'%s' AS dataset_name" % self.dataset_name))
@@ -392,6 +394,66 @@ class PlenarioETL(object):
                 )
         conn = engine.connect()
         conn.execute(ins)
+
+    def _update_geotags(self):
+        """ 
+        This is just adding the weather observation id to the master table right now.
+        In the future we can modify it to do all the geo tagging we need for the
+        master table.
+
+        The update below assumes the weather stations table has already been
+        created and populated. I have no idea how to do it in SQLAlchemy, 
+        mainly because of the geometry distance operator ('<->')
+        """
+
+        # Yo dawg, I heard you like subqueries. 
+        # I put a subquery in your subquery.
+        date_type = str(getattr(self.dat_table.c, slugify(self.observed_date)).type)
+        if 'timestamp' in date_type.lower():
+            weather_table = 'dat_weather_observations_hourly'
+            date_col_name = 'datetime'
+            temp_col = 'drybulb_fahrenheit'
+        else:
+            weather_table = 'dat_weather_observations_daily'
+            date_col_name = 'date'
+            temp_col = 'temp_avg'
+        upd = text(
+            """
+            UPDATE dat_master SET weather_observation_id=subq.weather_id
+                FROM (
+                SELECT DISTINCT ON (d.master_row_id) 
+                d.master_row_id AS master_id, 
+                w.id as weather_id, 
+                abs(extract(epoch from d.obs_date) - extract(epoch from w.%s)) as diff 
+                FROM dat_master AS d 
+                JOIN %s as w 
+                  ON w.wban_code = (
+                    SELECT b.wban_code 
+                      FROM weather_stations AS b 
+                      ORDER BY d.location_geom <-> b.location LIMIT 1
+                    ) 
+                WHERE d.location_geom IS NOT NULL 
+                  AND d.weather_observation_id IS NULL 
+                  AND d.dataset_name = :dname 
+                  AND d.obs_date > (
+                    SELECT MIN(%s) 
+                      FROM %s 
+                      WHERE %s IS NOT NULL
+                    ) 
+                  AND d.obs_date < (
+                    SELECT MAX(%s) 
+                      FROM %s 
+                      WHERE %s IS NOT NULL
+                    ) 
+                ORDER BY d.master_row_id, diff
+              ) as subq
+            WHERE dat_master.master_row_id = subq.master_id
+            """ % (date_col_name, weather_table, 
+                   date_col_name, weather_table, temp_col,
+                   date_col_name, weather_table, temp_col,)
+        )
+        conn = engine.connect()
+        conn.execute(upd, dname=self.dataset_name)
 
     def _find_changes(self):
         # Step Eight: Find changes
