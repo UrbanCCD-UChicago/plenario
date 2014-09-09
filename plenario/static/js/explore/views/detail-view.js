@@ -8,6 +8,7 @@ var DetailView = Backbone.View.extend({
         this.center = [41.880517,-87.644061];
         this.query = this.attributes.query;
         this.meta = this.attributes.meta;
+        this.filters = this.attributes.filters;
 
         // console.log('detail-view init')
         // console.log(this.query)
@@ -91,19 +92,7 @@ var DetailView = Backbone.View.extend({
         $('#time-agg-filter').val(this.query['agg']);
         $('#spatial-agg-filter').val(this.query['resolution']);
 
-        $("#detail-chart").spin('large');
-        $.when(this.getTimeSeries()).then( function(resp){
-            $("#detail-chart").spin(false);
-            var chart_vals = [];
-            var record_count = 0;
-            $.each(resp['objects'], function(i, o){
-                chart_vals.push([moment(o.datetime + "+0000").valueOf(),o.count]);
-                record_count += o.count;
-            });
-            $("#record-count").html(addCommas(record_count) + " records")
-            ChartHelper.sparkline("detail-chart", "day", chart_vals);
-        });
-
+        filters = {};
         // grab the field options before we render the filters
         self.field_options = {}
         $.when($.get('/api/fields/' + self.query['dataset_name'])).then(function(field_options){
@@ -121,6 +110,7 @@ var DetailView = Backbone.View.extend({
             $.each(self.query, function(key, val){
                 //exclude reserved query parameters
                 if ($.inArray(key, params_to_exclude) == -1) {
+                    filters[key] = val;
                     // create a dict for each field
                     var field_and_operator = key.split("__");
                     var field = "";
@@ -140,6 +130,7 @@ var DetailView = Backbone.View.extend({
                 }
             });
         });
+        this.filters = filters;
 
         $("#map").spin('large');
         $.when(this.getGrid()).then(
@@ -176,6 +167,19 @@ var DetailView = Backbone.View.extend({
                 }
             }
         )
+
+        $("#detail-chart").spin('large');
+        $.when(this.getTimeSeries()).then( function(resp){
+            $("#detail-chart").spin(false);
+            var chart_vals = [];
+            var record_count = 0;
+            $.each(resp['objects'], function(i, o){
+                chart_vals.push([moment(o.datetime + "+0000").valueOf(),o.count]);
+                record_count += o.count;
+            });
+            $("#record-count").html(addCommas(record_count) + " records")
+            ChartHelper.sparkline("detail-chart", "day", chart_vals);
+        });
     },
 
     addFilter: function(e){
@@ -254,19 +258,26 @@ var DetailView = Backbone.View.extend({
     backToExplorer: function(e){
         e.preventDefault();
         this.undelegateEvents();
-        delete this.points_query['dataset_name'];
+        points_query = this.points_query;
+
+        // delete filters and dataset name from query
+        delete points_query['dataset_name'];
+
+        $.each(self.filters, function(key, val){
+            delete points_query[key];
+        });
         
         if (resp) { resp.undelegateEvents(); }
-        resp = new ResponseView({el: '#list-view', attributes: {query: this.points_query}});
+        resp = new ResponseView({el: '#list-view', attributes: {query: points_query}});
         var attrs = { resp: resp }
-        if (typeof this.points_query['location_geom__within'] !== 'undefined'){
-            attrs['dataLayer'] = $.parseJSON(this.points_query['location_geom__within']);
+        if (typeof points_query['location_geom__within'] !== 'undefined'){
+            attrs['dataLayer'] = $.parseJSON(points_query['location_geom__within']);
         }
 
         if (map) { map.undelegateEvents(); }
         map = new MapView({el: '#map-view', attributes: attrs});
 
-        var route = "aggregate/" + $.param(this.points_query);
+        var route = "aggregate/" + $.param(points_query);
         router.navigate(route);
     },
 
