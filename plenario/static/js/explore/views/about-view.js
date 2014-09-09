@@ -1,6 +1,6 @@
 var AboutView = Backbone.View.extend({
     events: {
-        'click .detail': 'detailView'
+        'click .about-detail': 'detailView'
     },
     initialize: function(){
         this.render();
@@ -43,7 +43,7 @@ var AboutView = Backbone.View.extend({
         })
     },
     detailView: function(e){
-
+        // console.log('about-view detailView')
         var query = {};
         var start = $('#start-date-filter').val();
         var end = $('#end-date-filter').val();

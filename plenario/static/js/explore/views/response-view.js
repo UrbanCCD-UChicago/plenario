@@ -2,6 +2,9 @@ var ResponseView = Backbone.View.extend({
     events: {
         'click .detail': 'detailView'
     },
+    initialize: function(){
+        this.render();
+    },
     render: function(){
         $('#list-view').show();
         $('#detail-view').hide();
@@ -16,6 +19,7 @@ var ResponseView = Backbone.View.extend({
         this.getResults();
     },
     detailView: function(e){
+        // console.log('response-view detailView')
         var dataset_name = $(e.target).data('dataset_name')
         this.query['dataset_name'] = dataset_name
         this.undelegateEvents();
@@ -25,7 +29,6 @@ var ResponseView = Backbone.View.extend({
         router.navigate(route)
     },
     getResults: function(){
-        this.undelegateEvents();
         var self = this;
         $.when(this.resultsFetcher(), this.metaFetcher()).then(
             function(resp, meta_resp){

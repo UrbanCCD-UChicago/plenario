@@ -53,14 +53,20 @@ var MapView = Backbone.View.extend({
             prevText: '',
             nextText: ''
         });
+
+        var geojson = L.geoJson(this.attributes.dataLayer, {
+                      color: "#f06eaa",
+                      fillColor: "#f06eaa",
+                      weight: 4
+                    });
         if (typeof this.attributes.dataLayer !== 'undefined'){
-            this.map.drawnItems.addLayer(
-                L.geoJson(this.attributes.dataLayer, {
-                    color: "#f06eaa",
-                    fillColor: "#f06eaa",
-                    weight: 4
-            }));
-            //this.map.fitBounds(this.map.drawnItems.getBounds());
+            this.map.drawnItems.addLayer(geojson);
+            
+            this.map.whenReady(function () {
+                window.setTimeout(function () {
+                    this.map.fitBounds(geojson.getBounds());
+                }.bind(this), 200);
+            }, this);
         }
 
         $("#dismiss-intro").click(function(e){
@@ -90,6 +96,7 @@ var MapView = Backbone.View.extend({
         });
     },
     submitForm: function(e){
+        // console.log('map-view submit')
         var message = null;
         var query = {};
         var start = $('#start-date-filter').val();
@@ -118,9 +125,8 @@ var MapView = Backbone.View.extend({
         }
         query['agg'] = $('#time-agg-filter').val();
         if(valid){
-            var resp = new ResponseView({el: '#list-view'})
-            resp.attributes = {query: query};
-            resp.render();
+            if (resp) { resp.undelegateEvents(); }
+            resp = new ResponseView({el: '#list-view', attributes: {query: query}})
             var route = "aggregate/" + $.param(query);
             router.navigate(route);
         } else {

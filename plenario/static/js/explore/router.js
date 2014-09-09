@@ -5,20 +5,19 @@ var AppRouter = Backbone.Router.extend({
         "detail/:query": "detail"
     },
     defaultRoute: function(){
-        var about = new AboutView({el: '#list-view'});
-        var map = new MapView({el: '#map-view', attributes: {}})
+        new AboutView({el: '#list-view'});
+        map = new MapView({el: '#map-view', attributes: {}})
     },
     aggregate: function(query){
         var q = parseParams(query);
-        var resp = new ResponseView({el: '#list-view', attributes: {query: q}});
-        resp.render();
+        resp = new ResponseView({el: '#list-view', attributes: {query: q}});
         var attrs = {
             resp: resp
         }
         if (typeof q['location_geom__within'] !== 'undefined'){
             attrs['dataLayer'] = $.parseJSON(q['location_geom__within']);
         }
-        var map = new MapView({el: '#map-view', attributes: attrs});
+        map = new MapView({el: '#map-view', attributes: attrs});
     },
     detail: function(query){
         var q = parseParams(query);
