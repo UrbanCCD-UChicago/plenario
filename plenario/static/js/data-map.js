@@ -66,7 +66,7 @@
             var dataset_name = $(e.target).data('dataset_name')
             this.query['dataset_name'] = dataset_name
             $('#map-view').empty();
-            new GridMapView({el: '#map-view', attributes: {query: this.query, meta: this.meta[dataset_name]}})
+            new DetailView({el: '#map-view', attributes: {query: this.query, meta: this.meta[dataset_name]}})
             var route = 'detail/' + $.param(this.query)
             router.navigate(route)
         },
@@ -196,13 +196,13 @@
             query['dataset_name'] = dataset_name
 
             $('#map-view').empty();
-            new GridMapView({el: '#map-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
+            new DetailView({el: '#map-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
             var route = 'detail/' + $.param(query)
             router.navigate(route)
         }
     });
 
-    var GridMapView = Backbone.View.extend({
+    var DetailView = Backbone.View.extend({
         events: {
             'click #add-filter': 'addFilter',
             'click #submit-detail-query': 'submitForm'
@@ -226,7 +226,7 @@
             this.points_query = $.extend(true, {}, this.query);
             delete this.points_query['resolution'];
             delete this.points_query['center'];
-            this.$el.html(template_cache('gridMapTemplate', {query: this.query, points_query: this.points_query, meta: this.meta, start: start, end: end}));
+            this.$el.html(template_cache('detailTemplate', {query: this.query, points_query: this.points_query, meta: this.meta, start: start, end: end}));
 
             var map_options = {
                 scrollWheelZoom: false,
@@ -425,7 +425,7 @@
             this.query = query;
             if(valid){
                 this.undelegateEvents();
-                new GridMapView({el: '#map-view', attributes: {query: query, meta: this.meta}})
+                new DetailView({el: '#map-view', attributes: {query: query, meta: this.meta}})
                 var route = 'detail/' + $.param(query)
                 router.navigate(route)
             } else {
@@ -685,7 +685,7 @@
             var dataset = q['dataset_name']
             $.when($.getJSON('/api/', {dataset_name: dataset})).then(
                 function(resp){
-                    new GridMapView({el: '#map-view', attributes: {query: q, meta: resp[0]}})
+                    new DetailView({el: '#map-view', attributes: {query: q, meta: resp[0]}})
                 }
             )
         }
