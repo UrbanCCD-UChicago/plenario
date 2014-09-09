@@ -44,3 +44,9 @@ def update_dataset(source_url, fpath=None):
     etl = PlenarioETL(md.as_dict())
     etl.update(fpath=fpath)
     return 'Finished updating %s' % md.human_name
+
+@celery_app.task
+def update_weather(month, year):
+    w = WeatherETL()
+    w.initialize_month(month, year)
+    return 'Added weather for %s %s' % (month, year)
