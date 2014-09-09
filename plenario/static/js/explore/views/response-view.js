@@ -25,6 +25,7 @@ var ResponseView = Backbone.View.extend({
         router.navigate(route)
     },
     getResults: function(){
+        this.undelegateEvents();
         var self = this;
         $.when(this.resultsFetcher(), this.metaFetcher()).then(
             function(resp, meta_resp){
