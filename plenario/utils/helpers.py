@@ -29,6 +29,7 @@ def get_socrata_data_info(view_url):
             dataset_info = {
                 'name': resp['name'],
                 'description': resp.get('description'),
+                'attribution': resp.get('attribution'),
                 'columns': [],
                 'view_url': view_url
             }

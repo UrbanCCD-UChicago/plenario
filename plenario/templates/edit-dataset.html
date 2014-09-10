@@ -28,7 +28,22 @@
                     {% endif %}
                 </div>
             </div>
-            <div class="col-sm-6">
+            <div class="col-sm-3">
+                {% if form.attribution.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_attribution">Attribution</label>
+                    <input type="text" class="form-control" id="id_attribution" name="attribution" value="{{ meta.attribution }}"/>
+                    {% if form.attribution.errors %}
+                        {% for error in form.attribution.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-sm-3">
                 {% if form.update_freq.errors %}
                 <div class="form-group has-error has-feedback">
                 {% else %}

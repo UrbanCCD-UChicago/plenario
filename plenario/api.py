@@ -21,6 +21,7 @@ from shapely.wkb import loads
 from shapely.geometry import box, asShape
 from collections import OrderedDict
 from urlparse import urlparse
+from hashlib import md5
 
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
@@ -519,7 +520,6 @@ def grid():
         center = [41.880517,-87.644061]
     else:
         del raw_query_params['center[]']
-    print center
     location_geom = request.args.get('location_geom__within')
 
     if raw_query_params.get('buffer'):
@@ -595,15 +595,17 @@ def submit_dataset():
             status_code = 400
         else:
             source_domain = urlparse(dataset_info['view_url']).netloc
-            dataset_id = dataset_info['view_url'].split('/')[-1]
             source_url = 'http://%s/resource/%s' % (source_domain, dataset_id)
+            dataset_id = md5(source_url).hexdigest()
             md = session.query(MetaTable).get(dataset_id)
             if not md:
                 d = {
                     'dataset_name': slugify(dataset_info['name'], delim=u'_'),
                     'human_name': dataset_info['name'],
+                    'attribution': dataset_info['attribution'],
                     'description': dataset_info['description'],
                     'source_url': source_url,
+                    'source_url_hash': dataset_id,
                     'update_freq': post['update_frequency'],
                     'business_key': post['id_field'],
                     'observed_date': post['date_field'],
@@ -616,7 +618,7 @@ def submit_dataset():
                 md = MetaTable(**d)
                 session.add(md)
                 session.commit()
-            add_dataset.delay(md.source_url)
+            add_dataset.delay(md.source_url_hash)
             resp['message'] = 'Dataset %s submitted successfully' % md.human_name
     else:
         resp['status'] = 'error'

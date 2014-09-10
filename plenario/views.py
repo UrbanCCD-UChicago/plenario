@@ -66,6 +66,7 @@ class EditDatasetForm(Form):
     """
     human_name = TextField('human_name', validators=[DataRequired()])
     description = TextField('description', validators=[DataRequired()])
+    attribution = TextField('attribution', validators=[DataRequired()])
     obs_from = DateField('obs_from', validators=[DataRequired(message="Start of date range must be a valid date")])
     obs_to = DateField('obs_to', validators=[DataRequired(message="End of date range must be a valid date")])
     update_freq = SelectField('update_freq', 
@@ -101,17 +102,20 @@ class EditDatasetForm(Form):
 
         return valid
 
-@views.route('/edit-dataset/<four_by_four>', methods=['GET', 'POST'])
+@views.route('/edit-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
-def edit_dataset(four_by_four):
+def edit_dataset(source_url_hash):
     form = EditDatasetForm()
-    meta = session.query(MetaTable).get(four_by_four)
-    view_url = 'http://%s/api/views/%s' % (urlparse(meta.source_url).netloc, four_by_four)
+    meta = session.query(MetaTable).get(source_url_hash)
+    parsed_url = urlparse(meta.source_url)
+    four_by_four = parsed_url.path.split('/')[-1]
+    view_url = 'http://%s/api/views/%s' % (parsed_url.netloc, four_by_four)
     socrata_info, errors, status_code = get_socrata_data_info(view_url)
     if form.validate_on_submit():
         upd = {
             'human_name': form.human_name.data,
             'description': form.description.data,
+            'attribution': form.attribution.data,
             'obs_from': form.obs_from.data,
             'obs_to': form.obs_to.data,
             'update_freq': form.update_freq.data,
@@ -122,7 +126,7 @@ def edit_dataset(four_by_four):
             'observed_date': form.observed_date.data,
         }
         session.query(MetaTable)\
-            .filter(MetaTable.four_by_four == four_by_four)\
+            .filter(MetaTable.source_url_hash == meta.source_url_hash)\
             .update(upd)
         session.commit()
         flash('%s updated successfully!' % meta.human_name, 'success')
@@ -133,9 +137,9 @@ def edit_dataset(four_by_four):
     }
     return render_template('edit-dataset.html', **context)
 
-@views.route('/update-dataset/<four_by_four>')
-def update_dataset(four_by_four):
-    result = update_dataset_task.delay(four_by_four)
+@views.route('/update-dataset/<source_url_hash>')
+def update_dataset(source_url_hash):
+    result = update_dataset_task.delay(source_url_hash)
     return make_response(json.dumps({'status': 'success', 'task_id': result.id}))
 
 @views.route('/check-update/<task_id>')
