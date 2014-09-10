@@ -2,8 +2,6 @@
 {% block title %}API Documentation - Plenar.io{% endblock %}
 {% block content %}
 <div class='col-md-10 col-md-offset-1'>
-    <br/>
-    <div class="col-md-8 col-md-offset-2">
       <div class="panel panel-default">
         <div class="panel-heading">
           <h1 class="panel-title">Note</h1>
@@ -12,9 +10,6 @@
           <p class="lead">The easiest way to access Plenar.io&rsquo;s data and to build your own queries is via the <a href="{{ url_for('views.explore_view') }}">Data Explorer</a>.</p>
         </div>
       </div>
-    </div>
-    <div class="row"></div>
-      <hr />
       
       <h2 id="docs">For developers</h2>
       <p><strong></strong> The Plenar.io RESTful API can be used to perform custom geospatial and temporal queries.</p>  
@@ -34,8 +29,9 @@
         <div class="panel panel-default">
           <div class="panel-heading">
             <a data-toggle="collapse" data-parent="#accordion-api" href="#collapse-api" id="api">
+              <span class='label label-info'>GET</span>
               <strong><code>/v1/api/datasets/</code></strong>
-              - list datasets and metadata available
+              <p class='pull-right'>list datasets and metadata available</p>
             </a>
           </div>
           <div id="collapse-api" class="panel-collapse collapse">
@@ -88,7 +84,7 @@
               <div class='well examples'>
                 <p><strong>Example</strong></p>
                 <p>
-                  <a href='/v1/api/'>http://plenar.io/v1/api/</a><br />
+                  <a href='/v1/api/datasets'>http://plenar.io/v1/api/datasets</a><br />
                   Returns a list of datasets available in Plenar.io
                 </p>
               </div>
@@ -101,8 +97,9 @@
         <div class="panel panel-default">
           <div class="panel-heading">
             <a data-toggle="collapse" data-parent="#accordion-api-timeseries" href="#collapse-api-timeseries" id="api-timeseries">
+              <span class='label label-info'>GET</span>
               <strong><code>/v1/api/timeseries/</code></strong>
-              - query aggregate counts of available data bounded by a time window and geography
+              <p class='pull-right'>query aggregate counts of available data bounded by a time window and geography</p>
             </a>
           </div>
           <div id="collapse-api-timeseries" class="panel-collapse collapse">
@@ -269,16 +266,18 @@
                       All available datasets in a bounding box (downtown Chicago) from Feb 21, 2014 to Aug 20, 2014, aggregated by week.
                       </p>
                     </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="panel-group" id="accordion">
+      <div class="panel-group" id="accordion-api-fields">
         <div class="panel panel-default">
           <div class="panel-heading">
-            <a data-toggle="collapse" data-parent="#accordion" href="#collapse-api-fields" id="api-fields">
+            <a data-toggle="collapse" data-parent="#accordion-api-fields" href="#collapse-api-fields" id="api-fields">
+              <span class='label label-info'>GET</span>
               <strong><code>/v1/api/fields/&lt;dataset_name&gt;/</code></strong>
-              - list available fields for a dataset
+              <p class='pull-right'>list available fields for a dataset</p>
             </a>
           </div>
           <div id="collapse-api-fields" class="panel-collapse collapse">
@@ -317,16 +316,18 @@
                 <p><a href='/v1/api/fields/crimes_2001_to_present'>http://plenar.io/v1/api/fields/crimes_2001_to_present</a><br />
                 Field definitions for Chicago crime report dataset</p>
               </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="panel-group" id="accordion">
+      <div class="panel-group" id="accordion-api-detail-aggregate">
         <div class="panel panel-default">
           <div class="panel-heading">
-            <a data-toggle="collapse" data-parent="#accordion" href="#collapse-api-detail-aggregate" id="api-detail-aggregate">
+            <a data-toggle="collapse" data-parent="#accordion-api-detail-aggregate" href="#collapse-api-detail-aggregate" id="api-detail-aggregate">
+              <span class='label label-info'>GET</span>
               <strong><code>/v1/api/detail-aggregate/</code></strong>
-              - query a single dataset and return an aggregate count
+              <p class='pull-right'>query a single dataset and return an aggregate count</p>
             </a>
           </div>
           <div id="collapse-api-detail-aggregate" class="panel-collapse collapse">
@@ -473,16 +474,18 @@
                 <p><a href='/v1/api/detail-aggregate/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1&iucr=0110'>http://plenar.io/v1/api/detail-aggregate/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1&iucr=0110</a><br />
                 Chicago crime reports since Jan 1st 2012, aggregated by year with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)</p>
               </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="panel-group" id="accordion">
+      <div class="panel-group" id="accordion-api-detail">
         <div class="panel panel-default">
           <div class="panel-heading">
-            <a data-toggle="collapse" data-parent="#accordion" href="#collapse-api-detail" id="api-detail">
+            <a data-toggle="collapse" data-parent="#accordion-api-detail" href="#collapse-api-detail" id="api-detail">
+              <span class='label label-info'>GET</span>
               <strong><code>/v1/api/detail/</code></strong>
-              - query a single dataset and return all raw data
+              <p class='pull-right'>query a single dataset and return all raw data</p>
             </a>
           </div>
           <div id="collapse-api-detail" class="panel-collapse collapse">
@@ -590,6 +593,7 @@
                 <p><a href='/v1/api/detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110'>http://plenar.io/v1/api/detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110</a><br />
                 Chicago crime reports since Jan 1st 2014 with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)</p>
               </div>
+            </div>
           </div>
         </div>
       </div>
@@ -598,8 +602,9 @@
         <div class="panel panel-default">
           <div class="panel-heading">
             <a data-toggle="collapse" data-parent="#accordion" href="#collapse-api-grid" id="api-grid">
+              <span class='label label-info'>GET</span>
               <strong><code>/v1/api/grid/</code></strong>
-              - query a single dataset and return a GeoJSON grid heatmap
+              <p class='pull-right'>query a single dataset and return a GeoJSON grid heatmap</p>
             </a>
           </div>
           <div id="collapse-api-grid" class="panel-collapse collapse">
@@ -755,11 +760,11 @@
                       311 tree trim requests between March 9, 2014 and September 5th, 2014 for Wards 2, 42 and 32</p>
                     </div>
                 </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <h3 id='responses'>API responses</h3>
+      <h2 id='responses'>API responses</h2>
       <p>All JSON API calls return their data in the <code>objects</code> block. Additional information is returned in the <code>meta</code> block:</p>
 
       <table class='table table-bordered'>
@@ -843,5 +848,5 @@
           </div>
         </div>
       </div> -->
-      
+</div>
 {% endblock content %}
