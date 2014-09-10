@@ -38,7 +38,7 @@ def hourly_update():
     return 'yay'
 
 @celery_app.task
-def update_dataset(source_url, fpath=None):
+def update_dataset(source_url, s3_path=None):
     
     md = session.query(MetaTable).get(source_url)
     etl = PlenarioETL(md.as_dict())
