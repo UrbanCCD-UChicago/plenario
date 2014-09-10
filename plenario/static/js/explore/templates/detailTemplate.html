@@ -62,8 +62,8 @@
 
         <hr />
         <h4><i class='fa fa-download'></i> Download</h4>
-        <% var points = "/api/detail/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
-        <% var time_series = "/api/detail-aggregate/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
+        <% var points = "/v1/api/detail/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
+        <% var time_series = "/v1/api/detail-aggregate/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
         <table class='table table-condensed'>
             <tbody>
                 <tr>

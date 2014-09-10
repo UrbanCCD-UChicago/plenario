@@ -27,8 +27,23 @@ from plenario.database import session, app_engine as engine, Base
 from plenario.utils.helpers import get_socrata_data_info, slugify, increment_datetime_aggregate
 from plenario.tasks import add_dataset
 
-api = Blueprint('api', __name__)
+API_VERSION = '/v1'
+WEATHER_COL_LOOKUP = {
+    'daily': {
+        'temp_lo': 'temp_min',
+        'temp_hi': 'temp_max',
+        'temp_avg': 'temp_avg',
+        'precip_amount': 'precip_total',
+    },
+    'hourly': {
+        'temp_lo': 'drybulb_fahrenheit',
+        'temp_hi': 'drybulb_fahrenheit',
+        'temp_avg': 'drybulb_fahrenheit',
+        'precip_amount': 'hourly_precip',
+    },
+}
 
+api = Blueprint('api', __name__)
 dthandler = lambda obj: obj.isoformat() if isinstance(obj, date) else None
 
 def crossdomain(origin=None, methods=None, headers=None,
@@ -72,81 +87,7 @@ def crossdomain(origin=None, methods=None, headers=None,
         return update_wrapper(wrapped_function, f)
     return decorator
 
-def make_query(table, raw_query_params):
-    table_keys = table.columns.keys()
-    args_keys = raw_query_params.keys()
-    resp = {
-        'meta': {
-            'status': 'error',
-            'message': '',
-        },
-        'objects': [],
-    }
-    status_code = 200
-    query_clauses = []
-    valid_query = True
-    if 'offset' in args_keys:
-        args_keys.remove('offset')
-    if 'limit' in args_keys:
-        args_keys.remove('limit')
-    if 'order_by' in args_keys:
-        args_keys.remove('order_by')
-    for query_param in args_keys:
-        try:
-            field, operator = query_param.split('__')
-        except ValueError:
-            field = query_param
-            operator = 'eq'
-        query_value = raw_query_params.get(query_param)
-        column = table.columns.get(field)
-        if field not in table_keys:
-            resp['meta']['message'] = '"%s" is not a valid fieldname' % field
-            status_code = 400
-            valid_query = False
-        elif operator == 'in':
-            query = column.in_(query_value.split(','))
-            query_clauses.append(query)
-        elif operator == 'within':
-            geo = json.loads(query_value)
-            if 'features' in geo.keys():
-                val = geo['features'][0]['geometry']
-            elif 'geometry' in geo.keys():
-                val = geo['geometry']
-            else:
-                val = geo
-            if val['type'] == 'LineString':
-                shape = asShape(val)
-                lat = shape.centroid.y
-                # 100 meters by default
-                x, y = getSizeInDegrees(100, lat)
-                val = shape.buffer(y).__geo_interface__
-            val['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
-            query = column.ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val)))
-            query_clauses.append(query)
-        elif operator.startswith('time_of_day'):
-            if operator.endswith('ge'):
-                query = func.date_part('hour', column).__ge__(query_value)
-            elif operator.endswith('le'):
-                query = func.date_part('hour', column).__le__(query_value)
-            query_clauses.append(query)
-        else:
-            try:
-                attr = filter(
-                    lambda e: hasattr(column, e % operator),
-                    ['%s', '%s_', '__%s__']
-                )[0] % operator
-            except IndexError:
-                resp['meta']['message'] = '"%s" is not a valid query operator' % operator
-                status_code = 400
-                valid_query = False
-                break
-            if query_value == 'null': # pragma: no cover
-                query_value = None
-            query = getattr(column, attr)(query_value)
-            query_clauses.append(query)
-    return valid_query, query_clauses, resp, status_code
-
-@api.route('/api/')
+@api.route(API_VERSION + '/api/datasets')
 @crossdomain(origin="*")
 def meta():
     status_code = 200
@@ -162,7 +103,7 @@ def meta():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-@api.route('/api/fields/<dataset_name>/')
+@api.route(API_VERSION + '/api/fields/<dataset_name>/')
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
     try:
@@ -201,13 +142,7 @@ def dataset_fields(dataset_name):
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-def make_csv(data):
-    outp = StringIO()
-    writer = csv.writer(outp)
-    writer.writerows(data)
-    return outp.getvalue()
-
-@api.route('/api/weather-stations/')
+@api.route(API_VERSION + '/api/weather-stations/')
 @crossdomain(origin="*")
 def weather_stations():
     raw_query_params = request.args.copy()
@@ -231,7 +166,7 @@ def weather_stations():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-@api.route('/api/weather/<table>/')
+@api.route(API_VERSION + '/api/weather/<table>/')
 @crossdomain(origin="*")
 def weather(table):
     raw_query_params = request.args.copy()
@@ -275,7 +210,7 @@ def weather(table):
     return resp
 
 
-@api.route('/api/master/')
+@api.route(API_VERSION + '/api/timeseries/')
 @crossdomain(origin="*")
 def dataset():
     raw_query_params = request.args.copy()
@@ -382,55 +317,7 @@ def dataset():
         resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % (filedate)
     return resp
 
-def parse_join_query(params):
-    queries = {
-        'base' : {},
-        'detail': {},
-        'weather': {},
-    }
-    agg = 'day'
-    datatype = 'json'
-    master_columns = [
-        'obs_date', 
-        'location_geom', 
-        'dataset_name',
-        'weather_observation_id',
-    ]
-    weather_columns = [
-        'temp_hi',
-        'temp_lo',
-        'temp_avg',
-        'precip_amount',
-    ]
-    for key, value in params.items():
-        if key.split('__')[0] in master_columns:
-            queries['base'][key] = value
-        elif key.split('__')[0] in weather_columns:
-            queries['weather'][key] = value
-        elif key == 'agg':
-            agg = value
-        elif key == 'data_type':
-            datatype = value
-        else:
-            queries['detail'][key] = value
-    return agg, datatype, queries
-
-WEATHER_COL_LOOKUP = {
-    'daily': {
-        'temp_lo': 'temp_min',
-        'temp_hi': 'temp_max',
-        'temp_avg': 'temp_avg',
-        'precip_amount': 'precip_total',
-    },
-    'hourly': {
-        'temp_lo': 'drybulb_fahrenheit',
-        'temp_hi': 'drybulb_fahrenheit',
-        'temp_avg': 'drybulb_fahrenheit',
-        'precip_amount': 'hourly_precip',
-    },
-}
-
-@api.route('/api/detail/')
+@api.route(API_VERSION + '/api/detail/')
 @crossdomain(origin="*")
 def detail():
     raw_query_params = request.args.copy()
@@ -540,7 +427,7 @@ def detail():
         resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
     return resp
 
-@api.route('/api/detail-aggregate/')
+@api.route(API_VERSION + '/api/detail-aggregate/')
 @crossdomain(origin="*")
 def detail_aggregate():
     raw_query_params = request.args.copy()
@@ -614,21 +501,7 @@ def detail_aggregate():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-def getSizeInDegrees(meters, latitude):
-
-    earth_circumference = 40041000.0 # meters, average circumference
-    degrees_per_meter = 360.0 / earth_circumference
-    
-    degrees_at_equator = meters * degrees_per_meter
-
-    latitude_correction = 1.0 / math.cos(latitude * (math.pi / 180.0))
-    
-    degrees_x = degrees_at_equator * latitude_correction
-    degrees_y = degrees_at_equator
-
-    return degrees_x, degrees_y
-
-@api.route('/api/grid/')
+@api.route(API_VERSION + '/api/grid/')
 @crossdomain(origin="*")
 def grid():
     raw_query_params = request.args.copy()
@@ -706,7 +579,7 @@ def grid():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-@api.route('/api/submit-dataset/', methods=['POST'])
+@api.route(API_VERSION + '/api/submit-dataset/', methods=['POST'])
 def submit_dataset():
     resp = {'status': 'ok', 'message': ''}
     post = request.form
@@ -753,3 +626,130 @@ def submit_dataset():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
+# helper functions
+def make_query(table, raw_query_params):
+    table_keys = table.columns.keys()
+    args_keys = raw_query_params.keys()
+    resp = {
+        'meta': {
+            'status': 'error',
+            'message': '',
+        },
+        'objects': [],
+    }
+    status_code = 200
+    query_clauses = []
+    valid_query = True
+    if 'offset' in args_keys:
+        args_keys.remove('offset')
+    if 'limit' in args_keys:
+        args_keys.remove('limit')
+    if 'order_by' in args_keys:
+        args_keys.remove('order_by')
+    for query_param in args_keys:
+        try:
+            field, operator = query_param.split('__')
+        except ValueError:
+            field = query_param
+            operator = 'eq'
+        query_value = raw_query_params.get(query_param)
+        column = table.columns.get(field)
+        if field not in table_keys:
+            resp['meta']['message'] = '"%s" is not a valid fieldname' % field
+            status_code = 400
+            valid_query = False
+        elif operator == 'in':
+            query = column.in_(query_value.split(','))
+            query_clauses.append(query)
+        elif operator == 'within':
+            geo = json.loads(query_value)
+            if 'features' in geo.keys():
+                val = geo['features'][0]['geometry']
+            elif 'geometry' in geo.keys():
+                val = geo['geometry']
+            else:
+                val = geo
+            if val['type'] == 'LineString':
+                shape = asShape(val)
+                lat = shape.centroid.y
+                # 100 meters by default
+                x, y = getSizeInDegrees(100, lat)
+                val = shape.buffer(y).__geo_interface__
+            val['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
+            query = column.ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val)))
+            query_clauses.append(query)
+        elif operator.startswith('time_of_day'):
+            if operator.endswith('ge'):
+                query = func.date_part('hour', column).__ge__(query_value)
+            elif operator.endswith('le'):
+                query = func.date_part('hour', column).__le__(query_value)
+            query_clauses.append(query)
+        else:
+            try:
+                attr = filter(
+                    lambda e: hasattr(column, e % operator),
+                    ['%s', '%s_', '__%s__']
+                )[0] % operator
+            except IndexError:
+                resp['meta']['message'] = '"%s" is not a valid query operator' % operator
+                status_code = 400
+                valid_query = False
+                break
+            if query_value == 'null': # pragma: no cover
+                query_value = None
+            query = getattr(column, attr)(query_value)
+            query_clauses.append(query)
+    return valid_query, query_clauses, resp, status_code
+
+def getSizeInDegrees(meters, latitude):
+
+    earth_circumference = 40041000.0 # meters, average circumference
+    degrees_per_meter = 360.0 / earth_circumference
+    
+    degrees_at_equator = meters * degrees_per_meter
+
+    latitude_correction = 1.0 / math.cos(latitude * (math.pi / 180.0))
+    
+    degrees_x = degrees_at_equator * latitude_correction
+    degrees_y = degrees_at_equator
+
+    return degrees_x, degrees_y
+
+def make_csv(data):
+    outp = StringIO()
+    writer = csv.writer(outp)
+    writer.writerows(data)
+    return outp.getvalue()
+
+def parse_join_query(params):
+    queries = {
+        'base' : {},
+        'detail': {},
+        'weather': {},
+    }
+    agg = 'day'
+    datatype = 'json'
+    master_columns = [
+        'obs_date', 
+        'location_geom', 
+        'dataset_name',
+        'weather_observation_id',
+    ]
+    weather_columns = [
+        'temp_hi',
+        'temp_lo',
+        'temp_avg',
+        'precip_amount',
+    ]
+    for key, value in params.items():
+        if key.split('__')[0] in master_columns:
+            queries['base'][key] = value
+        elif key.split('__')[0] in weather_columns:
+            queries['weather'][key] = value
+        elif key == 'agg':
+            agg = value
+        elif key == 'data_type':
+            datatype = value
+        else:
+            queries['detail'][key] = value
+    return agg, datatype, queries

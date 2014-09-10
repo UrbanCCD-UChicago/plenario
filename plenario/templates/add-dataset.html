@@ -128,7 +128,7 @@
                 if(valid){
                     data_types['view_url'] = $('#name').data('view')
                     console.log(data_types);
-                    $.post('/api/submit-dataset/', data_types, function(resp){
+                    $.post('/v1/api/submit-dataset/', data_types, function(resp){
                         console.log(resp);
                         window.location = "/view-datasets/";
                     })

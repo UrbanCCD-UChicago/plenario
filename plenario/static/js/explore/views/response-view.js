@@ -80,14 +80,14 @@ var ResponseView = Backbone.View.extend({
     resultsFetcher: function(){
         var self = this;
         return $.ajax({
-            url: '/api/master/',
+            url: '/v1/api/timeseries/',
             dataType: 'json',
             data: self.query
         });
     },
     metaFetcher: function(){
         return $.ajax({
-            url: '/api/',
+            url: '/v1/api/datasets/',
             dataType: 'json'
         })
     }

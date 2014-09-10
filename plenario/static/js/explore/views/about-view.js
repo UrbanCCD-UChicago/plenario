@@ -38,7 +38,7 @@ var AboutView = Backbone.View.extend({
     },
     get_datasets: function(){
         return $.ajax({
-            url: '/api/',
+            url: '/v1/api/datasets/',
             dataType: 'json'
         })
     },

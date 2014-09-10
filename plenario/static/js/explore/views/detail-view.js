@@ -82,7 +82,7 @@ var DetailView = Backbone.View.extend({
         $('#detail-view').hide();
         $('#list-view').hide();
 
-        $('#download-geojson').attr('href','/api/grid/?' + $.param(self.getQuery()))
+        $('#download-geojson').attr('href','/v1/api/grid/?' + $.param(self.getQuery()))
         $('.date-filter').datepicker({
             dayNamesMin: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
             prevText: '',
@@ -95,13 +95,13 @@ var DetailView = Backbone.View.extend({
         filters = {};
         // grab the field options before we render the filters
         self.field_options = {}
-        $.when($.get('/api/fields/' + self.query['dataset_name'])).then(function(field_options){
+        $.when($.get('/v1/api/fields/' + self.query['dataset_name'])).then(function(field_options){
             self.field_options = field_options;
         
             // populate filters from query
             var params_to_exclude = ['location_geom__within', 'obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center', 'buffer', 'agg'];
 
-            // grab a list of dataset fields from the /api/fields/ endpoint
+            // grab a list of dataset fields from the /v1/api/fields/ endpoint
             // create a new empty filter
             new FilterView({el: '#filter_builder', attributes: {filter_dict: {"id" : 0, "field" : "", "value" : "", "operator" : "", "removable": false }, field_options: self.field_options}})
 
@@ -288,7 +288,7 @@ var DetailView = Backbone.View.extend({
     getTimeSeries: function(){
         var q = this.points_query;
         return $.ajax({
-            url: '/api/detail-aggregate/',
+            url: '/v1/api/detail-aggregate/',
             dataType: 'json',
             data: q
         })
@@ -296,7 +296,7 @@ var DetailView = Backbone.View.extend({
     getGrid: function(){
         var q = this.getQuery()
         return $.ajax({
-            url: '/api/grid/',
+            url: '/v1/api/grid/',
             dataType: 'json',
             data: q
         })
@@ -304,7 +304,7 @@ var DetailView = Backbone.View.extend({
     getFields: function(){
         var q = this.getQuery()
         return $.ajax({
-            url: ('/api/fields/' + q['dataset_name'])
+            url: ('/v1/api/fields/' + q['dataset_name'])
         })
     },
     getCutoffs: function(values){
