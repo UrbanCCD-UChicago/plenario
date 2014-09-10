@@ -36,7 +36,18 @@ class PlenarioShapeETL(object):
     """ 
     Downloads, transforms and loads shapefiles. 
     Expects input to be a zipfile containing the various
-    component files of the ESRI Shapefile format
+    component files of the ESRI Shapefile format. When initialized,
+    you need to give it a dict with these keys and values:
+
+        dataset_name:  Machine version of the dataset name.
+                       This is used to name the primary key field of the
+                       data table for the dataset as well as the table
+                       itself.  Should be lowercase with words seperated
+                       by underscores. Truncated to the first 50
+                       characters.
+
+        source_url:    This is used to download the raw data.
+
     """
     def __init__(self, meta):
         for k,v in meta.items():
@@ -71,10 +82,6 @@ class PlenarioShapeETL(object):
         self.s3_key.make_public()
     
     def _load_shapefile(self):
-        """
-        Import a shapefile into the PostGIS database
-        """
-        # Open the shapefile with fiona.
         content = StringIO()
         file_contents = self.s3_key.get_contents_to_file(content)
         content.seek(0)
