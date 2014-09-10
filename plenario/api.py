@@ -21,6 +21,7 @@ from shapely.wkb import loads
 from shapely.geometry import box, asShape
 from collections import OrderedDict
 from urlparse import urlparse
+from hashlib import md5
 
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
@@ -594,8 +595,8 @@ def submit_dataset():
             status_code = 400
         else:
             source_domain = urlparse(dataset_info['view_url']).netloc
-            dataset_id = dataset_info['view_url'].split('/')[-1]
             source_url = 'http://%s/resource/%s' % (source_domain, dataset_id)
+            dataset_id = md5(source_url).hexdigest()
             md = session.query(MetaTable).get(dataset_id)
             if not md:
                 d = {
@@ -604,6 +605,7 @@ def submit_dataset():
                     'attribution': dataset_info['attribution'],
                     'description': dataset_info['description'],
                     'source_url': source_url,
+                    'source_url_hash': dataset_id,
                     'update_freq': post['update_frequency'],
                     'business_key': post['id_field'],
                     'observed_date': post['date_field'],
