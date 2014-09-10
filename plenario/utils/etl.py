@@ -5,7 +5,7 @@ from datetime import datetime, date, time
 from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.models import MetaTable, MasterTable
-from plenario.utils.helpers import slugify
+from plenario.utils.helpers import slugify, iter_column
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET
 from urlparse import urlparse
 from csvkit.unicsv import UnicodeCSVReader
@@ -23,7 +23,7 @@ from shapely.geometry import box
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from cStringIO import StringIO
-
+    
 class PlenarioETL(object):
     
     def __init__(self, meta):
@@ -151,16 +151,6 @@ class PlenarioETL(object):
         except AttributeError:
             pass
 
-    def iter_column(self, idx, f):
-        f.seek(0)
-        reader = UnicodeCSVReader(f)
-        header = reader.next()
-        col = []
-        for row in reader:
-            col.append(row[idx])
-        col_type = normalize_column_type(col)
-        return col_type
-
     def _get_or_create_data_table(self):
         # Step One: Make a table where the data will eventually live
         try:
@@ -175,7 +165,7 @@ class PlenarioETL(object):
                 reader = UnicodeCSVReader(f)
                 header = reader.next()
                 for col in range(len(header)):
-                    col_types.append(self.iter_column(col, f))
+                    col_types.append(iter_column(col, f))
             cols = [
                 Column('%s_row_id' % self.dataset_name, Integer, primary_key=True),
                 Column('start_date', TIMESTAMP, server_default=text('CURRENT_TIMESTAMP')),

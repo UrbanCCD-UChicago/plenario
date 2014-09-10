@@ -2,7 +2,7 @@ from flask import make_response, request, render_template, current_app, g, \
     Blueprint, flash
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session
-from plenario.utils.helpers import get_socrata_data_info
+from plenario.utils.helpers import get_socrata_data_info, iter_column
 from plenario.tasks import update_dataset as update_dataset_task
 from flask_login import login_required
 from datetime import datetime, timedelta
@@ -13,6 +13,8 @@ from wtforms import TextField, PasswordField, DateField, SelectField
 from wtforms.validators import DataRequired, Email
 from dateutil import parser
 import json
+from cStringIO import StringIO
+from csvkit.unicsv import UnicodeCSVReader
 
 views = Blueprint('views', __name__)
 
@@ -40,15 +42,32 @@ def add_dataset():
     if request.method == 'POST':
         url = request.form.get('dataset_url')
         if url:
-            parsed = urlparse(url)
-            host = 'https://%s' % parsed.netloc
-            path = 'api/views'
-            fourbyfour = parsed.path.split('/')[-1]
-            view_url = '%s/%s/%s' % (host, path, fourbyfour)
-            dataset_info, errors, status_code = get_socrata_data_info(view_url)
-            if status_code is not None and status_code != 200:
-                errors.append('URL returned a %s status code' % status_code)
-            dataset_info['submitted_url'] = url
+            r = requests.get(url, stream=True)
+            dataset_info['name'] = urlparse(url).path.split('/')[-1]
+            inp = StringIO()
+            line_no = 0
+            lines = []
+            for line in r.iter_lines():
+                try:
+                    inp.write(line + '\n')
+                    line_no += 1
+                    if line_no > 1000:
+                        raise StopIteration
+                except StopIteration:
+                    break
+            inp.seek(0)
+            reader = UnicodeCSVReader(inp)
+            header = reader.next()
+            col_types = []
+            for col in range(len(header)):
+                col_types.append(iter_column(col, inp))
+            dataset_info['columns'] = []
+            for idx, col in enumerate(col_types):
+                d = {
+                    'human_name': header[idx],
+                    'data_type': col.__visit_name__.lower()
+                }
+                dataset_info['columns'].append(d)
         else:
             errors.append('Need a URL')
     context = {'dataset_info': dataset_info, 'errors': errors}
