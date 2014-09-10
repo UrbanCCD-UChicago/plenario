@@ -519,7 +519,6 @@ def grid():
         center = [41.880517,-87.644061]
     else:
         del raw_query_params['center[]']
-    print center
     location_geom = request.args.get('location_geom__within')
 
     if raw_query_params.get('buffer'):

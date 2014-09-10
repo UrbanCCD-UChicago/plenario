@@ -102,12 +102,14 @@ class EditDatasetForm(Form):
 
         return valid
 
-@views.route('/edit-dataset/<source_url>', methods=['GET', 'POST'])
+@views.route('/edit-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
-def edit_dataset(source_url):
+def edit_dataset(source_url_hash):
     form = EditDatasetForm()
-    meta = session.query(MetaTable).get(source_url)
-    view_url = 'http://%s/api/views/%s' % (urlparse(meta.source_url).netloc, source_url)
+    meta = session.query(MetaTable).get(source_url_hash)
+    parsed_url = urlparse(meta.source_url)
+    four_by_four = parsed_url.path.split('/')[-1]
+    view_url = 'http://%s/api/views/%s' % (parsed_url.netloc, four_by_four)
     socrata_info, errors, status_code = get_socrata_data_info(view_url)
     if form.validate_on_submit():
         upd = {
@@ -124,7 +126,7 @@ def edit_dataset(source_url):
             'observed_date': form.observed_date.data,
         }
         session.query(MetaTable)\
-            .filter(MetaTable.source_url == source_url)\
+            .filter(MetaTable.source_url_hash == meta.source_url_hash)\
             .update(upd)
         session.commit()
         flash('%s updated successfully!' % meta.human_name, 'success')
@@ -135,9 +137,9 @@ def edit_dataset(source_url):
     }
     return render_template('edit-dataset.html', **context)
 
-@views.route('/update-dataset/<source_url>')
-def update_dataset(source_url):
-    result = update_dataset_task.delay(source_url)
+@views.route('/update-dataset/<source_url_hash>')
+def update_dataset(source_url_hash):
+    result = update_dataset_task.delay(source_url_hash)
     return make_response(json.dumps({'status': 'success', 'task_id': result.id}))
 
 @views.route('/check-update/<task_id>')

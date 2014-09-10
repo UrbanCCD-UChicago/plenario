@@ -36,9 +36,9 @@
                     </td>
                     <td>{{ dataset.update_freq }}</td>
                     <td>{{ dataset.last_update }}</td>
-                    <td><button class="btn btn-default btn-sm update-dataset" data-dataset="{{dataset.four_by_four}}"><i class='fa fa-refresh'></i> Update now</button></td>
+                    <td><button class="btn btn-default btn-sm update-dataset" data-dataset="{{dataset.source_url_hash}}"><i class='fa fa-refresh'></i> Update now</button></td>
                     <td>
-                        <a href="{{ url_for('views.edit_dataset', four_by_four=dataset.four_by_four) }}"
+                        <a href="{{ url_for('views.edit_dataset', source_url_hash=dataset.source_url_hash) }}"
                             class="btn btn-info btn-sm">
                             <i class='fa fa-edit'></i> Edit
                         </a>

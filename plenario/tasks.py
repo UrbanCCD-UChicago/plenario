@@ -33,14 +33,14 @@ def hourly_update():
     md = session.query(MetaTable)\
         .filter(MetaTable.update_freq == 'hourly').all()
     for m in md:
-        update_dataset.delay(m.source_url)
+        update_dataset.delay(m.source_url_hash)
         print 'Updating %s' % m.human_name
     return 'yay'
 
 @celery_app.task
-def update_dataset(source_url, s3_path=None):
+def update_dataset(source_url_hash, s3_path=None):
     
-    md = session.query(MetaTable).get(source_url)
+    md = session.query(MetaTable).get(source_url_hash)
     etl = PlenarioETL(md.as_dict())
     etl.update(s3_path=s3_path)
     return 'Finished updating %s' % md.human_name
