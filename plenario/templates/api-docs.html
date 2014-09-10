@@ -23,7 +23,7 @@
       </ul>
 
       <h2 id='endpoints'>Endpoints</h2>
-      <p>Currently there are six API endpoints:</p>
+      <p>Currently there are nine API endpoints:</p>
 
       <div class="panel-group" id="accordion-api">
         <div class="panel panel-default">
@@ -157,10 +157,10 @@
                           </td>
                         </tr>
                         <tr>
-                          <td><strong><code>location_geom</code></strong></td>
+                          <td><strong><code>location_geom__within</code></strong></td>
                           <td>none</td>
                           <td>
-                            <p>A URL encoded <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest. Currently, the only query operator that can be applied to this is <code>within</code>.</p>
+                            <p>A URL encoded <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest.</p>
 
                             <p><strong>Example GeoJSON</strong> before it is <a href='http://meyerweb.com/eric/tools/dencoder/'>encoded as a URL parameter</a>:</p>
                             <pre>
@@ -434,9 +434,9 @@
                     <td>Obversations less than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
                   </tr>
                   <tr>
-                    <td><strong><code>location_geom</code></strong></td>
+                    <td><strong><code>location_geom__within</code></strong></td>
                     <td>none</td>
-                    <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest. Currently, the only query operator that can be applied to this is <code>within</code>.</td>
+                    <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest.</td>
                   </tr>
                   <tr>
                     <td><strong><code>data_type</code></strong></td>
@@ -511,6 +511,14 @@
                     <td><strong>Required.</strong> Machine version of the dataset name as you get it from the <code>/v1/api/</code> endpoint.</td>
                   </tr>
                   <tr>
+                    <td><strong><code>weather</code></strong></td>
+                    <td>false</td>
+                    <td>
+                      <p>If set to <strong>true</strong>, returns a weather observation for each record. The observation will be from the closest NOAA weather station.</p>
+                      <p>If the dataset has observations with a <strong>date and time</strong>, an hour weather observation based on <code>/v1/api/weather/hourly/</code> will be returned. Otherwise, it will return a daily weather observation based on <code>/v1/api/weather/daily/</code></p>
+                    </td>
+                  </tr>
+                  <tr>
                     <td><strong><code>[dataset_field]*</code></strong></td>
                     <td>none</td>
                     <td>
@@ -571,9 +579,9 @@
                   have filters applied such as <code>__gt</code> (greater than) and <code>__lt</code> (less than).</td>
                   </tr>
                   <tr>
-                    <td><strong><code>location_geom</code></strong></td>
+                    <td><strong><code>location_geom__within</code></strong></td>
                     <td>none</td>
-                    <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest. Currently, the only query operator that can be applied to this is <code>within</code>.</td>
+                    <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest.</td>
                   </tr>
                   <tr>
                     <td><strong><code>data_type</code></strong></td>
@@ -609,108 +617,108 @@
           </div>
           <div id="collapse-api-grid" class="panel-collapse collapse">
             <div class="panel-body">
-                    <p>
-                        Query a single dataset and return a GeoJSON grid heatmap.
-                    </p>
+              <p>
+                  Query a single dataset and return a GeoJSON grid heatmap.
+              </p>
 
-                    <p><strong>Query parameters</strong></p>
-                    <p>All query parameters are optional except for <code>dataset_name</code>.</p>
-                    <table class='table table-bordered'>
-                      <thead>
-                        <tr>
-                          <th>Parameter</th>
-                          <th>Default value</th>
-                          <th>Description</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td><strong><code>dataset_name</code></strong></td>
-                          <td>none</td>
-                          <td><strong>Required.</strong> Machine version of the dataset name as you get it from the <code>/v1/api/</code> endpoint.</td>
-                        </tr>
-                        <tr>
-                          <td><strong><code>[dataset_field]*</code></strong></td>
-                          <td>none</td>
-                          <td>
-                            <p>Any available dataset field. Discoverable via the <code>/v1/api/fields/&lt;dataset_name&gt;/</code> endpoint. Any number of these query parameters can be chained together and are linked together with a SQL <code>AND</code> under the hood.</p>
+              <p><strong>Query parameters</strong></p>
+              <p>All query parameters are optional except for <code>dataset_name</code>.</p>
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Default value</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>dataset_name</code></strong></td>
+                    <td>none</td>
+                    <td><strong>Required.</strong> Machine version of the dataset name as you get it from the <code>/v1/api/</code> endpoint.</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>[dataset_field]*</code></strong></td>
+                    <td>none</td>
+                    <td>
+                      <p>Any available dataset field. Discoverable via the <code>/v1/api/fields/&lt;dataset_name&gt;/</code> endpoint. Any number of these query parameters can be chained together and are linked together with a SQL <code>AND</code> under the hood.</p>
 
-                            <p><strong>Query operators</strong><br/> For any given <code>dataset_field</code>, the query can be modified with any of the following operators:</p>
+                      <p><strong>Query operators</strong><br/> For any given <code>dataset_field</code>, the query can be modified with any of the following operators:</p>
 
-                            <table class='table table-bordered'>
-                              <thead>
-                                <tr>
-                                  <th>Operator</th>
-                                  <th>Description</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr>
-                                  <td><strong><code>__gt</code></strong> </td>
-                                  <td>greater than (<code>&gt;</code>)</td>
-                                </tr>
-                                <tr>
-                                  <td><strong><code>__ge</code></strong></td>
-                                  <td> greater than or equal to (<code>&gt;=</code>)</td>
-                                </tr>
-                                <tr>
-                                  <td><strong><code>__lt</code></strong> </td>
-                                  <td>less than (<code>&lt;</code>)</td>
-                                </tr>
-                                <tr>
-                                  <td><strong><code>__le</code></strong></td>
-                                  <td> less than or equal to (<code>&lt;=</code>)</td>
-                                </tr>
-                                <tr>
-                                  <td><strong><code>__ne</code></strong> </td>
-                                  <td>not equal (<code>!=</code>)</td>
-                                </tr>
-                                <tr>
-                                  <td><strong><code>__in</code></strong> </td>
-                                  <td>within a list of provided values (<code>IN ('list', 'of', 'values')</code>)</td>
-                                </tr>
-                              </tbody>
-                            </table>
+                      <table class='table table-bordered'>
+                        <thead>
+                          <tr>
+                            <th>Operator</th>
+                            <th>Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td><strong><code>__gt</code></strong> </td>
+                            <td>greater than (<code>&gt;</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__ge</code></strong></td>
+                            <td> greater than or equal to (<code>&gt;=</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__lt</code></strong> </td>
+                            <td>less than (<code>&lt;</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__le</code></strong></td>
+                            <td> less than or equal to (<code>&lt;=</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__ne</code></strong> </td>
+                            <td>not equal (<code>!=</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__in</code></strong> </td>
+                            <td>within a list of provided values (<code>IN ('list', 'of', 'values')</code>)</td>
+                          </tr>
+                        </tbody>
+                      </table>
 
-                            <p><strong>Example:</strong> <code>ward__ge=48</code> translates to "ward >= 48" in SQL</p>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td><strong><code>obs_date__ge</code></strong></td>
-                          <td>180 days ago</td>
-                          <td>Obversations greater than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
-                        </tr>
-                        <tr>
-                          <td><strong><code>obs_date__le</code></strong></td>
-                          <td>today's date</td>
-                          <td>Obversations less than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
-                        </tr>
-                        <tr>
-                          <td><strong><code>center[]</code></strong></td>
-                          <td>[41.880517,-87.644061]</td>
-                          <td>Latitude and longitude of map center. Used for proper geospatial projection. If you are querying data outside of Chicago, you should provide a new center.</td>
-                        </tr>
-                        <tr>
-                          <td><strong><code>resolution</code></strong></td>
-                          <td>500</td>
-                          <td>Square grid size (in meters).</td>
-                        </tr>
-                        <tr>
-                          <td><strong><code>location_geom</code></strong></td>
-                          <td>none</td>
-                          <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest. Currently, the only query operator that can be applied to this is <code>within</code>.</td>
-                        </tr>
-                        <tr>
-                          <td><strong><code>buffer</code></strong></td>
-                          <td>100</td>
-                          <td>If <code>location_geom</code> is a <a href='http://geojson.org/geojson-spec.html#linestring'>GeoJSON LineString</a>, the size of the buffer around that line to query (in meters).</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                      <p><strong>Example:</strong> <code>ward__ge=48</code> translates to "ward >= 48" in SQL</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>obs_date__ge</code></strong></td>
+                    <td>180 days ago</td>
+                    <td>Obversations greater than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>obs_date__le</code></strong></td>
+                    <td>today's date</td>
+                    <td>Obversations less than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>center[]</code></strong></td>
+                    <td>[41.880517,-87.644061]</td>
+                    <td>Latitude and longitude of map center. Used for proper geospatial projection. If you are querying data outside of Chicago, you should provide a new center.</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>resolution</code></strong></td>
+                    <td>500</td>
+                    <td>Square grid size (in meters).</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>location_geom__within</code></strong></td>
+                    <td>none</td>
+                    <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest.</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>buffer</code></strong></td>
+                    <td>100</td>
+                    <td>If <code>location_geom__within</code> is a <a href='http://geojson.org/geojson-spec.html#linestring'>GeoJSON LineString</a>, the size of the buffer around that line to query (in meters).</td>
+                  </tr>
+                </tbody>
+              </table>
 
-                    <p><strong>Response</strong></p>
-                    <p>GeoJSON with a feature for each grid square containing a <code>count</code> property of observations within that square.</p>
-                    <pre>
+              <p><strong>Response</strong></p>
+              <p>GeoJSON with a feature for each grid square containing a <code>count</code> property of observations within that square.</p>
+              <pre>
 {
    "type":"FeatureCollection",
    "features":[
@@ -752,19 +760,497 @@
 
    ]
 }
-                    </pre>
+              </pre>
 
-                    <div class='well examples'>
-                      <p><strong>Example</strong></p>
-                      <p><a href='/v1/api/grid/?obs_date__le=2014%2F09%2F05&obs_date__ge=2014%2F03%2F09&dataset_name=311_service_requests_tree_trims&ward__in=2%2C42%2C32'>http://plenar.io/v1/api/grid/?obs_date__le=2014%2F09%2F05&obs_date__ge=2014%2F03%2F09&dataset_name=311_service_requests_tree_trims&ward__in=2%2C42%2C32</a><br />
-                      311 tree trim requests between March 9, 2014 and September 5th, 2014 for Wards 2, 42 and 32</p>
-                    </div>
-                </div>
+              <div class='well examples'>
+                <p><strong>Example</strong></p>
+                <p><a href='/v1/api/grid/?obs_date__le=2014%2F09%2F05&obs_date__ge=2014%2F03%2F09&dataset_name=311_service_requests_tree_trims&ward__in=2%2C42%2C32'>http://plenar.io/v1/api/grid/?obs_date__le=2014%2F09%2F05&obs_date__ge=2014%2F03%2F09&dataset_name=311_service_requests_tree_trims&ward__in=2%2C42%2C32</a><br />
+                311 tree trim requests between March 9, 2014 and September 5th, 2014 for Wards 2, 42 and 32</p>
+              </div>
             </div>
           </div>
         </div>
+      </div>
 
-      <h2 id='responses'>API responses</h2>
+      <div class="panel-group" id="accordion-api-weather-stations">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <a data-toggle="collapse" data-parent="#accordion-api-weather-stations" href="#collapse-api-weather-stations" id="api-weather-stations">
+              <span class='label label-info'>GET</span>
+              <strong><code>/v1/api/weather-stations/</code></strong>
+              <p class='pull-right'>list all available NOAA weather stations</p>
+            </a>
+          </div>
+          <div id="collapse-api-weather-stations" class="panel-collapse collapse">
+            <div class="panel-body">
+              <p>Query weather stations from NOAA's <a href='http://cdo.ncdc.noaa.gov/qclcd/QCLCD?prior=N'>Quality Controlled Local Climatological Data</a>.</p>
+
+              <p><strong>Query Parameters</strong></p>
+              <p>All query parameters are optional</p>
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>station_name</code></strong></td>
+                    <td>Name of weather station</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>call_sign</code></strong></td>
+                    <td>Call sign of weather station</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wban_code</code></strong></td>
+                    <td>Weather Bureau Army Navy (WBAN) code of weather station</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>begin</code></strong></td>
+                    <td>Date of first weather observation</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>end</code></strong></td>
+                    <td>Date of last weather observation</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>elevation</code></strong></td>
+                    <td>Elevation of station (in feet)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>county</code></strong></td>
+                    <td>County name</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>state</code></strong></td>
+                    <td>Two digit state code</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>location</code></strong></td>
+                    <td>Latitude and longitude location of weather station. Can be queried with a GeoJSON shape using <code>location__within</code>.</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p><strong>Query operators</strong><br/> For any given parameter above, the query can be modified with any of the following operators:</p>
+
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Operator</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>__gt</code></strong> </td>
+                    <td>greater than (<code>&gt;</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ge</code></strong></td>
+                    <td> greater than or equal to (<code>&gt;=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__lt</code></strong> </td>
+                    <td>less than (<code>&lt;</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__le</code></strong></td>
+                    <td> less than or equal to (<code>&lt;=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ne</code></strong> </td>
+                    <td>not equal (<code>!=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__like</code></strong> </td>
+                    <td>like value with % wildcards, case sensitive (<code>LIKE 'State%'</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ilike</code></strong> </td>
+                    <td>like value with % wildcards, case insensitive (<code>ILIKE 'state%'</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__in</code></strong> </td>
+                    <td>within a list of provided values (<code>IN ('list', 'of', 'values')</code>)</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p><strong>Response</strong></p>
+              <p>List of weather stations and attributes (described above) that match the provided query parameters.</p>
+
+              <div class='well examples'>
+                <p><strong>Examples</strong></p>
+
+                <p><a href='/v1/api/weather-stations/?state=IL'>http://plenar.io/v1/api/weather-stations/?state=IL</a><br />
+                All weather stations in Illinois</p>
+                
+                <p><a href='/v1/api/weather-stations/?location__within=%7B%0A%22type%22%3A%22Polygon%22%2C%0A%22coordinates%22%3A%5B%0A%5B%0A%5B%0A-88.08837890625%2C%0A41.541477666790286%0A%5D%2C%0A%5B%0A-88.08837890625%2C%0A42.17968819665961%0A%5D%2C%0A%5B%0A-87.3193359375%2C%0A42.17968819665961%0A%5D%2C%0A%5B%0A-87.3193359375%2C%0A41.541477666790286%0A%5D%2C%0A%5B%0A-88.08837890625%2C%0A41.541477666790286%0A%5D%0A%5D%0A%5D%0A%7D'>http://plenar.io/v1/api/weather-stations/?location__within=%7B%0A%22type%22%3A%22Polygon%22%2C%0A%22coordinates%22%3A%5B%0A%5B%0A%5B%0A-88.08837890625%2C%0A41.541477666790286%0A%5D%2C%0A%5B%0A-88.08837890625%2C%0A42.17968819665961%0A%5D%2C%0A%5B%0A-87.3193359375%2C%0A42.17968819665961%0A%5D%2C%0A%5B%0A-87.3193359375%2C%0A41.541477666790286%0A%5D%2C%0A%5B%0A-88.08837890625%2C%0A41.541477666790286%0A%5D%0A%5D%0A%5D%0A%7D</a><br />
+                All weather stations within a bounding box (around Chicago)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-group" id="accordion-api-weather-daily">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <a data-toggle="collapse" data-parent="#accordion-api-weather-daily" href="#collapse-api-weather-daily" id="api-weather-daily">
+              <span class='label label-info'>GET</span>
+              <strong><code>/v1/api/weather/daily/</code></strong>
+              <p class='pull-right'>daily weather observations from NOAA stations</p>
+            </a>
+          </div>
+          <div id="collapse-api-weather-daily" class="panel-collapse collapse">
+            <div class="panel-body">
+              <p>Query daily weather observations from NOAA's <a href='http://cdo.ncdc.noaa.gov/qclcd/QCLCD?prior=N'>Quality Controlled Local Climatological Data</a>.</p>
+
+              <p><strong>Query Parameters</strong></p>
+              <p>All query parameters are optional</p>
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>max5_direction_cardinal</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>max2_windspeed</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>snowfall</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>dewpoint_avg</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>date</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>temp_avg</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>id</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>max2_direction_cardinal</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>temp_max</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>max2_winddirection</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wetbulb_avg</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>max5_windspeed</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>avg_windspeed</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>max5_winddirection</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>precip_total</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>resultant_winddirection</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>departure_from_normal</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>sealevel_pressure</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>resultant_winddirection_cardinal</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>weather_types</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>snowice_depth</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>snowice_waterequiv</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>resultant_windspeed</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>temp_min</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>station_pressure</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wban_code</code></strong></td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p><strong>Query operators</strong><br/> For any given parameter above, the query can be modified with any of the following operators:</p>
+
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Operator</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>__gt</code></strong> </td>
+                    <td>greater than (<code>&gt;</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ge</code></strong></td>
+                    <td> greater than or equal to (<code>&gt;=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__lt</code></strong> </td>
+                    <td>less than (<code>&lt;</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__le</code></strong></td>
+                    <td> less than or equal to (<code>&lt;=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ne</code></strong> </td>
+                    <td>not equal (<code>!=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__like</code></strong> </td>
+                    <td>like value with % wildcards, case sensitive (<code>LIKE 'State%'</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ilike</code></strong> </td>
+                    <td>like value with % wildcards, case insensitive (<code>ILIKE 'state%'</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__in</code></strong> </td>
+                    <td>within a list of provided values (<code>IN ('list', 'of', 'values')</code>)</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p><strong>Response</strong></p>
+              <p>Weather observations and attributes (described above) that match the provided query parameters.</p>
+
+              <div class='well examples'>
+                <p><strong>Examples</strong></p>
+
+                <p><a href='/v1/api/weather/daily/?wban_code=14819&date__ge=2014-09-01'>http://plenar.io/v1/api/weather/daily/?wban_code=14819&date__ge=2014-09-01</a><br />
+                All daily weather observations at CHICAGO/MIDWAY since September 1st, 2014</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-group" id="accordion-api-weather-hourly">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <a data-toggle="collapse" data-parent="#accordion-api-weather-hourly" href="#collapse-api-weather-hourly" id="api-weather-hourly">
+              <span class='label label-info'>GET</span>
+              <strong><code>/v1/api/weather/hourly/</code></strong>
+              <p class='pull-right'>hourly weather observations from NOAA stations</p>
+            </a>
+          </div>
+          <div id="collapse-api-weather-hourly" class="panel-collapse collapse">
+            <div class="panel-body">
+              <p>Query hourly weather observations from NOAA's <a href='http://cdo.ncdc.noaa.gov/qclcd/QCLCD?prior=N'>Quality Controlled Local Climatological Data</a>.</p>
+
+              <p><strong>Query Parameters</strong></p>
+              <p>All query parameters are optional</p>
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>wind_speed</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>sealevel_pressure</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>old_station_type</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>station_type</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>sky_condition</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wind_direction</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>sky_condition_top</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>visibility</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>datetime</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wind_direction_cardinal</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>relative_humidity</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>hourly_precip</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>drybulb_fahrenheit</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>report_type</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>dewpoint_fahrenheit</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>station_pressure</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>weather_types</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wetbulb_fahrenheit</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>id</code></strong></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wban_code</code></strong></td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p><strong>Query operators</strong><br/> For any given parameter above, the query can be modified with any of the following operators:</p>
+
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Operator</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>__gt</code></strong> </td>
+                    <td>greater than (<code>&gt;</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ge</code></strong></td>
+                    <td> greater than or equal to (<code>&gt;=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__lt</code></strong> </td>
+                    <td>less than (<code>&lt;</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__le</code></strong></td>
+                    <td> less than or equal to (<code>&lt;=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ne</code></strong> </td>
+                    <td>not equal (<code>!=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__like</code></strong> </td>
+                    <td>like value with % wildcards, case sensitive (<code>LIKE 'State%'</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ilike</code></strong> </td>
+                    <td>like value with % wildcards, case insensitive (<code>ILIKE 'state%'</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__in</code></strong> </td>
+                    <td>within a list of provided values (<code>IN ('list', 'of', 'values')</code>)</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p><strong>Response</strong></p>
+              <p>Hourly weather observations and attributes (described above) that match the provided query parameters.</p>
+
+              <div class='well examples'>
+                <p><strong>Example</strong></p>
+
+                <p><a href='/v1/api/weather/hourly/?wban_code=14819&date__ge=2014-09-01'>http://plenar.io/v1/api/weather/hourly/?wban_code=14819&date__ge=2014-09-01</a><br />
+                All hourly weather observations at CHICAGO/MIDWAY since September 1st, 2014</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h2 id='responses'>Response format</h2>
       <p>All JSON API calls return their data in the <code>objects</code> block. Additional information is returned in the <code>meta</code> block:</p>
 
       <table class='table table-bordered'>
@@ -790,7 +1276,7 @@
         </tbody>
       </table>
 
-      Here's an example response from the /v1/api/timeseries/ endpoint:
+      Here's an example response from the <code>/v1/api/timeseries/</code> endpoint:
 
       <pre>
 {
