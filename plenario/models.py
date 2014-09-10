@@ -21,6 +21,7 @@ class MetaTable(Base):
     human_name = Column(String(200), nullable=False)
     description = Column(Text)
     source_url = Column(String(100), primary_key=True)
+    attribution = Column(String(100), primary_key=True)
     obs_from = Column(Date)
     obs_to = Column(Date)
     bbox = Column(Geometry('POLYGON', srid=4326))

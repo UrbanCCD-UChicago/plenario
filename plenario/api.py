@@ -602,6 +602,7 @@ def submit_dataset():
                 d = {
                     'dataset_name': slugify(dataset_info['name'], delim=u'_'),
                     'human_name': dataset_info['name'],
+                    'attribution': dataset_info['attribution'],
                     'description': dataset_info['description'],
                     'source_url': source_url,
                     'update_freq': post['update_frequency'],
