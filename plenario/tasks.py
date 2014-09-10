@@ -42,7 +42,7 @@ def update_dataset(source_url, fpath=None):
     
     md = session.query(MetaTable).get(source_url)
     etl = PlenarioETL(md.as_dict())
-    etl.update(fpath=fpath)
+    etl.update(s3_path=s3_path)
     return 'Finished updating %s' % md.human_name
 
 @celery_app.task
