@@ -26,7 +26,7 @@ from cStringIO import StringIO
     
 class PlenarioETL(object):
     
-    def __init__(self, meta):
+    def __init__(self, meta, data_types=None):
         """ 
         Initializes with a dictionary representation of a
         row from the meta_master table.  If you include
@@ -59,7 +59,36 @@ class PlenarioETL(object):
                        from the source data. The values in this column
                        should be formatted like so 
                        "(<latitude decimal degrees>, <longitude decimal degrees>)"
+
+        You can also optionally supply a list of dicts with the names of the fields
+        from the source data and the data type of the fields like so:
+
+        [
+          {
+            'field_name': 'A field name',
+            'data_type': 'integer',
+          },
+          {
+            'field_name': 'Another field name',
+            'data_type': 'string',
+          },
+          {
+            'field_name': 'Last field name',
+            'data_type': 'float'
+          },
+        ]
+
+        'data_type' can be one of
+          'boolean'
+          'integer'
+          'big_integer'
+          'float'
+          'string' 
+          'date'
+          'time'
+          'timestamp'
         """
+
         for k,v in meta.items():
             setattr(self, k, v)
         domain = urlparse(self.source_url).netloc

@@ -13,9 +13,9 @@ if CELERY_SENTRY_URL:
     setup_logging(handler)
 
 @celery_app.task
-def add_dataset(source_url_hash, s3_path=None):
+def add_dataset(source_url_hash, s3_path=None, data_types=None):
     md = session.query(MetaTable).get(source_url_hash)
-    etl = PlenarioETL(md.as_dict())
+    etl = PlenarioETL(md.as_dict(), data_types=data_types)
     etl.add(s3_path=s3_path)
     return 'Finished adding %s' % md.human_name
 
