@@ -611,7 +611,7 @@ def submit_dataset():
                 four_by_four = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', post['view_url'])[-1]
                 view_url = 'http://%s/api/views/%s' % (source_domain, four_by_four)
                 dataset_info, errors, status_code = get_socrata_data_info(view_url)
-                source_url = 'http://%s/resource/%s' % (source_domain, four_by_four)
+                source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url
             else:
                 dataset_info = {
                     'attribution': '',
@@ -643,10 +643,9 @@ def submit_dataset():
                     }
                     if len(d['dataset_name']) > 49:
                         d['dataset_name'] = d['dataset_name'][:50]
-                    print d
-                   #md = MetaTable(**d)
-                   #session.add(md)
-                   #session.commit()
+                    md = MetaTable(**d)
+                    session.add(md)
+                    session.commit()
                 #add_dataset.delay(md.source_url_hash)
                 resp['message'] = 'Dataset %s submitted successfully' % dataset_info['name']
         else:
