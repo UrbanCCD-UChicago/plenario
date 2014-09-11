@@ -68,13 +68,15 @@ class WeatherETL(object):
                      # "NO SIGN" MODERATE
                  }
 
+    current_row = None
+
     def __init__(self, data_dir=DATA_DIR, debug=False):
         self.base_url = 'http://cdo.ncdc.noaa.gov/qclcd_ascii'
         self.data_dir = data_dir
         self.debug_outfile = sys.stdout
         self.debug = debug
         if (self.debug == True):
-            self.debug_outfile = open(os.path.join(self.data_dir, 'weather_etl_debug_out.txt'), 'w')
+            self.debug_outfile = open(os.path.join(self.data_dir, 'weather_etl_debug_out.txt'), 'w+')
 
     # WeatherETL.initialize_last(): for debugging purposes, only initialize the most recent month of weather data.
     def initialize_last(self, start_line=0, end_line=None):
@@ -85,6 +87,9 @@ class WeatherETL(object):
         self._load_daily(t_daily)
         t_hourly = self._transform_hourly(raw_hourly, file_type, start_line=start_line, end_line=end_line)
         self._load_hourly(t_hourly)
+        self._update(span='daily')
+        self._update(span='hourly')            
+        self._cleanup_temp_tables()
 
     def initialize(self): 
         self.make_tables()
@@ -94,17 +99,17 @@ class WeatherETL(object):
                 print "INITIALIZE: doing fname", fname
             self._do_etl(fname)
 
-    def initialize_month(self, year, month, no_daily=False, no_hourly=False):
+    def initialize_month(self, year, month, no_daily=False, no_hourly=False, start_line=0, end_line=None):
         self.make_tables()
         fname = self._extract_fname(year,month)
-        self._do_etl(fname, no_daily, no_hourly)
+        self._do_etl(fname, no_daily, no_hourly, start_line, end_line)
         
-    def _do_etl(self, fname, no_daily=False, no_hourly=False):
+    def _do_etl(self, fname, no_daily=False, no_hourly=False, start_line=0, end_line=None):
         raw_hourly, raw_daily, file_type = self._extract(fname)
         if (not no_daily):
-            t_daily = self._transform_daily(raw_daily, file_type)
+            t_daily = self._transform_daily(raw_daily, file_type, start_line=start_line, end_line=end_line)
         if (not no_hourly):
-            t_hourly = self._transform_hourly(raw_hourly, file_type)             # this returns a StringIO with all the transformed data
+            t_hourly = self._transform_hourly(raw_hourly, file_type, start_line=start_line, end_line=end_line)             # this returns a StringIO with all the transformed data
         if (not no_daily):
             self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
             self._update(span='daily')
@@ -214,10 +219,6 @@ class WeatherETL(object):
     ########################################
     ########################################
     def _transform_daily(self, raw_weather, file_type, start_line=0, end_line=None):
-        station_table = Table('weather_stations', Base.metadata, autoload=True, autoload_with=engine)
-        wban_list = session.query(station_table.c.wban_code.distinct()). \
-                    order_by(station_table.c.wban_code).all()
-        
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
         header = reader.next()
@@ -239,6 +240,7 @@ class WeatherETL(object):
 
         row_count = 0
         for row in reader:
+            self.current_row = row
             if (row_count % 100 == 0):
                 if (self.debug == True):
                     self.debug_outfile.write("\rdaily parsing: row_count=%06d" % row_count)
@@ -398,7 +400,7 @@ class WeatherETL(object):
         # pad this into a four digit number:
         time_str = None
         if (time):
-            time_int =  self.integerOrNA(time, str(row))
+            time_int =  self.integerOrNA(time)
             time_str = '%04d' % time_int
         
         weather_date = datetime.strptime('%s %s' % (date, time_str), '%Y%m%d %H%M')
@@ -455,7 +457,7 @@ class WeatherETL(object):
         # pad this into a four digit number:
         time_str = None
         if (time): 
-            time_int = self.integerOrNA(time, str(row))
+            time_int = self.integerOrNA(time)
             if not time_int:
                 time_str = None
                 # XX: maybe just continue and bail if this doesn't work
@@ -475,8 +477,8 @@ class WeatherETL(object):
         drybulb_F = self.floatOrNA(row[header.index('Dry Bulb Temp')])
         wetbulb_F = self.floatOrNA(row[header.index('Wet Bulb Temp')])
         dewpoint_F = self.floatOrNA(row[header.index('Dew Point Temp')])
-        rel_humidity = self.integerOrNA(row[header.index('% Relative Humidity')], str(row))
-        wind_speed = self.integerOrNA(row[header.index('Wind Speed (kt)')], str(row))
+        rel_humidity = self.integerOrNA(row[header.index('% Relative Humidity')])
+        wind_speed = self.integerOrNA(row[header.index('Wind Speed (kt)')])
         wind_direction, wind_cardinal = self.getWind(wind_speed, row[header.index('Wind Direction')])
         station_pressure = self.floatOrNA(row[header.index('Station Pressure')])
         sealevel_pressure = self.floatOrNA(row[header.index('Sea Level Pressure')])
@@ -587,8 +589,9 @@ class WeatherETL(object):
         # if l still has a length let's print it out and see what went wrong
         if (self.debug==True):
             if (len(l) > 0):
-                self.debug_outfile.write("could not fully parse present weather : '%s' '%s'\n\n" % ( orig_pw, l))
-
+                self.debug_outfile.write("\n")
+                self.debug_outfile.write(str(self.current_row))
+                self.debug_outfile.write("\ncould not fully parse present weather : '%s' '%s'\n\n" % ( orig_pw, l))
         wt_list = [intensity, vicinity, desc, precips[0], obscuration, other]
     
         ret_wt_lists = []
@@ -656,8 +659,12 @@ class WeatherETL(object):
                 wind_direction_int = int(wind_direction)
             except ValueError, e:
                 if (self.debug==True):
-                    self.debug_outfile.write("ValueError: [%s], could not convert wind_direction '%s' to int\n" % (e, wind_direction))
+                    if (self.current_row): 
+                        self.debug_outfile.write("\n")
+                        self.debug_outfile.write(str(self.current_row))
+                    self.debug_outfile.write("\nValueError: [%s], could not convert wind_direction '%s' to int\n" % (e, wind_direction))
                 return None, None
+
             wind_cardinal = self.degToCardinal(int(wind_direction))
         if (wind_speed == 0):
             wind_direction = None
@@ -678,7 +685,7 @@ class WeatherETL(object):
         precip_total = self.floatOrNA(precip_total)
         return precip_total
                         
-    def floatOrNA(self, val, row=None):
+    def floatOrNA(self, val):
         val_str = str(val).strip()
         if (val_str == 'M'):
             return None
@@ -695,14 +702,14 @@ class WeatherETL(object):
                 fval = float(val_str)
             except ValueError, e:
                 if (self.debug==True):
-                    self.debug_outfile.write("ValueError: [%s], could not convert '%s' to float\n" % (e, val_str))
-                    if row:
-                        self.debug_outfile.write(row)
-                    #pdb.set_trace()
+                    if (self.current_row): 
+                        self.debug_outfile.write("\n")
+                        self.debug_outfile.write(str(self.current_row))
+                    self.debug_outfile.write("\nValueError: [%s], could not convert '%s' to float\n" % (e, val_str))
                 return None
             return fval
 
-    def integerOrNA(self, val, row=None):
+    def integerOrNA(self, val):
         val_str = str(val).strip()
         if (val_str == 'M'):
             return None
@@ -721,9 +728,10 @@ class WeatherETL(object):
                 ival = int(val)
             except ValueError, e:
                 if (self.debug==True):
-                    self.debug_outfile.write("ValueError [%s] could not convert '%s' to int\n" % (e, val))
-                    if row:
-                        self.debug_outfile.write(row)
+                    if (self.current_row): 
+                        self.debug_outfile.write("\n")
+                        self.debug_outfile.write(str(self.current_row))
+                    self.debug_outfile.write("\nValueError [%s] could not convert '%s' to int\n" % (e, val))
                 return None
             return ival
     
