@@ -14,7 +14,7 @@ from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.settings import DATA_DIR
 from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float, \
-    VARCHAR, BigInteger, UniqueConstraint, and_, select
+    VARCHAR, BigInteger, and_, select
 from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
 from uuid import uuid4
@@ -775,7 +775,6 @@ class WeatherETL(object):
                             Column('max2_windspeed', Float), 
                             Column('max2_winddirection', String(3)), # 000 through 360, M for missing
                             Column('max2_direction_cardinal', String(3)), # e.g. NNE, NNW
-                            UniqueConstraint('wban_code', 'date', name='%s_wban_date_ix' % name),
                             keep_existing=True) 
 
     def _get_hourly_table(self, name='dat'):
@@ -806,7 +805,6 @@ class WeatherETL(object):
                 Column('sealevel_pressure', Float),
                 Column('report_type', String), # Either 'AA' or 'SP'
                 Column('hourly_precip', Float, index=True),
-                UniqueConstraint('wban_code', 'datetime', name='%s_wban_datetime_ix' % name),
                 keep_existing=True)
 
     def _extract_last_fname(self):
