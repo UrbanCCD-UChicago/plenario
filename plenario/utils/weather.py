@@ -391,8 +391,6 @@ class WeatherETL(object):
         # As such, I believe it is sufficient to just use the 'AA' reports and keep
         # our composite primary key of (wban_code, datetime).
         report_type = row[header.index('RecordType')]
-        if (report_type == 'SP'):
-            return None
 
         wban_code = row[header.index('WBAN')]
         date = row[header.index('Date')] # e.g. 20140801
@@ -662,7 +660,9 @@ class WeatherETL(object):
                     if (self.current_row): 
                         self.debug_outfile.write("\n")
                         self.debug_outfile.write(str(self.current_row))
+
                     self.debug_outfile.write("\nValueError: [%s], could not convert wind_direction '%s' to int\n" % (e, wind_direction))
+                    self.debug_outfile.flush()
                 return None, None
 
             wind_cardinal = self.degToCardinal(int(wind_direction))
@@ -706,6 +706,7 @@ class WeatherETL(object):
                         self.debug_outfile.write("\n")
                         self.debug_outfile.write(str(self.current_row))
                     self.debug_outfile.write("\nValueError: [%s], could not convert '%s' to float\n" % (e, val_str))
+                    self.debug_outfile.flush()
                 return None
             return fval
 
@@ -732,6 +733,7 @@ class WeatherETL(object):
                         self.debug_outfile.write("\n")
                         self.debug_outfile.write(str(self.current_row))
                     self.debug_outfile.write("\nValueError [%s] could not convert '%s' to int\n" % (e, val))
+                    self.debug_outfile.flush()
                 return None
             return ival
     
@@ -861,11 +863,15 @@ class WeatherETL(object):
             ins_st += "FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
         conn = engine.raw_connection()
         cursor = conn.cursor()
+        if (self.debug==True): 
+            self.debug_outfile.write("\nCalling: '%s'\n" % ins_st)
+            self.debug_outfile.flush()
         cursor.copy_expert(ins_st, transformed_input)
 
         conn.commit()
         if (self.debug==True):
-            print ("committed", sys.stdout)
+            self.debug_outfile.write("Committed: '%s'" % ins_st)
+            self.debug_outfile.flush()
 
 
     def _load_daily(self, transformed_input): 
@@ -889,11 +895,15 @@ class WeatherETL(object):
             ins_st += "FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
         conn = engine.raw_connection()
         cursor = conn.cursor()
+        if (self.debug==True): 
+            self.debug_outfile.write("\nCalling: '%s'\n" % ins_st)
+            self.debug_outfile.flush()
         cursor.copy_expert(ins_st, transformed_input)
 
         conn.commit()
         if (self.debug == True):
-            print ("committed", sys.stdout)
+            self.debug_outfile.write("committed: '%s'" % ins_st)
+            self.debug_outfile.flush()
 
     def _date_span(self, start, end):
         delta = timedelta(days=30)
