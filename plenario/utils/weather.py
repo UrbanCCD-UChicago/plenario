@@ -660,7 +660,6 @@ class WeatherETL(object):
                     if (self.current_row): 
                         self.debug_outfile.write("\n")
                         self.debug_outfile.write(str(self.current_row))
-
                     self.debug_outfile.write("\nValueError: [%s], could not convert wind_direction '%s' to int\n" % (e, wind_direction))
                     self.debug_outfile.flush()
                 return None, None
@@ -706,7 +705,10 @@ class WeatherETL(object):
                         self.debug_outfile.write("\n")
                         self.debug_outfile.write(str(self.current_row))
                     self.debug_outfile.write("\nValueError: [%s], could not convert '%s' to float\n" % (e, val_str))
+<<<<<<< HEAD
                     self.debug_outfile.flush()
+=======
+>>>>>>> Improved debugging output for when debug=True. Fixed initialize_last().
                 return None
             return fval
 
@@ -733,7 +735,10 @@ class WeatherETL(object):
                         self.debug_outfile.write("\n")
                         self.debug_outfile.write(str(self.current_row))
                     self.debug_outfile.write("\nValueError [%s] could not convert '%s' to int\n" % (e, val))
+<<<<<<< HEAD
                     self.debug_outfile.flush()
+=======
+>>>>>>> Improved debugging output for when debug=True. Fixed initialize_last().
                 return None
             return ival
     

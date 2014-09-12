@@ -2,6 +2,7 @@ from flask import make_response, request, render_template, current_app, g, \
     Blueprint, abort
 from functools import update_wrapper
 import os
+import re
 import math
 from datetime import date, datetime, timedelta
 from dateutil.parser import parse
@@ -581,49 +582,76 @@ def grid():
 
 @api.route(API_VERSION + '/api/submit-dataset/', methods=['POST'])
 def submit_dataset():
-    resp = {'status': 'ok', 'message': ''}
-    post = request.form
-    referer = urlparse(request.headers['Referer']).netloc
-    req_url = urlparse(request.url).netloc
-    if referer != req_url:
-        abort(401)
-    if post.get('view_url'):
-        dataset_info, errors, status_code = get_socrata_data_info(post['view_url'])
-        if errors:
-            resp['message'] = ', '.join([e for e in errors])
-            resp['status'] = 'error'
-            status_code = 400
-        else:
-            source_domain = urlparse(dataset_info['view_url']).netloc
-            source_url = 'http://%s/resource/%s' % (source_domain, dataset_id)
-            dataset_id = md5(source_url).hexdigest()
-            md = session.query(MetaTable).get(dataset_id)
-            if not md:
-                d = {
-                    'dataset_name': slugify(dataset_info['name'], delim=u'_'),
-                    'human_name': dataset_info['name'],
-                    'attribution': dataset_info['attribution'],
-                    'description': dataset_info['description'],
-                    'source_url': source_url,
-                    'source_url_hash': dataset_id,
-                    'update_freq': post['update_frequency'],
-                    'business_key': post['id_field'],
-                    'observed_date': post['date_field'],
-                    'latitude': post.get('latitude'),
-                    'longitude': post.get('longitude'),
-                    'location': post.get('location')
-                }
-                if len(d['dataset_name']) > 49:
-                    d['dataset_name'] = d['dataset_name'][:50]
-                md = MetaTable(**d)
-                session.add(md)
-                session.commit()
-            add_dataset.delay(md.source_url_hash)
-            resp['message'] = 'Dataset %s submitted successfully' % md.human_name
+    # Slightly dumb way to make sure that POSTs are only coming from
+    # originating domain for the time being
+    referer = request.headers.get('Referer')
+    if referer:
+        referer = urlparse(referer).netloc
+        req_url = urlparse(request.url).netloc
+        if referer != req_url:
+            abort(401)
     else:
-        resp['status'] = 'error'
-        resp['message'] = 'Must provide a socrata view url'
-        status_code = 400
+        abort(401)
+    resp = {'status': 'ok', 'message': ''}
+    status_code = 200
+    errors = []
+    post = request.data
+    if not post:
+        try:
+            post = request.form.keys()[0]
+        except IndexError:
+            resp['status'] = 'error'
+            resp['message'] = 'Unable to decode POST data'
+            status_code = 400
+    if status_code == 200:
+        post = json.loads(post)
+        if post.get('view_url'):
+            if post.get('socrata'):
+                source_domain = urlparse(post['view_url']).netloc
+                four_by_four = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', post['view_url'])[-1]
+                view_url = 'http://%s/api/views/%s' % (source_domain, four_by_four)
+                dataset_info, errors, status_code = get_socrata_data_info(view_url)
+                source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url
+            else:
+                dataset_info = {
+                    'attribution': '',
+                    'description': '',
+                }
+                source_url = post['view_url']
+                dataset_info['name'] = urlparse(source_url).path.split('/')[-1]
+            if errors:
+                resp['message'] = ', '.join([e for e in errors])
+                resp['status'] = 'error'
+                status_code = 400
+            else:
+                dataset_id = md5(source_url).hexdigest()
+                md = session.query(MetaTable).get(dataset_id)
+                if not md:
+                    d = {
+                        'dataset_name': slugify(dataset_info['name'], delim=u'_'),
+                        'human_name': dataset_info['name'],
+                        'attribution': dataset_info['attribution'],
+                        'description': dataset_info['description'],
+                        'source_url': source_url,
+                        'source_url_hash': dataset_id,
+                        'update_freq': post['update_frequency'],
+                        'business_key': post['field_definitions']['id_field'],
+                        'observed_date': post['field_definitions']['date_field'],
+                        'latitude': post['field_definitions'].get('latitude'),
+                        'longitude': post['field_definitions'].get('longitude'),
+                        'location': post['field_definitions'].get('location')
+                    }
+                    if len(d['dataset_name']) > 49:
+                        d['dataset_name'] = d['dataset_name'][:50]
+                    md = MetaTable(**d)
+                    session.add(md)
+                    session.commit()
+                add_dataset.delay(md.source_url_hash, data_types=post.get('data_types'))
+                resp['message'] = 'Dataset %s submitted successfully' % dataset_info['name']
+        else:
+            resp['status'] = 'error'
+            resp['message'] = 'Must provide a url where data can be downloaded'
+            status_code = 400
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp

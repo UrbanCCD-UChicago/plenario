@@ -3,6 +3,18 @@ import re
 from unicodedata import normalize
 import calendar
 from datetime import timedelta
+from csvkit.unicsv import UnicodeCSVReader
+from plenario.utils.typeinference import normalize_column_type
+
+def iter_column(idx, f):
+    f.seek(0)
+    reader = UnicodeCSVReader(f)
+    header = reader.next()
+    col = []
+    for row in reader:
+        col.append(row[idx])
+    col_type = normalize_column_type(col)
+    return col_type
 
 def get_socrata_data_info(view_url):
     errors = []

@@ -5,7 +5,7 @@ from datetime import datetime, date, time
 from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.models import MetaTable, MasterTable
-from plenario.utils.helpers import slugify
+from plenario.utils.helpers import slugify, iter_column
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET
 from urlparse import urlparse
 from csvkit.unicsv import UnicodeCSVReader
@@ -13,7 +13,7 @@ from plenario.utils.typeinference import normalize_column_type
 import gzip
 from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
     Integer, Table, text, func, select, or_, and_, cast, UniqueConstraint, \
-    join, outerjoin, over
+    join, outerjoin, over, BigInteger
 from sqlalchemy.dialects.postgresql import TIMESTAMP, ARRAY
 from sqlalchemy.exc import NoSuchTableError
 from types import NoneType
@@ -23,10 +23,22 @@ from shapely.geometry import box
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from cStringIO import StringIO
+    
+COL_TYPES = {
+    'boolean': Boolean,
+    'integer': Integer,
+    'big_integer': BigInteger,
+    'float': Float,
+    'string': String,
+    'date': Date,
+    'time': Time,
+    'timestamp': TIMESTAMP,
+    'datetime': TIMESTAMP,
+}
 
 class PlenarioETL(object):
     
-    def __init__(self, meta):
+    def __init__(self, meta, data_types=None):
         """ 
         Initializes with a dictionary representation of a
         row from the meta_master table.  If you include
@@ -59,19 +71,46 @@ class PlenarioETL(object):
                        from the source data. The values in this column
                        should be formatted like so 
                        "(<latitude decimal degrees>, <longitude decimal degrees>)"
+
+        You can also optionally supply a list of dicts with the names of the fields
+        from the source data and the data type of the fields like so:
+
+        [
+          {
+            'field_name': 'A field name',
+            'data_type': 'integer',
+          },
+          {
+            'field_name': 'Another field name',
+            'data_type': 'string',
+          },
+          {
+            'field_name': 'Last field name',
+            'data_type': 'float'
+          },
+        ]
+
+        'data_type' can be one of
+          'boolean'
+          'integer'
+          'big_integer'
+          'float'
+          'string' 
+          'date'
+          'time'
+          'timestamp'
         """
+
         for k,v in meta.items():
             setattr(self, k, v)
-        domain = urlparse(self.source_url).netloc
-        fourbyfour = self.source_url.split('/')[-1]
-        self.view_url = 'http://%s/api/views/%s' % (domain, fourbyfour)
-        self.dl_url = '%s/rows.csv?accessType=DOWNLOAD' % self.view_url
         s3_path = '%s/%s.csv.gz' % (self.dataset_name, 
             datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
         s3conn = S3Connection(AWS_ACCESS_KEY, AWS_SECRET_KEY)
         bucket = s3conn.get_bucket(S3_BUCKET)
         self.s3_key = Key(bucket)
         self.s3_key.key = s3_path
+        if data_types:
+            self.data_types = data_types
     
     def _get_tables(self, table_name=None, all_tables=False):
         if all_tables:
@@ -131,7 +170,7 @@ class PlenarioETL(object):
         self._cleanup_temp_tables()
 
     def _download_csv(self):
-        r = requests.get(self.dl_url, stream=True)
+        r = requests.get(self.source_url, stream=True)
         s = StringIO()
         with gzip.GzipFile(fileobj=s, mode='wb') as f:
             for chunk in r.iter_content(chunk_size=1024):
@@ -151,16 +190,6 @@ class PlenarioETL(object):
         except AttributeError:
             pass
 
-    def iter_column(self, idx, f):
-        f.seek(0)
-        reader = UnicodeCSVReader(f)
-        header = reader.next()
-        col = []
-        for row in reader:
-            col.append(row[idx])
-        col_type = normalize_column_type(col)
-        return col_type
-
     def _get_or_create_data_table(self):
         # Step One: Make a table where the data will eventually live
         try:
@@ -170,12 +199,6 @@ class PlenarioETL(object):
             s = StringIO()
             self.s3_key.get_contents_to_file(s)
             s.seek(0)
-            col_types = []
-            with gzip.GzipFile(fileobj=s, mode='rb') as f:
-                reader = UnicodeCSVReader(f)
-                header = reader.next()
-                for col in range(len(header)):
-                    col_types.append(self.iter_column(col, f))
             cols = [
                 Column('%s_row_id' % self.dataset_name, Integer, primary_key=True),
                 Column('start_date', TIMESTAMP, server_default=text('CURRENT_TIMESTAMP')),
@@ -183,6 +206,19 @@ class PlenarioETL(object):
                 Column('current_flag', Boolean, server_default=text('TRUE')),
                 Column('dup_ver', Integer)
             ]
+            with gzip.GzipFile(fileobj=s, mode='rb') as f:
+                reader = UnicodeCSVReader(f)
+                header = reader.next()
+                col_types = []
+                try:
+                    types = getattr(self, 'data_types')
+                    col_map = {c['field_name']: c['data_type'] for c in types}
+                    for col in header:
+                        t = col_map[col]
+                        col_types.append(COL_TYPES[t])
+                except AttributeError:
+                    for col in range(len(header)):
+                        col_types.append(iter_column(col, f))
             for col_name,d_type in zip(header, col_types):
                 cols.append(Column(slugify(col_name), d_type))
             cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver', 
@@ -347,7 +383,8 @@ class PlenarioETL(object):
         dat_cols.append(text("NULL AS geotag2"))
         dat_cols.append(text("NULL AS geotag3"))
         dat_cols.append(text("'%s' AS dataset_name" % self.dataset_name))
-        dat_cols.append(getattr(self.dat_table.c, '%s_row_id' % self.dataset_name))
+        dat_pk = '%s_row_id' % self.dataset_name
+        dat_cols.append(getattr(self.dat_table.c, dat_pk))
         if self.latitude and self.longitude:
             dat_cols.append(text(
                 "ST_PointFromText('POINT(' || dat_%s.%s || ' ' || dat_%s.%s || ')', 4326) \
@@ -356,20 +393,17 @@ class PlenarioETL(object):
                           self.dataset_name, self.latitude,
                       )))
         elif self.location:
-            # probably a better way to do this...
             dat_cols.append(text(
-                "ST_PointFromText('POINT(' || \
-                      split_part(substr(replace(dat_%s.%s, ')', ''), strpos(dat_%s.%s, '(') + 1, length(dat_%s.%s) - 2), ',', 2) \
-                      || ' ' || \
-                      split_part(substr(replace(dat_%s.%s, '(', ''), strpos(dat_%s.%s, '(') + 1, length(dat_%s.%s) - 2), ',', 1) \
-                      || ')', 4326) \
-                      as location_geom" % (
-                          self.dataset_name, slugify(self.location), 
-                          self.dataset_name, slugify(self.location),
-                          self.dataset_name, slugify(self.location), 
-                          self.dataset_name, slugify(self.location),
-                          self.dataset_name, slugify(self.location), 
-                          self.dataset_name, slugify(self.location),
+                """ (
+                    SELECT ST_PointFromText('POINT(' || subq.longitude || ' ' || subq.latitude || ')', 4326) \
+                        FROM (
+                              SELECT FLOAT8((regexp_matches(%s, '\((.*),.*\)'))[1]) AS latitude, \
+                                     FLOAT8((regexp_matches(%s, '\(.*,(.*)\)'))[1]) AS longitude \
+                              FROM dat_%s as d where d."%s" = dat_%s."%s") AS subq) AS location_geom
+                """ % 
+                      (
+                          slugify(self.location), slugify(self.location),
+                          self.dataset_name, dat_pk, self.dataset_name, dat_pk,
                       )))
         mt = MasterTable.__table__
         bk = slugify(self.business_key)
@@ -533,7 +567,7 @@ class PlenarioETL(object):
         updated_date, bbox, and (when appropriate) date_added
         """
         md = session.query(MetaTable)\
-            .filter(MetaTable.source_url == self.source_url)\
+            .filter(MetaTable.source_url_hash == self.source_url_hash)\
             .first()
         now = datetime.now()
         md.last_update = now
