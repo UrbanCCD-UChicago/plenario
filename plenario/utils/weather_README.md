@@ -57,11 +57,11 @@ See [http://cdo.ncdc.noaa.gov/qclcd/qclcddocumentation.pdf](QCLCD Documentation)
 
 * `datetime`:  in SQL datetime form (e.g. '2003-10-05 23:04:00').
 
-* `old_station_type`: 
+* `old_station_type`: (Valid for all dates before May 1st, 2007)
   * AO1: automated station without a precipitation discriminator (no rain/snow sensor).
   * AO2; automated station with precipitation discriminator.
 
-* `station_type`: 
+* `station_type`: (Valid for all dates after May 1st, 2007)
   * 0 AMOS now AWOS, also USAF stations
   * 4 MAPSO
   * 5 Navy METAR
@@ -72,7 +72,7 @@ See [http://cdo.ncdc.noaa.gov/qclcd/qclcddocumentation.pdf](QCLCD Documentation)
   * 12 ASOS (FAA)
   * 15 Climate Reference Network (CRN)
 
-* `sky_condition`: Three strings representing up to three layers of cloud cover. Each string is one of the below contractions with (in the case of clouds) a three-digit height following, representing hundreds of feet.
+* `sky_condition`: Up to three strings representing up to three layers of cloud cover. Each string is one of the below abbreviations with (in the case of clouds) a three-digit height following, representing hundreds of feet.
 
   * CLR: Clear below 12,000 feet
   * FEW: > 0/8 - 2/8 sky cover

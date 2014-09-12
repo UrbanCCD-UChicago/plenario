@@ -920,108 +920,107 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td><strong><code>max5_direction_cardinal</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>max2_windspeed</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>snowfall</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>dewpoint_avg</code></strong></td>
-                    <td></td>
+                    <td><strong><code>wban_code</code></strong></td>
+                    <td>The WBAN (Weather Bureau Army Navy) number is the unique identifier for weather stations</td>
                   </tr>
                   <tr>
                     <td><strong><code>date</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>temp_avg</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>id</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>max2_direction_cardinal</code></strong></td>
-                    <td></td>
+                    <td>The date of the observations in SQL date form (e.g. '2003-10-05')</td>
                   </tr>
                   <tr>
                     <td><strong><code>temp_max</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>max2_winddirection</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>wetbulb_avg</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>max5_windspeed</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>avg_windspeed</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>max5_winddirection</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>precip_total</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>resultant_winddirection</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>departure_from_normal</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>sealevel_pressure</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>resultant_winddirection_cardinal</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>weather_types</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>snowice_depth</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>snowice_waterequiv</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>resultant_windspeed</code></strong></td>
-                    <td></td>
+                    <td>The maximum temperature for the day (in Fahrenheit)</td>
                   </tr>
                   <tr>
                     <td><strong><code>temp_min</code></strong></td>
-                    <td></td>
+                    <td>The minimum temperature for the day in Fahrenheit</td>
                   </tr>
                   <tr>
-                    <td><strong><code>station_pressure</code></strong></td>
-                    <td></td>
+                    <td><strong><code>temp_avg</code></strong></td>
+                    <td>The average temperature for the day in Fahrenheit</td>
                   </tr>
                   <tr>
-                    <td><strong><code>wban_code</code></strong></td>
-                    <td></td>
+                    <td><strong><code>departure_from_normal</code></strong></td>
+                    <td>The departure from the normal average temperature for the day in Fahrenheit</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>dewpoint_avg </code></strong></td>
+                    <td>The average dewpoint, i.e. the temperature at which water vapor condenses into water at the same rate at which it evaporates (in Fahrenheit)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wetbulb_avg </code></strong></td>
+                    <td>The average temperature the air would have had at 100% humidity (in Fahrenheit)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>weather_types </code></strong></td>
+ 
+                    <td><p>A multidimensional PostgreSQL array which contains values from <a href="http://www.ofcm.gov/fmh-1/fmh1.htm">Federal Meterological Handbook No. 1: Surface Weather Observations and Reports</a>, in the following six-tuple: [vicinity, intensity, desc, precip, obscuration, other]</p>
+
+		      <p>For example, in the event of an observation of a thunderstorm with heavy rain and snow with fog, one might see: <code>[NULL, +, TS, RA, DG, NULL]</code></p>
+
+		      <p>But if it were also snowing, there would be an additional six-tuple: <code>[NULL, NULL, NULL, SN, NULL, NULL]</code></p>
+
+</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>snowice_depth</code></strong></td>
+                    <td>In inches, the current depth of snow/ice. A 'trace' (T) is encoded as 0.005</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>snowice_waterequiv</code></strong></td>
+                    <td>This would be the depth of water in inches if you could melt the snowpack instantaneously</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>snowfall </code></strong></td>
+                    <td>Snowfall in inches on this day</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>precip_total </code></strong></td>
+                    <td> Total precipitation in inches, during the 24-hour period ending in local standard time</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>station_pressure </code></strong></td>
+                    <td>Average pressure in "Hg (inches of Mercury)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>sealevel_pressure </code></strong></td>
+                    <td>Average sea-level pressure in "Hg (inches of Mercury)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code> resultant_windspeed</code></strong></td>
+                    <td>The magnitude (in miles per hour) of "resultant" wind, which is obtained by converting recorded wind speeds and directions over a 24-hour period into a single vector with a single magnitude and direction</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code> resultant_winddirection</code></strong></td>
+                    <td>The direction (in degrees) of "resultant" wind, which is obtained by converting recorded wind speeds and directions over a 24-hour period into a single vector with a single magnitude and direction</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code> resultant_winddirection_cardinal</code></strong></td>
+                    <td>The above wind direction converted to human-readable direction, e.g. N, NE, NNE, NNW</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>max5_windspeed</code></strong></td>
+                    <td>The maximum windspeed of recorded <strong>5-second</strong> averages (in degrees)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>max5_winddirection</code></strong></td>
+                    <td>The maximum windspeed of recorded <strong>5-second</strong> averages (in degrees)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>max5_direction_cardinal</code></strong></td>
+                    <td>The maximum windspeed of recorded <strong>5-second</strong> averages (in cardinal directions)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>max2_windspeed</code></strong></td>
+                    <td>The maximum windspeed of recorded <strong>2-minute</strong> averages (in degrees)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>max2_winddirection</code></strong></td>
+                    <td>The maximum windspeed of recorded <strong>2-minute</strong> averages (in degrees)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>max2_direction_cardinal</code></strong></td>
+                    <td>The maximum windspeed of recorded <strong>2-minute</strong> averages (in cardinal directions)</td>
                   </tr>
                 </tbody>
               </table>
@@ -1109,84 +1108,112 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td><strong><code>wind_speed</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>sealevel_pressure</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>old_station_type</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>station_type</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>sky_condition</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>wind_direction</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>sky_condition_top</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>visibility</code></strong></td>
-                    <td></td>
+                    <td><strong><code>wban_code</code></strong></td>
+                    <td>The WBAN (Weather Bureau Army Navy) number is the unique identifier for weather stations</td>
                   </tr>
                   <tr>
                     <td><strong><code>datetime</code></strong></td>
-                    <td></td>
+                    <td>In SQL datetime form (e.g. '2003-10-05 23:04:00')</td>
                   </tr>
                   <tr>
-                    <td><strong><code>wind_direction_cardinal</code></strong></td>
-                    <td></td>
+                    <td><strong><code>old_station_type</code></strong></td>
+                    <td>(Valid for all dates before May 1st, 2007)
+		      <ul>
+			<li>AO1: automated station without a precipitation discriminator (no rain/snow sensor)
+     			<li>AO2; automated station with precipitation discriminator
+		    </td>
                   </tr>
                   <tr>
-                    <td><strong><code>relative_humidity</code></strong></td>
-                    <td></td>
+                    <td><strong><code>station_type</code></strong></td>
+                    <td>
+		      <li> 0 AMOS now AWOS, also USAF stations
+		      <li> 4 MAPSO
+		      <li> 5 Navy METAR
+		      <li> 6 Navy Airways(obsolete)
+		      <li> 8 SOD- Keyed from 10C
+	  	      <li> 9 SOD/HPD- Keyed B16, F-6, Navy Forms
+	 	      <li> 11 ASOS (NWS)
+		      <li> 12 ASOS (FAA)
+		      <li> 15 Climate Reference Network (CRN)		      
+		    </td>
                   </tr>
                   <tr>
-                    <td><strong><code>hourly_precip</code></strong></td>
-                    <td></td>
+                    <td><strong><code>sky_condition</code></strong></td>
+                    <td>Up to three strings representing up to three layers of cloud cover. Each string is one of the below abbreviations with (in the case of clouds) a three-digit height following, representing hundreds of feet.
+
+		      <li>CLR: Clear below 12,000 feet
+		      <li>FEW: > 0/8 - 2/8 sky cover
+		      <li>SCT (SCATTERED):  3/8 - 4/8 sky cover
+		      <li>BKN (BROKEN): 5/8 - 7/8 sky cover
+		      <li>OVC (OVERCAST): 8/8 sky cover
+		    </td>
                   </tr>
                   <tr>
-                    <td><strong><code>drybulb_fahrenheit</code></strong></td>
-                    <td></td>
+                    <td><strong><code>sky_condition_top</code></strong></td>
+                    <td>This parameter represents the highest observed sky condition (in hundreds of feet), taken from <code>sky_condition</code>.</td>
                   </tr>
                   <tr>
-                    <td><strong><code>report_type</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>dewpoint_fahrenheit</code></strong></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>station_pressure</code></strong></td>
-                    <td></td>
+                    <td><strong><code>visibility</code></strong></td>
+                    <td>Distance at which objects can be discerned, in statute miles</td>
                   </tr>
                   <tr>
                     <td><strong><code>weather_types</code></strong></td>
-                    <td></td>
+                    <td><p>A multidimensional PostgreSQL array which contains values from <a href="http://www.ofcm.gov/fmh-1/fmh1.htm">Federal Meterological Handbook No. 1: Surface Weather Observations and Reports</a>, in the following six-tuple: [vicinity, intensity, desc, precip, obscuration, other]</p>
+
+		      <p>For example, in the event of an observation of a thunderstorm with heavy rain and snow with fog, one might see: <code>[NULL, +, TS, RA, DG, NULL]</code></p>
+
+		      <p>But if it were also snowing, there would be an additional six-tuple: <code>[NULL, NULL, NULL, SN, NULL, NULL]</code></p>
+
+		    </td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>drybulb_fahrenheit</code></strong></td>
+                    <td>Current temperature at current level of humidity (in Fahrenheit)</td>
                   </tr>
                   <tr>
                     <td><strong><code>wetbulb_fahrenheit</code></strong></td>
-                    <td></td>
+                    <td>The temperature the air <strong>would</strong> have at 100% humidity (in Fahrenheit)</td>
                   </tr>
                   <tr>
-                    <td><strong><code>id</code></strong></td>
-                    <td></td>
+                    <td><strong><code>dewpoint_fahrenheit</code></strong></td>
+                    <td>The temperature at which water vapor condenses into water at the same rate at which it evaporates (in Fahrenheit)</td>
                   </tr>
                   <tr>
-                    <td><strong><code>wban_code</code></strong></td>
-                    <td></td>
+                    <td><strong><code>relative_humidity</code></strong></td>
+                    <td>Expressed as a percentage (0 to 100), the ratio of the partial pressure of water vapor to the saturated vapor pressure at the current temperature</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wind_speed</code></strong></td>
+                    <td> Observed wind speed (averaged?) (in miles per hour)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wind_direction</code></strong></td>
+                    <td>Observed wind direction (averaged?) in degrees (0 to 360)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wind_direction_cardinal</code></strong></td>
+                    <td>Observed wind direction (averaged?) as a human-readable direction, e.g. N, NE, NNE, NNW</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>station_pressure</code></strong></td>
+                    <td>Average pressure in "Hg (inches of Mercury)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>sealevel_pressure</code></strong></td>
+                    <td>Average sea-level pressure in "Hg (inches of Mercury)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>report_type</code></strong></td>
+                    <td>Standard reports are denoted 'AA' and special reports (e.g. for tornados) are 'SP'.
+		      <ul>
+			<li> AA: METAR (AVIATION ROUTINE WEATHER REPORT) – HOURLY
+			<li> SP: METAR SPECIAL REPORT
+			<li> CRN05: Climate Reference Network
+		    </td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>hourly_precip</code></strong></td>
+                    <td>Precipitation total (in inches)</td>
                   </tr>
                 </tbody>
               </table>
