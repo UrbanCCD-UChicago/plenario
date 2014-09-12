@@ -48,7 +48,7 @@ class MasterTable(Base):
     start_date = Column(TIMESTAMP)
     end_date = Column(TIMESTAMP)
     current_flag = Column(Boolean, default=True)
-    location = Column(String(100))
+    location = Column(String(200))
     latitude = Column(DOUBLE_PRECISION(precision=53))
     longitude = Column(DOUBLE_PRECISION(precision=53))
     obs_date = Column(TIMESTAMP, index=True)

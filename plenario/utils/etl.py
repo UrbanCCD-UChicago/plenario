@@ -383,7 +383,8 @@ class PlenarioETL(object):
         dat_cols.append(text("NULL AS geotag2"))
         dat_cols.append(text("NULL AS geotag3"))
         dat_cols.append(text("'%s' AS dataset_name" % self.dataset_name))
-        dat_cols.append(getattr(self.dat_table.c, '%s_row_id' % self.dataset_name))
+        dat_pk = '%s_row_id' % self.dataset_name
+        dat_cols.append(getattr(self.dat_table.c, dat_pk))
         if self.latitude and self.longitude:
             dat_cols.append(text(
                 "ST_PointFromText('POINT(' || dat_%s.%s || ' ' || dat_%s.%s || ')', 4326) \
@@ -392,20 +393,17 @@ class PlenarioETL(object):
                           self.dataset_name, self.latitude,
                       )))
         elif self.location:
-            # probably a better way to do this...
             dat_cols.append(text(
-                "ST_PointFromText('POINT(' || \
-                      split_part(substr(replace(dat_%s.%s, ')', ''), strpos(dat_%s.%s, '(') + 1, length(dat_%s.%s) - 2), ',', 2) \
-                      || ' ' || \
-                      split_part(substr(replace(dat_%s.%s, '(', ''), strpos(dat_%s.%s, '(') + 1, length(dat_%s.%s) - 2), ',', 1) \
-                      || ')', 4326) \
-                      as location_geom" % (
-                          self.dataset_name, slugify(self.location), 
-                          self.dataset_name, slugify(self.location),
-                          self.dataset_name, slugify(self.location), 
-                          self.dataset_name, slugify(self.location),
-                          self.dataset_name, slugify(self.location), 
-                          self.dataset_name, slugify(self.location),
+                """ (
+                    SELECT ST_PointFromText('POINT(' || subq.longitude || ' ' || subq.latitude || ')', 4326) \
+                        FROM (
+                              SELECT FLOAT8((regexp_matches(%s, '\((.*),.*\)'))[1]) AS latitude, \
+                                     FLOAT8((regexp_matches(%s, '\(.*,(.*)\)'))[1]) AS longitude \
+                              FROM dat_%s as d where d."%s" = dat_%s."%s") AS subq) AS location_geom
+                """ % 
+                      (
+                          slugify(self.location), slugify(self.location),
+                          self.dataset_name, dat_pk, self.dataset_name, dat_pk,
                       )))
         mt = MasterTable.__table__
         bk = slugify(self.business_key)
