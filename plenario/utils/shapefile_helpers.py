@@ -9,7 +9,6 @@ from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.exc import NoSuchTableError
 from geoalchemy2 import Geometry
 from plenario.database import task_engine as engine, Base
-from plenario.models import shp2table
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
@@ -18,12 +17,9 @@ import zipfile
 import shapefile
 from shapely.geometry import shape, Polygon, MultiPolygon, asShape
 import json
-# import pyproj
 from cStringIO import StringIO
 from itertools import izip_longest
 from urlparse import urlparse
-
-ENDPOINT = 'http://www2.census.gov/geo/tiger/TIGER2010'
 
 TYPE_MAP = {
     'C': String,
@@ -47,7 +43,9 @@ class PlenarioShapeETL(object):
                        characters.
 
         source_url:    This is used to download the raw data.
-
+        
+        business_key:  Business key for the table that is created when adding the file.
+                       This needs to stay unique even when the data updates.
     """
     def __init__(self, meta):
         for k,v in meta.items():
