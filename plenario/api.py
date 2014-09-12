@@ -646,7 +646,7 @@ def submit_dataset():
                     md = MetaTable(**d)
                     session.add(md)
                     session.commit()
-                #add_dataset.delay(md.source_url_hash)
+                add_dataset.delay(md.source_url_hash, data_types=post.get('data_types'))
                 resp['message'] = 'Dataset %s submitted successfully' % dataset_info['name']
         else:
             resp['status'] = 'error'

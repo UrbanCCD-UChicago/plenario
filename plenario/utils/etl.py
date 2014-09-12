@@ -33,6 +33,7 @@ COL_TYPES = {
     'date': Date,
     'time': Time,
     'timestamp': TIMESTAMP,
+    'datetime': TIMESTAMP,
 }
 
 class PlenarioETL(object):
