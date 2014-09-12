@@ -109,7 +109,8 @@ class PlenarioETL(object):
         bucket = s3conn.get_bucket(S3_BUCKET)
         self.s3_key = Key(bucket)
         self.s3_key.key = s3_path
-        self.data_types = data_types
+        if data_types:
+            self.data_types = data_types
     
     def _get_tables(self, table_name=None, all_tables=False):
         if all_tables:
