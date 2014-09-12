@@ -84,6 +84,7 @@ def add_dataset():
                     reader = UnicodeCSVReader(inp)
                     header = reader.next()
                     col_types = []
+                    inp.seek(0)
                     for col in range(len(header)):
                         col_types.append(iter_column(col, inp))
                     dataset_info['columns'] = []

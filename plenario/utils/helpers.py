@@ -12,7 +12,8 @@ def iter_column(idx, f):
     header = reader.next()
     col = []
     for row in reader:
-        col.append(row[idx])
+        if row:
+            col.append(row[idx])
     col_type = normalize_column_type(col)
     return col_type
 

@@ -13,7 +13,7 @@ NULL_VALUES = ('na', 'n/a', 'none', 'null', '.', '')
 TRUE_VALUES = ('yes', 'y', 'true', 't')
 FALSE_VALUES = ('no', 'n', 'false', 'f')
 
-DEFAULT_DATETIME = datetime.datetime(9999, 12, 31, 0, 0, 0)
+DEFAULT_DATETIME = datetime.datetime(2999, 12, 31, 0, 0, 0)
 NULL_DATE = datetime.date(9999, 12, 31)
 NULL_TIME = datetime.time(0, 0, 0)
 

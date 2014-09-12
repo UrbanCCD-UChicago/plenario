@@ -595,7 +595,7 @@ def submit_dataset():
     resp = {'status': 'ok', 'message': ''}
     status_code = 200
     errors = []
-    post = request.data
+    post = request.form.get('data')
     if not post:
         try:
             post = request.form.keys()[0]
