@@ -65,6 +65,7 @@ var ResponseView = Backbone.View.extend({
                     "aoColumns": [
                         null,
                         null,
+                        null,
                         { "bSortable": false },
                         { "bSortable": false }
                     ],

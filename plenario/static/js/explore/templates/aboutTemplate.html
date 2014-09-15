@@ -2,9 +2,9 @@
 <table id='available-datasets' class='table table-condensed'>
   <thead>
     <tr>
-      <th width='50%'>Dataset</th>
+      <th>Dataset name</th>
+      <th>Attribution</th>
       <th>Time span available</th>
-      <th></th>
     </tr>
   </thead>
   <tbody>
@@ -13,16 +13,11 @@
         <td>
           <a href="javascript://" class='about-detail' data-dataset_name="<%= set.dataset_name %>"><%= set.human_name %></a>
         </td>
+        <td><%= set.attribution %></td>
         <td>
           <% if (set.obs_from && set.obs_to) { %>
           <strong><%= moment(set.obs_from).from(moment(set.obs_to), true) %></strong> (<%= moment(set.obs_from).format("M/D/YYYY") %> - <%= moment(set.obs_to).format("M/D/YYYY") %>)
           <% } %>
-        </td>
-        <td>
-          <a href="javascript://" class="about-detail btn btn-info btn-sm" data-dataset_name="<%= set.dataset_name %>">
-              <i class='fa fa-info-circle'></i>
-              View
-          </a>
         </td>
       </tr>
     <% }) %>

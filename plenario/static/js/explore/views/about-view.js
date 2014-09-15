@@ -27,7 +27,7 @@ var AboutView = Backbone.View.extend({
                     "aoColumns": [
                         null,
                         null,
-                        { "bSortable": false }
+                        null
                     ],
                     "paging": false,
                     "searching": false,
