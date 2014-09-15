@@ -1,3 +1,7 @@
+<% var points = "/v1/api/detail/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
+<% var time_series = "/v1/api/detail-aggregate/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
+<% var fields_list = "/v1/api/fields/" + meta.dataset_name %>
+
 <div class='col-md-12'>
     <p><a href='#' id='back-to-explorer'>&lt; back to Explorer</a></p>
 </div>
@@ -58,34 +62,32 @@
                 <i class='fa fa-search'></i>
                 Refine query
             </button>
+
+            <div class="btn-group">
+                <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                    <i class='fa fa-download'></i>
+                    Download
+                    <span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu" role="menu">
+                    <li><a class='download-geojson data-download' href="#" target="_blank" ><i class='fa fa-download'></i> Map grid (GeoJSON)</a></li>
+                    <li><a href="<%= time_series + '&data_type=csv' %>" class="data-download" target="_blank"><i class='fa fa-download'></i> Time series (CSV)</a></li>
+                    <li><a href="<%= points + '&data_type=csv' %>" class="data-download" target="_blank"><i class='fa fa-download'></i> Raw data (CSV)</a></li>
+                </ul>
+            </div>
         </form>
 
         <hr />
-        <h4><i class='fa fa-download'></i> Download</h4>
-        <% var points = "/v1/api/detail/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
-        <% var time_series = "/v1/api/detail-aggregate/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
-        <table class='table table-condensed'>
-            <tbody>
-                <tr>
-                    <td>Map grid</td>
-                    <td><a id='download-geojson' class='btn btn-default btn-sm' href="#"><i class='fa fa-download'></i> GeoJSON</a></td>
-                </tr>
-                <tr>
-                    <td>Time series</td>
-                    <td>
-                        <a href="<%= time_series + '&data_type=csv' %>" class="data-download btn btn-default btn-sm" target="_blank"><i class='fa fa-download'></i> CSV</a> 
-                        <a href="<%= time_series %>" class="data-download btn btn-default btn-sm" target="_blank"><i class='fa fa-download'></i> JSON</a>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Raw data</td>
-                    <td>
-                        <a href="<%= points + '&data_type=csv' %>" class="data-download btn btn-default btn-sm" target="_blank"><i class='fa fa-download'></i> CSV</a> 
-                        <a href="<%= points %>" class="data-download btn btn-default btn-sm" target="_blank"><i class='fa fa-download'></i> JSON</a>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        
+        <h4>API queries</h4>
+        <p>View the API queries that are used on this page. <a href='/api-docs/'>Read the API docs</a>.</p>
+        <ul class=''>
+            <li><a class='download-geojson' target="_blank" href="#"><code>/v1/api/grid/&hellip;</code></a></li>
+            <li><a href="<%= time_series %>" target="_blank"><code>/v1/api/timeseries/&hellip;</code></a></li>
+            <li><a href="<%= points %>" target="_blank"><code>/v1/api/detail/&hellip;</code></a></li>
+            <li><a href="<%= fields_list %>" target="_blank"><code>/v1/api/fields/&hellip;</code></a></li>
+        </ul>
+
     </div>
 </div>
 <div class='col-md-7'>

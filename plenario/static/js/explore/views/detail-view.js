@@ -82,7 +82,7 @@ var DetailView = Backbone.View.extend({
         $('#detail-view').hide();
         $('#list-view').hide();
 
-        $('#download-geojson').attr('href','/v1/api/grid/?' + $.param(self.getQuery()))
+        $('.download-geojson').attr('href','/v1/api/grid/?' + $.param(self.getQuery()))
         $('.date-filter').datepicker({
             dayNamesMin: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
             prevText: '',
