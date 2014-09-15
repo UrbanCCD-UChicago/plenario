@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, url_for, request
 from raven.contrib.flask import Sentry
 from plenario.database import session as db_session
 from plenario.models import bcrypt
@@ -26,6 +26,14 @@ def create_app():
     app.register_blueprint(api)
     app.register_blueprint(views)
     app.register_blueprint(auth)
+
+    @app.before_request
+    def check_maintenance_mode():
+        maint = app.config.get('MAINTENANCE')
+        if maint and request.path != url_for('views.maintenance') \
+            and not 'static' in request.path:
+            return redirect(url_for('views.maintenance'))
+
     @app.teardown_appcontext
     def shutdown_session(exception=None):
         db_session.remove()
@@ -37,5 +45,6 @@ def create_app():
     @app.errorhandler(500)
     def page_not_found(e):
         return render_template('error.html'), 500
+
     return app
 

@@ -13,3 +13,6 @@ S3_BUCKET = ''
 # that gets created when init_db is run from database module.
 # Just needs 'name', 'email', and 'password' keys.
 DEFAULT_USER = {}
+
+# Toggle maintenence mode
+MAINTENANCE = False

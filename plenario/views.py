@@ -35,6 +35,10 @@ def api_docs_view():
 def about_view():
     return render_template('about.html')
 
+@views.route('/maintenance')
+def maintenance():
+    return render_template('maintenance.html'), 503
+
 @views.route('/add-dataset', methods=['GET', 'POST'])
 @login_required
 def add_dataset():
