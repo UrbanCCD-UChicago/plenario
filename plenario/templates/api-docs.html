@@ -25,17 +25,17 @@
       <h2 id='endpoints'>Endpoints</h2>
       <p>Currently there are nine API endpoints:</p>
 
-      <div class="panel-group" id="accordion-api">
+      <div class="panel-group" id="accordion-api-datasets">
         <div class="panel panel-default">
           <div class="panel-heading">
-            <a data-toggle="collapse" data-parent="#accordion-api" href="#collapse-api" id="api">
+            <a data-toggle="collapse" data-parent="#accordion-api-datasets" href="#collapse-api-datasets" id="api-datasets">
               <span class='label label-info'>GET</span>
               <strong><code>/v1/api/datasets/</code></strong>
               <p class='pull-right'>list datasets and metadata available</p>
               <div class='clearfix'></div>
             </a>
           </div>
-          <div id="collapse-api" class="panel-collapse collapse">
+          <div id="collapse-api-datasets" class="panel-collapse collapse">
             <div class="panel-body">
               <p>This is the “data about the data” endpoint. It contains a record for each dataset.</p>
 
@@ -1365,20 +1365,19 @@
    ]
 }
       </pre>
-
-      <!-- <div class="panel-group" id="accordion">
-        <div class="panel panel-default">
-          <div class="panel-heading">
-            <a data-toggle="collapse" data-parent="#accordion" href="#collapse-api" id="api">
-              <strong><code>/v1/api/grid/</code></strong>
-              - query a single dataset and return a GeoJSON grid heatmap
-            </a>
-          </div>
-          <div id="collapse-api" class="panel-collapse collapse">
-            <div class="panel-body">
-              
-          </div>
-        </div>
-      </div> -->
 </div>
 {% endblock content %}
+
+{% block extra_javascript %}
+  <script>
+    $('.collapse').collapse('hide');
+    $('.collapse').on('show.bs.collapse', function () {
+      window.location.hash = $(this).attr('id');
+    });
+
+    $(document).ready(function() {
+      var anchor = window.location.hash.replace("#", "");
+      $('#' + anchor).collapse('show');
+    });
+  </script>
+{% endblock extra_javascript %}
