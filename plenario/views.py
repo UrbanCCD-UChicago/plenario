@@ -197,8 +197,3 @@ def check_update(task_id):
     resp = make_response(json.dumps(r))
     resp.headers['Content-Type'] = 'application/json'
     return resp
-
-
-@views.route('/terms')
-def terms_view():
-    return render_template('terms.html')
