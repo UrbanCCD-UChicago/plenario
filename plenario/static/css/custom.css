@@ -11,6 +11,8 @@ body {
     height: 165px;
 }
 
+.panel-group { margin-bottom: 5px;}
+
 .showmore-content p {
     font-size: 14px;
     line-height: 20px;
