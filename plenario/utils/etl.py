@@ -429,7 +429,7 @@ class PlenarioETL(object):
         conn = engine.connect()
         conn.execute(ins)
 
-    def _update_geotags(self):
+    def _add_weather_info(self):
         """ 
         This is just adding the weather observation id to the master table right now.
         In the future we can modify it to do all the geo tagging we need for the
@@ -488,6 +488,33 @@ class PlenarioETL(object):
         )
         conn = engine.connect()
         conn.execute(upd, dname=self.dataset_name)
+        
+    def _add_census_block(self):
+        """ 
+        Adds a census block geoid to entries in the master table
+        """
+        upd = text(""" 
+            UPDATE dat_master SET census_block=subq.census_block
+                FROM (
+                    SELECT 
+                        d.master_row_id as master_id,
+                        c.geoid10 as census_block
+                    FROM
+                       dat_master as d
+                    JOIN census_blocks as c
+                       ON ST_Within(d.location_geom, c.geom)
+                    WHERE d.census_block IS NULL
+                        AND d.location_geom IS NOT NULL
+                        AND d.dataset_name = :dname
+                ) as subq
+                WHERE dat_master.master_row_id = subq.master_id
+            """)
+        conn = engine.contextual_connect()
+        conn.execute(upd, dname=self.dataset_name)
+
+    def _update_geotags(self):
+        self._add_weather_info()
+        self._add_census_block()
 
     def _find_changes(self):
         # Step Eight: Find changes

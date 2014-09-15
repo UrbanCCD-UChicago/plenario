@@ -53,9 +53,9 @@ class MasterTable(Base):
     longitude = Column(DOUBLE_PRECISION(precision=53))
     obs_date = Column(TIMESTAMP, index=True)
     weather_observation_id = Column(BigInteger, index=True)
-    geotag2 = Column(String(50))
+    census_block = Column(String(15), index=True)
     geotag3 = Column(String(50))
-    dataset_name = Column(String(100))
+    dataset_name = Column(String(100), index=True)
     dataset_row_id = Column(Integer)
     location_geom = Column(Geometry('POINT', srid=4326))
 
