@@ -1,6 +1,6 @@
 from celery.schedules import crontab
 
-BROKER_URL = 'some://broker:@url/thing'
+BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://'
 
 CELERYBEAT_SCHEDULE = {
@@ -19,5 +19,3 @@ CELERYBEAT_SCHEDULE = CELERYBEAT_SCHEDULE
 CELERY_TIMEZONE = 'America/Chicago'
 CELERYD_HIJACK_ROOT_LOGGER = False
 CELERY_IGNORE_RESULT = True
-
-

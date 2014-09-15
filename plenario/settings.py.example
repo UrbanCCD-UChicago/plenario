@@ -9,10 +9,18 @@ AWS_ACCESS_KEY = ''
 AWS_SECRET_KEY = ''
 S3_BUCKET = ''
 
-# Optional dict with attributes for a default user 
-# that gets created when init_db is run from database module.
-# Just needs 'name', 'email', and 'password' keys.
-DEFAULT_USER = {}
+# Optional dict with attributes for a default web admin 
+DEFAULT_USER = {
+    'name': 'plenario_user',
+    'email': 'youremail@example.com',
+    'password': 'your password'
+}
+
+CENSUS_BLOCKS = {
+    'dataset_name': 'census_blocks',
+    'business_key': 'geoid',
+    'source_url': 'http://www2.census.gov/geo/tiger/TIGER2010/TABBLOCK/2010/tl_2010_17031_tabblock10.zip'
+}
 
 # Toggle maintenence mode
 MAINTENANCE = False

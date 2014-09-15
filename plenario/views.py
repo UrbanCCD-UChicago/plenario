@@ -194,6 +194,7 @@ def update_dataset(source_url_hash):
 @views.route('/check-update/<task_id>')
 def check_update(task_id):
     result = update_dataset_task.AsyncResult(task_id)
+    # print result.__dict__
     if result.ready():
         r = {'status': 'ready'}
     else:

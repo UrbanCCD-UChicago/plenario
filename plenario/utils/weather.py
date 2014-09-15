@@ -894,7 +894,9 @@ class WeatherETL(object):
         self.src_hourly_table = self._get_hourly_table(name='src')
         self.src_hourly_table.drop(engine, checkfirst=True)
         self.src_hourly_table.create(engine, checkfirst=True)
-        names = [c.name for c in self.hourly_table.columns if c.name != 'id']
+
+        skip_cols = ['id', 'latitude', 'longitude']
+        names = [c.name for c in self.hourly_table.columns if c.name not in skip_cols]
         ins_st = "COPY src_weather_observations_hourly ("
         for idx, name in enumerate(names):
             if idx < len(names) - 1:
@@ -923,7 +925,9 @@ class WeatherETL(object):
             f.write(transformed_input.getvalue())
             f.close()
         transformed_input.seek(0)
-        names = [c.name for c in self.daily_table.columns if c.name != 'id']
+
+        skip_cols = ['id', 'latitude', 'longitude']
+        names = [c.name for c in self.daily_table.columns if c.name not in skip_cols]
         self.src_daily_table = self._get_daily_table(name='src')
         self.src_daily_table.drop(engine, checkfirst=True)
         self.src_daily_table.create(engine, checkfirst=True)
