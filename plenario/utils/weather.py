@@ -14,7 +14,7 @@ from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.settings import DATA_DIR
 from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float, \
-    VARCHAR, BigInteger, and_, select
+    VARCHAR, BigInteger, and_, select, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
 from uuid import uuid4
@@ -88,7 +88,7 @@ class WeatherETL(object):
         t_hourly = self._transform_hourly(raw_hourly, file_type, start_line=start_line, end_line=end_line)
         self._load_hourly(t_hourly)
         self._update(span='daily')
-        self._update(span='hourly')            
+        self._update(span='hourly')
         self._cleanup_temp_tables()
 
     def initialize(self): 
@@ -113,9 +113,11 @@ class WeatherETL(object):
         if (not no_daily):
             self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
             self._update(span='daily')
+            self._add_location(span='daily')
         if (not no_hourly):
             self._load_hourly(t_hourly)    # this actually imports the transformed StringIO csv
             self._update(span='hourly')
+            self._add_location(span='hourly')
         self._cleanup_temp_tables()
 
     def _cleanup_temp_tables(self):
@@ -126,6 +128,41 @@ class WeatherETL(object):
                     table.drop(engine, checkfirst=True)
                 except AttributeError:
                     continue
+
+    def _add_location(self, span=None):
+        """ 
+        Add latitude and longitude from weather station into observations table
+        """
+        start_day, end_day = calendar.monthrange(self.current_year, self.current_month)
+        range_start = '%s-%s-%s' % (self.current_year, self.current_month, 1)
+        range_end = '%s-%s-%s' % (self.current_year, self.current_month, end_day)
+        date_col = 'date'
+        table_name = 'dat_weather_observations_%s' % span
+        if span == 'hourly':
+            date_col = 'datetime'
+        upd = text("""
+            UPDATE %s SET 
+                longitude = subq.longitude,
+                latitude = subq.latitude
+            FROM (
+                SELECT 
+                    wban_code,
+                    st_x(location) as longitude,
+                    st_y(location) as latitude
+                FROM weather_stations
+            ) as subq
+            WHERE %s.wban_code = subq.wban_code
+               AND %s.%s <= :range_end
+               AND %s.%s >= :range_start
+               AND %s.longitude IS NULL
+               AND %s.latitude IS NULL
+        """ % (table_name, table_name, 
+               table_name, date_col,
+               table_name, date_col,
+               table_name, table_name)
+        )
+        conn = engine.contextual_connect()
+        conn.execute(upd, range_start=range_start, range_end=range_end)
 
     def _update(self, span=None):
         new_table = Table('new_weather_observations_%s' % span, Base.metadata,
@@ -705,10 +742,7 @@ class WeatherETL(object):
                         self.debug_outfile.write("\n")
                         self.debug_outfile.write(str(self.current_row))
                     self.debug_outfile.write("\nValueError: [%s], could not convert '%s' to float\n" % (e, val_str))
-<<<<<<< HEAD
                     self.debug_outfile.flush()
-=======
->>>>>>> Improved debugging output for when debug=True. Fixed initialize_last().
                 return None
             return fval
 
@@ -735,10 +769,7 @@ class WeatherETL(object):
                         self.debug_outfile.write("\n")
                         self.debug_outfile.write(str(self.current_row))
                     self.debug_outfile.write("\nValueError [%s] could not convert '%s' to int\n" % (e, val))
-<<<<<<< HEAD
                     self.debug_outfile.flush()
-=======
->>>>>>> Improved debugging output for when debug=True. Fixed initialize_last().
                 return None
             return ival
     
@@ -782,6 +813,8 @@ class WeatherETL(object):
                             Column('max2_windspeed', Float), 
                             Column('max2_winddirection', String(3)), # 000 through 360, M for missing
                             Column('max2_direction_cardinal', String(3)), # e.g. NNE, NNW
+                            Column('longitude', Float),
+                            Column('latitude', Float),
                             keep_existing=True) 
 
     def _get_hourly_table(self, name='dat'):
@@ -812,6 +845,8 @@ class WeatherETL(object):
                 Column('sealevel_pressure', Float),
                 Column('report_type', String), # Either 'AA' or 'SP'
                 Column('hourly_precip', Float, index=True),
+                Column('longitude', Float),
+                Column('latitude', Float),
                 keep_existing=True)
 
     def _extract_last_fname(self):
@@ -822,10 +857,14 @@ class WeatherETL(object):
         #print 'tar_filename'
 
         zip_last = datetime.now()
+        self.current_year = zip_last.year
+        self.current_month = zip_last.month
         zip_filename = 'QCLCD%s.zip' % zip_last.strftime('%Y%m') 
         return zip_filename
 
     def _extract_fname(self, year_num, month_num):
+        self.current_year = year_num
+        self.current_month = month_num
         curr_dt = datetime(year_num, month_num, 1, 0, 0)
         if ((year_num < 2007) or (year_num == 2007 and month_num < 5)):
             tar_filename =  '%s.tar.gz' % (curr_dt.strftime('%Y%m'))
