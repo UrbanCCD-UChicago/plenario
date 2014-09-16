@@ -14,7 +14,7 @@ import gzip
 from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
     Integer, Table, text, func, select, or_, and_, cast, UniqueConstraint, \
     join, outerjoin, over, BigInteger
-from sqlalchemy.dialects.postgresql import TIMESTAMP, ARRAY
+from sqlalchemy.dialects.postgresql import TIMESTAMP, ARRAY, TIME
 from sqlalchemy.exc import NoSuchTableError
 from types import NoneType
 import plenario.settings
@@ -31,7 +31,7 @@ COL_TYPES = {
     'float': Float,
     'string': String,
     'date': Date,
-    'time': Time,
+    'time': TIME,
     'timestamp': TIMESTAMP,
     'datetime': TIMESTAMP,
 }

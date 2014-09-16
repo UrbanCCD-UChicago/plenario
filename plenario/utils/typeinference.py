@@ -3,18 +3,18 @@
 import datetime
 
 from dateutil.parser import parse
-from sqlalchemy import Boolean, Integer, BigInteger, Float, Date, Time, \
+from sqlalchemy import Boolean, Integer, BigInteger, Float, Date, \
     String
-from sqlalchemy.dialects.postgresql import TIMESTAMP
+from sqlalchemy.dialects.postgresql import TIMESTAMP, TIME
 
 NoneType = type(None)
 
-NULL_VALUES = ('na', 'n/a', 'none', 'null', '.', '')
-TRUE_VALUES = ('yes', 'y', 'true', 't')
-FALSE_VALUES = ('no', 'n', 'false', 'f')
+NULL_VALUES = ('na', 'n/a', 'none', 'null', '.', '',)
+TRUE_VALUES = ('yes', 'y', 'true', 't',)
+FALSE_VALUES = ('no', 'n', 'false', 'f',)
 
 DEFAULT_DATETIME = datetime.datetime(2999, 12, 31, 0, 0, 0)
-NULL_DATE = datetime.date(9999, 12, 31)
+NULL_DATE = datetime.date(2999, 12, 31)
 NULL_TIME = datetime.time(0, 0, 0)
 
 
@@ -22,12 +22,11 @@ def normalize_column_type(l):
     """
     Docs to come...
     """
-    
+
     # Convert "NA", "N/A", etc. to null types.
     for i, x in enumerate(l):
-        if x is not None and x.lower().strip() in NULL_VALUES:
+        if x is not None and x.lower() in NULL_VALUES:
             l[i] = ''
-
     # Are they boolean?
     try:
         for i, x in enumerate(l):
@@ -56,6 +55,8 @@ def normalize_column_type(l):
 
             if x[0] == '0' and int(x) != 0:
                 raise TypeError('Integer is padded with 0s, so treat it as a string instead.')
+            if x.isspace():
+                raise TypeError('Integer is nothing but spaces so falling back to string')
 
             if int_x > 1000000000:
                 add(BigInteger)
@@ -99,7 +100,7 @@ def normalize_column_type(l):
  
             # Is it only a time?
             if d.date() == NULL_DATE:
-                add(Time)
+                add(TIME)
  
             # Is it only a date?
             elif d.time() == NULL_TIME:
@@ -115,10 +116,10 @@ def normalize_column_type(l):
         if normal_types_set == set([TIMESTAMP, Date]):
             normal_types_set = set([TIMESTAMP])
         # Datetimes and times don't mix -- fallback to using strings
-        elif normal_types_set == set([TIMESTAMP, Time]):
+        elif normal_types_set == set([TIMESTAMP, TIME]):
             normal_types_set = set([String])
         # Dates and times don't mix -- fallback to using strings
-        elif normal_types_set == set([Date, Time]):
+        elif normal_types_set == set([Date, TIME]):
             normal_types_set = set([String])
  
         return normal_types_set.pop()
