@@ -159,6 +159,16 @@
                           </td>
                         </tr>
                         <tr>
+                          <td><strong><code>census_block</code></strong></td>
+                          <td>none</td>
+                          <td>
+                            <p>Census block <a href='https://www.census.gov/geo/reference/codes/cou.html'>FIPS code</a>. Supports the <code>__like</code> operator for querying states, counties, tracts and blocks.</p>
+
+                            <p><img src='/static/images/fips-code.png' alt='FIPS codes' class='img-responsive'/></p>
+                            <p><strong>Example:</strong> <code>census_block__like=17031241400%</code> will fetch census tract '17031241400'</p>
+                          </td>
+                        </tr>
+                        <tr>
                           <td><strong><code>location_geom__within</code></strong></td>
                           <td>none</td>
                           <td>
@@ -438,6 +448,16 @@
                     <td>Obversations less than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
                   </tr>
                   <tr>
+                    <td><strong><code>census_block</code></strong></td>
+                    <td>none</td>
+                    <td>
+                      <p>Census block <a href='https://www.census.gov/geo/reference/codes/cou.html'>FIPS code</a>. Supports the <code>__like</code> operator for querying states, counties, tracts and blocks.</p>
+
+                      <p><img src='/static/images/fips-code.png' alt='FIPS codes' class='img-responsive'/></p>
+                      <p><strong>Example:</strong> <code>census_block__like=17031241400%</code> will fetch census tract '17031241400'</p>
+                    </td>
+                  </tr>
+                  <tr>
                     <td><strong><code>location_geom__within</code></strong></td>
                     <td>none</td>
                     <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest.</td>
@@ -584,6 +604,16 @@
                   have filters applied such as <code>__gt</code> (greater than) and <code>__lt</code> (less than).</td>
                   </tr>
                   <tr>
+                    <td><strong><code>census_block</code></strong></td>
+                    <td>none</td>
+                    <td>
+                      <p>Census block <a href='https://www.census.gov/geo/reference/codes/cou.html'>FIPS code</a>. Supports the <code>__like</code> operator for querying states, counties, tracts and blocks.</p>
+
+                      <p><img src='/static/images/fips-code.png' alt='FIPS codes' class='img-responsive'/></p>
+                      <p><strong>Example:</strong> <code>census_block__like=17031241400%</code> will fetch census tract '17031241400'</p>
+                    </td>
+                  </tr>
+                  <tr>
                     <td><strong><code>location_geom__within</code></strong></td>
                     <td>none</td>
                     <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest.</td>
@@ -708,6 +738,16 @@
                     <td><strong><code>resolution</code></strong></td>
                     <td>500</td>
                     <td>Square grid size (in meters).</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>census_block</code></strong></td>
+                    <td>none</td>
+                    <td>
+                      <p>Census block <a href='https://www.census.gov/geo/reference/codes/cou.html'>FIPS code</a>. Supports the <code>__like</code> operator for querying states, counties, tracts and blocks.</p>
+
+                      <p><img src='/static/images/fips-code.png' alt='FIPS codes' class='img-responsive'/></p>
+                      <p><strong>Example:</strong> <code>census_block__like=17031241400%</code> will fetch census tract '17031241400'</p>
+                    </td>
                   </tr>
                   <tr>
                     <td><strong><code>location_geom__within</code></strong></td>
