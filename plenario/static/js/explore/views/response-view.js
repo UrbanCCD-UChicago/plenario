@@ -34,6 +34,7 @@ var ResponseView = Backbone.View.extend({
             function(resp, meta_resp){
                 self.$el.spin(false);
                 var results = resp[0].objects;
+                var results_meta = resp[0]['meta']
                 var m = meta_resp[0]
                 var objects = []
                 self.meta = {}
@@ -56,8 +57,9 @@ var ResponseView = Backbone.View.extend({
                     objects: objects,
                     query: self.query
                 }));
+                
                 $.each(objects, function(i, obj){
-                    ChartHelper.sparkline((obj['dataset_name'] + '-sparkline'), obj.temporal_aggregate, obj['values']);
+                    ChartHelper.sparkline((obj['dataset_name'] + '-sparkline'), results_meta['query']['agg'], obj['values']);
                 });
 
                 $('#response-datasets').DataTable( {
