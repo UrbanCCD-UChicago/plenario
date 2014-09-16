@@ -406,6 +406,7 @@ def detail():
                         w_q['__'.join([t_fname, operator])] = v
                 valid_query, weather_clauses, resp, status_code = make_query(weather_table, w_q)
                 if valid_query:
+                    resp['meta']['status'] = 'ok'
                     base_query = base_query.join(weather_table, mt.c.weather_observation_id == weather_table.c.id)
                     for clause in weather_clauses:
                         base_query = base_query.filter(clause)
@@ -692,6 +693,8 @@ def make_query(table, raw_query_params):
         args_keys.remove('limit')
     if 'order_by' in args_keys:
         args_keys.remove('order_by')
+    if 'weather' in args_keys:
+        args_keys.remove('weather')
     for query_param in args_keys:
         try:
             field, operator = query_param.split('__')
@@ -745,6 +748,7 @@ def make_query(table, raw_query_params):
                 query_value = None
             query = getattr(column, attr)(query_value)
             query_clauses.append(query)
+            
     return valid_query, query_clauses, resp, status_code
 
 def getSizeInDegrees(meters, latitude):
