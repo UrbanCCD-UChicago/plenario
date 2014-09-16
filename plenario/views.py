@@ -3,7 +3,8 @@ from flask import make_response, request, render_template, current_app, g, \
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session
 from plenario.utils.helpers import get_socrata_data_info, iter_column
-from plenario.tasks import update_dataset as update_dataset_task
+from plenario.tasks import update_dataset as update_dataset_task, \
+    delete_dataset as delete_dataset_task
 from flask_login import login_required
 from datetime import datetime, timedelta
 from urlparse import urlparse
@@ -185,6 +186,12 @@ def edit_dataset(source_url_hash):
         'socrata_info': socrata_info
     }
     return render_template('edit-dataset.html', **context)
+
+@views.route('/delete-dataset/<source_url_hash>')
+@login_required
+def delete_dataset(source_url_hash):
+    result = delete_dataset_task.delay(source_url_hash)
+    return make_response(json.dumps({'status': 'success', 'task_id': result.id}))
 
 @views.route('/update-dataset/<source_url_hash>')
 def update_dataset(source_url_hash):

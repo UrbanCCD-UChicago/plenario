@@ -16,3 +16,4 @@ csvkit
 redis
 pytz
 datetime_truncate
+pyshp

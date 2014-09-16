@@ -1,16 +1,33 @@
 import os
 from urlparse import urlparse
 from plenario.celery_app import celery_app
-from plenario.models import MetaTable
-from plenario.database import task_session as session
+from plenario.models import MetaTable, MasterTable
+from plenario.database import task_session as session, task_engine as engine, \
+    Base
 from plenario.utils.etl import PlenarioETL
 from raven.handlers.logging import SentryHandler
 from raven.conf import setup_logging
 from plenario.settings import CELERY_SENTRY_URL
+from sqlalchemy import Table
 
 if CELERY_SENTRY_URL:
     handler = SentryHandler(CELERY_SENTRY_URL)
     setup_logging(handler)
+
+@celery_app.task
+def delete_dataset(source_url_hash):
+    md = session.query(MetaTable).get(source_url_hash)
+    dat_table = Table('dat_%s' % md.dataset_name, Base.metadata, 
+        autoload=True, autoload_with=engine, keep_existing=True)
+    dat_table.drop(engine, checkfirst=True)
+    master_table = MasterTable.__table__
+    delete = master_table.delete()\
+        .where(master_table.c.dataset_name == md.dataset_name)
+    conn = engine.contextual_connect()
+    conn.execute(delete)
+    session.delete(md)
+    session.commit()
+    return 'Deleted %s' % md.human_name
 
 @celery_app.task
 def add_dataset(source_url_hash, s3_path=None, data_types=None):

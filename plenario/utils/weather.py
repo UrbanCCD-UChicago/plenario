@@ -19,8 +19,6 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
 from uuid import uuid4
 
-import pdb
-
 class WeatherError(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
@@ -113,11 +111,11 @@ class WeatherETL(object):
         if (not no_daily):
             self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
             self._update(span='daily')
-            self._add_location(span='daily')
+            # self._add_location(span='daily')
         if (not no_hourly):
             self._load_hourly(t_hourly)    # this actually imports the transformed StringIO csv
             self._update(span='hourly')
-            self._add_location(span='hourly')
+            # self._add_location(span='hourly')
         self._cleanup_temp_tables()
 
     def _cleanup_temp_tables(self):
