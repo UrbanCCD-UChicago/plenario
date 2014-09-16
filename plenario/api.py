@@ -184,6 +184,12 @@ def weather_stations():
 @crossdomain(origin="*")
 def weather(table):
     raw_query_params = request.args.copy()
+
+    # default the response limit to 1000 records
+    limit = raw_query_params.get('limit')
+    if not limit:
+        limit = 1000
+
     weather_table = Table('dat_weather_observations_%s' % table, Base.metadata,
         autoload=True, autoload_with=engine, extend_existing=True)
     stations_table = Table('weather_stations', Base.metadata, 
@@ -196,6 +202,9 @@ def weather(table):
             weather_table.c.wban_code == stations_table.c.wban_code)
         for clause in query_clauses:
             base_query = base_query.filter(clause)
+
+        if limit:
+            base_query = base_query.limit(limit)
         values = [r for r in base_query.all()]
         weather_fields = weather_table.columns.keys()
         station_fields = stations_table.columns.keys()
@@ -342,13 +351,17 @@ def detail():
     if not obs_dates:
         six_months_ago = datetime.now() - timedelta(days=30)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
+
+    # default the response limit to 1000 records
+    limit = raw_query_params.get('limit')
+    if not limit:
+        limit = 1000
     
     include_weather = False
     if raw_query_params.get('weather') is not None:
         include_weather = raw_query_params['weather']
         del raw_query_params['weather']
     agg, datatype, queries = parse_join_query(raw_query_params)
-    limit = raw_query_params.get('limit')
     order_by = raw_query_params.get('order_by')
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
