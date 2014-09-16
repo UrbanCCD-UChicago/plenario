@@ -31,7 +31,7 @@ function template_cache(tmpl_name, tmpl_data){
 function parseParams(query){
     var re = /([^&=]+)=?([^&]*)/g;
     var decodeRE = /\+/g;  // Regex for replacing addition symbol with a space
-    var decode = function (str) {return decodeURIComponent( str.replace(decodeRE, " ") );};
+    var decode = function (str) {return str.replace(decodeRE, " ");};
     var params = {}, e;
     while ( e = re.exec(query) ) {
         var k = decode( e[1] ), v = decode( e[2] );
@@ -43,6 +43,13 @@ function parseParams(query){
     }
     return params;
 }
+
+function humanize(property) {
+  return property.replace(/_/g, ' ')
+      .replace(/(\w+)/g, function(match) {
+        return match.charAt(0).toUpperCase() + match.slice(1);
+      });
+};
 
 function addCommas(nStr) {
     nStr += '';

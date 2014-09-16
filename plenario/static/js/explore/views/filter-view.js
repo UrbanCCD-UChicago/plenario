@@ -13,7 +13,7 @@ var FilterView = Backbone.View.extend({
 
         var filter_dict_id = this.filter_dict.id;
         $.each(this.field_options['objects'], function(k, v){
-            $('#field_' + filter_dict_id).prepend("<option value='" + v['field_name'] + "'>" + v['field_name'] + "</option>");
+            $('#field_' + filter_dict_id).append("<option value='" + v['field_name'] + "'>" + humanize(v['field_name']) + "</option>");
         });
 
         // select dropdowns
