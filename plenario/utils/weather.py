@@ -292,6 +292,9 @@ class WeatherETL(object):
             #print len(row)
             #print zip(header,row)
 
+            if (len(row) == 0):
+                continue
+
             row_vals = getattr(self, '_parse_%s_row_daily' % file_type)(row, header)
 
             writer.writerow(row_vals)
@@ -406,6 +409,9 @@ class WeatherETL(object):
                 break
 
             row_count += 1
+
+            if (len(row) == 0):
+                continue
 
             # this calls either self._parse_zipfile_row_hourly
             # or self._parse_tarfile_row_hourly
