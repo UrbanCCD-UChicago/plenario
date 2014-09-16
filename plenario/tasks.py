@@ -37,13 +37,31 @@ def add_dataset(source_url_hash, s3_path=None, data_types=None):
     return 'Finished adding %s' % md.human_name
 
 @celery_app.task
+def monthly_update():
+    md = session.query(MetaTable)\
+        .filter(MetaTable.update_freq == 'monthly').all()
+    for m in md:
+        update_dataset.delay(m.source_url_hash)
+        print 'Updating %s' % m.human_name
+    return 'Weekly update complere'
+
+@celery_app.task
+def weekly_update():
+    md = session.query(MetaTable)\
+        .filter(MetaTable.update_freq == 'weekly').all()
+    for m in md:
+        update_dataset.delay(m.source_url_hash)
+        print 'Updating %s' % m.human_name
+    return 'Weekly update complere'
+
+@celery_app.task
 def daily_update():
     md = session.query(MetaTable)\
         .filter(MetaTable.update_freq == 'daily').all()
     for m in md:
         update_dataset.delay(m.source_url_hash)
         print 'Updating %s' % m.human_name
-    return 'yay'
+    return 'Daily update complete'
 
 @celery_app.task
 def hourly_update():
