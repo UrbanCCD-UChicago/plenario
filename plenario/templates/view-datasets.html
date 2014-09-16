@@ -57,7 +57,6 @@
                 var btn = $(this);
                 var dataset_id = btn.data('dataset')
                 $.getJSON('/update-dataset/' + dataset_id, function(resp){
-                    console.log(resp);
                     animate_button(btn);
                     check_update(resp.task_id, btn);
                 })
@@ -81,7 +80,6 @@
             $.ajax({
                 url: '/check-update/' + task_id,
                 success: function(data){
-                    console.log(data)
                     if(data.status == 'ready'){
                         btn.html("<i class='fa fa-refresh'></i> Updated!");
                         btn.attr('class','btn btn-success btn-sm');
