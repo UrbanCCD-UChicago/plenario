@@ -784,6 +784,7 @@ def parse_join_query(params):
         'location_geom', 
         'dataset_name',
         'weather_observation_id',
+        'census_block',
     ]
     weather_columns = [
         'temp_hi',
