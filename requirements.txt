@@ -1,4 +1,5 @@
 Flask
+Flask-Cache
 flask_sqlalchemy
 gunicorn
 psycopg2

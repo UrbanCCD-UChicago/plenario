@@ -1,5 +1,6 @@
 from flask import make_response, request, render_template, current_app, g, \
     Blueprint, abort
+from flask.ext.cache import Cache
 from functools import update_wrapper
 import os
 import re
@@ -46,6 +47,7 @@ WEATHER_COL_LOOKUP = {
 }
 
 api = Blueprint('api', __name__)
+cache = Cache(config={'CACHE_TYPE': 'simple'})
 dthandler = lambda obj: obj.isoformat() if isinstance(obj, date) else None
 
 def crossdomain(origin=None, methods=None, headers=None,
@@ -89,7 +91,14 @@ def crossdomain(origin=None, methods=None, headers=None,
         return update_wrapper(wrapped_function, f)
     return decorator
 
+def make_cache_key(*args, **kwargs):
+    path = request.path
+    args = str(hash(frozenset(request.args.items())))
+    # print 'cache_key:', (path+args)
+    return (path + args).encode('utf-8')
+
 @api.route(API_VERSION + '/api/datasets')
+@cache.cached(timeout=60*60)
 @crossdomain(origin="*")
 def meta():
     status_code = 200
@@ -106,6 +115,7 @@ def meta():
     return resp
 
 @api.route(API_VERSION + '/api/fields/<dataset_name>/')
+@cache.cached(timeout=60*60)
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
     try:
@@ -145,6 +155,7 @@ def dataset_fields(dataset_name):
     return resp
 
 @api.route(API_VERSION + '/api/weather-stations/')
+@cache.cached(timeout=60*60, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def weather_stations():
     raw_query_params = request.args.copy()
@@ -169,6 +180,7 @@ def weather_stations():
     return resp
 
 @api.route(API_VERSION + '/api/weather/<table>/')
+@cache.cached(timeout=60*60, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def weather(table):
     raw_query_params = request.args.copy()
@@ -213,6 +225,7 @@ def weather(table):
 
 
 @api.route(API_VERSION + '/api/timeseries/')
+@cache.cached(timeout=60*60, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def dataset():
     raw_query_params = request.args.copy()
@@ -320,6 +333,7 @@ def dataset():
     return resp
 
 @api.route(API_VERSION + '/api/detail/')
+@cache.cached(timeout=60*60, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail():
     raw_query_params = request.args.copy()
@@ -430,6 +444,7 @@ def detail():
     return resp
 
 @api.route(API_VERSION + '/api/detail-aggregate/')
+@cache.cached(timeout=60*60, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail_aggregate():
     raw_query_params = request.args.copy()
@@ -504,6 +519,7 @@ def detail_aggregate():
     return resp
 
 @api.route(API_VERSION + '/api/grid/')
+@cache.cached(timeout=60*60, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def grid():
     raw_query_params = request.args.copy()

@@ -22,7 +22,7 @@ var AppRouter = Backbone.Router.extend({
     detail: function(query){
         var q = parseParams(query);
         var dataset = q['dataset_name']
-        $.when($.getJSON('/v1/api/', {dataset_name: dataset})).then(
+        $.when($.getJSON('/v1/api/datasets/', {dataset_name: dataset})).then(
             function(resp){
                 new DetailView({el: '#map-view', attributes: {query: q, meta: resp[0]}})
             }

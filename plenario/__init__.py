@@ -3,7 +3,7 @@ from flask import Flask, render_template, redirect, url_for, request
 from raven.contrib.flask import Sentry
 from plenario.database import session as db_session
 from plenario.models import bcrypt
-from plenario.api import api
+from plenario.api import api, cache
 from plenario.auth import auth, login_manager
 from plenario.views import views
 from urllib import quote_plus
@@ -26,6 +26,7 @@ def create_app():
     app.register_blueprint(api)
     app.register_blueprint(views)
     app.register_blueprint(auth)
+    cache.init_app(app)
 
     @app.before_request
     def check_maintenance_mode():
