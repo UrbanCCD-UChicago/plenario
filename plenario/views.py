@@ -40,7 +40,7 @@ def about_view():
 def maintenance():
     return render_template('maintenance.html'), 503
 
-@views.route('/add-dataset', methods=['GET', 'POST'])
+@views.route('/admin/add-dataset', methods=['GET', 'POST'])
 @login_required
 def add_dataset():
     dataset_info = {}
@@ -104,7 +104,7 @@ def add_dataset():
     context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source}
     return render_template('add-dataset.html', **context)
 
-@views.route('/view-datasets')
+@views.route('/admin/view-datasets')
 @login_required
 def view_datasets():
     datasets = session.query(MetaTable).all()
@@ -152,7 +152,7 @@ class EditDatasetForm(Form):
 
         return valid
 
-@views.route('/edit-dataset/<source_url_hash>', methods=['GET', 'POST'])
+@views.route('/admin/edit-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
 def edit_dataset(source_url_hash):
     form = EditDatasetForm()
@@ -187,7 +187,7 @@ def edit_dataset(source_url_hash):
     }
     return render_template('edit-dataset.html', **context)
 
-@views.route('/delete-dataset/<source_url_hash>')
+@views.route('/admin/delete-dataset/<source_url_hash>')
 @login_required
 def delete_dataset(source_url_hash):
     result = delete_dataset_task.delay(source_url_hash)

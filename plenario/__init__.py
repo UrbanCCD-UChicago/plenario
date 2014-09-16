@@ -31,8 +31,14 @@ def create_app():
     @app.before_request
     def check_maintenance_mode():
         maint = app.config.get('MAINTENANCE')
-        if maint and request.path != url_for('views.maintenance') \
-            and not 'static' in request.path:
+        maint_pages = ['/v1/api', '/explore', '/admin']
+        
+        maint_on = False
+        for m in maint_pages:
+            if m in request.path:
+                maint_on = True
+
+        if maint and maint_on and request.path != url_for('views.maintenance'):
             return redirect(url_for('views.maintenance'))
 
     @app.teardown_appcontext

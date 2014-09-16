@@ -89,7 +89,7 @@ def login():
     email = form.email.data
     return render_template('login.html', form=form, email=email)
 
-@auth.route('/add-user/', methods=['GET', 'POST'])
+@auth.route('/admin/add-user/', methods=['GET', 'POST'])
 @login_required
 def add_user():
     form = AddUserForm()
@@ -110,7 +110,7 @@ def add_user():
     }
     return render_template('add-user.html', **context)
 
-@auth.route('/reset-password/', methods=['GET', 'POST'])
+@auth.route('/admin/reset-password/', methods=['GET', 'POST'])
 @login_required
 def reset_password():
     form = ResetPasswordForm()

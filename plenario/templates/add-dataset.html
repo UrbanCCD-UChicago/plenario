@@ -113,7 +113,7 @@
                     var data = JSON.stringify(definitions);
                     $.post('/v1/api/submit-dataset/', {'data': data}, function(resp){
                         console.log(resp);
-                        window.location = "/view-datasets/";
+                        window.location = "/admin/view-datasets/";
                     })
                 }
             })

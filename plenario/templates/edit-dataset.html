@@ -265,7 +265,7 @@
         $(document).ready(function(){
             $('#delete').on('click', function(e){
                 var hash = $(this).data('hash');
-                $.getJSON('/delete-dataset/' + hash, {}, function(resp){
+                $.getJSON('/admin/delete-dataset/' + hash, {}, function(resp){
                     console.log(resp);
                 })
             })
