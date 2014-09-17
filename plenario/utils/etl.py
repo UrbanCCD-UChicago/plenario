@@ -398,8 +398,8 @@ class PlenarioETL(object):
             dat_cols.append(text(
                 "ST_PointFromText('POINT(' || dat_%s.%s || ' ' || dat_%s.%s || ')', 4326) \
                       as location_geom" % (
-                          self.dataset_name, self.longitude, 
-                          self.dataset_name, self.latitude,
+                          self.dataset_name, slugify(self.longitude), 
+                          self.dataset_name, slugify(self.latitude),
                       )))
         elif self.location:
             dat_cols.append(text(
