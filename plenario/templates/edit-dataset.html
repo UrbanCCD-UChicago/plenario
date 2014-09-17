@@ -5,9 +5,9 @@
     <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
 {% endblock %}
 {% block content %}
+    <p><a href='{{ url_for('views.view_datasets') }}'>&laquo; view datasets</a></p>
     <h2>
         Edit {{ meta.human_name }}
-        <button type="button" data-toggle="modal" data-target="#confirm-modal" class="btn btn-danger">Delete</button>
     </h2>
     <p><strong>Source URL: </strong>{{ meta.source_url }}</p>
     <p><strong>Machine name: </strong>{{ meta.dataset_name }}</p>
@@ -243,7 +243,8 @@
                 </div>
             </div>
         </div>
-        <button type="submit" class="btn btn-default">Submit</button>
+        <button type="submit" class="btn btn-success">Save</button>
+        <button type="button" data-toggle="modal" data-target="#confirm-modal" class="btn btn-link"><i class='fa fa-times'></i> Delete</button>
     </form>
     <div id="confirm-modal" class="modal fade">
       <div class="modal-dialog">
