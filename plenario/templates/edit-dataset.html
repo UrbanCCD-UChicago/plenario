@@ -51,7 +51,7 @@
                 <div class="form-group">
                 {% endif %}
                     <label for="id_update_freq">Update Frequency</label>
-                    <select id="id_update_freq" class="form-control" name="update_freq">
+                    <select id="id_update_freq" class="form-control" name="update_freq" autocomplete=off>
                         {% for value, name in form.update_freq.choices %}
                             {% if value == meta.update_freq %}
                                 <option selected="selected" value="{{ value }}">{{name}}</option>
@@ -93,12 +93,12 @@
                 <div class="form-group">
                 {% endif %}
                     <label for="id_obvervation_date">Observation Date Field Name</label>
-                    <select id="id_obvervation_date" name="observed_date" class="form-control">
-                        {% for column in socrata_info.columns %}
-                            {% if column.human_name == meta.observed_date %}
-                                <option selected="selected" value="{{ column.human_name }}">{{column.human_name}}</option>
+                    <select id="id_obvervation_date" name="observed_date" class="form-control" autocomplete=off>
+                        {% for column in fieldnames %}
+                            {% if column == meta.observed_date|slugify %}
+                                <option value="{{ column }}" selected>{{ column }}</option>
                             {% else %}
-                                <option value="{{ column.human_name }}">{{column.human_name}}</option>
+                                <option value="{{ column }}">{{column}}</option>
                             {% endif %}
                         {% endfor %}
                     </select>
@@ -152,12 +152,12 @@
                 <div class="form-group">
                 {% endif %}
                     <label for="id_business_key">Business Key Field Name</label>
-                    <select id="id_business_key" name="business_key" class="form-control">
-                        {% for column in socrata_info.columns %}
-                            {% if column.human_name == meta.business_key %}
-                                <option selected="selected" value="{{ column.human_name }}">{{column.human_name}}</option>
+                    <select id="id_business_key" name="business_key" class="form-control" autocomplete=off>
+                        {% for column in fieldnames %}
+                            {% if column == meta.business_key|slugify %}
+                                <option selected="selected" value="{{ column }}">{{column}}</option>
                             {% else %}
-                                <option value="{{ column.human_name }}">{{column.human_name}}</option>
+                                <option value="{{ column }}">{{column}}</option>
                             {% endif %}
                         {% endfor %}
                     </select>
@@ -175,13 +175,13 @@
                 <div class="form-group">
                 {% endif %}
                     <label for="id_location">Location Field Name</label>
-                    <select id="id_location" name="location" class="form-control">
+                    <select id="id_location" name="location" class="form-control" autocomplete=off>
                         <option value="">------------</option>
-                        {% for column in socrata_info.columns %}
-                            {% if column.human_name == meta.location %}
-                                <option value="{{ column.human_name }}" selected="selected">{{column.human_name}}</option>
+                        {% for column in fieldnames %}
+                            {% if column == meta.location|slugify %}
+                                <option value="{{ column }}" selected="selected">{{column}}</option>
                             {% else %}
-                                <option value="{{ column.human_name }}">{{column.human_name}}</option>
+                                <option value="{{ column }}">{{column}}</option>
                             {% endif %}
                         {% endfor %}
                     </select>
@@ -201,13 +201,13 @@
                 <div class="form-group">
                 {% endif %}
                     <label for="id_latitude">Latitude Field Name</label>
-                    <select id="id_latitude" name="latitude" class="form-control">
+                    <select id="id_latitude" name="latitude" class="form-control" autocomplete=off>
                         <option value="">------------</option>
-                        {% for column in socrata_info.columns %}
-                            {% if column.human_name == meta.latitude %}
-                                <option selected="selected" value="{{ column.human_name }}">{{column.human_name}}</option>
+                        {% for column in fieldnames %}
+                            {% if column == meta.latitude|slugify %}
+                                <option selected="selected" value="{{ column }}">{{column}}</option>
                             {% else %}
-                                <option value="{{ column.human_name }}">{{column.human_name}}</option>
+                                <option value="{{ column }}">{{column}}</option>
                             {% endif %}
                         {% endfor %}
                     </select>
@@ -225,13 +225,13 @@
                 <div class="form-group">
                 {% endif %}
                     <label for="id_longitude">Longitude Field Name</label>
-                    <select id="id_longitude" name="longitude" class="form-control">
+                    <select id="id_longitude" name="longitude" class="form-control" autocomplete=off>
                         <option value="">------------</option>
-                        {% for column in socrata_info.columns %}
-                            {% if column.human_name == meta.longitude %}
-                                <option value="{{ column.human_name }}" selected="selected">{{column.human_name}}</option>
+                        {% for column in fieldnames %}
+                            {% if column == meta.longitude|slugify %}
+                                <option value="{{ column }}" selected="selected">{{column}}</option>
                             {% else %}
-                                <option value="{{ column.human_name }}">{{column.human_name}}</option>
+                                <option value="{{ column }}">{{column}}</option>
                             {% endif %}
                         {% endfor %}
                     </select>

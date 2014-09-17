@@ -1,7 +1,7 @@
 from flask import make_response, request, render_template, current_app, g, \
     Blueprint, flash
 from plenario.models import MasterTable, MetaTable
-from plenario.database import session
+from plenario.database import session, Base, app_engine as engine
 from plenario.utils.helpers import get_socrata_data_info, iter_column
 from plenario.tasks import update_dataset as update_dataset_task, \
     delete_dataset as delete_dataset_task
@@ -17,6 +17,7 @@ import json
 import re
 from cStringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader
+from sqlalchemy import Table
 
 views = Blueprint('views', __name__)
 
@@ -157,10 +158,9 @@ class EditDatasetForm(Form):
 def edit_dataset(source_url_hash):
     form = EditDatasetForm()
     meta = session.query(MetaTable).get(source_url_hash)
-    parsed_url = urlparse(meta.source_url)
-    four_by_four = parsed_url.path.split('/')[-1]
-    view_url = 'http://%s/api/views/%s' % (parsed_url.netloc, four_by_four)
-    socrata_info, errors, status_code = get_socrata_data_info(view_url)
+    table = Table('dat_%s' % meta.dataset_name, Base.metadata,
+        autoload=True, autoload_with=engine)
+    fieldnames = table.columns.keys()
     if form.validate_on_submit():
         upd = {
             'human_name': form.human_name.data,
@@ -183,7 +183,7 @@ def edit_dataset(source_url_hash):
     context = {
         'form': form,
         'meta': meta,
-        'socrata_info': socrata_info
+        'fieldnames': fieldnames,
     }
     return render_template('edit-dataset.html', **context)
 
