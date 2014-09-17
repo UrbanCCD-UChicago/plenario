@@ -19,7 +19,7 @@
     <table id='datasets-table' class="table table-condensed">
         <thead>
             <th>Name</th>
-            <th>Time span available</th>
+            <th>Attribution</th>
             <th>Update frequency</th>
             <th>Last updated</th>
             <!-- <th></th> -->
@@ -29,13 +29,9 @@
             {% for dataset in datasets %}
                 <tr>
                     <td>{{ dataset.human_name }}</td>
-                    <td>
-                        {% if dataset.obs_from and dataset.obs_to %}
-                            {{ dataset.obs_from }} — {{dataset.obs_to}}
-                        {% endif %}
-                    </td>
+                    <td>{{ dataset.attribution }}</td>
                     <td>{{ dataset.update_freq }}</td>
-                    <td>{{ dataset.last_update }}</td>
+                    <td class='last-update'>{{ dataset.last_update }}</td>
                     <!-- <td><button class="btn btn-default btn-sm update-dataset" data-dataset="{{dataset.source_url_hash}}"><i class='fa fa-refresh'></i> Update now</button></td> -->
                     <td>
                         <a href="{{ url_for('views.edit_dataset', source_url_hash=dataset.source_url_hash) }}"
@@ -52,6 +48,14 @@
     <script type="text/javascript" charset="utf8" src="//cdn.datatables.net/1.10.2/js/jquery.dataTables.js"></script>
     <script type="text/javascript">
         $(document).ready(function(){
+            $('.last-update').each(function(i, row){
+                var updated = $(row).html();
+                if (updated != 'None')
+                    $(row).html(moment(updated).from(moment()));
+                else
+                    $(row).html('Never');
+            });
+
             $('.update-dataset').on('click', function(e){
                 e.preventDefault()
                 var btn = $(this);
