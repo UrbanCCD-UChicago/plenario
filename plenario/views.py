@@ -1,4 +1,4 @@
-from flask import make_response, request, render_template, current_app, g, \
+from flask import make_response, request, redirect, url_for, render_template, current_app, g, \
     Blueprint, flash
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session, Base, app_engine as engine
@@ -180,6 +180,7 @@ def edit_dataset(source_url_hash):
             .update(upd)
         session.commit()
         flash('%s updated successfully!' % meta.human_name, 'success')
+        return redirect(url_for('views.view_datasets'))
     context = {
         'form': form,
         'meta': meta,

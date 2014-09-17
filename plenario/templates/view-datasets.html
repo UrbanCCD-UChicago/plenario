@@ -51,7 +51,7 @@
             $('.last-update').each(function(i, row){
                 var updated = $(row).html();
                 if (updated != 'None')
-                    $(row).html(moment(updated).from(moment()));
+                    $(row).html(moment(updated + "+0000").from(moment()));
                 else
                     $(row).html('Never');
             });
