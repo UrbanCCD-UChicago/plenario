@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import TIMESTAMP, TIME
 
 NoneType = type(None)
 
-NULL_VALUES = ('na', 'n/a', 'none', 'null', '.', '',)
+NULL_VALUES = ('na', 'n/a', 'none', 'null', '.', '', ' ')
 TRUE_VALUES = ('yes', 'y', 'true', 't',)
 FALSE_VALUES = ('no', 'n', 'false', 'f',)
 
@@ -26,7 +26,7 @@ def normalize_column_type(l):
     # Convert "NA", "N/A", etc. to null types.
     for i, x in enumerate(l):
         if x is not None and x.lower() in NULL_VALUES:
-            l[i] = ''
+            l[i] = None
     # Are they boolean?
     try:
         for i, x in enumerate(l):
@@ -90,7 +90,7 @@ def normalize_column_type(l):
     try:
         normal_types_set = set()
         add = normal_types_set.add
- 
+        ampm = False
         for i, x in enumerate(l):
             if x == '' or x is None:
                 add(NoneType)
@@ -101,7 +101,7 @@ def normalize_column_type(l):
             # Is it only a time?
             if d.date() == NULL_DATE:
                 add(TIME)
- 
+
             # Is it only a date?
             elif d.time() == NULL_TIME:
                 add(Date)
@@ -109,6 +109,13 @@ def normalize_column_type(l):
             # It must be a date and time
             else:
                 add(TIMESTAMP)
+            
+            if 'am' in x.lower():
+                ampm = True
+            
+            if 'pm' in x.lower():
+                ampm = True
+
             
         normal_types_set.discard(NoneType)
  
@@ -120,6 +127,8 @@ def normalize_column_type(l):
             normal_types_set = set([String])
         # Dates and times don't mix -- fallback to using strings
         elif normal_types_set == set([Date, TIME]):
+            normal_types_set = set([String])
+        elif normal_types_set == set([TIME]) and ampm:
             normal_types_set = set([String])
  
         return normal_types_set.pop()

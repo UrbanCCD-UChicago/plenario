@@ -377,7 +377,7 @@ class PlenarioETL(object):
         else:
             dat_cols.append(text("NULL AS latitude"))
             dat_cols.append(text("NULL AS longitude"))
-        dat_cols.append(getattr(self.dat_table.c, slugify(self.observed_date))\
+        dat_cols.append(func.cast(getattr(self.dat_table.c, slugify(self.observed_date)), TIMESTAMP)\
             .label('obs_date'))
         dat_cols.append(text("NULL AS weather_station_id"))
         dat_cols.append(text("NULL AS geotag2"))

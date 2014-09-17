@@ -13,7 +13,11 @@ def iter_column(idx, f):
     col = []
     for row in reader:
         if row:
-            col.append(row[idx])
+            try:
+                col.append(row[idx])
+            except IndexError:
+                # Bad data. Maybe we can fill with nulls?
+                pass
     col_type = normalize_column_type(col)
     return col_type
 
