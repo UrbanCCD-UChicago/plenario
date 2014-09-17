@@ -266,6 +266,15 @@ class PlenarioETL(object):
             cursor.copy_expert(copy_st, f)
         conn.commit()
 
+        # Also need to remove rows that have an empty business key
+        # There might be a better way to do this...
+        del_st = """ 
+            DELETE FROM src_%s WHERE %s IS NULL
+            """ % (self.dataset_name, slugify(self.business_key))
+        cursor = conn.cursor()
+        cursor.execute(del_st)
+        conn.commit()
+
     def _make_new_and_dup_table(self):
         # Step Four
         bk_col = self.dat_table.c[slugify(self.business_key)]
