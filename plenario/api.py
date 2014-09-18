@@ -471,8 +471,15 @@ def detail():
         resp = make_response(json.dumps(resp, default=dthandler), status_code)
         resp.headers['Content-Type'] = 'application/json'
     elif datatype == 'csv':
-        csv_resp = [fieldnames]
-        csv_resp.extend([v[1:] for v in values])
+        csv_resp = [dataset_fields]
+        if include_weather:
+            csv_resp = [dataset_fields + weather_fields]
+        for value in values:
+            d = [getattr(value, f) for f in dataset_fields]
+            if include_weather:
+                print [getattr(value, f) for f in weather_fields]
+                d.extend([getattr(value, f) for f in weather_fields])
+            csv_resp.append(d)
         resp = make_response(make_csv(csv_resp), 200)
         filedate = datetime.now().strftime('%Y-%m-%d')
         dname = raw_query_params['dataset_name']
