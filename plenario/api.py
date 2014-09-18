@@ -496,6 +496,7 @@ def detail_aggregate():
         to_date = parse(raw_query_params['obs_date__le'])
     else:
         to_date = datetime.now()
+
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
     if valid_query:
@@ -537,17 +538,26 @@ def detail_aggregate():
                     }
                 items.append(i)
 
-            resp['objects'] = items
-            # populate meta block
-            resp['meta']['status'] = 'ok'
-            resp['meta']['query'] = raw_query_params
-            loc = resp['meta']['query'].get('location_geom__within')
-            if loc:
-                resp['meta']['query']['location_geom__within'] = json.loads(loc)
-            resp['meta']['query']['agg'] = agg
+            if datatype == 'json':
+                resp['objects'] = items
+                resp['meta']['status'] = 'ok'
+                resp['meta']['query'] = raw_query_params
+                loc = resp['meta']['query'].get('location_geom__within')
+                if loc:
+                    resp['meta']['query']['location_geom__within'] = json.loads(loc)
+                resp['meta']['query']['agg'] = agg
 
-    resp = make_response(json.dumps(resp, default=dthandler), status_code)
-    resp.headers['Content-Type'] = 'application/json'
+                resp = make_response(json.dumps(resp, default=dthandler), status_code)
+                resp.headers['Content-Type'] = 'application/json'
+            elif datatype == 'csv':
+                outp = StringIO()
+                writer = csv.DictWriter(outp, fieldnames=items[0].keys())
+                writer.writeheader()
+                writer.writerows(items)
+                resp = make_response(outp.getvalue(), status_code)
+                resp.headers['Content-Type'] = 'text/csv'
+                filedate = datetime.now().strftime('%Y-%m-%d')
+                resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % (filedate)
     return resp
 
 @api.route(API_VERSION + '/api/grid/')
@@ -834,5 +844,4 @@ def parse_join_query(params):
             datatype = value
         else:
             queries['detail'][key] = value
-        print key, value
     return agg, datatype, queries
