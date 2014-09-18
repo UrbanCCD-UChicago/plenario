@@ -32,6 +32,8 @@ from plenario.tasks import add_dataset
 
 API_VERSION = '/v1'
 RESPONSE_LIMIT = 500
+VALID_DATA_TYPE = ['csv', 'json']
+VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
 WEATHER_COL_LOOKUP = {
     'daily': {
         'temp_lo': 'temp_min',
@@ -258,25 +260,31 @@ def dataset():
         six_months_ago = datetime.now() - timedelta(days=180)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
 
-    # init from and to dates ad python datetimes
-    from_date = truncate(parse(raw_query_params['obs_date__ge']), agg)
-    if 'obs_date__le' in raw_query_params.keys():
-        to_date = parse(raw_query_params['obs_date__le'])
-    else:
-        to_date = datetime.now()
-
+    # set datatype
     datatype = 'json'
     if raw_query_params.get('data_type'):
         datatype = raw_query_params['data_type']
         del raw_query_params['data_type']
+
     mt = MasterTable.__table__
     valid_query, query_clauses, resp, status_code = make_query(mt,raw_query_params)
-    if datatype not in ['csv', 'json']:
+    
+    # check for valid output format
+    if datatype not in VALID_DATA_TYPE:
         valid_query = False
         resp['meta']['status'] = 'error'
         resp['meta']['message'] = "'%s' is an invalid output format" % datatype
         resp = make_response(json.dumps(resp, default=dthandler), 400)
         resp.headers['Content-Type'] = 'application/json'
+
+    # check for valid temporal aggregate
+    if agg not in VALID_AGG:
+        valid_query = False
+        resp['meta']['status'] = 'error'
+        resp['meta']['message'] = "'%s' is an invalid temporal aggregation" % agg
+        resp = make_response(json.dumps(resp, default=dthandler), 400)
+        resp.headers['Content-Type'] = 'application/json'
+
     if valid_query:
         time_agg = func.date_trunc(agg, mt.c['obs_date'])
         base_query = session.query(time_agg, 
@@ -289,6 +297,13 @@ def dataset():
             .group_by(time_agg)\
             .order_by(time_agg)
         values = [o for o in base_query.all()]
+
+        # init from and to dates ad python datetimes
+        from_date = truncate(parse(raw_query_params['obs_date__ge']), agg)
+        if 'obs_date__le' in raw_query_params.keys():
+            to_date = parse(raw_query_params['obs_date__le'])
+        else:
+            to_date = datetime.now()
 
         # build the response
         results = sorted(values, key=itemgetter(2))
@@ -500,23 +515,25 @@ def detail_aggregate():
         six_months_ago = datetime.now() - timedelta(days=180)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
 
-    # init from and to dates ad python datetimes
-    from_date = truncate(parse(raw_query_params['obs_date__ge']), agg)
-    if 'obs_date__le' in raw_query_params.keys():
-        to_date = parse(raw_query_params['obs_date__le'])
-    else:
-        to_date = datetime.now()
-
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
 
     # check for valid output format
-    if datatype not in ['csv', 'json']:
+    if datatype not in VALID_DATA_TYPE:
         valid_query = False
         resp['meta']['status'] = 'error'
         resp['meta']['message'] = "'%s' is an invalid output format" % datatype
         resp = make_response(json.dumps(resp, default=dthandler), 400)
         resp.headers['Content-Type'] = 'application/json'
+
+    # check for valid temporal aggregate
+    if agg not in VALID_AGG:
+        valid_query = False
+        resp['meta']['status'] = 'error'
+        resp['meta']['message'] = "'%s' is an invalid temporal aggregation" % agg
+        resp = make_response(json.dumps(resp, default=dthandler), 400)
+        resp.headers['Content-Type'] = 'application/json'
+
     if valid_query:
         time_agg = func.date_trunc(agg, mt.c['obs_date'])
         base_query = session.query(time_agg, func.count(mt.c.dataset_row_id))
@@ -533,6 +550,13 @@ def detail_aggregate():
             for clause in detail_clauses:
                 base_query = base_query.filter(clause)
             values = [r for r in base_query.group_by(time_agg).order_by(time_agg).all()]
+            
+            # init from and to dates ad python datetimes
+            from_date = truncate(parse(raw_query_params['obs_date__ge']), agg)
+            if 'obs_date__le' in raw_query_params.keys():
+                to_date = parse(raw_query_params['obs_date__le'])
+            else:
+                to_date = datetime.now()
             
             items = []
             dense_matrix = []
