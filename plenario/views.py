@@ -37,6 +37,10 @@ def api_docs_view():
 def about_view():
     return render_template('about.html')
 
+@views.route('/examples')
+def examples_view():
+    return render_template('examples.html')
+
 @views.route('/maintenance')
 def maintenance():
     return render_template('maintenance.html'), 503
