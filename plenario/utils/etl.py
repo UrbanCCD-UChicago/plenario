@@ -15,7 +15,7 @@ from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
     Integer, Table, text, func, select, or_, and_, cast, UniqueConstraint, \
     join, outerjoin, over, BigInteger
 from sqlalchemy.dialects.postgresql import TIMESTAMP, ARRAY, TIME
-from sqlalchemy.exc import NoSuchTableError
+from sqlalchemy.exc import NoSuchTableError, InternalError
 from types import NoneType
 import plenario.settings
 from geoalchemy2.shape import from_shape
@@ -35,6 +35,12 @@ COL_TYPES = {
     'timestamp': TIMESTAMP,
     'datetime': TIMESTAMP,
 }
+
+class PlenarioETLError(Exception):
+    def __init__(self, message):
+        Exception.__init__(self, message)
+        self.message = message
+
 
 class PlenarioETL(object):
     
@@ -312,7 +318,11 @@ class PlenarioETL(object):
         ins = self.dup_table.insert()\
             .from_select([c for c in self.dup_table.columns], sel)
         conn = engine.connect()
-        conn.execute(ins)
+        try:
+            conn.execute(ins)
+        except InternalError, e:
+            raise PlenarioETLError('Database error when finding duplicates in %s: %s' % (self.dataset_name, e))
+        conn.close()
 
     def _insert_new_data(self, added=False):
         # Step Six
@@ -336,11 +346,15 @@ class PlenarioETL(object):
             .from_select([c for c in self.new_table.columns], sel)
         conn = engine.connect()
         try:
-            conn.execute(ins)
-            return True
+            try:
+                conn.execute(ins)
+                return True
+            except InternalError, e:
+                raise PlenarioETLError('Database Error when finding new records in %s: %s' % (self.dataset_name, e))
         except TypeError:
             # There are no new records
             return False
+        conn.close()
 
     def _insert_data_table(self):
         # Step Seven
@@ -364,7 +378,11 @@ class PlenarioETL(object):
                     ))
             )
         conn = engine.connect()
-        conn.execute(ins)
+        try:
+            conn.execute(ins)
+        except InternalError, e:
+            raise PlenarioETLError('Database Error when inserting data into data table for %s: %s' % (self.dataset_name, e))
+        conn.close()
 
     def _update_master(self, added=False):
         # Step Eight: Insert new records into master table
@@ -436,7 +454,11 @@ class PlenarioETL(object):
                     )
                 )
         conn = engine.connect()
-        conn.execute(ins)
+        try:
+            conn.execute(ins)
+        except InternalError, e:
+            raise PlenarioETLError('Database error raised when updating master table from %s: %s' % (self.dataset_name, e))
+        conn.close()
 
     def _add_weather_info(self):
         """ 
@@ -496,7 +518,11 @@ class PlenarioETL(object):
                    date_col_name, weather_table, temp_col,)
         )
         conn = engine.connect()
-        conn.execute(upd, dname=self.dataset_name)
+        try:
+            conn.execute(upd, dname=self.dataset_name)
+        except InternalError, e:
+            raise PlenarioETLError('Database Error raised when updating weather data for %s: %s' % (self.dataset_name, e))
+        conn.close()
         
     def _add_census_block(self):
         """ 
@@ -519,7 +545,11 @@ class PlenarioETL(object):
                 WHERE dat_master.master_row_id = subq.master_id
             """)
         conn = engine.contextual_connect()
-        conn.execute(upd, dname=self.dataset_name)
+        try:
+            conn.execute(upd, dname=self.dataset_name)
+        except InternalError, e:
+            raise PlenarioETLError('Database error raised when adding census blocks for %s: %s' % (self.dataset_name, e))
+        conn.close()
 
     def _update_geotags(self):
         # self._add_weather_info()
@@ -560,11 +590,15 @@ class PlenarioETL(object):
             )
         conn = engine.connect()
         try:
-            conn.execute(ins)
-            return True
+            try:
+                conn.execute(ins)
+                return True
+            except InternalError, e:
+                raise PlenarioETLError('Database error when finding changes in %s: %s' (self.dataset_name, e))
         except TypeError:
             # No changes found
             return False
+        conn.close()
 
     def _update_dat_current_flag(self):
         # Step Nine: Update data table with changed records
@@ -578,7 +612,11 @@ class PlenarioETL(object):
             .where(pk == self.chg_table.c.id)\
             .where(self.dat_table.c.current_flag == True)
         conn = engine.connect()
-        conn.execute(update)
+        try:
+            conn.execute(update)
+        except InternalError, e:
+            raise PlenarioETLError('Database error when updating current flag for %s' % (self.dataset_name, e))
+        conn.close()
         return None
 
     def _update_master_current_flag(self):
@@ -594,7 +632,11 @@ class PlenarioETL(object):
             .where(self.dat_table.c.current_flag == False)\
             .where(self.dat_table.c.end_date == datetime.now().strftime('%Y-%m-%d'))
         conn = engine.connect()
-        conn.execute(update)
+        try:
+            conn.execute(update)
+        except InternalError, e:
+            raise PlenarioETLError('Database error when updating master current flag for %s: %s' (self.dataset_name, e))
+        conn.close()
         return None
 
     def _update_meta(self, added=False):
