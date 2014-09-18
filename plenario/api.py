@@ -31,7 +31,7 @@ from plenario.utils.helpers import get_socrata_data_info, slugify, increment_dat
 from plenario.tasks import add_dataset
 
 API_VERSION = '/v1'
-RESPONSE_LIMIT = 1000
+RESPONSE_LIMIT = 500
 WEATHER_COL_LOOKUP = {
     'daily': {
         'temp_lo': 'temp_min',
@@ -206,6 +206,7 @@ def weather(table):
         for clause in query_clauses:
             base_query = base_query.filter(clause)
 
+        base_query = base_query.order_by(weather_table.c.id.asc())
         base_query = base_query.limit(RESPONSE_LIMIT) # returning the top 1000 records
         values = [r for r in base_query.all()]
         weather_fields = weather_table.columns.keys()
@@ -441,6 +442,8 @@ def detail():
                 if order_by:
                     col, order = order_by.split(',')
                     base_query = base_query.order_by(getattr(mt.c[col], order)())
+                else:
+                    base_query = base_query.order_by(mt.c.master_row_id.asc())
                 base_query = base_query.limit(RESPONSE_LIMIT)
                 values = [r for r in base_query.all()]
                 for value in values:
