@@ -272,6 +272,12 @@ def dataset():
         del raw_query_params['data_type']
     mt = MasterTable.__table__
     valid_query, query_clauses, resp, status_code = make_query(mt,raw_query_params)
+    if datatype not in ['csv', 'json']:
+        valid_query = False
+        resp['meta']['status'] = 'error'
+        resp['meta']['message'] = "'%s' is an invalid output format" % datatype
+        resp = make_response(json.dumps(resp, default=dthandler), 400)
+        resp.headers['Content-Type'] = 'application/json'
     if valid_query:
         time_agg = func.date_trunc(agg, mt.c['obs_date'])
         base_query = session.query(time_agg, 
@@ -323,40 +329,40 @@ def dataset():
         resp['meta']['query']['agg'] = agg
         resp['meta']['status'] = 'ok'
     
-    if datatype == 'json':
-        resp = make_response(json.dumps(resp, default=dthandler), status_code)
-        resp.headers['Content-Type'] = 'application/json'
-    elif datatype == 'csv':
-
-        # response format
-        # temporal_group,dataset_name_1,dataset_name_2
-        # 2014-02-24 00:00:00,235,653
-        # 2014-03-03 00:00:00,156,624
-
-        fields = ['temporal_group']
-        for o in resp['objects']:
-            fields.append(o['dataset_name'])
-
-        csv_resp = []
-        i = 0
-        for k,g in groupby(resp['objects'], key=itemgetter('dataset_name')):
-            l_g = list(g)[0]
-            
-            j = 0
-            for row in l_g['items']:
-                # first iteration, populate the first column with temporal_groups
-                if i == 0: 
-                    csv_resp.append([row['datetime']])
-                csv_resp[j].append(row['count'])
-                j += 1
-            i += 1
+        if datatype == 'json':
+            resp = make_response(json.dumps(resp, default=dthandler), status_code)
+            resp.headers['Content-Type'] = 'application/json'
+        elif datatype == 'csv':
+ 
+            # response format
+            # temporal_group,dataset_name_1,dataset_name_2
+            # 2014-02-24 00:00:00,235,653
+            # 2014-03-03 00:00:00,156,624
+ 
+            fields = ['temporal_group']
+            for o in resp['objects']:
+                fields.append(o['dataset_name'])
+ 
+            csv_resp = []
+            i = 0
+            for k,g in groupby(resp['objects'], key=itemgetter('dataset_name')):
+                l_g = list(g)[0]
                 
-        csv_resp.insert(0, fields)
-        csv_resp = make_csv(csv_resp)
-        resp = make_response(csv_resp, 200)
-        resp.headers['Content-Type'] = 'text/csv'
-        filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % (filedate)
+                j = 0
+                for row in l_g['items']:
+                    # first iteration, populate the first column with temporal_groups
+                    if i == 0: 
+                        csv_resp.append([row['datetime']])
+                    csv_resp[j].append(row['count'])
+                    j += 1
+                i += 1
+                    
+            csv_resp.insert(0, fields)
+            csv_resp = make_csv(csv_resp)
+            resp = make_response(csv_resp, 200)
+            resp.headers['Content-Type'] = 'text/csv'
+            filedate = datetime.now().strftime('%Y-%m-%d')
+            resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % (filedate)
     return resp
 
 @api.route(API_VERSION + '/api/detail/')
