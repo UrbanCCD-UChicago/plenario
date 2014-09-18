@@ -522,7 +522,7 @@ class PlenarioETL(object):
         conn.execute(upd, dname=self.dataset_name)
 
     def _update_geotags(self):
-        self._add_weather_info()
+        # self._add_weather_info()
         self._add_census_block()
 
     def _find_changes(self):
