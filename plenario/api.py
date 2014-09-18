@@ -208,6 +208,9 @@ def weather(table):
 
         base_query = base_query.order_by(weather_table.c.id.asc())
         base_query = base_query.limit(RESPONSE_LIMIT) # returning the top 1000 records
+        if raw_query_params.get('offset'):
+            offset = raw_query_params['offset']
+            base_query = base_query.offset(int(offset))
         values = [r for r in base_query.all()]
         weather_fields = weather_table.columns.keys()
         station_fields = stations_table.columns.keys()
@@ -378,6 +381,7 @@ def detail():
         del raw_query_params['weather']
     agg, datatype, queries = parse_join_query(raw_query_params)
     order_by = raw_query_params.get('order_by')
+    offset = raw_query_params.get('offset')
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
     if not raw_query_params.get('dataset_name'):
@@ -445,6 +449,8 @@ def detail():
                 else:
                     base_query = base_query.order_by(mt.c.master_row_id.asc())
                 base_query = base_query.limit(RESPONSE_LIMIT)
+                if offset:
+                    base_query = base_query.offset(int(offset))
                 values = [r for r in base_query.all()]
                 for value in values:
                     d = {f:getattr(value, f) for f in dataset_fields}
