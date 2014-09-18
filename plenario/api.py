@@ -333,19 +333,24 @@ def dataset():
         # 2014-02-24 00:00:00,235,653
         # 2014-03-03 00:00:00,156,624
 
-        csv_resp = []
         fields = ['temporal_group']
+        for o in resp['objects']:
+            fields.append(o['dataset_name'])
 
+        csv_resp = []
         i = 0
         for k,g in groupby(resp['objects'], key=itemgetter('dataset_name')):
             l_g = list(g)[0]
-            d = [l_g['items'][i]['datetime']] # step across the list to get temp_agg
-            i += 1
-            fields.append(l_g['dataset_name'])
+            
+            j = 0
             for row in l_g['items']:
-                d.append(row['count'])
-
-            csv_resp.append(d)
+                # first iteration, populate the first column with temporal_groups
+                if i == 0: 
+                    csv_resp.append([row['datetime']])
+                csv_resp[j].append(row['count'])
+                j += 1
+            i += 1
+                
         csv_resp.insert(0, fields)
         csv_resp = make_csv(csv_resp)
         resp = make_response(csv_resp, 200)
