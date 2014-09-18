@@ -101,7 +101,7 @@ def make_cache_key(*args, **kwargs):
     return (path + args).encode('utf-8')
 
 @api.route(API_VERSION + '/api/datasets')
-@cache.cached(timeout=60*60)
+@cache.cached(timeout=60*60, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def meta():
     status_code = 200
