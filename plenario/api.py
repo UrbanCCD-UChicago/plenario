@@ -499,6 +499,14 @@ def detail_aggregate():
 
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
+
+    # check for valid output format
+    if datatype not in ['csv', 'json']:
+        valid_query = False
+        resp['meta']['status'] = 'error'
+        resp['meta']['message'] = "'%s' is an invalid output format" % datatype
+        resp = make_response(json.dumps(resp, default=dthandler), 400)
+        resp.headers['Content-Type'] = 'application/json'
     if valid_query:
         time_agg = func.date_trunc(agg, mt.c['obs_date'])
         base_query = session.query(time_agg, func.count(mt.c.dataset_row_id))
@@ -841,7 +849,7 @@ def parse_join_query(params):
         elif key == 'agg':
             agg = value
         elif key == 'data_type':
-            datatype = value
+            datatype = value.lower()
         else:
             queries['detail'][key] = value
     return agg, datatype, queries
