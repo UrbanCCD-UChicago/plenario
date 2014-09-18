@@ -477,7 +477,6 @@ def detail():
         for value in values:
             d = [getattr(value, f) for f in dataset_fields]
             if include_weather:
-                print [getattr(value, f) for f in weather_fields]
                 d.extend([getattr(value, f) for f in weather_fields])
             csv_resp.append(d)
         resp = make_response(make_csv(csv_resp), 200)
