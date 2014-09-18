@@ -52,13 +52,25 @@ var DetailView = Backbone.View.extend({
                 from, to;
 
             labels.push('<i style="background-color:' + self.getColor(0) + '"></i> 0');
-            labels.push('<i style="background-color:' + self.getColor(1) + '"></i> 1 &ndash; ' + grades[2]);
+            if (grades[2] == 1)
+                labels.push('<i style="background-color:' + self.getColor(1) + '"></i> 1');
+            else
+                labels.push('<i style="background-color:' + self.getColor(1) + '"></i> 1 &ndash; ' + grades[2]);
+
             for (var i = 2; i < grades.length; i++) {
                 from = grades[i] + 1;
                 to = grades[i + 1];
-                labels.push(
-                    '<i style="background-color:' + self.getColor(from + 1) + '"></i> ' +
-                    from + (to ? '&ndash;' + to : '+'));
+
+                if (from == to) {
+                    labels.push(
+                        '<i style="background-color:' + self.getColor(from + 1) + '"></i> ' +
+                        from);
+                }
+                else {
+                    labels.push(
+                        '<i style="background-color:' + self.getColor(from + 1) + '"></i> ' +
+                        from + (to ? '&ndash;' + to : '+'));
+                }
             }
 
             div.innerHTML = '<div><strong>' + self.meta['human_name'] + '</strong><br />' + labels.join('<br />') + '</div>';
@@ -308,10 +320,15 @@ var DetailView = Backbone.View.extend({
         })
     },
     getCutoffs: function(values){
-        var jenks_cutoffs = jenks(values, 4);
-        jenks_cutoffs.unshift(0); // set the bottom value to 0
-        jenks_cutoffs[1] = 1; // set the second value to 1
-        jenks_cutoffs.pop(); // last item is the max value, so dont use it
+
+        if (Math.max.apply(null, values) < 5)
+            jenks_cutoffs = [0,1,2,3,4]
+        else {
+            var jenks_cutoffs = jenks(values, 4);
+            jenks_cutoffs.unshift(0); // set the bottom value to 0
+            jenks_cutoffs[1] = 1; // set the second value to 1
+            jenks_cutoffs.pop(); // last item is the max value, so dont use it
+        }
         return jenks_cutoffs;
     },
     getColor: function(d){
