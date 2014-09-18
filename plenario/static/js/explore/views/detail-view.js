@@ -38,7 +38,7 @@ var DetailView = Backbone.View.extend({
             minZoom: 1
         };
         this.map = L.map('map', map_options).setView(this.center, 11);
-        L.tileLayer('https://{s}.tiles.mapbox.com/v3/derekeder.hehblhbj/{z}/{x}/{y}.png', {
+        L.tileLayer('https://{s}.tiles.mapbox.com/v3/datamade.hn83a654/{z}/{x}/{y}.png', {
           attribution: '<a href="http://www.mapbox.com/about/maps/" target="_blank">Terms &amp; Feedback</a>'
         }).addTo(this.map);
         this.legend = L.control({position: 'bottomright'});
