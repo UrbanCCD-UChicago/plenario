@@ -31,6 +31,7 @@ from plenario.utils.helpers import get_socrata_data_info, slugify, increment_dat
 from plenario.tasks import add_dataset
 
 API_VERSION = '/v1'
+RESPONSE_LIMIT = 1000
 WEATHER_COL_LOOKUP = {
     'daily': {
         'temp_lo': 'temp_min',
@@ -192,11 +193,6 @@ def weather_stations():
 def weather(table):
     raw_query_params = request.args.copy()
 
-    # default the response limit to 1000 records
-    limit = raw_query_params.get('limit')
-    if not limit:
-        limit = 1000
-
     weather_table = Table('dat_weather_observations_%s' % table, Base.metadata,
         autoload=True, autoload_with=engine, extend_existing=True)
     stations_table = Table('weather_stations', Base.metadata, 
@@ -210,8 +206,7 @@ def weather(table):
         for clause in query_clauses:
             base_query = base_query.filter(clause)
 
-        if limit:
-            base_query = base_query.limit(limit)
+        base_query = base_query.limit(RESPONSE_LIMIT) # returning the top 1000 records
         values = [r for r in base_query.all()]
         weather_fields = weather_table.columns.keys()
         station_fields = stations_table.columns.keys()
@@ -375,11 +370,6 @@ def detail():
     if not obs_dates:
         six_months_ago = datetime.now() - timedelta(days=30)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
-
-    # default the response limit to 1000 records
-    limit = raw_query_params.get('limit')
-    if not limit:
-        limit = 1000
     
     include_weather = False
     if raw_query_params.get('weather') is not None:
@@ -451,8 +441,7 @@ def detail():
                 if order_by:
                     col, order = order_by.split(',')
                     base_query = base_query.order_by(getattr(mt.c[col], order)())
-                if limit:
-                    base_query = base_query.limit(limit)
+                base_query = base_query.limit(RESPONSE_LIMIT)
                 values = [r for r in base_query.all()]
                 for value in values:
                     d = {f:getattr(value, f) for f in dataset_fields}
