@@ -9,7 +9,7 @@ from raven.handlers.logging import SentryHandler
 from raven.conf import setup_logging
 from plenario.settings import CELERY_SENTRY_URL
 from sqlalchemy import Table
-from sqlalchemy.exc import NoSuchTableError
+from sqlalchemy.exc import NoSuchTableError, InternalError
 
 if CELERY_SENTRY_URL:
     handler = SentryHandler(CELERY_SENTRY_URL)
@@ -28,9 +28,13 @@ def delete_dataset(source_url_hash):
     delete = master_table.delete()\
         .where(master_table.c.dataset_name == md.dataset_name)
     conn = engine.contextual_connect()
-    conn.execute(delete)
-    session.delete(md)
-    session.commit()
+    try:
+        conn.execute(delete)
+        session.delete(md)
+        session.commit()
+    except InternalError, e:
+        raise delete_dataset.retry(exc=e)
+    conn.close()
     return 'Deleted %s' % md.human_name
 
 @celery_app.task
