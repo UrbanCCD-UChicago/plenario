@@ -253,12 +253,14 @@ def dataset():
         agg = 'day'
     else:
         del raw_query_params['agg']
-    
+
     # if no obs_date given, default to >= 180 days ago
-    obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
-    if not obs_dates:
+    if not raw_query_params.get('obs_date__ge'):
         six_months_ago = datetime.now() - timedelta(days=180)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
+
+    if not raw_query_params.get('obs_date__le'):
+        raw_query_params['obs_date__le'] = datetime.now().strftime('%Y-%m-%d') 
 
     # set datatype
     datatype = 'json'
@@ -510,10 +512,12 @@ def detail_aggregate():
         agg = 'day'
 
     # if no obs_date given, default to >= 180 days ago
-    obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
-    if not obs_dates:
+    if not raw_query_params.get('obs_date__ge'):
         six_months_ago = datetime.now() - timedelta(days=180)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
+
+    if not raw_query_params.get('obs_date__le'):
+        raw_query_params['obs_date__le'] = datetime.now().strftime('%Y-%m-%d') 
 
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
@@ -537,11 +541,23 @@ def detail_aggregate():
     if valid_query:
         time_agg = func.date_trunc(agg, mt.c['obs_date'])
         base_query = session.query(time_agg, func.count(mt.c.dataset_row_id))
-        dname = raw_query_params['dataset_name']
-        dataset = Table('dat_%s' % dname, Base.metadata,
-            autoload=True, autoload_with=engine,
-            extend_existing=True)
-        valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
+        dname = raw_query_params.get('dataset_name')
+
+        try:
+            dataset = Table('dat_%s' % dname, Base.metadata,
+                autoload=True, autoload_with=engine,
+                extend_existing=True)
+            valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
+        except:
+            valid_query = False
+            resp['meta']['status'] = 'error'
+            if not dname:
+                resp['meta']['message'] = "dataset_name' is required"
+            else:
+                resp['meta']['message'] = "unable to find dataset '%s'" % dname
+            resp = make_response(json.dumps(resp, default=dthandler), 400)
+            resp.headers['Content-Type'] = 'application/json'
+
         if valid_query:
             pk = [p.name for p in dataset.primary_key][0]
             base_query = base_query.join(dataset, mt.c.dataset_row_id == dataset.c[pk])
@@ -557,7 +573,7 @@ def detail_aggregate():
                 to_date = parse(raw_query_params['obs_date__le'])
             else:
                 to_date = datetime.now()
-            
+
             items = []
             dense_matrix = []
             cursor = from_date
