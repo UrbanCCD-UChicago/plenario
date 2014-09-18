@@ -13,6 +13,7 @@ var AboutView = Backbone.View.extend({
         var self = this;
         $.when(this.get_datasets()).then(
             function(resp){
+                resp = resp['objects']
                 self.$el.spin(false);
                 self.$el.html(template_cache('aboutTemplate', {datasets:resp}));
                 var dataObjs = {}

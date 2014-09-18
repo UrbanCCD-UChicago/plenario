@@ -327,6 +327,12 @@ def dataset():
         resp = make_response(json.dumps(resp, default=dthandler), status_code)
         resp.headers['Content-Type'] = 'application/json'
     elif datatype == 'csv':
+
+        # response format
+        # temporal_group,dataset_name_1,dataset_name_2
+        # 2014-02-24 00:00:00,235,653
+        # 2014-03-03 00:00:00,156,624
+
         csv_resp = []
         fields = ['temporal_group']
 
@@ -823,4 +829,5 @@ def parse_join_query(params):
             datatype = value
         else:
             queries['detail'][key] = value
+        print key, value
     return agg, datatype, queries
