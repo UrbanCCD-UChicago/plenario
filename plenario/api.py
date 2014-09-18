@@ -102,14 +102,21 @@ def make_cache_key(*args, **kwargs):
 @crossdomain(origin="*")
 def meta():
     status_code = 200
-    resp = []
+    resp = {
+            'meta': {
+                'status': 'ok',
+                'message': '',
+            },
+            'objects': []
+        }
     dataset_name = request.args.get('dataset_name')
     if dataset_name:
         metas = session.query(MetaTable)\
             .filter(MetaTable.dataset_name == dataset_name).all()
     else:
         metas = session.query(MetaTable).all()
-    resp.extend([m.as_dict() for m in metas])
+    resp['objects'].extend([m.as_dict() for m in metas])
+    resp['meta']['total'] = len(resp['objects'])
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
@@ -333,7 +340,7 @@ def dataset():
                 d.append(row['count'])
 
             csv_resp.append(d)
-        csv_resp[0] = fields
+        csv_resp.insert(0, fields)
         csv_resp = make_csv(csv_resp)
         resp = make_response(csv_resp, 200)
         resp.headers['Content-Type'] = 'text/csv'
