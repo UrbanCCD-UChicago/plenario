@@ -621,12 +621,19 @@
                     <td>json</td>
                     <td>Response data format. Current options are <code>json</code> and <code>csv</code>. </td>
                   </tr>
-
+                  <tr>
+                    <td><strong><code>offset</code></strong></td>
+                    <td>none</td>
+                    <td>
+                      <p>Used to paginate through results of more than 500.</p>
+                      <p><strong>Example:</strong> <code>offset=500</code> will fetch the second page of results.</p>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
 
               <p><strong>Response</strong></p>
-              <p>The API responds with a list of raw records for the particular dataset. The fields returned will vary per dataset.</p>
+              <p>The API responds with a list of raw records for the particular dataset. The fields returned will vary per dataset. Response is limited to 500 results, which can be paginated by using the <code>offset</code> parameter.</p>
 
               <div class='well examples'>
                 <p><strong>Example</strong></p>
@@ -1118,7 +1125,7 @@
               </table>
 
               <p><strong>Response</strong></p>
-              <p>Weather observations and attributes (described above) that match the provided query parameters.</p>
+              <p>Weather observations and attributes (described above) that match the provided query parameters. Response is limited to 500 results, which can be paginated by using the <code>offset</code> parameter.</p>
 
               <div class='well examples'>
                 <p><strong>Examples</strong></p>
@@ -1321,12 +1328,12 @@
               </table>
 
               <p><strong>Response</strong></p>
-              <p>Hourly weather observations and attributes (described above) that match the provided query parameters.</p>
+              <p>Hourly weather observations and attributes (described above) that match the provided query parameters. Response is limited to 500 results, which can be paginated by using the <code>offset</code> parameter.</p>
 
               <div class='well examples'>
                 <p><strong>Example</strong></p>
 
-                <p><a href='/v1/api/weather/hourly/?wban_code=14819&date__ge=2014-09-01'>http://plenar.io/v1/api/weather/hourly/?wban_code=14819&date__ge=2014-09-01</a><br />
+                <p><a href='/v1/api/weather/hourly/?wban_code=14819&datetime__ge=2014-09-01'>http://plenar.io/v1/api/weather/hourly/?wban_code=14819&datetime__ge=2014-09-01</a><br />
                 All hourly weather observations at CHICAGO/MIDWAY since September 1st, 2014</p>
               </div>
             </div>
