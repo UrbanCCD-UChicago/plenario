@@ -35,6 +35,7 @@ cache = Cache(config=CACHE_CONFIG)
 
 API_VERSION = '/v1'
 RESPONSE_LIMIT = 500
+CACHE_TIMEOUT = 60*60*24*7
 VALID_DATA_TYPE = ['csv', 'json']
 VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
 WEATHER_COL_LOOKUP = {
@@ -102,8 +103,15 @@ def make_cache_key(*args, **kwargs):
     # print 'cache_key:', (path+args)
     return (path + args).encode('utf-8')
 
+@api.route(API_VERSION + '/api/flush-cache')
+def flush_cache():
+    cache.clear()
+    resp = make_response(json.dumps({'status' : 'ok', 'message' : 'cache flushed!'}))
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
 @api.route(API_VERSION + '/api/datasets')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def meta():
     status_code = 200
@@ -127,7 +135,7 @@ def meta():
     return resp
 
 @api.route(API_VERSION + '/api/fields/<dataset_name>/')
-@cache.cached(timeout=60*60)
+@cache.cached(timeout=CACHE_TIMEOUT)
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
     try:
@@ -167,7 +175,7 @@ def dataset_fields(dataset_name):
     return resp
 
 @api.route(API_VERSION + '/api/weather-stations/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def weather_stations():
     raw_query_params = request.args.copy()
@@ -192,7 +200,7 @@ def weather_stations():
     return resp
 
 @api.route(API_VERSION + '/api/weather/<table>/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def weather(table):
     raw_query_params = request.args.copy()
@@ -244,7 +252,7 @@ def weather(table):
 
 
 @api.route(API_VERSION + '/api/timeseries/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def dataset():
     raw_query_params = request.args.copy()
@@ -384,7 +392,7 @@ def dataset():
     return resp
 
 @api.route(API_VERSION + '/api/detail/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail():
     raw_query_params = request.args.copy()
@@ -505,7 +513,7 @@ def detail():
     return resp
 
 @api.route(API_VERSION + '/api/detail-aggregate/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail_aggregate():
     raw_query_params = request.args.copy()
@@ -621,7 +629,7 @@ def detail_aggregate():
     return resp
 
 @api.route(API_VERSION + '/api/grid/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def grid():
     raw_query_params = request.args.copy()
