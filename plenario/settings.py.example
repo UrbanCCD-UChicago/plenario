@@ -3,7 +3,12 @@ PLENARIO_SENTRY_URL = ''
 CELERY_SENTRY_URL = ''
 DATABASE_CONN = 'postgresql://plenario:@localhost:5432/plenario_test'
 DATA_DIR = '/tmp'
-REDIS_CONFIG = {'host': 'hostname', 'port': 'port_number'}
+
+# See: https://pythonhosted.org/Flask-Cache/#configuring-flask-cache
+# for config options
+CACHE_CONFIG = {
+    'CACHE_TYPE': 'simple',
+}
 
 AWS_ACCESS_KEY = ''
 AWS_SECRET_KEY = ''

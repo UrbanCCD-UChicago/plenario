@@ -29,6 +29,9 @@ from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
 from plenario.utils.helpers import get_socrata_data_info, slugify, increment_datetime_aggregate
 from plenario.tasks import add_dataset
+from plenario.settings import CACHE_CONFIG
+
+cache = Cache(config=CACHE_CONFIG)
 
 API_VERSION = '/v1'
 RESPONSE_LIMIT = 500
@@ -50,7 +53,6 @@ WEATHER_COL_LOOKUP = {
 }
 
 api = Blueprint('api', __name__)
-cache = Cache(config={'CACHE_TYPE': 'simple'})
 dthandler = lambda obj: obj.isoformat() if isinstance(obj, date) else None
 
 def crossdomain(origin=None, methods=None, headers=None,
