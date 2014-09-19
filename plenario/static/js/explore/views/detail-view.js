@@ -13,7 +13,7 @@ var DetailView = Backbone.View.extend({
         // console.log('detail-view init')
         // console.log(this.query)
 
-        var start = moment().subtract('d', 180).format('MM/DD/YYYY');
+        var start = moment().subtract('d', 90).format('MM/DD/YYYY');
         var end = moment().format('MM/DD/YYYY');
 
         if (this.query) {
@@ -216,7 +216,7 @@ var DetailView = Backbone.View.extend({
 
         start = moment(start);
         if (!start){
-            start = moment().subtract('days', 180);
+            start = moment().subtract('days', 90);
         }
         end = moment(end)
         if(!end){

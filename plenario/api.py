@@ -264,9 +264,9 @@ def dataset():
     else:
         del raw_query_params['agg']
 
-    # if no obs_date given, default to >= 180 days ago
+    # if no obs_date given, default to >= 90 days ago
     if not raw_query_params.get('obs_date__ge'):
-        six_months_ago = datetime.now() - timedelta(days=180)
+        six_months_ago = datetime.now() - timedelta(days=90)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
 
     if not raw_query_params.get('obs_date__le'):
@@ -521,9 +521,9 @@ def detail_aggregate():
     if not agg:
         agg = 'day'
 
-    # if no obs_date given, default to >= 180 days ago
+    # if no obs_date given, default to >= 90 days ago
     if not raw_query_params.get('obs_date__ge'):
-        six_months_ago = datetime.now() - timedelta(days=180)
+        six_months_ago = datetime.now() - timedelta(days=90)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
 
     if not raw_query_params.get('obs_date__le'):

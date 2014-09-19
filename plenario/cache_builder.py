@@ -64,7 +64,7 @@ if __name__ == "__main__":
     cache_end_date = parser.parse(sys.argv[1])
     for d in range (8):
         cache_end_date = cache_end_date - timedelta(days=1)
-        cache_start_date = cache_end_date - timedelta(days=180)
+        cache_start_date = cache_end_date - timedelta(days=90)
         pool.map(fetch_url, list(fetch_for_dates(cache_start_date, cache_end_date)))
     print '\n\nlongest request:'
     print longest_request

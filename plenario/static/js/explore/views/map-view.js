@@ -4,7 +4,7 @@ var MapView = Backbone.View.extend({
         'click #reset': 'resetForm'
     },
     initialize: function(){
-        var start = moment().subtract('d', 180).format('MM/DD/YYYY');
+        var start = moment().subtract('d', 90).format('MM/DD/YYYY');
         var end = moment().format('MM/DD/YYYY');
 
         if (this.attributes.resp && this.attributes.resp.query)
@@ -103,7 +103,7 @@ var MapView = Backbone.View.extend({
         var end = $('#end-date-filter').val();
         start = moment(start);
         if (!start){
-            start = moment().subtract('days', 180);
+            start = moment().subtract('days', 90);
         }
         end = moment(end)
         if(!end){
