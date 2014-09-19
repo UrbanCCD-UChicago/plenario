@@ -19,8 +19,8 @@
       <div class="col-md-1"></div>
       <div class="col-md-10">
         <div class='well'>
-          <p><strong>Here&rsquo;s an example</strong>: <a href='/v1/api/timeseries/?obs_date__ge=2007-6-1&obs_date__lt=2007-9-1&dataset_name__in=chicago_crimes_all,cdph_environmental_complaints'>Chicago crime reports and environmental complaints during summer 2007</a>.</p>
-          <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.explore_view') }}">Build your own query&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a><p>
+          <p><strong>Here&rsquo;s an example</strong>: <a href='/v1/api/detail/?dataset_name=nypd_motor_vehicle_collisions&obs_date__ge=2014-03-23&obs_date__le=2014-09-23&borough=MANHATTAN&number_of_persons_killed__gt=0&weather=true'>Manhattan traffic accidents and the weather conditions at the time</a>.</p>
+          <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.examples_view') }}#collapse-ex-3">Build your own query&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a><p>
         </div>
       </div>
     </div>
