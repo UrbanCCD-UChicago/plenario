@@ -277,6 +277,12 @@ body {
 	opacity: 1;
 }
 
+.navbar-brand .alpha {
+  font-size: 0.5em;
+  position: relative;
+  top: 5px;
+  left: 1px;
+}
 
 /* examples page */
 .example textarea {
