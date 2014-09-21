@@ -19,8 +19,9 @@
       <div class="col-md-1"></div>
       <div class="col-md-10">
         <div class='well'>
-          <p><strong>Here&rsquo;s an example</strong>: <a href='/v1/api/detail/?dataset_name=nypd_motor_vehicle_collisions&obs_date__ge=2014-03-23&obs_date__le=2014-09-23&borough=MANHATTAN&number_of_persons_killed__gt=0&weather=true'>Manhattan traffic accidents and the weather conditions at the time</a>.</p>
-          <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.examples_view') }}#collapse-ex-3">Build your own query&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a><p>
+          <p><strong>Here&rsquo;s an example</strong>: <a href='/explore#aggregate/dataset_name__in=crimes_2001_to_present,food_inspections,business_licenses&obs_date__le=2013%2F09%2F01&obs_date__ge=2013%2F06%2F01&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.5720751285553%2C41.8496161693754%5D%2C%5B-87.6379930973053%2C41.8526849831226%5D%2C%5B-87.8137743473053%2C41.79691191119474%5D%2C%5B-87.8137743473053%2C41.68316883525891%5D%2C%5B-87.52400994300842%2C41.66265316924903%5D%2C%5B-87.52332329750061%2C41.74672584176937%5D%2C%5B-87.5720751285553%2C41.8496161693754%5D%5D%5D%7D%7D&agg=day'>Crimes, business licenses, and food inspections in Southside Chicago during summer 2013.
+          <p><img src='/static/images/southside-chicago.png' class='img-responsive img-thumbnail' alt='Plenar.io Data Explorer' /></p></a>
+          <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.explore_view') }}">Try it yourself&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a> <a class="btn btn-default" href="/v1/api/timeseries/?dataset_name__in=crimes_2001_to_present,food_inspections,business_licenses&obs_date__le=2013%2F09%2F01&obs_date__ge=2013%2F06%2F01&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.5720751285553%2C41.8496161693754%5D%2C%5B-87.6379930973053%2C41.8526849831226%5D%2C%5B-87.8137743473053%2C41.79691191119474%5D%2C%5B-87.8137743473053%2C41.68316883525891%5D%2C%5B-87.52400994300842%2C41.66265316924903%5D%2C%5B-87.52332329750061%2C41.74672584176937%5D%2C%5B-87.5720751285553%2C41.8496161693754%5D%5D%5D%7D%7D&agg=day">See JSON response&nbsp;&nbsp;<i class="fa fa-gear"></i></a><p>
         </div>
       </div>
     </div>
@@ -32,19 +33,19 @@
       <div class="col-md-10">
         <div class='well'>
           <p><a href="{{ url_for('views.explore_view') }}"><img src='/static/images/plenario-explorer.png' class='img-responsive img-thumbnail' alt='Plenar.io Data Explorer' /></a></p>
-          <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.explore_view') }}">Try it yourself&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a><p>
+          <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.explore_view') }}">Try it yourself&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a> <a class="btn btn-default" href="{{ url_for('views.examples_view') }}">See some examples&nbsp;&nbsp;<i class="fa fa-gear"></i></a><p>
         </div>
       </div>
     </div>
 
-    <h3>Enormous amounts of data.</h3>
-    <p class="lead">City data portals, the federal government, nonprofit organizations, individual researchers&mdash;we have it all.</p>
+    <h3>Enormous variety of data.</h3>
+    <p class="lead">City data portals, the federal government, individual datasets&mdash;we have it all, whether originally housed at Socrata or CKAN data portals or in CSV format.</p>
     <div class="row">
       <div class="col-md-1"></div>
       <div class="col-md-10">
         <div class='well'>
           <p class="text-center"><a href="{{ url_for('views.explore_view') }}"><img src='/static/images/view-datasets.png' class='img-responsive img-thumbnail' alt='Plenar.io Data Explorer' /></a></p>
-          <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.explore_view') }}">Take a look&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a></p>
+          <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.explore_view') }}">Take a look&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a> <a class="btn btn-default" href="/v1/api/datasets">Metadata for all datasets&nbsp;&nbsp;<i class="fa fa-gear"></i></a></p>
         </div>
       </div>
     </div>
@@ -55,9 +56,21 @@
       <div class="col-md-1"></div>
       <div class="col-md-10">
         <div class='well'>
-          <p><strong>Here&rsquo;s an example</strong>: <a href="/explore#aggregate/obs_date__le=2013%2F12%2F31&obs_date__ge=2013%2F01%2F01&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.637939453125%2C41.88694340165636%5D%2C%5B-87.62746810913086%2C41.8875823767912%5D%2C%5B-87.62454986572266%2C41.88898809959183%5D%2C%5B-87.60944366455078%2C41.88834913851702%5D%2C%5B-87.6101303100586%2C41.86700416724044%5D%2C%5B-87.63450622558592%2C41.867387672721804%5D%2C%5B-87.63725280761719%2C41.876974562065904%5D%2C%5B-87.637939453125%2C41.88694340165636%5D%5D%5D%7D%7D&agg=week">Get a week-by-week look at downtown Chicago in 2013</a>.</p>
-          <p class="text-center"><a href="/explore#aggregate/obs_date__le=2013%2F12%2F31&obs_date__ge=2013%2F01%2F01&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.637939453125%2C41.88694340165636%5D%2C%5B-87.62746810913086%2C41.8875823767912%5D%2C%5B-87.62454986572266%2C41.88898809959183%5D%2C%5B-87.60944366455078%2C41.88834913851702%5D%2C%5B-87.6101303100586%2C41.86700416724044%5D%2C%5B-87.63450622558592%2C41.867387672721804%5D%2C%5B-87.63725280761719%2C41.876974562065904%5D%2C%5B-87.637939453125%2C41.88694340165636%5D%5D%5D%7D%7D&agg=week"><img src='/static/images/downtown-chicago.png' class='img-responsive img-thumbnail' alt='Plenar.io Data Explorer' /></a></p>
-          <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.explore_view') }}">See your own city&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a><p>
+          <p><strong>Here&rsquo;s an example</strong>: <a href="/explore#aggregate/obs_date__ge=2013%2F01%2F01&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.637939453125%2C41.88694340165636%5D%2C%5B-87.62746810913086%2C41.8875823767912%5D%2C%5B-87.62454986572266%2C41.88898809959183%5D%2C%5B-87.60944366455078%2C41.88834913851702%5D%2C%5B-87.6101303100586%2C41.86700416724044%5D%2C%5B-87.63450622558592%2C41.867387672721804%5D%2C%5B-87.63725280761719%2C41.876974562065904%5D%2C%5B-87.637939453125%2C41.88694340165636%5D%5D%5D%7D%7D&agg=week">Get a week-by-week look at downtown Chicago since 2013</a>.</p>
+          <p class="text-center"><a href="/explore#aggregate/obs_date__ge=2013%2F01%2F01&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.637939453125%2C41.88694340165636%5D%2C%5B-87.62746810913086%2C41.8875823767912%5D%2C%5B-87.62454986572266%2C41.88898809959183%5D%2C%5B-87.60944366455078%2C41.88834913851702%5D%2C%5B-87.6101303100586%2C41.86700416724044%5D%2C%5B-87.63450622558592%2C41.867387672721804%5D%2C%5B-87.63725280761719%2C41.876974562065904%5D%2C%5B-87.637939453125%2C41.88694340165636%5D%5D%5D%7D%7D&agg=week"><img src='/static/images/downtown-chicago.png' class='img-responsive img-thumbnail' alt='Plenar.io Data Explorer' /></a></p>
+          <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.explore_view') }}">See your own city&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a>  <a class="btn btn-default" href="/v1/api/timeseries/?obs_date__ge=2013%2F01%2F01&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.637939453125%2C41.88694340165636%5D%2C%5B-87.62746810913086%2C41.8875823767912%5D%2C%5B-87.62454986572266%2C41.88898809959183%5D%2C%5B-87.60944366455078%2C41.88834913851702%5D%2C%5B-87.6101303100586%2C41.86700416724044%5D%2C%5B-87.63450622558592%2C41.867387672721804%5D%2C%5B-87.63725280761719%2C41.876974562065904%5D%2C%5B-87.637939453125%2C41.88694340165636%5D%5D%5D%7D%7D&agg=week">See JSON response&nbsp;&nbsp;<i class="fa fa-gear"></i></a><p>
+        </div>
+      </div>
+    </div>
+
+    <h3>Rich, contextualized data.</h3>
+    <p class="lead">All data points are automatically connected to their census block and local weather for a more holistic understanding of the complex urban environment.</p>
+    <div class="row">
+      <div class="col-md-1"></div>
+      <div class="col-md-10">
+        <div class='well'>
+          <p><strong>Here&rsquo;s an example</strong>: <a href="/v1/api/detail/?dataset_name=nypd_motor_vehicle_collisions&obs_date__ge=2014-03-23&obs_date__le=2014-09-23&borough=MANHATTAN&number_of_persons_killed__gt=0&weather=true">Recent fatal traffic accidents in Manhattan with the weather at the time</a>.</p>
+          <p class="text-center"><a class="btn btn-info" href="{{ url_for('views.examples_view') }}">See more examples&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a> <a class="btn btn-default" href="{{ url_for('views.examples_view') }}#collapse-ex-3">Edit this query&nbsp;&nbsp;<i class="fa fa-gear"></i></a><p>
         </div>
       </div>
     </div>
