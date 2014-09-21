@@ -63,7 +63,7 @@ var ResponseView = Backbone.View.extend({
                 });
 
                 $('#response-datasets').DataTable( {
-                    "aaSorting": [ [1,'desc'] ],
+                    "aaSorting": [ [2,'desc'] ],
                     "aoColumns": [
                         null,
                         null,
