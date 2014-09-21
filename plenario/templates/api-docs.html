@@ -734,7 +734,8 @@
                     <td>false</td>
                     <td>
                       <p>If set to <strong>true</strong>, returns a weather observation for each record. The observation will be from the closest NOAA weather station.</p>
-                      <p>If the dataset has observations with a <strong>date and time</strong>, an hourly weather observation based on <code>/v1/api/weather/hourly/</code> will be returned. Otherwise, it will return a daily weather observation based on <code>/v1/api/weather/daily/</code></p>
+                      <p>If the dataset has observations with a <strong>date and time</strong>, an hourly weather observation based on <code>/v1/api/weather/hourly/</code> will be returned. Otherwise, it will return a daily weather observation based on <code>/v1/api/weather/daily/</code>.</p>
+                      <p><strong>* Please note</strong> that there is a <a href="https://github.com/datamade/plenario/issues/118">known issue</a> where records whose nearest weather station did not record an observation near the record's timestamp (for instance, if the station was closed) are not returned when <code>weather=true</code>. To work around this, you can supply <code>weather=false</code> to collect the missing records, and then call <code>/v1/api/weather/hourly/</code> or <code>/v1/api/weather/daily/</code> to fill in the missing weather data using the next-closest station (which you can find using <code>/v1/api/weather-stations/</code>).</p>
                     </td>
                   </tr>
                   <tr>
@@ -1373,7 +1374,7 @@
         <tbody>
           <tr>
             <td><strong><code>status</code></strong></td>
-            <td><strong>ok</strong> if query was sucessful, <strong>error</strong> if not.</td>
+            <td><strong>ok</strong> if query was successful, <strong>error</strong> if not.</td>
           </tr>
           <tr>
             <td><strong><code>query</code></strong></td>
