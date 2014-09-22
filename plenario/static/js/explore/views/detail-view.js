@@ -109,7 +109,7 @@ var DetailView = Backbone.View.extend({
         self.field_options = {}
         $.when($.get('/v1/api/fields/' + self.query['dataset_name'])).then(function(field_options){
             self.field_options = field_options;
-        
+
             // populate filters from query
             var params_to_exclude = ['location_geom__within', 'obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center', 'buffer', 'agg'];
 
@@ -196,7 +196,7 @@ var DetailView = Backbone.View.extend({
 
     addFilter: function(e){
         var filter_ids = []
-        $(".filter_row").each(function (key, val) { 
+        $(".filter_row").each(function (key, val) {
             filter_ids.push(parseInt($(val).attr("data-id")));
         });
         new FilterView({el: '#filter_builder', attributes: {filter_dict: {"id" : (Math.max.apply(null, filter_ids) + 1), "field" : "", "value" : "", "operator" : "", "removable": true }, field_options: this.field_options}});
@@ -236,7 +236,7 @@ var DetailView = Backbone.View.extend({
         query['resolution'] = $('#spatial-agg-filter').val();
 
         // update query from filters
-        $(".filter_row").each(function (key, val) { 
+        $(".filter_row").each(function (key, val) {
 
             val = $(val);
             // console.log(val)
@@ -256,6 +256,7 @@ var DetailView = Backbone.View.extend({
             // console.log(this.query)
             new DetailView({el: '#map-view', attributes: {query: query, meta: this.meta}})
             var route = 'detail/' + $.param(query)
+            _gaq.push(['_trackPageview', route]);
             router.navigate(route)
         } else {
             $('#map-view').spin(false);
@@ -278,7 +279,7 @@ var DetailView = Backbone.View.extend({
         $.each(self.filters, function(key, val){
             delete points_query[key];
         });
-        
+
         if (resp) { resp.undelegateEvents(); }
         resp = new ResponseView({el: '#list-view', attributes: {query: points_query}});
         var attrs = { resp: resp }
@@ -290,6 +291,7 @@ var DetailView = Backbone.View.extend({
         map = new MapView({el: '#map-view', attributes: attrs});
 
         var route = "aggregate/" + $.param(points_query);
+        _gaq.push(['_trackPageview', route]);
         router.navigate(route);
     },
 

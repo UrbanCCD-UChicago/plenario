@@ -61,7 +61,7 @@ var MapView = Backbone.View.extend({
                     });
         if (typeof this.attributes.dataLayer !== 'undefined'){
             this.map.drawnItems.addLayer(geojson);
-            
+
             this.map.whenReady(function () {
                 window.setTimeout(function () {
                     this.map.fitBounds(geojson.getBounds());
@@ -128,6 +128,7 @@ var MapView = Backbone.View.extend({
             if (resp) { resp.undelegateEvents(); }
             resp = new ResponseView({el: '#list-view', attributes: {query: query}})
             var route = "aggregate/" + $.param(query);
+            _gaq.push(['_trackPageview', route]);
             router.navigate(route);
         } else {
             $('#list-view').spin(false);

@@ -26,6 +26,7 @@ var ResponseView = Backbone.View.extend({
         $('#map-view').empty();
         new DetailView({el: '#map-view', attributes: {query: this.query, meta: this.meta[dataset_name]}})
         var route = 'detail/' + $.param(this.query)
+        _gaq.push(['_trackPageview', route]);
         router.navigate(route)
     },
     getResults: function(){
@@ -57,7 +58,7 @@ var ResponseView = Backbone.View.extend({
                     objects: objects,
                     query: self.query
                 }));
-                
+
                 $.each(objects, function(i, obj){
                     ChartHelper.sparkline((obj['dataset_name'] + '-sparkline'), results_meta['query']['agg'], obj['values']);
                 });

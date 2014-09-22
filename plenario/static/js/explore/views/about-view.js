@@ -66,7 +66,8 @@ var AboutView = Backbone.View.extend({
         this.undelegateEvents();
         $('#map-view').empty();
         new DetailView({el: '#map-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
-        var route = 'detail/' + $.param(query)
+        var route = 'detail/' + $.param(query);
+        _gaq.push(['_trackPageview', route]);
         router.navigate(route)
     }
 });
