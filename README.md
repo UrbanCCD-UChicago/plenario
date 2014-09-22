@@ -9,7 +9,7 @@ For more details, see the presentation slides from [Exploring Open Civic Data Th
 ## Running locally
 
 ``` bash
-git clone git@github.com:datamade/plenario.git
+git clone git@github.com:UrbanCCD-UChicago/plenario.git
 cd plenario
 pip install -r requirements.txt
 python runserver.py
@@ -48,7 +48,7 @@ We used the following open source tools:
 ## Errors / Bugs
 
 If something is not behaving intuitively, it is a bug, and should be reported.
-Report it here: https://github.com/datamade/plenario/issues
+Report it here: https://github.com/UrbanCCD-UChicago/plenario/issues
 
 ## Note on Patches/Pull Requests
  
@@ -59,4 +59,4 @@ Report it here: https://github.com/datamade/plenario/issues
 
 ## Copyright
 
-Copyright (c) 2014 DataMade and the University of Chicago. Released under the [MIT License](https://github.com/datamade/plenario/blob/master/LICENSE).
+Copyright (c) 2014 DataMade and the University of Chicago. Released under the [MIT License](https://github.com/UrbanCCD-UChicago/plenario/blob/master/LICENSE).
