@@ -23,7 +23,7 @@ from shapely.geometry import box
 from boto.s3.connection import S3Connection, S3ResponseError
 from boto.s3.key import Key
 from cStringIO import StringIO
-    
+
 COL_TYPES = {
     'boolean': Boolean,
     'integer': Integer,
