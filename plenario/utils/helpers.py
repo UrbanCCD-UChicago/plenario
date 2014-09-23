@@ -87,7 +87,7 @@ def get_socrata_data_info(view_url):
 
 def slugify(text, delim=u'_'):
     if text:
-        punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.]+')
+        punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.:;]+')
         result = []
         for word in punct_re.split(text.lower()):
             word = normalize('NFKD', word).encode('ascii', 'ignore')
@@ -99,9 +99,9 @@ def slugify(text, delim=u'_'):
 
 def increment_datetime_aggregate(sourcedate, time_agg):
     delta = None
-    if time_agg == 'hour':
-        delta = timedelta(hours=1)
-    elif time_agg == 'day':
+    # if time_agg == 'hour':
+    #     delta = timedelta(hours=1)
+    if time_agg == 'day':
         delta = timedelta(days=1)
     elif time_agg == 'week':
         delta = timedelta(days=7)

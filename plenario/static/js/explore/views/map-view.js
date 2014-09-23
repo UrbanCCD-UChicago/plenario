@@ -4,7 +4,7 @@ var MapView = Backbone.View.extend({
         'click #reset': 'resetForm'
     },
     initialize: function(){
-        var start = moment().subtract('d', 180).format('MM/DD/YYYY');
+        var start = moment().subtract('d', 90).format('MM/DD/YYYY');
         var end = moment().format('MM/DD/YYYY');
 
         if (this.attributes.resp && this.attributes.resp.query)
@@ -25,7 +25,7 @@ var MapView = Backbone.View.extend({
             minZoom: 1
         };
         this.map = L.map('map', map_options).setView([41.880517,-87.644061], 11);
-        L.tileLayer('https://{s}.tiles.mapbox.com/v3/derekeder.hehblhbj/{z}/{x}/{y}.png', {
+        L.tileLayer('https://{s}.tiles.mapbox.com/v3/datamade.hn83a654/{z}/{x}/{y}.png', {
           attribution: '<a href="http://www.mapbox.com/about/maps/" target="_blank">Terms &amp; Feedback</a>'
         }).addTo(this.map);
         this.map.drawnItems = new L.FeatureGroup();
@@ -61,7 +61,7 @@ var MapView = Backbone.View.extend({
                     });
         if (typeof this.attributes.dataLayer !== 'undefined'){
             this.map.drawnItems.addLayer(geojson);
-            
+
             this.map.whenReady(function () {
                 window.setTimeout(function () {
                     this.map.fitBounds(geojson.getBounds());
@@ -103,7 +103,7 @@ var MapView = Backbone.View.extend({
         var end = $('#end-date-filter').val();
         start = moment(start);
         if (!start){
-            start = moment().subtract('days', 180);
+            start = moment().subtract('days', 90);
         }
         end = moment(end)
         if(!end){
@@ -128,6 +128,7 @@ var MapView = Backbone.View.extend({
             if (resp) { resp.undelegateEvents(); }
             resp = new ResponseView({el: '#list-view', attributes: {query: query}})
             var route = "aggregate/" + $.param(query);
+            _gaq.push(['_trackPageview', route]);
             router.navigate(route);
         } else {
             $('#list-view').spin(false);

@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+{% block title %}Examples - Plenar.io{% endblock %}
+{% block content %}
+  <div class='col-md-8 col-md-offset-2'>
+    <br/>
+    <h1>Examples</h1>
+
+    <p>These editable sample queries demonstrate some of the capabilities of Plenario.</p>
+    <br>
+    
+    <div class="panel-group example" id="accordion-ex-1">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <a data-toggle="collapse" data-parent="#accordion-ex-1" href="#collapse-ex-1" id="ex-1">
+            <span class='label label-info pull-right'>/api/timeseries</span>
+            <strong>Tell me the story of 700 Howard Street in San Francisco.</strong>
+            <div class='clearfix'></div>
+          </a>
+        </div>
+        <div id="collapse-ex-1" class="panel-collapse collapse">
+          <div class="panel-body">
+            <div class="row">
+              <div class="col-md-9">
+                <p>Returns a time series for every dataset with observations located in the two blocks around 700 Howard Street for the past five years, aggregated by week.</p>
+                <p><strong>API documentation: <a href="{{ url_for('views.api_docs_view')}}#collapse-api-timeseries" target="_blank"><code>/v1/api/timeseries</code></a></strong></p>
+              </div>
+              <div class="col-md-3">
+                <a class="try-explore pull-right" target="_blank" href="/explore#aggregate/obs_date__ge=2009%2F09%2F23&obs_date__le=2014%2F09%2F23&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-122.401578%2C37.789506%5D%2C%5B-122.408574%2C37.784113%5D%2C%5B-122.401857%2C37.77889%5D%2C%5B-122.394948%2C37.784351%5D%2C%5B-122.401578%2C37.789506%5D%5D%5D%7D%7D&agg=week"><img src="/static/images/view-in-explorer.png" height="125px" width="125px"></a>
+              </div>
+            </div>
+            <br>
+            <div class="well">
+              <div class="row">
+                <div class="col-md-12">
+                  <p>You can edit the query below.</p>
+                  <a class="btn btn-primary try-url pull-right" target="_blank"><i class="fa fa-external-link"></i> Run query</a>
+                  <textarea class="form-control input-lg" rows="6">http://plenar.io/v1/api/timeseries/?obs_date__ge=2009-09-23&#13;&obs_date__le=2014-09-23&location_geom__within=%7B"type":"Feature","properties":%7B%7D,"geometry":%7B"type":"Polygon","coordinates":[[[-122.401578,37.789505],[-122.408573,37.784113],[-122.401857,37.77889],[-122.394948,37.784351],[-122.401578,37.789506]]]%7D%7D&agg=week</textarea>
+                  <p><small>White space such as spaces and new lines will be ignored.</small></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-group example" id="accordion-ex-2">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <a data-toggle="collapse" data-parent="#accordion-ex-2" href="#collapse-ex-2" id="ex-2">
+            <span class='label label-info pull-right'>/api/timeseries</span>
+            <strong>Give me weekly counts of 311 requests for every city in the country.</strong>
+            <div class='clearfix'></div>
+          </a>
+        </div>
+        <div id="collapse-ex-2" class="panel-collapse collapse">
+          <div class="panel-body">
+            <div class="row">
+              <div class="col-md-9">
+                <p>Returns a time series for every dataset with "311" in the name, aggregated by week, since January 1, 2014.</p>
+                <p><strong>API documentation: <a href="{{ url_for('views.api_docs_view')}}#collapse-api-timeseries" target="_blank"><code>/v1/api/timeseries</code></a></strong></p>
+              </div>
+              <div class="col-md-3">
+                <a class="try-explore pull-right" target="_blank" href="/explore#aggregate/dataset_name__in=311_unified_data,case_data_from_san_francisco_311_sf311,311_service_requests_tree_debris,311_service_requests_tree_trims,311_service_requests_vacant_and_abandoned_building,311_service_requests_street_lights_one_out,311_service_requests_street_lights_all_out,311_service_requests_sanitation_code_complaints,311_service_requests_rodent_baiting,311_service_requests_pot_holes_reported,311_service_requests_graffiti_removal,311_service_requests_garbage_carts,311_service_requests_from_2010_to_present,311_service_requests_abandoned_vehicles,311_service_requests_alley_lights_out,&obs_date__ge=2014-01-01&agg=week"><img src="/static/images/view-in-explorer.png" height="125px" width="125px"></a>
+              </div>
+            </div>
+            <br>
+            <div class="well">
+              <div class="row">
+                <div class="col-md-12">
+                  <p>You can edit the query below.</p>
+                  <a class="btn btn-primary try-url pull-right" target="_blank"><i class="fa fa-external-link"></i> Run query</a>
+                  <textarea class="form-control input-lg" rows="4">http://plenar.io/v1/api/timeseries/?obs_date__ge=2014-01-01&dataset_name__ilike=%25311%25&agg=week</textarea>
+                  <p><small>White space such as spaces and new lines will be ignored.</small></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-group example" id="accordion-ex-1">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <a data-toggle="collapse" data-parent="#accordion-ex-3" href="#collapse-ex-3" id="ex-3">
+            <span class='label label-info pull-right'>/api/detail</span>
+            <strong>What recent traffic accidents in Manhattan resulted in a fatality—and what was the weather like?</strong>
+            <div class='clearfix'></div>
+          </a>
+        </div>
+        <div id="collapse-ex-3" class="panel-collapse collapse">
+          <div class="panel-body">
+            <div class="row">
+              <div class="col-md-9">
+                <p>Returns a record for every motor vehicle incident in Manhattan, New York City in the past six months that resulted in at least one fatality, along with the weather attributes recorded at the nearest weather station to the incident and on the day of the incident.</p>
+                <p><strong>API documentation: <a href="{{ url_for('views.api_docs_view')}}#collapse-api-detail" target="_blank"><code>/v1/api/detail</code></a></strong></p>
+              </div>
+              <div class="col-md-3">
+                <a class="try-explore pull-right" target="_blank" href="/explore#detail/dataset_name=nypd_motor_vehicle_collisions&obs_date__le=2014%2F09%2F17&obs_date__ge=2013%2F09%2F17&agg=week&resolution=500&borough=MANHATTAN&number_of_persons_killed__gt=0"><img src="/static/images/view-in-explorer.png" height="125px" width="125px"></a>
+              </div>
+            </div>
+            <br>
+            <div class="well">
+              <div class="row">
+                <div class="col-md-12">
+                  <p>You can edit the query below.</p>
+                  <a class="btn btn-primary try-url pull-right" target="_blank"><i class="fa fa-external-link"></i> Run query</a>
+                  <textarea class="form-control input-lg" rows="5">http://plenar.io/v1/api/detail/?dataset_name=nypd_motor_vehicle_collisions&obs_date__ge=2014-03-23&obs_date__le=2014-09-23&borough=MANHATTAN&number_of_persons_killed__gt=0&weather=true</textarea>
+                  <p><small>White space such as spaces and new lines will be ignored.</small></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-group example" id="accordion-ex-4">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <a data-toggle="collapse" data-parent="#accordion-ex-4" href="#collapse-ex-4" id="ex-4">
+            <span class='label label-info pull-right'>/api/detail</span>
+            <strong>Let me download all pothole reports from the census tract containing the Sears Tower.</strong>
+            <div class='clearfix'></div>
+          </a>
+        </div>
+        <div id="collapse-ex-4" class="panel-collapse collapse">
+          <div class="panel-body">
+            <div class="row">
+              <div class="col-md-9">
+                <p>Returns all records in the Chicago 311 Potholes Reported dataset located in Cook County Census Tract 8391, from the past six months.</p>
+                <p><strong>API documentation: <a href="{{ url_for('views.api_docs_view')}}#collapse-api-detail" target="_blank"><code>/v1/api/detail</code></a></strong></p>
+              </div>
+              <div class="col-md-3">
+                <a class="try-explore pull-right" target="_blank" href="/explore#detail/dataset_name=311_service_requests_pot_holes_reported&obs_date__ge=2014%2F03%2F23&obs_date__le=2014%2F09%2F23&location_geom__within=%7B%22type%22%3A%22Feature%22%2C%22properties%22%3A%7B%7D%2C%22geometry%22%3A%7B%22type%22%3A%22Polygon%22%2C%22coordinates%22%3A%5B%5B%5B-87.62796834111214%2C41.88707119719461%5D%2C%5B-87.62758210301399%2C41.874546019423576%5D%2C%5B-87.63573601841925%2C41.87448210916051%5D%2C%5B-87.63732388615608%2C41.87668697630679%5D%2C%5B-87.63835385441779%2C41.880649155073556%5D%2C%5B-87.63762429356575%2C41.88582517979217%5D%2C%5B-87.63565018773079%2C41.88710314603922%5D%2C%5B-87.62796834111214%2C41.88707119719461%5D%5D%5D%7D%7D&agg=week&resolution=300"><img src="/static/images/view-in-explorer.png" height="125px" width="125px"></a>
+              </div>
+            </div>
+            <br>
+            <div class="well">
+              <div class="row">
+                <div class="col-md-12">
+                  <p>You can edit the query below.</p>
+                  <a class="btn btn-primary try-url pull-right" target="_blank"><i class="fa fa-external-link"></i> Run query</a>
+                  <textarea class="form-control input-lg" rows="4">http://plenar.io/v1/api/detail/?dataset_name=311_service_requests_pot_holes_reported&obs_date__ge=2014-03-23&census_block__ilike=17031839100%25&data_type=csv</textarea>
+                  <p><small>White space such as spaces and new lines will be ignored.</small></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-group example" id="accordion-ex-5">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <a data-toggle="collapse" data-parent="#accordion-ex-5" href="#collapse-ex-5" id="ex-5">
+            <span class='label label-info pull-right'>/api/detail</span>
+            <strong>Show me snow-related calls in Boston during the Snowpocalypse (Winter Storm Nemo, Feb 2013).</strong>
+            <div class='clearfix'></div>
+          </a>
+        </div>
+        <div id="collapse-ex-5" class="panel-collapse collapse">
+          <div class="panel-body">
+            <div class="row">
+              <div class="col-md-9">
+                <p>Returns all snow-related "Mayor's 24-hour hotline" calls made in Boston during the Snowpocalypse (Winter Storm Nemo), between 2/8/13 and 2/10/13, along with the weather reported at that hour by the nearest weather station to the caller's location.</p>
+                <p><strong>API documentation: <a href="{{ url_for('views.api_docs_view')}}#collapse-api-detail" target="_blank"><code>/v1/api/detail</code></a></strong></p>
+              </div>
+              <div class="col-md-3">
+                <a class="try-explore pull-right" target="_blank" href="/explore#detail/dataset_name=mayors_24_hour_hotline_nemo_snow_related_calls&obs_date__le=2013%2F02%2F11&obs_date__ge=2013%2F02%2F08&agg=day&resolution=200"><img src="/static/images/view-in-explorer.png" height="125px" width="125px"></a>
+              </div>
+            </div>
+            <br>
+            <div class="well">
+              <div class="row">
+                <div class="col-md-12">
+                  <p>You can edit the query below.</p>
+                  <a class="btn btn-primary try-url pull-right" target="_blank"><i class="fa fa-external-link"></i> Run query</a>
+                  <textarea class="form-control input-lg" rows="4">http://plenar.io/v1/api/detail/?dataset_name=mayors_24_hour_hotline_nemo_snow_related_calls&obs_date__ge=2013-02-08&obs_date__le=2013-02-11&weather=true</textarea>
+                  <p><small>White space such as spaces and new lines will be ignored.</small></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-group example" id="accordion-ex-6">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <a data-toggle="collapse" data-parent="#accordion-ex-6" href="#collapse-ex-6" id="ex-6">
+            <span class='label label-info pull-right'>/api/detail-aggregate</span>
+            <strong>Let me see all homicides in Chicago since 2001 where an arrest was made.</strong>
+            <div class='clearfix'></div>
+          </a>
+        </div>
+        <div id="collapse-ex-6" class="panel-collapse collapse">
+          <div class="panel-body">
+            <div class="row">
+              <div class="col-md-9">
+                <p>Returns a time series of all observations since 2001 where the IUCR code is 0110 (homicide) and a related arrest was made, aggregated by month.</p>
+                <p><strong>API documentation: <a href="{{ url_for('views.api_docs_view')}}#collapse-api-detail-aggregate" target="_blank"><code>/v1/api/detail-aggregate</code></a></strong></p>
+              </div>
+              <div class="col-md-3">
+                <a class="try-explore pull-right" target="_blank" href="/explore#detail/dataset_name=crimes_2001_to_present&obs_date__ge=2001%2F01%2F01&agg=month&resolution=1000&arrest=yes&iucr=0110"><img src="/static/images/view-in-explorer.png" height="125px" width="125px"></a>
+              </div>
+            </div>
+            <br>
+            <div class="well">
+              <div class="row">
+                <div class="col-md-12">
+                  <p>You can edit the query below.</p>
+                  <a class="btn btn-primary try-url pull-right" target="_blank"><i class="fa fa-external-link"></i> Run query</a>
+                  <textarea class="form-control input-lg" rows="4">http://plenar.io/v1/api/detail-aggregate/?dataset_name=crimes_2001_to_present&obs_date__ge=2001-01-01&iucr=0110&arrest=yes&agg=month</textarea>
+                  <p><small>White space such as spaces and new lines will be ignored.</small></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <br>
+    For more examples specific to the API endpoints, see the <a href="{{ url_for('views.api_docs_view') }}#docs">API documentation</a>.
+  <br>
+  <br>
+  <br>
+
+    
+  </div>
+{% endblock content %}
+{% block extra_javascript %}
+<script>
+// panel display
+  $('.collapse').collapse('hide');
+  $('.collapse').on('show.bs.collapse', function () {
+    window.location.hash = $(this).attr('id');
+  });
+
+  $(document).ready(function() {
+    // display { } % inside textareas (can't be done in HTML)
+    $('.panel-group textarea').each(function(){
+      $(this).text($(this).text().replace(/%7B/g, '{').replace(/%7D/g, '}'));
+    });
+    // update link
+    $('.panel-group').on('mouseenter', '.try-url', function(){
+      var link = $(this).closest('.panel-group').find('textarea').val();
+      link = link.replace(/(\r\n|\n|\r| )/gm,"");
+      $(this).attr('href', link);
+    });
+    // prevent accidental (annoying) click and drag link url
+    $('.example').attr('ondragstart', 'return false').attr('draggable', 'false');
+    // panel display
+    var anchor = window.location.hash.replace("#", "");
+    $('#' + anchor).collapse('show');
+  });
+</script>
+{% endblock %}

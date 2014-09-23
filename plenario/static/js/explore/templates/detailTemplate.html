@@ -8,7 +8,7 @@
 <div class='col-md-5'>
     <div id="filters">
         <h3 class='detail-header'>
-            <%= meta.human_name %>
+            <%= meta.attribution %>: <%= meta.human_name %>
         </h3>
         <form class='form' role="form">
             <div class='row'>
@@ -83,7 +83,7 @@
         <p>View the API queries that are used on this page. <a href='/api-docs/'>Read the API docs</a>.</p>
         <ul class=''>
             <li><a class='download-geojson' target="_blank" href="#"><code>/v1/api/grid/&hellip;</code></a></li>
-            <li><a href="<%= time_series %>" target="_blank"><code>/v1/api/timeseries/&hellip;</code></a></li>
+            <li><a href="<%= time_series %>" target="_blank"><code>/v1/api/detail-aggregate/&hellip;</code></a></li>
             <li><a href="<%= points %>" target="_blank"><code>/v1/api/detail/&hellip;</code></a></li>
             <li><a href="<%= fields_list %>" target="_blank"><code>/v1/api/fields/&hellip;</code></a></li>
         </ul>

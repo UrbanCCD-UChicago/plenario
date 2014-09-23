@@ -7,12 +7,12 @@
           <h1 class="panel-title">Note</h1>
         </div>
         <div class="panel-body">
-          <p class="lead">The easiest way to access Plenar.io&rsquo;s data and to build your own queries is via the <a href="{{ url_for('views.explore_view') }}">Data Explorer</a>.</p>
+          <p class="lead">The easiest way to access Plenario&rsquo;s data and to build your own queries is via the <a href="{{ url_for('views.explore_view') }}">Data Explorer</a>.</p>
         </div>
       </div>
       
       <h2 id="docs">For developers</h2>
-      <p><strong></strong> The Plenar.io RESTful API can be used to perform custom geospatial and temporal queries.</p>  
+      <p><strong></strong> The Plenario RESTful API can be used to perform custom geospatial and temporal queries.</p>  
 
       <p>A few things to know:</p>
 
@@ -25,6 +25,7 @@
       <h2 id='endpoints'>Endpoints</h2>
       <p>Currently there are nine API endpoints:</p>
 
+      <h3>Data about the data</h3>
       <div class="panel-group" id="accordion-api-datasets">
         <div class="panel panel-default">
           <div class="panel-heading">
@@ -40,7 +41,23 @@
               <p>This is the “data about the data” endpoint. It contains a record for each dataset.</p>
 
               <p><strong>Query Parameters</strong></p>
-              <p>This API endpoint doesn't take in any query parameters.</p>
+              <p>All query parameters are optional.</p>
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Default value</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>dataset_name</code></strong></td>
+                    <td>none</td>
+                    <td>Machine version of the dataset name. Supports the <code>__like</code> and <code>__in</code> operators for fetching multiple.</td>
+                  </tr>
+                </tbody>
+              </table>
 
               <p><strong>Response</strong></p>
               <table class='table table-bordered'>
@@ -86,7 +103,7 @@
                 <p><strong>Example</strong></p>
                 <p>
                   <a href='/v1/api/datasets'>http://plenar.io/v1/api/datasets</a><br />
-                  Returns a list of datasets available in Plenar.io
+                  Returns a list of datasets available in Plenario
                 </p>
               </div>
             </div>
@@ -94,6 +111,58 @@
         </div>
       </div>
 
+      <div class="panel-group" id="accordion-api-fields">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <a data-toggle="collapse" data-parent="#accordion-api-fields" href="#collapse-api-fields" id="api-fields">
+              <span class='label label-info'>GET</span>
+              <strong><code>/v1/api/fields/&lt;dataset_name&gt;/</code></strong>
+              <p class='pull-right'>list available fields for a dataset</p>
+              <div class='clearfix'></div>
+            </a>
+          </div>
+          <div id="collapse-api-fields" class="panel-collapse collapse">
+            <div class="panel-body">
+              <p>
+                  Gives you a listing of all the fields and their data types for the given
+                  dataset. This is useful for figuring out how to structure a query against the <code>/v1/api/detail/</code> or <code>/v1/api/detail-aggregate/</code> endpoints.
+              </p>
+
+              <p><strong>Query Parameters</strong></p>
+              <p>This API endpoint doesn't take in any query parameters.</p>
+
+              <p><strong>Response</strong></p>
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>field_type</code></strong></td>
+                    <td><a href='http://www.postgresql.org/docs/9.3/interactive/datatype.html'>Postgres data type</a> for given field.</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>field_name</code></strong></td>
+                    <td>Name of database field. Useful for performing additional queries using the <code>/v1/api/detail-aggregate/</code> and <code>/v1/api/detail/</code> endpoints.</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class='well examples'>
+                <p><strong>Example</strong></p>
+                
+                <p><a href='/v1/api/fields/crimes_2001_to_present'>http://plenar.io/v1/api/fields/crimes_2001_to_present</a><br />
+                Field definitions for Chicago crime report dataset</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Aggregate data</h3>
       <div class="panel-group" id="accordion-api-timeseries">
         <div class="panel panel-default">
           <div class="panel-heading">
@@ -131,7 +200,6 @@
 
                             <p>Supported values:</p>
                             <ul>
-                              <li>hour</li>
                               <li>day</li>
                               <li>week</li>
                               <li>month</li>
@@ -142,7 +210,7 @@
                         </tr>
                         <tr>
                           <td><strong><code>obs_date__ge</code></strong></td>
-                          <td>180 days ago</td>
+                          <td>90 days ago</td>
                           <td>Obversations greater than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
                         </tr>
                         <tr>
@@ -154,7 +222,7 @@
                           <td><strong><code>dataset_name</code></strong></td>
                           <td>none</td>
                           <td>
-                            <p>Machine version of the dataset name as you get it from the <code>/v1/api/</code> endpoint. If not provided, returns all available datasets.</p>
+                            <p>Machine version of the dataset name as you get it from the <code>/v1/api/datasets</code> endpoint. If not provided, returns all available datasets.</p>
                             <p>More than one dataset can be requested by using <code>dataset_name__in</code>  and listing multiple comma separated dataset names.</p>
                           </td>
                         </tr>
@@ -283,57 +351,6 @@
         </div>
       </div>
 
-      <div class="panel-group" id="accordion-api-fields">
-        <div class="panel panel-default">
-          <div class="panel-heading">
-            <a data-toggle="collapse" data-parent="#accordion-api-fields" href="#collapse-api-fields" id="api-fields">
-              <span class='label label-info'>GET</span>
-              <strong><code>/v1/api/fields/&lt;dataset_name&gt;/</code></strong>
-              <p class='pull-right'>list available fields for a dataset</p>
-              <div class='clearfix'></div>
-            </a>
-          </div>
-          <div id="collapse-api-fields" class="panel-collapse collapse">
-            <div class="panel-body">
-              <p>
-                  Gives you a listing of all the fields and their data types for the given
-                  dataset. This is useful for figuring out how to structure a query against the <code>/v1/api/detail/</code> or <code>/v1/api/detail-aggregate/</code> endpoints.
-              </p>
-
-              <p><strong>Query Parameters</strong></p>
-              <p>This API endpoint doesn't take in any query parameters.</p>
-
-              <p><strong>Response</strong></p>
-              <table class='table table-bordered'>
-                <thead>
-                  <tr>
-                    <th>Parameter</th>
-                    <th>Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><strong><code>field_type</code></strong></td>
-                    <td><a href='http://www.postgresql.org/docs/9.3/interactive/datatype.html'>Postgres data type</a> for given field.</td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>field_name</code></strong></td>
-                    <td>Name of database field. Useful for performing additional queries using the <code>/v1/api/detail-aggregate/</code> and <code>/v1/api/detail/</code> endpoints.</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div class='well examples'>
-                <p><strong>Example</strong></p>
-                
-                <p><a href='/v1/api/fields/crimes_2001_to_present'>http://plenar.io/v1/api/fields/crimes_2001_to_present</a><br />
-                Field definitions for Chicago crime report dataset</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div class="panel-group" id="accordion-api-detail-aggregate">
         <div class="panel panel-default">
           <div class="panel-heading">
@@ -428,7 +445,6 @@
 
                       <p>Supported values:</p>
                       <ul>
-                        <li>hour</li>
                         <li>day</li>
                         <li>week</li>
                         <li>month</li>
@@ -439,7 +455,7 @@
                   </tr>
                   <tr>
                     <td><strong><code>obs_date__ge</code></strong></td>
-                    <td>180 days ago</td>
+                    <td>90 days ago</td>
                     <td>Obversations greater than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
                   </tr>
                   <tr>
@@ -497,144 +513,6 @@
                 
                 <p><a href='/v1/api/detail-aggregate/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1&iucr=0110'>http://plenar.io/v1/api/detail-aggregate/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1&iucr=0110</a><br />
                 Chicago crime reports since Jan 1st 2012, aggregated by year with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel-group" id="accordion-api-detail">
-        <div class="panel panel-default">
-          <div class="panel-heading">
-            <a data-toggle="collapse" data-parent="#accordion-api-detail" href="#collapse-api-detail" id="api-detail">
-              <span class='label label-info'>GET</span>
-              <strong><code>/v1/api/detail/</code></strong>
-              <p class='pull-right'>query a single dataset and return all raw data</p>
-              <div class='clearfix'></div>
-            </a>
-          </div>
-          <div id="collapse-api-detail" class="panel-collapse collapse">
-            <div class="panel-body">
-              <p>
-                  Query a particular dataset and get back the raw individual records.
-              </p>
-
-              <p><strong>Query parameters</strong></p>
-              <p>All query parameters are optional except for <code>dataset_name</code>.</p>
-              <table class='table table-bordered'>
-                <thead>
-                  <tr>
-                    <th>Parameter</th>
-                    <th>Default value</th>
-                    <th>Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><strong><code>dataset_name</code></strong></td>
-                    <td>none</td>
-                    <td><strong>Required.</strong> Machine version of the dataset name as you get it from the <code>/v1/api/</code> endpoint.</td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>weather</code></strong></td>
-                    <td>false</td>
-                    <td>
-                      <p>If set to <strong>true</strong>, returns a weather observation for each record. The observation will be from the closest NOAA weather station.</p>
-                      <p>If the dataset has observations with a <strong>date and time</strong>, an hour weather observation based on <code>/v1/api/weather/hourly/</code> will be returned. Otherwise, it will return a daily weather observation based on <code>/v1/api/weather/daily/</code></p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>[dataset_field]*</code></strong></td>
-                    <td>none</td>
-                    <td>
-                      <p>Any available dataset field. Discoverable via the <code>/v1/api/fields/&lt;dataset_name&gt;/</code> endpoint. Any number of these query parameters can be chained together and are linked together with a SQL <code>AND</code> under the hood.</p>
-
-                      <p><strong>Query operators</strong><br/> For any given <code>dataset_field</code>, the query can be modified with any of the following operators:</p>
-
-                      <table class='table table-bordered'>
-                        <thead>
-                          <tr>
-                            <th>Operator</th>
-                            <th>Description</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td><strong><code>__gt</code></strong> </td>
-                            <td>greater than (<code>&gt;</code>)</td>
-                          </tr>
-                          <tr>
-                            <td><strong><code>__ge</code></strong></td>
-                            <td> greater than or equal to (<code>&gt;=</code>)</td>
-                          </tr>
-                          <tr>
-                            <td><strong><code>__lt</code></strong> </td>
-                            <td>less than (<code>&lt;</code>)</td>
-                          </tr>
-                          <tr>
-                            <td><strong><code>__le</code></strong></td>
-                            <td> less than or equal to (<code>&lt;=</code>)</td>
-                          </tr>
-                          <tr>
-                            <td><strong><code>__ne</code></strong> </td>
-                            <td>not equal (<code>!=</code>)</td>
-                          </tr>
-                          <tr>
-                            <td><strong><code>__like</code></strong> </td>
-                            <td>like value with % wildcards, case sensitive (<code>LIKE 'State%'</code>)</td>
-                          </tr>
-                          <tr>
-                            <td><strong><code>__ilike</code></strong> </td>
-                            <td>like value with % wildcards, case insensitive (<code>ILIKE 'state%'</code>)</td>
-                          </tr>
-                          <tr>
-                            <td><strong><code>__in</code></strong> </td>
-                            <td>within a list of provided values (<code>IN ('list', 'of', 'values')</code>)</td>
-                          </tr>
-                        </tbody>
-                      </table>
-
-                      <p><strong>Example:</strong> <code>ward__ge=48</code> translates to "ward >= 48" in SQL</p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>obs_date</code></strong></td>
-                    <td>greater than or equal to 30 days ago</td>
-                    <td>Date of obversations. This can
-                  have filters applied such as <code>__gt</code> (greater than) and <code>__lt</code> (less than).</td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>census_block</code></strong></td>
-                    <td>none</td>
-                    <td>
-                      <p>Census block <a href='https://www.census.gov/geo/reference/codes/cou.html'>FIPS code</a>. Supports the <code>__like</code> operator for querying states, counties, tracts and blocks.</p>
-
-                      <p><img src='/static/images/fips-code.png' alt='FIPS codes' class='img-responsive'/></p>
-                      <p><strong>Example:</strong> <code>census_block__like=17031241400%</code> will fetch census tract '17031241400'</p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>location_geom__within</code></strong></td>
-                    <td>none</td>
-                    <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest.</td>
-                  </tr>
-                  <tr>
-                    <td><strong><code>data_type</code></strong></td>
-                    <td>json</td>
-                    <td>Response data format. Current options are <code>json</code> and <code>csv</code>. </td>
-                  </tr>
-
-                </tbody>
-              </table>
-
-              <p><strong>Response</strong></p>
-              <p>The API responds with a list of raw records for the particular dataset. The fields returned will vary per dataset.</p>
-
-              <div class='well examples'>
-                <p><strong>Example</strong></p>
-                
-                <p><a href='/v1/api/detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110'>http://plenar.io/v1/api/detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110</a><br />
-                Chicago crime reports since Jan 1st 2014 with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)</p>
               </div>
             </div>
           </div>
@@ -721,7 +599,7 @@
                   </tr>
                   <tr>
                     <td><strong><code>obs_date__ge</code></strong></td>
-                    <td>180 days ago</td>
+                    <td>90 days ago</td>
                     <td>Obversations greater than or equal to a given date. Dates must be formatted as <strong>YYYY-MM-DD</strong></td>
                   </tr>
                   <tr>
@@ -812,6 +690,153 @@
                 <p><strong>Example</strong></p>
                 <p><a href='/v1/api/grid/?obs_date__le=2014%2F09%2F05&obs_date__ge=2014%2F03%2F09&dataset_name=311_service_requests_tree_trims&ward__in=2%2C42%2C32'>http://plenar.io/v1/api/grid/?obs_date__le=2014%2F09%2F05&obs_date__ge=2014%2F03%2F09&dataset_name=311_service_requests_tree_trims&ward__in=2%2C42%2C32</a><br />
                 311 tree trim requests between March 9, 2014 and September 5th, 2014 for Wards 2, 42 and 32</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Raw data</h3>
+      <div class="panel-group" id="accordion-api-detail">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <a data-toggle="collapse" data-parent="#accordion-api-detail" href="#collapse-api-detail" id="api-detail">
+              <span class='label label-info'>GET</span>
+              <strong><code>/v1/api/detail/</code></strong>
+              <p class='pull-right'>query a single dataset and return all raw data</p>
+              <div class='clearfix'></div>
+            </a>
+          </div>
+          <div id="collapse-api-detail" class="panel-collapse collapse">
+            <div class="panel-body">
+              <p>
+                  Query a particular dataset and get back the raw individual records.
+              </p>
+
+              <p><strong>Query parameters</strong></p>
+              <p>All query parameters are optional except for <code>dataset_name</code>.</p>
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Default value</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>dataset_name</code></strong></td>
+                    <td>none</td>
+                    <td><strong>Required.</strong> Machine version of the dataset name as you get it from the <code>/v1/api/</code> endpoint.</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>weather</code></strong></td>
+                    <td>false</td>
+                    <td>
+                      <p>If set to <strong>true</strong>, returns a weather observation for each record. The observation will be from the closest NOAA weather station.</p>
+                      <p>If the dataset has observations with a <strong>date and time</strong>, an hourly weather observation based on <code>/v1/api/weather/hourly/</code> will be returned. Otherwise, it will return a daily weather observation based on <code>/v1/api/weather/daily/</code>.</p>
+                      <p><strong>* Please note</strong> that there is a <a href="https://github.com/UrbanCCD-UChicago/plenario/issues/118">known issue</a> where records whose nearest weather station did not record an observation near the record's timestamp (for instance, if the station was closed) are not returned when <code>weather=true</code>. To work around this, you can supply <code>weather=false</code> to collect the missing records, and then call <code>/v1/api/weather/hourly/</code> or <code>/v1/api/weather/daily/</code> to fill in the missing weather data using the next-closest station (which you can find using <code>/v1/api/weather-stations/</code>).</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>[dataset_field]*</code></strong></td>
+                    <td>none</td>
+                    <td>
+                      <p>Any available dataset field. Discoverable via the <code>/v1/api/fields/&lt;dataset_name&gt;/</code> endpoint. Any number of these query parameters can be chained together and are linked together with a SQL <code>AND</code> under the hood.</p>
+
+                      <p><strong>Query operators</strong><br/> For any given <code>dataset_field</code>, the query can be modified with any of the following operators:</p>
+
+                      <table class='table table-bordered'>
+                        <thead>
+                          <tr>
+                            <th>Operator</th>
+                            <th>Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td><strong><code>__gt</code></strong> </td>
+                            <td>greater than (<code>&gt;</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__ge</code></strong></td>
+                            <td> greater than or equal to (<code>&gt;=</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__lt</code></strong> </td>
+                            <td>less than (<code>&lt;</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__le</code></strong></td>
+                            <td> less than or equal to (<code>&lt;=</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__ne</code></strong> </td>
+                            <td>not equal (<code>!=</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__like</code></strong> </td>
+                            <td>like value with % wildcards, case sensitive (<code>LIKE 'State%'</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__ilike</code></strong> </td>
+                            <td>like value with % wildcards, case insensitive (<code>ILIKE 'state%'</code>)</td>
+                          </tr>
+                          <tr>
+                            <td><strong><code>__in</code></strong> </td>
+                            <td>within a list of provided values (<code>IN ('list', 'of', 'values')</code>)</td>
+                          </tr>
+                        </tbody>
+                      </table>
+
+                      <p><strong>Example:</strong> <code>ward__ge=48</code> translates to "ward >= 48" in SQL</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>obs_date</code></strong></td>
+                    <td>greater than or equal to 30 days ago</td>
+                    <td>Date of obversations. This can
+                  have filters applied such as <code>__gt</code> (greater than) and <code>__lt</code> (less than).</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>census_block</code></strong></td>
+                    <td>none</td>
+                    <td>
+                      <p>Census block <a href='https://www.census.gov/geo/reference/codes/cou.html'>FIPS code</a>. Supports the <code>__like</code> operator for querying states, counties, tracts and blocks.</p>
+
+                      <p><img src='/static/images/fips-code.png' alt='FIPS codes' class='img-responsive'/></p>
+                      <p><strong>Example:</strong> <code>census_block__like=17031241400%</code> will fetch census tract '17031241400'</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>location_geom__within</code></strong></td>
+                    <td>none</td>
+                    <td>A <a href='https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify'>stringified</a> <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest.</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>data_type</code></strong></td>
+                    <td>json</td>
+                    <td>Response data format. Current options are <code>json</code> and <code>csv</code>. </td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>offset</code></strong></td>
+                    <td>none</td>
+                    <td>
+                      <p>Used to paginate through results of more than 500.</p>
+                      <p><strong>Example:</strong> <code>offset=500</code> will fetch the second page of results.</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p><strong>Response</strong></p>
+              <p>The API responds with a list of raw records for the particular dataset. The fields returned will vary per dataset. Response is limited to 500 results, which can be paginated by using the <code>offset</code> parameter.</p>
+
+              <div class='well examples'>
+                <p><strong>Example</strong></p>
+                
+                <p><a href='/v1/api/detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110'>http://plenar.io/v1/api/detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110</a><br />
+                Chicago crime reports since Jan 1st 2014 with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)</p>
               </div>
             </div>
           </div>
@@ -1120,7 +1145,7 @@
               </table>
 
               <p><strong>Response</strong></p>
-              <p>Weather observations and attributes (described above) that match the provided query parameters.</p>
+              <p>Weather observations and attributes (described above) that match the provided query parameters. Response is limited to 500 results, which can be paginated by using the <code>offset</code> parameter.</p>
 
               <div class='well examples'>
                 <p><strong>Examples</strong></p>
@@ -1323,12 +1348,12 @@
               </table>
 
               <p><strong>Response</strong></p>
-              <p>Hourly weather observations and attributes (described above) that match the provided query parameters.</p>
+              <p>Hourly weather observations and attributes (described above) that match the provided query parameters. Response is limited to 500 results, which can be paginated by using the <code>offset</code> parameter.</p>
 
               <div class='well examples'>
                 <p><strong>Example</strong></p>
 
-                <p><a href='/v1/api/weather/hourly/?wban_code=14819&date__ge=2014-09-01'>http://plenar.io/v1/api/weather/hourly/?wban_code=14819&date__ge=2014-09-01</a><br />
+                <p><a href='/v1/api/weather/hourly/?wban_code=14819&datetime__ge=2014-09-01'>http://plenar.io/v1/api/weather/hourly/?wban_code=14819&datetime__ge=2014-09-01</a><br />
                 All hourly weather observations at CHICAGO/MIDWAY since September 1st, 2014</p>
               </div>
             </div>
@@ -1349,7 +1374,7 @@
         <tbody>
           <tr>
             <td><strong><code>status</code></strong></td>
-            <td><strong>ok</strong> if query was sucessful, <strong>error</strong> if not.</td>
+            <td><strong>ok</strong> if query was successful, <strong>error</strong> if not.</td>
           </tr>
           <tr>
             <td><strong><code>query</code></strong></td>

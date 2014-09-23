@@ -13,7 +13,7 @@ var DetailView = Backbone.View.extend({
         // console.log('detail-view init')
         // console.log(this.query)
 
-        var start = moment().subtract('d', 180).format('MM/DD/YYYY');
+        var start = moment().subtract('d', 90).format('MM/DD/YYYY');
         var end = moment().format('MM/DD/YYYY');
 
         if (this.query) {
@@ -38,7 +38,7 @@ var DetailView = Backbone.View.extend({
             minZoom: 1
         };
         this.map = L.map('map', map_options).setView(this.center, 11);
-        L.tileLayer('https://{s}.tiles.mapbox.com/v3/derekeder.hehblhbj/{z}/{x}/{y}.png', {
+        L.tileLayer('https://{s}.tiles.mapbox.com/v3/datamade.hn83a654/{z}/{x}/{y}.png', {
           attribution: '<a href="http://www.mapbox.com/about/maps/" target="_blank">Terms &amp; Feedback</a>'
         }).addTo(this.map);
         this.legend = L.control({position: 'bottomright'});
@@ -52,13 +52,25 @@ var DetailView = Backbone.View.extend({
                 from, to;
 
             labels.push('<i style="background-color:' + self.getColor(0) + '"></i> 0');
-            labels.push('<i style="background-color:' + self.getColor(1) + '"></i> 1 &ndash; ' + grades[2]);
+            if (grades[2] == 1)
+                labels.push('<i style="background-color:' + self.getColor(1) + '"></i> 1');
+            else
+                labels.push('<i style="background-color:' + self.getColor(1) + '"></i> 1 &ndash; ' + grades[2]);
+
             for (var i = 2; i < grades.length; i++) {
                 from = grades[i] + 1;
                 to = grades[i + 1];
-                labels.push(
-                    '<i style="background-color:' + self.getColor(from + 1) + '"></i> ' +
-                    from + (to ? '&ndash;' + to : '+'));
+
+                if (from == to) {
+                    labels.push(
+                        '<i style="background-color:' + self.getColor(from + 1) + '"></i> ' +
+                        from);
+                }
+                else {
+                    labels.push(
+                        '<i style="background-color:' + self.getColor(from + 1) + '"></i> ' +
+                        from + (to ? '&ndash;' + to : '+'));
+                }
             }
 
             div.innerHTML = '<div><strong>' + self.meta['human_name'] + '</strong><br />' + labels.join('<br />') + '</div>';
@@ -97,7 +109,7 @@ var DetailView = Backbone.View.extend({
         self.field_options = {}
         $.when($.get('/v1/api/fields/' + self.query['dataset_name'])).then(function(field_options){
             self.field_options = field_options;
-        
+
             // populate filters from query
             var params_to_exclude = ['location_geom__within', 'obs_date__ge', 'obs_date__le', 'dataset_name', 'resolution' , 'center', 'buffer', 'agg'];
 
@@ -184,7 +196,7 @@ var DetailView = Backbone.View.extend({
 
     addFilter: function(e){
         var filter_ids = []
-        $(".filter_row").each(function (key, val) { 
+        $(".filter_row").each(function (key, val) {
             filter_ids.push(parseInt($(val).attr("data-id")));
         });
         new FilterView({el: '#filter_builder', attributes: {filter_dict: {"id" : (Math.max.apply(null, filter_ids) + 1), "field" : "", "value" : "", "operator" : "", "removable": true }, field_options: this.field_options}});
@@ -204,7 +216,7 @@ var DetailView = Backbone.View.extend({
 
         start = moment(start);
         if (!start){
-            start = moment().subtract('days', 180);
+            start = moment().subtract('days', 90);
         }
         end = moment(end)
         if(!end){
@@ -224,7 +236,7 @@ var DetailView = Backbone.View.extend({
         query['resolution'] = $('#spatial-agg-filter').val();
 
         // update query from filters
-        $(".filter_row").each(function (key, val) { 
+        $(".filter_row").each(function (key, val) {
 
             val = $(val);
             // console.log(val)
@@ -244,6 +256,7 @@ var DetailView = Backbone.View.extend({
             // console.log(this.query)
             new DetailView({el: '#map-view', attributes: {query: query, meta: this.meta}})
             var route = 'detail/' + $.param(query)
+            _gaq.push(['_trackPageview', route]);
             router.navigate(route)
         } else {
             $('#map-view').spin(false);
@@ -266,7 +279,7 @@ var DetailView = Backbone.View.extend({
         $.each(self.filters, function(key, val){
             delete points_query[key];
         });
-        
+
         if (resp) { resp.undelegateEvents(); }
         resp = new ResponseView({el: '#list-view', attributes: {query: points_query}});
         var attrs = { resp: resp }
@@ -278,6 +291,7 @@ var DetailView = Backbone.View.extend({
         map = new MapView({el: '#map-view', attributes: attrs});
 
         var route = "aggregate/" + $.param(points_query);
+        _gaq.push(['_trackPageview', route]);
         router.navigate(route);
     },
 
@@ -308,10 +322,15 @@ var DetailView = Backbone.View.extend({
         })
     },
     getCutoffs: function(values){
-        var jenks_cutoffs = jenks(values, 4);
-        jenks_cutoffs.unshift(0); // set the bottom value to 0
-        jenks_cutoffs[1] = 1; // set the second value to 1
-        jenks_cutoffs.pop(); // last item is the max value, so dont use it
+
+        if (Math.max.apply(null, values) < 5)
+            jenks_cutoffs = [0,1,2,3,4]
+        else {
+            var jenks_cutoffs = jenks(values, 4);
+            jenks_cutoffs.unshift(0); // set the bottom value to 0
+            jenks_cutoffs[1] = 1; // set the second value to 1
+            jenks_cutoffs.pop(); // last item is the max value, so dont use it
+        }
         return jenks_cutoffs;
     },
     getColor: function(d){

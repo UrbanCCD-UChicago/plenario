@@ -13,6 +13,7 @@ var AboutView = Backbone.View.extend({
         var self = this;
         $.when(this.get_datasets()).then(
             function(resp){
+                resp = resp['objects']
                 self.$el.spin(false);
                 self.$el.html(template_cache('aboutTemplate', {datasets:resp}));
                 var dataObjs = {}
@@ -27,7 +28,7 @@ var AboutView = Backbone.View.extend({
                     "aoColumns": [
                         null,
                         null,
-                        null
+                        { "bSortable": false }
                     ],
                     "paging": false,
                     "searching": false,
@@ -48,7 +49,7 @@ var AboutView = Backbone.View.extend({
         var start = $('#start-date-filter').val();
         var end = $('#end-date-filter').val();
         start = moment(start);
-        if (!start){ start = moment().subtract('days', 180); }
+        if (!start){ start = moment().subtract('days', 90); }
         end = moment(end)
         if(!end){ end = moment(); }
         start = start.startOf('day').format('YYYY/MM/DD');
@@ -65,7 +66,8 @@ var AboutView = Backbone.View.extend({
         this.undelegateEvents();
         $('#map-view').empty();
         new DetailView({el: '#map-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})
-        var route = 'detail/' + $.param(query)
+        var route = 'detail/' + $.param(query);
+        _gaq.push(['_trackPageview', route]);
         router.navigate(route)
     }
 });

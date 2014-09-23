@@ -29,8 +29,15 @@ from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
 from plenario.utils.helpers import get_socrata_data_info, slugify, increment_datetime_aggregate
 from plenario.tasks import add_dataset
+from plenario.settings import CACHE_CONFIG
+
+cache = Cache(config=CACHE_CONFIG)
 
 API_VERSION = '/v1'
+RESPONSE_LIMIT = 500
+CACHE_TIMEOUT = 60*60*24*7
+VALID_DATA_TYPE = ['csv', 'json']
+VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
 WEATHER_COL_LOOKUP = {
     'daily': {
         'temp_lo': 'temp_min',
@@ -47,7 +54,6 @@ WEATHER_COL_LOOKUP = {
 }
 
 api = Blueprint('api', __name__)
-cache = Cache(config={'CACHE_TYPE': 'simple'})
 dthandler = lambda obj: obj.isoformat() if isinstance(obj, date) else None
 
 def crossdomain(origin=None, methods=None, headers=None,
@@ -97,25 +103,39 @@ def make_cache_key(*args, **kwargs):
     # print 'cache_key:', (path+args)
     return (path + args).encode('utf-8')
 
+@api.route(API_VERSION + '/api/flush-cache')
+def flush_cache():
+    cache.clear()
+    resp = make_response(json.dumps({'status' : 'ok', 'message' : 'cache flushed!'}))
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
 @api.route(API_VERSION + '/api/datasets')
-@cache.cached(timeout=60*60)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def meta():
     status_code = 200
-    resp = []
+    resp = {
+            'meta': {
+                'status': 'ok',
+                'message': '',
+            },
+            'objects': []
+        }
     dataset_name = request.args.get('dataset_name')
     if dataset_name:
         metas = session.query(MetaTable)\
             .filter(MetaTable.dataset_name == dataset_name).all()
     else:
         metas = session.query(MetaTable).all()
-    resp.extend([m.as_dict() for m in metas])
+    resp['objects'].extend([m.as_dict() for m in metas])
+    resp['meta']['total'] = len(resp['objects'])
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
 @api.route(API_VERSION + '/api/fields/<dataset_name>/')
-@cache.cached(timeout=60*60)
+@cache.cached(timeout=CACHE_TIMEOUT)
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
     try:
@@ -155,7 +175,7 @@ def dataset_fields(dataset_name):
     return resp
 
 @api.route(API_VERSION + '/api/weather-stations/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def weather_stations():
     raw_query_params = request.args.copy()
@@ -180,15 +200,10 @@ def weather_stations():
     return resp
 
 @api.route(API_VERSION + '/api/weather/<table>/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def weather(table):
     raw_query_params = request.args.copy()
-
-    # default the response limit to 1000 records
-    limit = raw_query_params.get('limit')
-    if not limit:
-        limit = 1000
 
     weather_table = Table('dat_weather_observations_%s' % table, Base.metadata,
         autoload=True, autoload_with=engine, extend_existing=True)
@@ -203,8 +218,11 @@ def weather(table):
         for clause in query_clauses:
             base_query = base_query.filter(clause)
 
-        if limit:
-            base_query = base_query.limit(limit)
+        base_query = base_query.order_by(weather_table.c.id.asc())
+        base_query = base_query.limit(RESPONSE_LIMIT) # returning the top 1000 records
+        if raw_query_params.get('offset'):
+            offset = raw_query_params['offset']
+            base_query = base_query.offset(int(offset))
         values = [r for r in base_query.all()]
         weather_fields = weather_table.columns.keys()
         station_fields = stations_table.columns.keys()
@@ -234,7 +252,7 @@ def weather(table):
 
 
 @api.route(API_VERSION + '/api/timeseries/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def dataset():
     raw_query_params = request.args.copy()
@@ -245,26 +263,40 @@ def dataset():
         agg = 'day'
     else:
         del raw_query_params['agg']
-    
-    # if no obs_date given, default to >= 180 days ago
-    obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
-    if not obs_dates:
-        six_months_ago = datetime.now() - timedelta(days=180)
+
+    # if no obs_date given, default to >= 90 days ago
+    if not raw_query_params.get('obs_date__ge'):
+        six_months_ago = datetime.now() - timedelta(days=90)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
 
-    # init from and to dates ad python datetimes
-    from_date = truncate(parse(raw_query_params['obs_date__ge']), agg)
-    if 'obs_date__le' in raw_query_params.keys():
-        to_date = parse(raw_query_params['obs_date__le'])
-    else:
-        to_date = datetime.now()
+    if not raw_query_params.get('obs_date__le'):
+        raw_query_params['obs_date__le'] = datetime.now().strftime('%Y-%m-%d') 
 
+    # set datatype
     datatype = 'json'
     if raw_query_params.get('data_type'):
         datatype = raw_query_params['data_type']
         del raw_query_params['data_type']
+
     mt = MasterTable.__table__
     valid_query, query_clauses, resp, status_code = make_query(mt,raw_query_params)
+    
+    # check for valid output format
+    if datatype not in VALID_DATA_TYPE:
+        valid_query = False
+        resp['meta']['status'] = 'error'
+        resp['meta']['message'] = "'%s' is an invalid output format" % datatype
+        resp = make_response(json.dumps(resp, default=dthandler), 400)
+        resp.headers['Content-Type'] = 'application/json'
+
+    # check for valid temporal aggregate
+    if agg not in VALID_AGG:
+        valid_query = False
+        resp['meta']['status'] = 'error'
+        resp['meta']['message'] = "'%s' is an invalid temporal aggregation" % agg
+        resp = make_response(json.dumps(resp, default=dthandler), 400)
+        resp.headers['Content-Type'] = 'application/json'
+
     if valid_query:
         time_agg = func.date_trunc(agg, mt.c['obs_date'])
         base_query = session.query(time_agg, 
@@ -277,6 +309,13 @@ def dataset():
             .group_by(time_agg)\
             .order_by(time_agg)
         values = [o for o in base_query.all()]
+
+        # init from and to dates ad python datetimes
+        from_date = truncate(parse(raw_query_params['obs_date__ge']), agg)
+        if 'obs_date__le' in raw_query_params.keys():
+            to_date = parse(raw_query_params['obs_date__le'])
+        else:
+            to_date = datetime.now()
 
         # build the response
         results = sorted(values, key=itemgetter(2))
@@ -316,33 +355,44 @@ def dataset():
         resp['meta']['query']['agg'] = agg
         resp['meta']['status'] = 'ok'
     
-    if datatype == 'json':
-        resp = make_response(json.dumps(resp, default=dthandler), status_code)
-        resp.headers['Content-Type'] = 'application/json'
-    elif datatype == 'csv':
-        csv_resp = []
-        fields = ['temporal_group']
-
-        i = 0
-        for k,g in groupby(resp['objects'], key=itemgetter('dataset_name')):
-            l_g = list(g)[0]
-            d = [l_g['items'][i]['datetime']] # step across the list to get temp_agg
-            i += 1
-            fields.append(l_g['dataset_name'])
-            for row in l_g['items']:
-                d.append(row['count'])
-
-            csv_resp.append(d)
-        csv_resp[0] = fields
-        csv_resp = make_csv(csv_resp)
-        resp = make_response(csv_resp, 200)
-        resp.headers['Content-Type'] = 'text/csv'
-        filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % (filedate)
+        if datatype == 'json':
+            resp = make_response(json.dumps(resp, default=dthandler), status_code)
+            resp.headers['Content-Type'] = 'application/json'
+        elif datatype == 'csv':
+ 
+            # response format
+            # temporal_group,dataset_name_1,dataset_name_2
+            # 2014-02-24 00:00:00,235,653
+            # 2014-03-03 00:00:00,156,624
+ 
+            fields = ['temporal_group']
+            for o in resp['objects']:
+                fields.append(o['dataset_name'])
+ 
+            csv_resp = []
+            i = 0
+            for k,g in groupby(resp['objects'], key=itemgetter('dataset_name')):
+                l_g = list(g)[0]
+                
+                j = 0
+                for row in l_g['items']:
+                    # first iteration, populate the first column with temporal_groups
+                    if i == 0: 
+                        csv_resp.append([row['datetime']])
+                    csv_resp[j].append(row['count'])
+                    j += 1
+                i += 1
+                    
+            csv_resp.insert(0, fields)
+            csv_resp = make_csv(csv_resp)
+            resp = make_response(csv_resp, 200)
+            resp.headers['Content-Type'] = 'text/csv'
+            filedate = datetime.now().strftime('%Y-%m-%d')
+            resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % (filedate)
     return resp
 
 @api.route(API_VERSION + '/api/detail/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail():
     raw_query_params = request.args.copy()
@@ -351,11 +401,6 @@ def detail():
     if not obs_dates:
         six_months_ago = datetime.now() - timedelta(days=30)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
-
-    # default the response limit to 1000 records
-    limit = raw_query_params.get('limit')
-    if not limit:
-        limit = 1000
     
     include_weather = False
     if raw_query_params.get('weather') is not None:
@@ -363,6 +408,7 @@ def detail():
         del raw_query_params['weather']
     agg, datatype, queries = parse_join_query(raw_query_params)
     order_by = raw_query_params.get('order_by')
+    offset = raw_query_params.get('offset')
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
     if not raw_query_params.get('dataset_name'):
@@ -427,8 +473,11 @@ def detail():
                 if order_by:
                     col, order = order_by.split(',')
                     base_query = base_query.order_by(getattr(mt.c[col], order)())
-                if limit:
-                    base_query = base_query.limit(limit)
+                else:
+                    base_query = base_query.order_by(mt.c.master_row_id.asc())
+                base_query = base_query.limit(RESPONSE_LIMIT)
+                if offset:
+                    base_query = base_query.offset(int(offset))
                 values = [r for r in base_query.all()]
                 for value in values:
                     d = {f:getattr(value, f) for f in dataset_fields}
@@ -447,8 +496,14 @@ def detail():
         resp = make_response(json.dumps(resp, default=dthandler), status_code)
         resp.headers['Content-Type'] = 'application/json'
     elif datatype == 'csv':
-        csv_resp = [fieldnames]
-        csv_resp.extend([v[1:] for v in values])
+        csv_resp = [dataset_fields]
+        if include_weather:
+            csv_resp = [dataset_fields + weather_fields]
+        for value in values:
+            d = [getattr(value, f) for f in dataset_fields]
+            if include_weather:
+                d.extend([getattr(value, f) for f in weather_fields])
+            csv_resp.append(d)
         resp = make_response(make_csv(csv_resp), 200)
         filedate = datetime.now().strftime('%Y-%m-%d')
         dname = raw_query_params['dataset_name']
@@ -458,7 +513,7 @@ def detail():
     return resp
 
 @api.route(API_VERSION + '/api/detail-aggregate/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail_aggregate():
     raw_query_params = request.args.copy()
@@ -466,28 +521,53 @@ def detail_aggregate():
     if not agg:
         agg = 'day'
 
-    # if no obs_date given, default to >= 180 days ago
-    obs_dates = [i for i in raw_query_params.keys() if i.startswith('obs_date')]
-    if not obs_dates:
-        six_months_ago = datetime.now() - timedelta(days=180)
+    # if no obs_date given, default to >= 90 days ago
+    if not raw_query_params.get('obs_date__ge'):
+        six_months_ago = datetime.now() - timedelta(days=90)
         raw_query_params['obs_date__ge'] = six_months_ago.strftime('%Y-%m-%d')
 
-    # init from and to dates ad python datetimes
-    from_date = truncate(parse(raw_query_params['obs_date__ge']), agg)
-    if 'obs_date__le' in raw_query_params.keys():
-        to_date = parse(raw_query_params['obs_date__le'])
-    else:
-        to_date = datetime.now()
+    if not raw_query_params.get('obs_date__le'):
+        raw_query_params['obs_date__le'] = datetime.now().strftime('%Y-%m-%d') 
+
     mt = MasterTable.__table__
     valid_query, base_clauses, resp, status_code = make_query(mt, queries['base'])
+
+    # check for valid output format
+    if datatype not in VALID_DATA_TYPE:
+        valid_query = False
+        resp['meta']['status'] = 'error'
+        resp['meta']['message'] = "'%s' is an invalid output format" % datatype
+        resp = make_response(json.dumps(resp, default=dthandler), 400)
+        resp.headers['Content-Type'] = 'application/json'
+
+    # check for valid temporal aggregate
+    if agg not in VALID_AGG:
+        valid_query = False
+        resp['meta']['status'] = 'error'
+        resp['meta']['message'] = "'%s' is an invalid temporal aggregation" % agg
+        resp = make_response(json.dumps(resp, default=dthandler), 400)
+        resp.headers['Content-Type'] = 'application/json'
+
     if valid_query:
         time_agg = func.date_trunc(agg, mt.c['obs_date'])
         base_query = session.query(time_agg, func.count(mt.c.dataset_row_id))
-        dname = raw_query_params['dataset_name']
-        dataset = Table('dat_%s' % dname, Base.metadata,
-            autoload=True, autoload_with=engine,
-            extend_existing=True)
-        valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
+        dname = raw_query_params.get('dataset_name')
+
+        try:
+            dataset = Table('dat_%s' % dname, Base.metadata,
+                autoload=True, autoload_with=engine,
+                extend_existing=True)
+            valid_query, detail_clauses, resp, status_code = make_query(dataset, queries['detail'])
+        except:
+            valid_query = False
+            resp['meta']['status'] = 'error'
+            if not dname:
+                resp['meta']['message'] = "dataset_name' is required"
+            else:
+                resp['meta']['message'] = "unable to find dataset '%s'" % dname
+            resp = make_response(json.dumps(resp, default=dthandler), 400)
+            resp.headers['Content-Type'] = 'application/json'
+
         if valid_query:
             pk = [p.name for p in dataset.primary_key][0]
             base_query = base_query.join(dataset, mt.c.dataset_row_id == dataset.c[pk])
@@ -497,6 +577,13 @@ def detail_aggregate():
                 base_query = base_query.filter(clause)
             values = [r for r in base_query.group_by(time_agg).order_by(time_agg).all()]
             
+            # init from and to dates ad python datetimes
+            from_date = truncate(parse(raw_query_params['obs_date__ge']), agg)
+            if 'obs_date__le' in raw_query_params.keys():
+                to_date = parse(raw_query_params['obs_date__le'])
+            else:
+                to_date = datetime.now()
+
             items = []
             dense_matrix = []
             cursor = from_date
@@ -519,21 +606,30 @@ def detail_aggregate():
                     }
                 items.append(i)
 
-            resp['objects'] = items
-            # populate meta block
-            resp['meta']['status'] = 'ok'
-            resp['meta']['query'] = raw_query_params
-            loc = resp['meta']['query'].get('location_geom__within')
-            if loc:
-                resp['meta']['query']['location_geom__within'] = json.loads(loc)
-            resp['meta']['query']['agg'] = agg
+            if datatype == 'json':
+                resp['objects'] = items
+                resp['meta']['status'] = 'ok'
+                resp['meta']['query'] = raw_query_params
+                loc = resp['meta']['query'].get('location_geom__within')
+                if loc:
+                    resp['meta']['query']['location_geom__within'] = json.loads(loc)
+                resp['meta']['query']['agg'] = agg
 
-    resp = make_response(json.dumps(resp, default=dthandler), status_code)
-    resp.headers['Content-Type'] = 'application/json'
+                resp = make_response(json.dumps(resp, default=dthandler), status_code)
+                resp.headers['Content-Type'] = 'application/json'
+            elif datatype == 'csv':
+                outp = StringIO()
+                writer = csv.DictWriter(outp, fieldnames=items[0].keys())
+                writer.writeheader()
+                writer.writerows(items)
+                resp = make_response(outp.getvalue(), status_code)
+                resp.headers['Content-Type'] = 'text/csv'
+                filedate = datetime.now().strftime('%Y-%m-%d')
+                resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % (filedate)
     return resp
 
 @api.route(API_VERSION + '/api/grid/')
-@cache.cached(timeout=60*60, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def grid():
     raw_query_params = request.args.copy()
@@ -813,7 +909,7 @@ def parse_join_query(params):
         elif key == 'agg':
             agg = value
         elif key == 'data_type':
-            datatype = value
+            datatype = value.lower()
         else:
             queries['detail'][key] = value
     return agg, datatype, queries
