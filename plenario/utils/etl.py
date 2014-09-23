@@ -6,7 +6,7 @@ from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.models import MetaTable, MasterTable
 from plenario.utils.helpers import slugify, iter_column
-from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET
+from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET, DATA_DIR
 from urlparse import urlparse
 from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
@@ -20,10 +20,10 @@ from types import NoneType
 import plenario.settings
 from geoalchemy2.shape import from_shape
 from shapely.geometry import box
-from boto.s3.connection import S3Connection
+from boto.s3.connection import S3Connection, S3ResponseError
 from boto.s3.key import Key
 from cStringIO import StringIO
-    
+
 COL_TYPES = {
     'boolean': Boolean,
     'integer': Integer,
@@ -49,7 +49,7 @@ class PlenarioETL(object):
         Initializes with a dictionary representation of a
         row from the meta_master table.  If you include
         keys for all of the columns in the meta_master
-        table, it doen't hurt anything but the only keys
+        table, it doesn't hurt anything but the only keys
         that are required are:
 
         dataset_name:  Machine version of the dataset name.
@@ -109,15 +109,33 @@ class PlenarioETL(object):
 
         for k,v in meta.items():
             setattr(self, k, v)
-        s3_path = '%s/%s.csv.gz' % (self.dataset_name, 
-            datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
-        s3conn = S3Connection(AWS_ACCESS_KEY, AWS_SECRET_KEY)
-        bucket = s3conn.get_bucket(S3_BUCKET)
-        self.s3_key = Key(bucket)
-        self.s3_key.key = s3_path
+
         if data_types:
             self.data_types = data_types
+
+        self.s3_key = None
+
+        if (AWS_ACCESS_KEY != ''):
+            s3_path = '%s/%s.csv.gz' % (self.dataset_name, 
+                                        datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
+            try:
+                s3conn = S3Connection(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+                bucket = s3conn.get_bucket(S3_BUCKET)
+                self.s3_key = Key(bucket)
+                self.s3_key.key = s3_path
+            except S3ResponseError, e:
+                # XX: When this happens, we should log a more serious message
+                print "Failed to connect to S3 for filename '%s', trying to init locally" % self.dataset_name
+                self._init_local(self.dataset_name)                
+        else:
+            self._init_local(self.dataset_name)
     
+    def _init_local(self, dataset_name):
+        print "PlenarioETL._init_local('%s')" % dataset_name
+        # nothing to do here?
+        self.fname = '%s.csv.gz' % dataset_name
+        self.data_dir = DATA_DIR
+
     def _get_tables(self, table_name=None, all_tables=False):
         if all_tables:
             table_names = ['src', 'dup', 'new', 'dat']
@@ -137,7 +155,7 @@ class PlenarioETL(object):
                 pass
 
     def add(self, s3_path=None):
-        if s3_path:
+        if s3_path and s3_key:
             self.s3_key.key = s3_path
         else:
             self._download_csv()
@@ -154,7 +172,7 @@ class PlenarioETL(object):
         self._cleanup_temp_tables()
     
     def update(self, s3_path=None):
-        if s3_path:
+        if s3_path and s3_key:
             self.s3_key.key = s3_path
         else:
             self._download_csv()
@@ -177,15 +195,27 @@ class PlenarioETL(object):
 
     def _download_csv(self):
         r = requests.get(self.source_url, stream=True)
-        s = StringIO()
-        with gzip.GzipFile(fileobj=s, mode='wb') as f:
-            for chunk in r.iter_content(chunk_size=1024):
-                if chunk:
-                    f.write(chunk)
-                    f.flush()
-        s.seek(0)
-        self.s3_key.set_contents_from_file(s)
-        self.s3_key.make_public()
+ 
+        if (self.s3_key):
+            s = StringIO()
+            with gzip.GzipFile(fileobj=s, mode='wb') as f:
+                for chunk in r.iter_content(chunk_size=1024):
+                    if chunk:
+                        f.write(chunk)
+                        f.flush()
+            s.seek(0)
+            self.s3_key.set_contents_from_file(s)
+            self.s3_key.make_public()
+        else:
+            # write out a la shapefile_helpers
+            self.fpath = os.path.join(self.data_dir, self.fname)
+            if not os.path.exists(self.fpath):
+                gz_f = gzip.open(self.fpath, 'wb')
+                for chunk in r.iter_content(chunk_size=1024):
+                    if chunk:
+                        gz_f.write(chunk)
+                        gz_f.flush()
+                gz_f.close() # Explicitly close before re-opening to read.
  
     def _cleanup_temp_tables(self):
         self.src_table.drop(bind=engine, checkfirst=True)
@@ -203,7 +233,12 @@ class PlenarioETL(object):
                 autoload=True, autoload_with=engine, extend_existing=True)
         except NoSuchTableError:
             s = StringIO()
-            self.s3_key.get_contents_to_file(s)
+            if (self.s3_key):
+                self.s3_key.get_contents_to_file(s)
+            else:
+                # XX read the file out of DATA_DIR
+                with open(self.fpath, 'r') as f:
+                    s.write(f.read())
             s.seek(0)
             cols = [
                 Column('%s_row_id' % self.dataset_name, Integer, primary_key=True),
@@ -266,7 +301,11 @@ class PlenarioETL(object):
         conn = engine.raw_connection()
         cursor = conn.cursor()
         s = StringIO()
-        self.s3_key.get_contents_to_file(s)
+        if (self.s3_key):
+            self.s3_key.get_contents_to_file(s)
+        else:
+            with open(self.fpath, 'r') as f:
+                s.write(f.read())
         s.seek(0)
         with gzip.GzipFile(fileobj=s, mode='rb') as f:
             cursor.copy_expert(copy_st, f)

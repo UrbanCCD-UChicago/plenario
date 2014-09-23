@@ -28,7 +28,7 @@ def init_db():
     import plenario.models
     from plenario.utils.weather import WeatherETL, WeatherStationsETL
     from plenario.utils.shapefile_helpers import PlenarioShapeETL
-    from datetime import date
+    import datetime
 
     print 'creating master, meta and user tables'
     Base.metadata.create_all(bind=app_engine)
@@ -42,10 +42,10 @@ def init_db():
     s = WeatherStationsETL()
     s.initialize()
 
-    print 'initializing NOAA daily and hourly weather observations for %s/%s' % (date.now().month, date.now().year) 
+    print 'initializing NOAA daily and hourly weather observations for %s/%s' % (datetime.datetime.now().month, datetime.datetime.now().year) 
     print 'this will take a few minutes ...'
     e = WeatherETL()
-    e.initialize_month(date.now().year, date.now().month)
+    e.initialize_month(datetime.datetime.now().year, datetime.datetime.now().month)
 
     print 'initializing and populating US Census blocks'
     print 'this will *also* take a few minutes ...'

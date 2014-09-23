@@ -134,6 +134,8 @@ def normalize_column_type(l):
         return normal_types_set.pop()
     except ValueError:
         pass
+    except TypeError: #https://bugs.launchpad.net/dateutil/+bug/1247643
+        pass
 
     # Don't know what they are, so they must just be strings 
     return String
