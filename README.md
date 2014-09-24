@@ -138,8 +138,7 @@ Report it here: https://github.com/UrbanCCD-UChicago/plenario/issues
  
 * Fork the project.
 * Make your feature addition or bug fix.
-* Commit, do not mess with rakefile, version, or history.
-* Send me a pull request. Bonus points for topic branches.
+* Send us a pull request. Bonus points for topic branches.
 
 ## Copyright
 
