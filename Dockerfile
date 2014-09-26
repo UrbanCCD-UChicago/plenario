@@ -23,3 +23,8 @@ ADD start.sh /start.sh
 RUN chmod 0755 /start.sh
 
 CMD ["/start.sh"]
+
+RUN apt-get -y python-pip git redis
+RUN git clone git@github.com:UrbanCCD-UChicago/plenario.git
+RUN pip install -r plenario/requirements.txt
+
