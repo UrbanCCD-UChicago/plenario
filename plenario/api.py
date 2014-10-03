@@ -34,8 +34,8 @@ from plenario.settings import CACHE_CONFIG
 cache = Cache(config=CACHE_CONFIG)
 
 API_VERSION = '/v1'
-RESPONSE_LIMIT = 500
-CACHE_TIMEOUT = 60*60*24*7
+RESPONSE_LIMIT = 1000
+CACHE_TIMEOUT = 60*60*6
 VALID_DATA_TYPE = ['csv', 'json']
 VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
 WEATHER_COL_LOOKUP = {
