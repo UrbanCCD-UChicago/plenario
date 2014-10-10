@@ -45,6 +45,79 @@ def examples_view():
 def maintenance():
     return render_template('maintenance.html'), 503
 
+# Given a URL, this function returns a tuple (dataset_info, errors, socrata_source)
+# 
+def get_context_for_new_dataset(url):
+    dataset_info = {}
+    errors = []
+    socrata_source = False
+    if url:
+        four_by_four = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
+        errors = True
+        if four_by_four:
+            parsed = urlparse(url)
+            host = 'https://%s' % parsed.netloc
+            path = 'api/views'
+            view_url = '%s/%s/%s' % (host, path, four_by_four[-1])
+            dataset_info, errors, status_code = get_socrata_data_info(view_url)
+            if not errors:
+                socrata_source = True
+                dataset_info['submitted_url'] = url
+        if errors:
+            errors = []
+            try:
+                r = requests.get(url, stream=True)
+                status_code = r.status_code
+            except requests.exceptions.InvalidURL:
+                errors.append('Invalid URL')
+            except requests.exceptions.ConnectionError:
+                errors.append('URL can not be reached')
+            if status_code != 200:
+                errors.append('URL returns a %s status code' % status_code)
+            if not errors:
+                dataset_info['submitted_url'] = url
+                dataset_info['name'] = urlparse(url).path.split('/')[-1]
+                inp = StringIO()
+                line_no = 0
+                lines = []
+                for line in r.iter_lines():
+                    try:
+                        inp.write(line + '\n')
+                        line_no += 1
+                        if line_no > 1000:
+                            raise StopIteration
+                    except StopIteration:
+                        break
+                inp.seek(0)
+                reader = UnicodeCSVReader(inp)
+                header = reader.next()
+                col_types = []
+                inp.seek(0)
+                for col in range(len(header)):
+                    col_types.append(iter_column(col, inp))
+                dataset_info['columns'] = []
+                for idx, col in enumerate(col_types):
+                    d = {
+                        'human_name': header[idx],
+                        'data_type': col.__visit_name__.lower()
+                    }
+                    dataset_info['columns'].append(d)
+    else:
+        errors.append('Need a URL')
+    return (dataset_info, errors, socrata_source)
+
+# /contrib is similar to /admin/add-dataset, but sends an email instead of actually adding
+@views.route('/contrib', methods=['GET','POST'])
+def contrib_view():
+    dataset_info = {}
+    errors = []
+    socrata_source = False
+    if request.method == 'POST':
+        url = request.form.get('dataset_url')
+        (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url)
+    context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source}
+    return render_template('contribute.html', **context)
+
 @views.route('/admin/add-dataset', methods=['GET', 'POST'])
 @login_required
 def add_dataset():
@@ -53,61 +126,9 @@ def add_dataset():
     socrata_source = False
     if request.method == 'POST':
         url = request.form.get('dataset_url')
-        if url:
-            four_by_four = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
-            errors = True
-            if four_by_four:
-                parsed = urlparse(url)
-                host = 'https://%s' % parsed.netloc
-                path = 'api/views'
-                view_url = '%s/%s/%s' % (host, path, four_by_four[-1])
-                dataset_info, errors, status_code = get_socrata_data_info(view_url)
-                if not errors:
-                    socrata_source = True
-                    dataset_info['submitted_url'] = url
-            if errors:
-                errors = []
-                try:
-                    r = requests.get(url, stream=True)
-                    status_code = r.status_code
-                except requests.exceptions.InvalidURL:
-                    errors.append('Invalid URL')
-                except requests.exceptions.ConnectionError:
-                    errors.append('URL can not be reached')
-                if status_code != 200:
-                    errors.append('URL returns a %s status code' % status_code)
-                if not errors:
-                    dataset_info['submitted_url'] = url
-                    dataset_info['name'] = urlparse(url).path.split('/')[-1]
-                    inp = StringIO()
-                    line_no = 0
-                    lines = []
-                    for line in r.iter_lines():
-                        try:
-                            inp.write(line + '\n')
-                            line_no += 1
-                            if line_no > 1000:
-                                raise StopIteration
-                        except StopIteration:
-                            break
-                    inp.seek(0)
-                    reader = UnicodeCSVReader(inp)
-                    header = reader.next()
-                    col_types = []
-                    inp.seek(0)
-                    for col in range(len(header)):
-                        col_types.append(iter_column(col, inp))
-                    dataset_info['columns'] = []
-                    for idx, col in enumerate(col_types):
-                        d = {
-                            'human_name': header[idx],
-                            'data_type': col.__visit_name__.lower()
-                        }
-                        dataset_info['columns'].append(d)
-        else:
-            errors.append('Need a URL')
+        (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url)
     context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source}
-    return render_template('add-dataset.html', **context)
+    return render_template('add-dataset2.html', **context)
 
 @views.route('/admin/view-datasets')
 @login_required
