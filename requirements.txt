@@ -18,3 +18,4 @@ redis
 pytz
 datetime_truncate
 pyshp
+Flask-Mail

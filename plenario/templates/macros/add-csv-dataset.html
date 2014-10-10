@@ -1,24 +1,15 @@
+{% macro add_csv_dataset(dataset_info, submit_button_verb) -%}
 <div class="row">
     <div class="col-md-10 col-md-offset-1">
         <h4 id="name" data-view="{{dataset_info.view_url}}">{{dataset_info.name}}
-            {% if dataset_info.update_freq %}
-            <br />Updated: {{dataset_info.update_freq}}
-            {% endif %}
         </h4>
-        {% if dataset_info.description %}
-            <p>{{dataset_info.description}}</p>
-        {% endif %}
         <form role="form">
             <div id="errors"></div>
             <table class="table">
                 <thead>
                     <th>Choose Type</th>
                     <th>Name</th>
-                    <th>Description</th>
-                    <th>Socrata Data Type</th>
-                    <th>Width</th>
-                    <th>Value Range</th>
-                    <th>Nulls?</th>
+                    <th>Data Type (guess)</th>
                 </thead>
                 <tbody>
                     {% for info in dataset_info.columns %}
@@ -30,20 +21,21 @@
                                     <option value="{{info.human_name}}">ID Field</option>
                                     <option value="{{info.human_name}}">Latitude</option>
                                     <option value="{{info.human_name}}">Longitude</option>
-                                    <option value="{{info.human_name}}">Location</option>
                                 </select>
                             </td>
                             <td>{{ info.human_name }}</td>
-                            <td>{{ info.description }}</td>
-                            <td>{{ info.data_type }}</td>
-                            <td>{{ info.width }}</td>
-                            <td>{{ info.smallest }} — {{info.largest}}</td>
                             <td>
-                                {% if info.null_values %}
-                                    Yes
-                                {% else %}
-                                    No
-                                {% endif %}
+                                <select class="data-type">
+                                    <option value="">-----------</option>
+                                    <option value="{{info.human_name}}_type" {% if info.data_type == 'boolean' %}selected="selected"{% endif %}>Boolean</option>
+                                    <option value="{{info.human_name}}_type" {% if info.data_type == 'integer' %}selected="selected"{% endif %}>Integer</option>
+                                    <option value="{{info.human_name}}_type" {% if info.data_type == 'big_integer' %}selected="selected"{% endif %}>Big Integer</option>
+                                    <option value="{{info.human_name}}_type" {% if info.data_type == 'float' %}selected="selected"{% endif %}>Float</option>
+                                    <option value="{{info.human_name}}_type" {% if info.data_type == 'string' %}selected="selected"{% endif %}>String</option>
+                                    <option value="{{info.human_name}}_type" {% if info.data_type == 'date' %}selected="selected"{% endif %}>Date</option>
+                                    <option value="{{info.human_name}}_type" {% if info.data_type == 'time' %}selected="selected"{% endif %}>Time</option>
+                                    <option value="{{info.human_name}}_type" {% if info.data_type == 'timestamp' %}selected="selected"{% endif %}>Datetime</option>
+                                </select>
                             </td>
                         </tr>
                     {% endfor %}
@@ -62,8 +54,11 @@
             </p>
 
             <p>
-                <button type="submit" class="btn btn-default" id="datatype-submit"><i class='fa fa-plus-circle'></i> Add this dataset</button>
+                <button type="submit" class="btn btn-default" id="datatype-submit"><i class='fa fa-plus-circle'></i>
+		  {{ submit_button_verb }} this dataset
+		</button>
             </p>
         </form>
     </div>
 </div>
+{%- endmacro %}
