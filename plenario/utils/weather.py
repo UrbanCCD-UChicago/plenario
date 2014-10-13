@@ -97,17 +97,27 @@ class WeatherETL(object):
                 print "INITIALIZE: doing fname", fname
             self._do_etl(fname)
 
-    def initialize_month(self, year, month, no_daily=False, no_hourly=False, start_line=0, end_line=None):
+    def initialize_month(self, year, month, no_daily=False, no_hourly=False, weather_stations_list = None, start_line=0, end_line=None):
         self.make_tables()
         fname = self._extract_fname(year,month)
-        self._do_etl(fname, no_daily, no_hourly, start_line, end_line)
+        self._do_etl(fname, no_daily, no_hourly, weather_stations_list, start_line, end_line)
         
-    def _do_etl(self, fname, no_daily=False, no_hourly=False, start_line=0, end_line=None):
+
+    ######################################################################
+    # do_etl: perform the ETL on a given tar/zip file
+    #    weather_stations_list: a list of WBAN codes (as strings) in order to only read a subset of station observations
+    #    start_line, end_line: optional parameters for testing which will only read a subset of lines from the file
+    ######################################################################
+    def _do_etl(self, fname, no_daily=False, no_hourly=False, weather_stations_list=None, start_line=0, end_line=None):
         raw_hourly, raw_daily, file_type = self._extract(fname)
         if (not no_daily):
-            t_daily = self._transform_daily(raw_daily, file_type, start_line=start_line, end_line=end_line)
+            t_daily = self._transform_daily(raw_daily, file_type, 
+                                            weather_stations_list=weather_stations_list, 
+                                            start_line=start_line, end_line=end_line)
         if (not no_hourly):
-            t_hourly = self._transform_hourly(raw_hourly, file_type, start_line=start_line, end_line=end_line)             # this returns a StringIO with all the transformed data
+            t_hourly = self._transform_hourly(raw_hourly, file_type, 
+                                              weather_stations_list=weather_stations_list, 
+                                              start_line=start_line, end_line=end_line)
         if (not no_daily):
             self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
             self._update(span='daily')
@@ -253,7 +263,7 @@ class WeatherETL(object):
     # Transformations of daily data e.g. '200704daily.txt' (from tarfile) or '201101daily.txt' (from zipfile)
     ########################################
     ########################################
-    def _transform_daily(self, raw_weather, file_type, start_line=0, end_line=None):
+    def _transform_daily(self, raw_weather, file_type,  weather_stations_list = None, start_line=0, end_line=None):
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
         header = reader.next()
@@ -295,13 +305,19 @@ class WeatherETL(object):
             if (len(row) == 0):
                 continue
 
-            row_vals = getattr(self, '_parse_%s_row_daily' % file_type)(row, header)
+            row_vals = getattr(self, '_parse_%s_row_daily' % file_type)(row, header, out_header)
+
+            row_dict = dict(zip(out_header, row_vals))
+            if (weather_stations_list is not None):
+                # Only include observations from the specified list of wban_code values
+                if (row_dict['wban_code'] not in weather_stations_list):
+                    continue
 
             writer.writerow(row_vals)
         return self.clean_observations_daily
 
 
-    def _parse_zipfile_row_daily(self, row, header):
+    def _parse_zipfile_row_daily(self, row, header, out_header):
         wban_code = row[header.index('WBAN')]
         date = row[header.index('YearMonthDay')] # e.g. 20140801
         temp_max = self.floatOrNA(row[header.index('Tmax')])
@@ -325,18 +341,22 @@ class WeatherETL(object):
         max2_windspeed=self.floatOrNA(row[header.index('Max2Speed')])
         max2_winddirection, max2_winddirection_cardinal=self.getWind(max2_windspeed, row[header.index('Max2Dir')])
 
-        return [wban_code,date,temp_max,temp_min,
-                      temp_avg,departure_from_normal,
-                      dewpoint_avg, wetbulb_avg,weather_types_list,
-                      snowice_depth, snowice_waterequiv,
-                      snowfall,precip_total, station_pressure,
-                      sealevel_pressure, 
-                      resultant_windspeed, resultant_winddirection, resultant_winddirection_cardinal,
-                      avg_windspeed,
-                      max5_windspeed, max5_winddirection,max5_winddirection_cardinal,
-                      max2_windspeed, max2_winddirection, max2_winddirection_cardinal]
+        vals = [wban_code,date,temp_max,temp_min,
+                temp_avg,departure_from_normal,
+                dewpoint_avg, wetbulb_avg,weather_types_list,
+                snowice_depth, snowice_waterequiv,
+                snowfall,precip_total, station_pressure,
+                sealevel_pressure, 
+                resultant_windspeed, resultant_winddirection, resultant_winddirection_cardinal,
+                avg_windspeed,
+                max5_windspeed, max5_winddirection,max5_winddirection_cardinal,
+                max2_windspeed, max2_winddirection, max2_winddirection_cardinal]
 
-    def _parse_tarfile_row_daily(self, row, header):
+        assert(len(out_header) == len(vals))
+        
+        return vals
+
+    def _parse_tarfile_row_daily(self, row, header, out_header):
         wban_code = row[header.index('Wban Number')]
         date = row[header.index('YearMonthDay')] # e.g. 20140801
         temp_max = self.floatOrNA(row[header.index('Max Temp')])
@@ -360,16 +380,20 @@ class WeatherETL(object):
         max2_windspeed=self.floatOrNA(row[header.index('Max 2 min speed')])
         max2_winddirection, max2_winddirection_cardinal=self.getWind(max2_windspeed, row[header.index('Max 2 min Dir')])
 
-        return [wban_code,date,temp_max,temp_min,
-                      temp_avg,departure_from_normal,
-                      dewpoint_avg, wetbulb_avg,weather_types_list,
-                      snowice_depth, snowice_waterequiv,
-                      snowfall,precip_total, station_pressure,
-                      sealevel_pressure, 
-                      resultant_windspeed, resultant_winddirection, resultant_winddirection_cardinal,
-                      avg_windspeed,
-                      max5_windspeed, max5_winddirection,max5_winddirection_cardinal,
-                      max2_windspeed, max2_winddirection, max2_winddirection_cardinal]
+        vals= [wban_code,date,temp_max,temp_min,
+               temp_avg,departure_from_normal,
+               dewpoint_avg, wetbulb_avg,weather_types_list,
+               snowice_depth, snowice_waterequiv,
+               snowfall,precip_total, station_pressure,
+               sealevel_pressure, 
+               resultant_windspeed, resultant_winddirection, resultant_winddirection_cardinal,
+               avg_windspeed,
+               max5_windspeed, max5_winddirection,max5_winddirection_cardinal,
+               max2_windspeed, max2_winddirection, max2_winddirection_cardinal]
+
+        assert(len(out_header) == len(vals))
+        
+        return vals
 
 
     ########################################
@@ -377,7 +401,7 @@ class WeatherETL(object):
     # Transformations of hourly data e.g. 200704hourly.txt (from tarfile) or 201101hourly.txt (from zipfile)
     ########################################
     ########################################
-    def _transform_hourly(self, raw_weather, file_type, start_line=0, end_line=None):
+    def _transform_hourly(self, raw_weather, file_type,  weather_stations_list = None, start_line=0, end_line=None):
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
         header= reader.next()
@@ -415,14 +439,20 @@ class WeatherETL(object):
 
             # this calls either self._parse_zipfile_row_hourly
             # or self._parse_tarfile_row_hourly
-            row_vals = getattr(self, '_parse_%s_row_hourly' % file_type)(row, header)
+            row_vals = getattr(self, '_parse_%s_row_hourly' % file_type)(row, header, out_header)
             if (not row_vals):
                 continue
+
+            row_dict = dict(zip(out_header, row_vals))
+            if (weather_stations_list is not None):
+                # Only include observations from the specified list of wban_code values
+                if (row_dict['wban_code'] not in weather_stations_list):
+                    continue
 
             writer.writerow(row_vals)
         return self.clean_observations_hourly
 
-    def _parse_zipfile_row_hourly(self, row, header):
+    def _parse_zipfile_row_hourly(self, row, header, out_header):
         # There are two types of report types (column is called "RecordType" for some reason).
         # 1) AA - METAR (AVIATION ROUTINE WEATHER REPORT) - HOURLY
         # 2) SP - METAR SPECIAL REPORT
@@ -467,24 +497,28 @@ class WeatherETL(object):
         sealevel_pressure = self.floatOrNA(row[header.index('SeaLevelPressure')])
         hourly_precip = self.getPrecip(row[header.index('HourlyPrecip')])
             
-        # return hourly zipfile params
-        return [wban_code,
-                weather_date, 
-                old_station_type,
-                station_type,
-                sky_condition, sky_condition_top,
-                visibility, 
-                weather_types_list,
-                drybulb_F,
-                wetbulb_F,
-                dewpoint_F,
-                rel_humidity,
-                wind_speed, wind_direction, wind_cardinal,
-                station_pressure, sealevel_pressure,
-                report_type,
-                hourly_precip]
+        vals= [wban_code,
+               weather_date, 
+               old_station_type,
+               station_type,
+               sky_condition, sky_condition_top,
+               visibility, 
+               weather_types_list,
+               drybulb_F,
+               wetbulb_F,
+               dewpoint_F,
+               rel_humidity,
+               wind_speed, wind_direction, wind_cardinal,
+               station_pressure, sealevel_pressure,
+               report_type,
+               hourly_precip]
 
-    def _parse_tarfile_row_hourly(self, row, header):
+        assert(len(out_header) == len(vals))
+
+        # return hourly zipfile params
+        return vals
+
+    def _parse_tarfile_row_hourly(self, row, header, out_header):
         report_type = row[header.index('Record Type')]
         if (report_type == 'SP'):
             return None
@@ -523,20 +557,24 @@ class WeatherETL(object):
         sealevel_pressure = self.floatOrNA(row[header.index('Sea Level Pressure')])
         hourly_precip = self.getPrecip(row[header.index('Precip. Total')])
         
-        return [wban_code,
-                weather_date, 
-                old_station_type,station_type,
-                sky_condition, sky_condition_top,
-                visibility, 
-                weather_types_list,
-                drybulb_F,
-                wetbulb_F,
-                dewpoint_F,
-                rel_humidity,
-                wind_speed, wind_direction, wind_cardinal,
-                station_pressure, sealevel_pressure,
-                report_type,
-                hourly_precip]
+        vals= [wban_code,
+               weather_date, 
+               old_station_type,station_type,
+               sky_condition, sky_condition_top,
+               visibility, 
+               weather_types_list,
+               drybulb_F,
+               wetbulb_F,
+               dewpoint_F,
+               rel_humidity,
+               wind_speed, wind_direction, wind_cardinal,
+               station_pressure, sealevel_pressure,
+               report_type,
+               hourly_precip]
+
+        assert(len(out_header) == len(vals))
+
+        return vals
 
     # Help parse a 'present weather' string like 'FZFG' (freezing fog) or 'BLSN' (blowing snow) or '-RA' (light rain)
     # When we are doing precip slurp as many as possible
