@@ -4,6 +4,7 @@ import sys
 import tarfile
 import zipfile
 import re
+from ftplib import FTP
 from cStringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader, UnicodeCSVWriter, \
     UnicodeCSVDictReader
@@ -1013,8 +1014,10 @@ class WeatherStationsETL(object):
     """
 
     def __init__(self):
-        self.stations_url = \
-            'http://www1.ncdc.noaa.gov/pub/data/noaa/ish-history.csv'
+        self.stations_ftp = \
+            'ftp.ncdc.noaa.gov'
+        self.stations_file = \
+            '/pub/data/noaa/isd-history.csv'
 
     def initialize(self):
         self._extract()
@@ -1031,14 +1034,17 @@ class WeatherStationsETL(object):
 
     def _extract(self):
         """ Download CSV of station info from NOAA """
-        stations = requests.get(self.stations_url)
-        if stations.status_code == 200:
-            self.station_raw_info = StringIO(stations.content)
+
+        try:
+            ftp = FTP(self.stations_ftp) 
+            ftp.login()
+            stations = StringIO()
+            ftp.retrbinary('RETR %s' % self.stations_file, stations.write)
+            self.station_raw_info = stations
             self.station_raw_info.seek(0)
-        else:
+        except:
             self.station_info = None
-            raise WeatherError('Unable to fetch station data from NOAA. \
-                Recieved a %s HTTP status code' % stations.status_code)
+            raise WeatherError('Unable to fetch station data from NOAA.')
 
     def _transform(self):
         reader = UnicodeCSVReader(self.station_raw_info)
@@ -1049,26 +1055,28 @@ class WeatherStationsETL(object):
         self.clean_station_info = StringIO()
         all_rows = []
         wbans = []
+
         for row in reader:
-            if row[1] == '99999':
+            wban = row[1]
+            name = row[2]
+            country = row[3]
+            state = row[4]
+            call_sign = ''
+            lat = row[6].replace('+', '')
+            lon = row[7].replace('+', '')
+            elev = row[8].replace('+', '')
+            begin = parser.parse(row[9]).isoformat()
+            end = parser.parse(row[10]).isoformat()
+            
+            if wban == '99999':
                 continue
-            elif row[1] in wbans:
+            elif wban in wbans:
                 continue
-            elif row[5] and row[6]:
-                row.pop(0)
-                row.pop(3)
-                lat = row[5].replace('+', '')
-                lon = row[6].replace('+', '')
-                elev = row[7].replace('+', '')
-                begin = parser.parse(row[8]).isoformat()
-                end = parser.parse(row[9]).isoformat()
-                row[5] = 'SRID=4326;POINT(%s %s)' % ((float(lon) / 1000), (float(lat) / 1000))
-                row[6] = float(elev) / 10
-                row[7] = begin
-                row[8] = end
-                row.pop()
-                wbans.append(row[0])
-                all_rows.append(row)
+            elif lat and lon:
+                location = 'SRID=4326;POINT(%s %s)' % (lon, lat)
+                wbans.append(wban)
+                all_rows.append([wban, name, country, state, 
+                    call_sign, location, elev, begin, end])
         writer = UnicodeCSVWriter(self.clean_station_info)
         writer.writerow(header)
         writer.writerows(all_rows)
@@ -1077,8 +1085,8 @@ class WeatherStationsETL(object):
     def _make_station_table(self):
         self.station_table = Table('weather_stations', Base.metadata,
                 Column('wban_code', String(5), primary_key=True),
-                Column('station_name', String(50), nullable=False),
-                Column('country', String(2), nullable=False),
+                Column('station_name', String(100), nullable=False),
+                Column('country', String(2)),
                 Column('state', String(2)),
                 Column('call_sign', String(5)),
                 Column('location', Geometry('POINT', srid=4326)),
