@@ -865,7 +865,7 @@ class WeatherETL(object):
                 Column('wban_code', String(5), nullable=False),
                 Column('datetime', DateTime, nullable=False),
                 # AO1: without precipitation discriminator, AO2: with precipitation discriminator
-                Column('old_station_type', String(3)),
+                Column('old_station_type', String(5)),
                 Column('station_type', Integer),
                 Column('sky_condition', String),
                 Column('sky_condition_top', String), # top-level sky condition, e.g.
