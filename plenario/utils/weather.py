@@ -1023,7 +1023,11 @@ class WeatherStationsETL(object):
         self._extract()
         self._transform()
         self._make_station_table()
-        self._load()
+        try:
+            self._load()
+        except:
+            print 'weather stations already exist, updating instead'
+            self._update_stations()
 
     def update(self):
         self._extract()
