@@ -7,7 +7,7 @@ import re
 from ftplib import FTP
 from cStringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader, UnicodeCSVWriter, \
-    UnicodeCSVDictReader
+    UnicodeCSVDictReader, FieldSizeLimitError
 from dateutil import parser
 from datetime import datetime, date, timedelta
 import calendar
@@ -285,36 +285,44 @@ class WeatherETL(object):
         writer.writerow(out_header)
 
         row_count = 0
-        for row in reader:
-            self.current_row = row
-            if (row_count % 100 == 0):
-                if (self.debug == True):
-                    self.debug_outfile.write("\rdaily parsing: row_count=%06d" % row_count)
-                    self.debug_outfile.flush()
-
-            if (start_line > row_count):
-                row_count +=1
-                continue
-            if ((end_line is not None) and (row_count > end_line)):
-                break
-
-            row_count += 1
-            #print len(header)
-            #print len(row)
-            #print zip(header,row)
-
-            if (len(row) == 0):
-                continue
-
-            row_vals = getattr(self, '_parse_%s_row_daily' % file_type)(row, header, out_header)
-
-            row_dict = dict(zip(out_header, row_vals))
-            if (weather_stations_list is not None):
-                # Only include observations from the specified list of wban_code values
-                if (row_dict['wban_code'] not in weather_stations_list):
+        while True:
+            try:
+                row = reader.next()
+                self.current_row = row
+                if (row_count % 100 == 0):
+                    if (self.debug == True):
+                        self.debug_outfile.write("\rdaily parsing: row_count=%06d" % row_count)
+                        self.debug_outfile.flush()
+             
+                if (start_line > row_count):
+                    row_count +=1
                     continue
-
-            writer.writerow(row_vals)
+                if ((end_line is not None) and (row_count > end_line)):
+                    break
+             
+                row_count += 1
+                #print len(header)
+                #print len(row)
+                #print zip(header,row)
+             
+                if (len(row) == 0):
+                    continue
+             
+                row_vals = getattr(self, '_parse_%s_row_daily' % file_type)(row, header, out_header)
+             
+                row_dict = dict(zip(out_header, row_vals))
+                if (weather_stations_list is not None):
+                    # Only include observations from the specified list of wban_code values
+                    if (row_dict['wban_code'] not in weather_stations_list):
+                        continue
+             
+                writer.writerow(row_vals)
+            except UnicodeDecodeError:
+                print 'uhhhh %s' % row_count
+                break
+            except StopIteration:
+                break
+        print 'finished %s rows' % row_count
         return self.clean_observations_daily
 
 
@@ -405,7 +413,7 @@ class WeatherETL(object):
     def _transform_hourly(self, raw_weather, file_type,  weather_stations_list = None, start_line=0, end_line=None):
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
-        header= reader.next()
+        header = reader.next()
         # strip leading and trailing whitespace from header (e.g. from tarfiles)
         header = [x.strip() for x in header]
 
@@ -421,36 +429,42 @@ class WeatherETL(object):
         writer.writerow(out_header)
 
         row_count = 0
-        for row in reader:
-            if (row_count % 1000 == 0):
-                if (self.debug==True):
-                    self.debug_outfile.write( "\rparsing: row_count=%06d" % row_count)
-                    self.debug_outfile.flush()
-
-            if (start_line > row_count):
-                row_count +=1
-                continue
-            if ((end_line is not None) and (row_count > end_line)):
-                break
-
-            row_count += 1
-
-            if (len(row) == 0):
-                continue
-
-            # this calls either self._parse_zipfile_row_hourly
-            # or self._parse_tarfile_row_hourly
-            row_vals = getattr(self, '_parse_%s_row_hourly' % file_type)(row, header, out_header)
-            if (not row_vals):
-                continue
-
-            row_dict = dict(zip(out_header, row_vals))
-            if (weather_stations_list is not None):
-                # Only include observations from the specified list of wban_code values
-                if (row_dict['wban_code'] not in weather_stations_list):
+        while True:
+            try:
+                row = reader.next()
+                if (row_count % 1000 == 0):
+                    if (self.debug==True):
+                        self.debug_outfile.write( "\rparsing: row_count=%06d" % row_count)
+                        self.debug_outfile.flush()
+             
+                if (start_line > row_count):
+                    row_count +=1
                     continue
-
-            writer.writerow(row_vals)
+                if ((end_line is not None) and (row_count > end_line)):
+                    break
+             
+                row_count += 1
+             
+                if (len(row) == 0):
+                    continue
+             
+                # this calls either self._parse_zipfile_row_hourly
+                # or self._parse_tarfile_row_hourly
+                row_vals = getattr(self, '_parse_%s_row_hourly' % file_type)(row, header, out_header)
+                if (not row_vals):
+                    continue
+             
+                row_dict = dict(zip(out_header, row_vals))
+                if (weather_stations_list is not None):
+                    # Only include observations from the specified list of wban_code values
+                    if (row_dict['wban_code'] not in weather_stations_list):
+                        continue
+             
+                writer.writerow(row_vals)
+            except FieldSizeLimitError:
+                continue
+            except StopIteration:
+                break
         return self.clean_observations_hourly
 
     def _parse_zipfile_row_hourly(self, row, header, out_header):
@@ -537,8 +551,11 @@ class WeatherETL(object):
                 # XX: maybe just continue and bail if this doesn't work
                 return None
             time_str = '%04d' % time_int
-
-        weather_date = datetime.strptime('%s %s' % (date, time_str), '%Y%m%d %H%M')
+        try:
+            weather_date = datetime.strptime('%s %s' % (date, time_str), '%Y%m%d %H%M')
+        except ValueError:
+            # This means the date / time can't be parsed and is probably not reliable.
+            return None
         old_station_type = row[header.index('Station Type')].strip() # either AO1, AO2, or '-' (XX: why '-'??)
         station_type = None
         sky_condition = row[header.index('Sky Conditions')].strip()
