@@ -218,7 +218,10 @@ def weather(table):
         for clause in query_clauses:
             base_query = base_query.filter(clause)
 
-        base_query = base_query.order_by(weather_table.c.id.asc())
+        try:
+            base_query = base_query.order_by(getattr(weather_table.c, 'date').desc())
+        except AttributeError:
+            base_query = base_query.order_by(getattr(weather_table.c, 'datetime').desc())
         base_query = base_query.limit(RESPONSE_LIMIT) # returning the top 1000 records
         if raw_query_params.get('offset'):
             offset = raw_query_params['offset']

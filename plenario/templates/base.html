@@ -40,9 +40,10 @@
         <div class="navbar-collapse collapse pull-right">
           <ul class="nav navbar-nav">
           	<li class="{% if request.path == '/' %}active{% endif %}"><a href="{{ url_for('views.index') }}">Home</a></li>
-            <li class="{% if request.path == '/api-docs' %}active{% endif %}"><a href="{{ url_for('views.api_docs_view') }}">API</a></li>
             <li class="{% if request.path == '/explore' %}active{% endif %}"><a href="{{ url_for('views.explore_view') }}">Explore</a></li>
             <li class="{% if request.path == '/contrib' %}active{% endif %}"><a href="{{ url_for('views.contrib_view') }}">Contribute</a></li>
+            <li class="{% if request.path == '/api-docs' %}active{% endif %}"><a href="{{ url_for('views.api_docs_view') }}">API</a></li>
+            <li class="{% if request.path == '/examples' %}active{% endif %}"><a href="{{ url_for('views.examples_view') }}">Examples</a></li>
             <li class="{% if request.path == '/about' %}active{% endif %}"><a href="{{ url_for('views.about_view') }}">About</a></li>
             {% if session.get('user_id') %}
                 <li class="dropdown">

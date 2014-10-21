@@ -1,6 +1,7 @@
 import os
 import re
 import psycopg2
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import create_engine, types
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import NullPool
@@ -36,7 +37,10 @@ def init_db():
         print 'creating default user %s' % plenario.settings.DEFAULT_USER['name']
         user = plenario.models.User(**plenario.settings.DEFAULT_USER)
         session.add(user)
-        session.commit()
+        try: 
+            session.commit()
+        except IntegrityError:
+            pass
 
     print 'initializing NOAA weather stations'
     s = WeatherStationsETL()

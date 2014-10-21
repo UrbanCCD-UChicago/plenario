@@ -129,6 +129,12 @@ We used the following open source tools:
 * Forest Gregg
 * Michael Castelle
 
+## Join Our Community
+
+Join our community to hear about platform updates, new features and discuss the potential uses of Plenario. We want to start a conversation with you, the users, about what Plenario can do for you - whether you're a city manager, an app developer, a researcher, or a citizen interested in exploring open data.
+
+[Join our Google Group](https://groups.google.com/forum/#!forum/plenariodataportal)
+
 ## Errors / Bugs
 
 If something is not behaving intuitively, it is a bug, and should be reported.
