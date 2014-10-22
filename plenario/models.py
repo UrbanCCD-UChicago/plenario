@@ -35,7 +35,7 @@ class MetaTable(Base):
     latitude = Column(String)
     longitude = Column(String)
     location = Column(String)
-    approved_status = Column(String) # XXX mcc -- values include "Pending" (Contributed) or "Accepted"/"Approved"
+    approved_status = Column(String) # if False, then do not display without first getting administrator approval
 
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
