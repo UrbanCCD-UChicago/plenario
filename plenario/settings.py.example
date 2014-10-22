@@ -21,6 +21,13 @@ DEFAULT_USER = {
     'password': 'your password'
 }
 
+MAIL_SERVER = 'smtp.gmail.com'
+MAIL_PORT = 465
+MAIL_USE_SSL = True
+MAIL_USERNAME = ''
+MAIL_PASSWORD = ''
+
+
 CENSUS_BLOCKS = {
     'dataset_name': 'census_blocks',
     'business_key': 'geoid',

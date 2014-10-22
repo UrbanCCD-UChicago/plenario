@@ -1,6 +1,9 @@
 from flask import make_response, request, render_template, current_app, g, \
     Blueprint, abort
 from flask.ext.cache import Cache
+from flask_mail import Mail
+from flask_mail import Message
+
 from functools import update_wrapper
 import os
 import re
@@ -29,7 +32,7 @@ from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
 from plenario.utils.helpers import get_socrata_data_info, slugify, increment_datetime_aggregate
 from plenario.tasks import add_dataset
-from plenario.settings import CACHE_CONFIG
+from plenario.settings import CACHE_CONFIG, MAIL_TESTUSERNAME, MAIL_USERNAME
 
 cache = Cache(config=CACHE_CONFIG)
 
@@ -709,8 +712,7 @@ def grid():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-@api.route(API_VERSION + '/api/submit-dataset/', methods=['POST'])
-def submit_dataset():
+def add_dataset_to_metatable(request, approved_status=True):
     # Slightly dumb way to make sure that POSTs are only coming from
     # originating domain for the time being
     referer = request.headers.get('Referer')
@@ -734,6 +736,9 @@ def submit_dataset():
             status_code = 400
     if status_code == 200:
         post = json.loads(post)
+
+        print "POST is ", post
+
         if post.get('view_url'):
             if post.get('socrata'):
                 source_domain = urlparse(post['view_url']).netloc
@@ -770,9 +775,13 @@ def submit_dataset():
                         'longitude': post['field_definitions'].get('longitude'),
                         'location': post['field_definitions'].get('location')
                     }
+                    d['approved_status'] = approved_status
+
                     if len(d['dataset_name']) > 49:
                         d['dataset_name'] = d['dataset_name'][:50]
                     md = MetaTable(**d)
+
+                    # add this to meta_master
                     session.add(md)
                     session.commit()
                 add_dataset.delay(md.source_url_hash, data_types=post.get('data_types'))
@@ -781,6 +790,33 @@ def submit_dataset():
             resp['status'] = 'error'
             resp['message'] = 'Must provide a url where data can be downloaded'
             status_code = 400
+    return resp, status_code
+    
+
+@api.route(API_VERSION + '/api/submit-dataset/', methods=['POST'])
+def submit_dataset():
+    resp, status_code = add_dataset_to_metatable(request, approved_status=True)
+
+    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+@api.route(API_VERSION + '/api/contribute-dataset/', methods=['POST'])
+def contribute_dataset():
+    resp, status_code = add_dataset_to_metatable(request, approved_status=False)
+
+    # email the response to somebody
+    msg = Message("Hello",
+                  sender=MAIL_USERNAME,
+                  recipients=[MAIL_TESTUSERNAME])
+
+    msg.body = "testing: " + str(resp)
+    msg.html = "<b>testing: RESP IS " + resp['message'] + "</b>" 
+
+    mail = Mail(current_app)
+
+    mail.send(msg)
+    
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp

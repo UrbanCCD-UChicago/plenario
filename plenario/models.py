@@ -35,7 +35,7 @@ class MetaTable(Base):
     latitude = Column(String)
     longitude = Column(String)
     location = Column(String)
-    status = Column(String) # XXX mcc -- values include "Pending" (Contributed) or "Accepted"
+    approved_status = Column(String) # XXX mcc -- values include "Pending" (Contributed) or "Accepted"/"Approved"
 
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
