@@ -1,8 +1,4 @@
 {% extends 'submit-dataset.html' %}
 {% block title %}Add a dataset - Plenar.io{% endblock %}
-{% block submit_dataset %}
-                    $.post('/v1/api/submit-dataset/', {'data': data}, function(resp){
-                        console.log(resp);
-                        window.location = "/admin/view-datasets/";
-                    })
-{% endblock %}
+
+

@@ -128,7 +128,7 @@ def add_dataset():
         url = request.form.get('dataset_url')
         (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url)
     context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source}
-    return render_template('add-dataset2.html', **context)
+    return render_template('add-dataset.html', **context)
 
 @views.route('/admin/view-datasets')
 @login_required
@@ -177,6 +177,11 @@ class EditDatasetForm(Form):
             self.longitude.errors.append('You must provide both a Latitude field name and a Longitude field name')
 
         return valid
+
+@views.route('/admin/edit-dataset/<source_url_hash>', methods=['GET', 'POST'])
+@login_required
+def approve_dataset(source_url_hash):
+    pass
 
 @views.route('/admin/edit-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
