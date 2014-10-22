@@ -178,7 +178,7 @@ class EditDatasetForm(Form):
 
         return valid
 
-@views.route('/admin/edit-dataset/<source_url_hash>', methods=['GET', 'POST'])
+@views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
 def approve_dataset(source_url_hash):
     pass
@@ -186,6 +186,7 @@ def approve_dataset(source_url_hash):
 @views.route('/admin/edit-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
 def edit_dataset(source_url_hash):
+    print "edit_dataset" + source_url_hash
     form = EditDatasetForm()
     meta = session.query(MetaTable).get(source_url_hash)
     table = Table('dat_%s' % meta.dataset_name, Base.metadata,
