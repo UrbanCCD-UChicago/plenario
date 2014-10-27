@@ -2,8 +2,11 @@
     <script type="text/javascript">
         $(document).ready(function(){
             $('#datatype-submit').on('click', function(e){
+	         console.log('#datatype-submit called');
 
-
+	        function appendError(message) {
+                     $('#errors').append('<div class="alert alert-danger alert-dismissible" role="alert"><button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>' + message + '</div>');
+                }
 
 
                 e.preventDefault();
@@ -26,7 +29,7 @@
                         if (field_type){
                             if (typeof definitions['field_definitions'][field_type] !== 'undefined'){
                                 valid = false
-                                $('#errors').append('<p><strong>You defined more than one ' + $(opt).text() + '</strong></p>')
+		                appendError('You defined more than one ' + $(opt).text());
                             } else {
                                 definitions['field_definitions'][field_type] = field_name;
                             }
@@ -44,7 +47,7 @@
                             })
                         } else {
                             valid = false;
-                            $('#errors').append('<p><strong>Provide a data type for ' + field_name + '</strong></p>')
+                            appendError('Provide a data type for ' + field_name);
                         }
                     }
 
@@ -55,21 +58,22 @@
                 })
                 if(!(defined.indexOf('id_field') >= 0)){
                     valid = false
-                    $('#errors').append('<p><strong>You need to define a unique ID field</strong></p>')
+	   
+                    appendError('You need to define a unique ID field');
                 }
                 if(!(defined.indexOf('date_field') >= 0)){
                     valid = false
-                    $('#errors').append('<p><strong>You need to define a date/datetime field</strong></p>')
+                    appendError('You need to define a date/datetime field');
                 }
                 if(!(defined.indexOf('location') >= 0)){
                     if(!(defined.indexOf('latitude') >= 0) && !(defined.indexOf('longitude') >= 0)){
                         valid = false
-                        $('#errors').append('<p><strong>You need to defined either a location field or a latitude and longitude field</strong></p>')
+                        appendError('You need to defined either a location field or a latitude and longitude field');
                     }
                 }
                 if(!$('#update-select').val()){
                     valid = false
-                    $('#errors').append('<p><strong>You need to select an update frequency</strong></p>')
+                    appendError('You need to select an update frequency');
                 } else {
                     definitions['update_frequency'] = $('#update-select').val();
                 }
@@ -80,21 +84,25 @@
                     definitions['view_url'] = $('input[name="dataset_url"]').val()
                     var data = JSON.stringify(definitions);
 
-	    {% if submit_button_verb == 'Contribute' %}
+  	            {% if submit_button_verb == 'Contribute' %}
 
-	        // XXX insert error checking code for email!.. in javascript.
+	                // XXX: insert error checking code for email.
+			// We can do this on the client side if we want submitting contributions to be part of the API,
+	                // or server side if we don't.
 
-	        $.post('/v1/api/contribute-dataset/', {'data': data}, function(resp){
-	            console.log("HELLLO "); console.log(resp);
-	            //window.location = "/admin/contribute-thankyou/";
-	        })
+		        console.log('submitting..');
+	                $.post('/v1/api/contribute-dataset/', {'data': data}, function(resp){
+	                    console.log("HELLLO "); console.log(resp);
+	                    //window.location = "/admin/contribute-thankyou/";
+	                })
 
-	    {% else %}
+	            {% else %}
 
-                $.post('/v1/api/submit-dataset/', {'data': data}, function(resp){
-                     console.log(resp);
-                     window.location = "/admin/view-datasets/";
-                })
+                        $.post('/v1/api/submit-dataset/', {'data': data}, function(resp){
+                            console.log(resp);
+	                    // XX: is this necessary?
+                            //window.location = "/admin/view-datasets/";
+                        })
 	   
  	    {% endif %}
                 }
