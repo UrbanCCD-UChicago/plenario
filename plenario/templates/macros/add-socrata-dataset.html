@@ -9,8 +9,8 @@
         {% if dataset_info.description %}
             <p>{{dataset_info.description}}</p>
         {% endif %}
-        <form role="form">
-            <div id="errors"></div>
+        <!-- <form role="form">-->
+        <form role="form" method="POST">
             <table class="table">
                 <thead>
                     <th>Choose Type</th>
@@ -66,7 +66,7 @@
 	    {% if submit_button_verb == 'Contribute' %}
 	    <div>
 
-	     Finally, tell us about yourself:<p>
+	     Finally, tell us about yourself so that the administrators of this Plenario instance can contact you about this dataset if necessary:<p>
 
 	      <div class="row">
 	      <div class="col-md-4 col-md-offset-0">
