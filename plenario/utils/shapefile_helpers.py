@@ -72,7 +72,6 @@ class PlenarioShapeETL(object):
 
 
     def _init_local(self, fname):
-        print "PlenarioShapeETL._init_local('%s')" % fname
         # use DATA_DIR to store source_url file
         self.fname = fname
         self.data_dir = DATA_DIR
@@ -167,12 +166,17 @@ class PlenarioShapeETL(object):
             if self.multipolygon:
                 geo_type = 'MULTIPOLYGON'
             columns.append(Column('geom', Geometry(geo_type)))
-            self.table = Table(self.dataset_name, Base.metadata, *columns)
+            self.table = Table(self.dataset_name, Base.metadata, *columns, extend_existing=True)
             self.table.create(engine, checkfirst=True)
 
     def _insert_data(self):
         fields = self.table.columns.keys()
         values = []
+
+        ins = self.table.insert()
+        conn = engine.contextual_connect()
+
+        shp_count = 0
         for record in self.records:
             d = {}
             for k,v in zip(fields, record.record):
@@ -182,7 +186,13 @@ class PlenarioShapeETL(object):
                 geom = MultiPolygon([geom])
             d['geom'] = 'SRID=4326;%s' % geom.wkt
             values.append(d)
-        ins = self.table.insert()
-        conn = engine.contextual_connect()
+            shp_count += 1
+            if (shp_count == 100):
+                # dump 100 shapefile records at a time
+                conn.execute(ins, values)
+                values = []
+                shp_count = 0
+        # out of the loop -- add the remaining records
         conn.execute(ins, values)
+
         conn.close()

@@ -34,8 +34,8 @@ from plenario.settings import CACHE_CONFIG
 cache = Cache(config=CACHE_CONFIG)
 
 API_VERSION = '/v1'
-RESPONSE_LIMIT = 500
-CACHE_TIMEOUT = 60*60*24*7
+RESPONSE_LIMIT = 1000
+CACHE_TIMEOUT = 60*60*6
 VALID_DATA_TYPE = ['csv', 'json']
 VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
 WEATHER_COL_LOOKUP = {
@@ -218,7 +218,10 @@ def weather(table):
         for clause in query_clauses:
             base_query = base_query.filter(clause)
 
-        base_query = base_query.order_by(weather_table.c.id.asc())
+        try:
+            base_query = base_query.order_by(getattr(weather_table.c, 'date').desc())
+        except AttributeError:
+            base_query = base_query.order_by(getattr(weather_table.c, 'datetime').desc())
         base_query = base_query.limit(RESPONSE_LIMIT) # returning the top 1000 records
         if raw_query_params.get('offset'):
             offset = raw_query_params['offset']
