@@ -777,7 +777,7 @@ def add_dataset_to_metatable(request, approved_status=True):
                         'location': post['field_definitions'].get('location'),
                         'contributor_name': post['contributor_name'],
                         'contributor_organization': post['contributor_organization'],
-                        'contributor_email': post['contributor_email']
+                        'contributor_email': post['contributor_email'],
                         'approved_status': approved_status
                     }
                     
