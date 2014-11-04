@@ -1,5 +1,5 @@
 from flask import make_response, request, render_template, current_app, g, \
-    Blueprint, abort
+    Blueprint, abort, session as flask_session
 from flask.ext.cache import Cache
 from flask_mail import Mail
 from flask_mail import Message
@@ -33,7 +33,9 @@ from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
 from plenario.utils.helpers import get_socrata_data_info, slugify, increment_datetime_aggregate
 from plenario.tasks import add_dataset
-from plenario.settings import CACHE_CONFIG, MAIL_TESTUSERNAME, MAIL_USERNAME
+from plenario.settings import CACHE_CONFIG, MAIL_USERNAME
+
+from plenario.auth import check_admin_status
 
 mail = Mail()
 cache = Cache(config=CACHE_CONFIG)
@@ -116,8 +118,9 @@ def flush_cache():
     return resp
 
 @api.route(API_VERSION + '/api/datasets')
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+#@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
+@check_admin_status()
 def meta():
     status_code = 200
     resp = {
@@ -130,10 +133,15 @@ def meta():
     dataset_name = request.args.get('dataset_name')
     if dataset_name:
         metas = session.query(MetaTable)\
-            .filter(MetaTable.dataset_name == dataset_name).all()
+                       .filter(MetaTable.dataset_name == dataset_name)
     else:
-        metas = session.query(MetaTable).all()
-    resp['objects'].extend([m.as_dict() for m in metas])
+        metas = session.query(MetaTable)
+
+
+    if (not flask_session['user_id']):
+        metas=metas.filter(MetaTable.approved_status == 'true')
+        
+    resp['objects'].extend([m.as_dict() for m in metas.all()])
     resp['meta']['total'] = len(resp['objects'])
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
@@ -142,6 +150,7 @@ def meta():
 @api.route(API_VERSION + '/api/fields/<dataset_name>/')
 @cache.cached(timeout=CACHE_TIMEOUT)
 @crossdomain(origin="*")
+@check_admin_status()
 def dataset_fields(dataset_name):
     try:
         table = Table('dat_%s' % dataset_name, Base.metadata,
@@ -778,10 +787,11 @@ def add_dataset_to_metatable(request, approved_status=True):
                         'contributor_name': post['contributor_name'],
                         'contributor_organization': post['contributor_organization'],
                         'contributor_email': post['contributor_email'],
-                        'approved_status': approved_status
+                        'approved_status': approved_status,
                     }
+                    if (post.get('data_types')):
+                        d['contributor_data_types'] = json.dumps(post.get('data_types'))
                     
-
                     if len(d['dataset_name']) > 49:
                         d['dataset_name'] = d['dataset_name'][:50]
 
@@ -791,7 +801,8 @@ def add_dataset_to_metatable(request, approved_status=True):
                     # add this to meta_master
                     session.add(md)
                     session.commit()
-                add_dataset.delay(md.source_url_hash, data_types=post.get('data_types'))
+                if (approved_status == True):
+                    add_dataset.delay(md.source_url_hash, data_types=post.get('data_types'))
                 resp['message'] = 'Dataset %s submitted successfully' % dataset_info['name']
         else:
             resp['status'] = 'error'

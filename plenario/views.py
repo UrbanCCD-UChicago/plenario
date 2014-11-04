@@ -4,7 +4,8 @@ from plenario.models import MasterTable, MetaTable, User
 from plenario.database import session, Base, app_engine as engine
 from plenario.utils.helpers import get_socrata_data_info, iter_column
 from plenario.tasks import update_dataset as update_dataset_task, \
-    delete_dataset as delete_dataset_task
+    delete_dataset as delete_dataset_task, add_dataset as add_dataset_task
+from plenario.api import mail
 from flask_login import login_required
 from datetime import datetime, timedelta
 from urlparse import urlparse
@@ -18,6 +19,9 @@ import re
 from cStringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader
 from sqlalchemy import Table
+from flask_mail import Mail, Message
+from plenario.settings import CACHE_CONFIG, MAIL_USERNAME
+import string
 
 views = Blueprint('views', __name__)
 
@@ -193,10 +197,34 @@ class EditDatasetForm(Form):
 @login_required
 def approve_dataset(source_url_hash):
     # get the MetaTable row and change the approved_status and bounce back to view-datasets.
-    upd = { 'approved_status': 'true' }
+
     meta = session.query(MetaTable).get(source_url_hash)
+    json_data_types = None
+    if (meta.contributed_data_types):
+        json_data_types = json.loads(meta.contributed_data_types)
+        
+    add_dataset_task.delay(source_url_hash, data_types=json_data_types)
+    
+    upd = { 'approved_status': 'true' }
+
     meta.approved_status = 'true'
     session.commit()
+
+    # Email the user who submitted that their dataset has been approved.
+    # email the response to somebody
+    msg = Message("Your contribution to Plenario has been approved",
+                  sender=MAIL_USERNAME,
+                  recipients=[meta.contributor_email])
+
+    msg.body = "Hello " + str(meta.contributor_name) + "!\r\n"
+    msg.body += "We have approved your contribution to Plenario: %s\r\n" % meta.human_name
+    msg.body += "It should appear on the site within 24 hours.\r\n"
+    msg.body += "Thanks!\nThe Plenario Team\nhttp://plenar.io\r\n"
+    
+    msg.html = string.replace(msg.body,'\r\n','<p>')
+
+    mail.send(msg)
+    
     return redirect(url_for('views.view_datasets'))
 
 
