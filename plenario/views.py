@@ -1,6 +1,6 @@
 from flask import make_response, request, redirect, url_for, render_template, current_app, g, \
-    Blueprint, flash
-from plenario.models import MasterTable, MetaTable
+    Blueprint, flash, session as flask_session
+from plenario.models import MasterTable, MetaTable, User
 from plenario.database import session, Base, app_engine as engine
 from plenario.utils.helpers import get_socrata_data_info, iter_column
 from plenario.tasks import update_dataset as update_dataset_task, \
@@ -59,6 +59,7 @@ def get_context_for_new_dataset(url):
             host = 'https://%s' % parsed.netloc
             path = 'api/views'
             view_url = '%s/%s/%s' % (host, path, four_by_four[-1])
+
             dataset_info, errors, status_code = get_socrata_data_info(view_url)
             if not errors:
                 socrata_source = True
@@ -118,6 +119,12 @@ def contrib_view():
     context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source}
     return render_template('contribute.html', **context)
 
+@views.route('/contrib-thankyou')
+def contrib_thankyou():
+    context = {}
+    return render_template('contribute_thankyou.html', **context)
+
+
 @views.route('/admin/add-dataset', methods=['GET', 'POST'])
 @login_required
 def add_dataset():
@@ -127,6 +134,10 @@ def add_dataset():
     if request.method == 'POST':
         url = request.form.get('dataset_url')
         (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url)
+        user = session.query(User).get(flask_session['user_id'])
+        dataset_info['contributor_name'] = user.name
+        dataset_info['contributor_organization'] = 'Plenario Admin'
+        dataset_info['contributor_email'] = user.email
     context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source}
     return render_template('add-dataset.html', **context)
 
@@ -181,12 +192,17 @@ class EditDatasetForm(Form):
 @views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
 def approve_dataset(source_url_hash):
-    pass
+    # get the MetaTable row and change the approved_status and bounce back to view-datasets.
+    upd = { 'approved_status': 'true' }
+    meta = session.query(MetaTable).get(source_url_hash)
+    meta.approved_status = 'true'
+    session.commit()
+    return redirect(url_for('views.view_datasets'))
+
 
 @views.route('/admin/edit-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
 def edit_dataset(source_url_hash):
-    print "edit_dataset" + source_url_hash
     form = EditDatasetForm()
     meta = session.query(MetaTable).get(source_url_hash)
     table = Table('dat_%s' % meta.dataset_name, Base.metadata,

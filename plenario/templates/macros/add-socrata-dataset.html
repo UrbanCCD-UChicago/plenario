@@ -62,7 +62,6 @@
                 </select>
             </p>
 
-
 	    {% if submit_button_verb == 'Contribute' %}
 	    <div>
 
@@ -71,13 +70,17 @@
 	      <div class="row">
 	      <div class="col-md-4 col-md-offset-0">
 	      <div class="form-group">
- <input name="name" type="text" class="form-control" placeholder="Username" value="{{ '%s' % name if name }}" />
- <input name="organization" type="text" class="form-control" placeholder="Organization" value="{{ '%s' % name if name }}" />
- <input name="email address" type="text" class="form-control" placeholder="Email address" value="{{ '%s' % name if name }}" />
+		  <input name="contributor_name" type="text" class="form-control" placeholder="Username" value="{{ '%s' % contributor_name if contributor_name }}" />
+		  <input name="contributor_organization" type="text" class="form-control" placeholder="Organization" value="{{ '%s' % contributor_organization if contributor_organization }}" />
+		  <input name="contributor_email" type="text" class="form-control" placeholder="Email address" value="{{ '%s' % contributor_email if contributor_email }}" />
 	      </div>
 	      </div>
 	      </div>
-	    </p>
+	     </p>
+	     {% else %}
+	    <input type="hidden" name="contributor_name" value="{{dataset_info.contributor_name}}">
+	    <input type="hidden" name="contributor_organization" value="{{dataset_info.contributor_organization}}">
+	    <input type="hidden" name="contributor_email" value="{{dataset_info.contributor_email}}">
 	    {% endif %}
 
 	    <div class="row">

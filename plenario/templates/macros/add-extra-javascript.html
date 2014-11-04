@@ -1,19 +1,23 @@
-{% macro add_extra_javascript(submit_button_verb) -%}
+{% macro add_extra_javascript(submit_button_verb, is_socrata_source) -%}
     <script type="text/javascript">
-        $(document).ready(function(){
-            $('#datatype-submit').on('click', function(e){
-	         console.log('#datatype-submit called');
+            $(document).ready(function(){
 
+                function validateEmail(email) { 
+	            var re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+	            return re.test(email);
+                } 
+
+       
+            $('#datatype-submit').on('click', function(e){
 	        function appendError(message) {
                      $('#errors').append('<div class="alert alert-danger alert-dismissible" role="alert"><button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>' + message + '</div>');
                 }
-
 
                 e.preventDefault();
                 var definitions = {
                     'field_definitions': {},
                     'data_types': [],
-                    'socrata': "{{socrata_source}}"
+                    'socrata': '{{ is_socrata_source }}'
                 }
                 if(definitions['socrata'] == 'True'){
                     definitions['socrata'] = true
@@ -78,34 +82,34 @@
                     definitions['update_frequency'] = $('#update-select').val();
                 }
 
-
+	        definitions['contributor_name'] = $('input[name="contributor_name"]').val()
+	        definitions['contributor_organization'] = $('input[name="contributor_organization"]').val()
+	        definitions['contributor_email'] = $('input[name="contributor_email"]').val()
+                if (!validateEmail(definitions['contributor_email'])) {
+	             valid= false;
+	             appendError('Not a valid email address:' + definitions['contributor_email']);
+	        }
 
                 if(valid){
                     definitions['view_url'] = $('input[name="dataset_url"]').val()
                     var data = JSON.stringify(definitions);
 
   	            {% if submit_button_verb == 'Contribute' %}
-
-	                // XXX: insert error checking code for email.
-			// We can do this on the client side if we want submitting contributions to be part of the API,
-	                // or server side if we don't.
-
-		        console.log('submitting..');
 	                $.post('/v1/api/contribute-dataset/', {'data': data}, function(resp){
-	                    console.log("HELLLO "); console.log(resp);
-	                    //window.location = "/admin/contribute-thankyou/";
+	                    window.location = "/contrib-thankyou/";
 	                })
 
 	            {% else %}
 
                         $.post('/v1/api/submit-dataset/', {'data': data}, function(resp){
-                            console.log(resp);
-	                    // XX: is this necessary?
-                            //window.location = "/admin/view-datasets/";
+                            window.location = "/admin/view-datasets/";
                         })
 	   
  	    {% endif %}
-                }
+                   } else {
+	                window.location = "#";
+	   
+               	    }
             })
         })
     </script>

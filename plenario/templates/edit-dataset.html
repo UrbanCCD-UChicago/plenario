@@ -11,6 +11,11 @@
     </h2>
     <p><strong>Source URL: </strong>{{ meta.source_url }}</p>
     <p><strong>Machine name: </strong>{{ meta.dataset_name }}</p>
+    {% if meta.contributor_email %}
+    <p><strong>Contributor: </strong>{{ meta.contributor_name }} (<i>{{ meta.contributor_email }}</i>) / {{ meta.contributor_organization }}</p>
+    {% else %}
+    <p><strong>Contributor: <i>no contributor info</i></strong></p>
+    {% endif %}
     <form role="form" method="POST">
         {{ form.csrf_token }}
         <div class="row">
@@ -262,12 +267,15 @@
   </div><!-- /.modal -->
 {% endblock content %}
 {% block extra_javascript %}
-    <script type="text/javascript">
+  <script type="text/javascript">
         $(document).ready(function(){
             $('#delete').on('click', function(e){
                 var hash = $(this).data('hash');
                 $.getJSON('/admin/delete-dataset/' + hash, {}, function(resp){
-                    console.log(resp);
+	            // Slight hack: reload the view-datasets page after waiting for a couple seconds.
+ 	            setTimeout( function(){
+                        window.location = "/admin/view-datasets/?" +new Date().getTime();
+                    }, 2500 );
                 })
             })
         })

@@ -13,6 +13,7 @@ from dateutil.parser import parse
 from datetime_truncate import truncate
 import time
 import json
+import string
 from sqlalchemy import func, distinct, Column, Float, Table
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.types import NullType
@@ -34,6 +35,7 @@ from plenario.utils.helpers import get_socrata_data_info, slugify, increment_dat
 from plenario.tasks import add_dataset
 from plenario.settings import CACHE_CONFIG, MAIL_TESTUSERNAME, MAIL_USERNAME
 
+mail = Mail()
 cache = Cache(config=CACHE_CONFIG)
 
 API_VERSION = '/v1'
@@ -737,8 +739,6 @@ def add_dataset_to_metatable(request, approved_status=True):
     if status_code == 200:
         post = json.loads(post)
 
-        print "POST is ", post
-
         if post.get('view_url'):
             if post.get('socrata'):
                 source_domain = urlparse(post['view_url']).netloc
@@ -760,6 +760,7 @@ def add_dataset_to_metatable(request, approved_status=True):
             else:
                 dataset_id = md5(source_url).hexdigest()
                 md = session.query(MetaTable).get(dataset_id)
+
                 if not md:
                     d = {
                         'dataset_name': slugify(dataset_info['name'], delim=u'_'),
@@ -773,12 +774,18 @@ def add_dataset_to_metatable(request, approved_status=True):
                         'observed_date': post['field_definitions']['date_field'],
                         'latitude': post['field_definitions'].get('latitude'),
                         'longitude': post['field_definitions'].get('longitude'),
-                        'location': post['field_definitions'].get('location')
+                        'location': post['field_definitions'].get('location'),
+                        'contributor_name': post['contributor_name'],
+                        'contributor_organization': post['contributor_organization'],
+                        'contributor_email': post['contributor_email']
+                        'approved_status': approved_status
                     }
-                    d['approved_status'] = approved_status
+                    
 
                     if len(d['dataset_name']) > 49:
                         d['dataset_name'] = d['dataset_name'][:50]
+
+
                     md = MetaTable(**d)
 
                     # add this to meta_master
@@ -805,15 +812,23 @@ def submit_dataset():
 def contribute_dataset():
     resp, status_code = add_dataset_to_metatable(request, approved_status=False)
 
+    post = request.form.get('data')
+    post = json.loads(post)
+    
+    contributor_name = post['contributor_name']
+    contributor_email = post['contributor_email']
+
     # email the response to somebody
-    msg = Message("Hello",
+    msg = Message("Your contribution to Plenario",
                   sender=MAIL_USERNAME,
-                  recipients=[MAIL_TESTUSERNAME])
+                  recipients=[contributor_email])
 
-    msg.body = "testing: " + str(resp)
-    msg.html = "<b>testing: RESP IS " + resp['message'] + "</b>" 
-
-    mail = Mail(current_app)
+    msg.body = "Hello " + str(contributor_name) + "!\r\n"
+    msg.body += "We received your recent contribution to Plenario. Our administrators will need to approve this dataset before it is added.\r\n"
+    msg.body += "Our server's automatic reply was: " + str(resp['message']) + "\r\n"
+    msg.body += "Thank you!\nThe Plenario Team\nhttp://plenar.io\r\n"
+    
+    msg.html = string.replace(msg.body,'\r\n','<p>')
 
     mail.send(msg)
     
