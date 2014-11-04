@@ -21,6 +21,7 @@ DEFAULT_USER = {
     'password': 'your password'
 }
 
+# For emailing users. ('MAIL_USERNAME' is an email address.)
 MAIL_SERVER = 'smtp.gmail.com'
 MAIL_PORT = 465
 MAIL_USE_SSL = True

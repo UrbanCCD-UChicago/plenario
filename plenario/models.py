@@ -36,7 +36,10 @@ class MetaTable(Base):
     longitude = Column(String)
     location = Column(String)
     approved_status = Column(String) # if False, then do not display without first getting administrator approval
-
+    contributor_name = Column(String)
+    contributor_organization = Column(String)
+    contributor_email = Column(String)
+    
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
 
