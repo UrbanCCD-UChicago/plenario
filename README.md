@@ -95,6 +95,15 @@ the homepage, click 'Login' to log in with the username and password
 from `settings.py`. Once logged in, go to 'Add a dataset' under the
 'Admin' menu to add your own datasets.
 
+## Running with Docker
+Additionally, we support installing Plenario using Docker containers. Because of the variety of PostgresQL+Docker config options, there are two containers needed for Plenario. One is web server plenario docker container, which we provide a dockerfile for. The other is a postgresql+postgis database. We recommend using [helmi03/docker-postgis](https://github.com/helmi03/docker-postgis). Please read carefully about persisting data to the database. 
+
+1) Boot a Postgis/Postgres setup. See above. 
+2) Alter settings in settings.py.docker. 
+3) Run `docker build .`
+4) Run `docker run`
+5) Congrats! Plenario should now be running in the container. 
+
 # Data
 
 New datasets are actively being added to the Plenario API. We keep track of them in this [Google Doc](https://docs.google.com/spreadsheet/ccc?key=0Au-2OHnpwhGTdGJzUWJ2SERwVXZLeDU4Y3laWFJvNEE&usp=sharing#gid=0).
