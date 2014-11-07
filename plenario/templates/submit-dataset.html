@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% from "macros/add-socrata-dataset.html" import add_socrata_dataset %}
+{% from "macros/add-csv-dataset.html" import add_csv_dataset %}
+{% from "macros/add-extra-javascript.html" import add_extra_javascript %}
+
+{% block title %}Submit a dataset - Plenar.io{% endblock %}
+{% block content %}
+
+     {% if errors %}
+     <div class="row">
+          <div class='col-md-10'>
+            <h4>There were some problems with your submission: </h4>
+                {% for error in errors %}
+                        <div class="alert alert-danger alert-dismissible" role="alert">
+                            <button type="button" class="close" data-dismiss="alert">
+                                <span aria-hidden="true">&times;</span>
+                                <span class="sr-only">Close</span>
+                            </button>
+			    {{ error }}
+                        </div>
+                 {% endfor %}   
+          </div>
+      </div>
+      {% endif %}
+      <div id="errors"></div>
+
+    <div class="row">
+        <div class='col-md-10 col-md-offset-1'>
+            <h2>
+	      {% block headline %}
+	      Submit a dataset
+	      {% endblock %}
+	    </h2>
+	    <p>
+	      {% block submit_instructions %}
+	      {% endblock %}
+	    </p>
+	    
+            <form role="form" method="POST">
+                <div class="form-group">
+                    {% if dataset_info %}
+                    <input type="text" class="form-control" name="dataset_url" value="{{dataset_info.submitted_url}}" />
+                    {% else %}
+                    <input type="text" class="form-control" name="dataset_url" />
+                    {% endif %}
+                    <p class="help-block">Publicly available URL for a data source in CSV format.</p>
+                </div>
+                <div class="form-group">
+                    <button class="btn btn-info" type="submit">Fetch details &raquo;</button>
+                </div>
+            </form>
+        </div>
+   </div>
+
+    {% if dataset_info %}
+	{% block submit_form %}
+        {% if socrata_source %}
+             {{ add_socrata_dataset(dataset_info, 'Submit') }}
+        {% else %}
+             {{ add_csv_dataset(dataset_info, 'Submit' ) }}
+        {% endif %}
+	{% endblock %}
+
+    {% endif %}
+
+
+
+{% endblock content %}
+
+
+{% block extra_javascript %}
+    {{ add_extra_javascript(null, socrata_source)  }}
+{% endblock %}
