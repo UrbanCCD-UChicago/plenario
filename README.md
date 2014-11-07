@@ -76,13 +76,7 @@ redis-server &
 celery -A plenario.celery_app worker --loglevel=info &
 ```
 
-Initialize the plenario database: 
-
-```
-python
->>> from plenario import database
->>> database.init_db()
-```
+Initialize the plenario database by running `python init_db.py`. 
 
 Finally, run the server:
 
