@@ -1,13 +1,16 @@
 {% macro add_socrata_dataset(dataset_info, submit_button_verb) -%}
+<hr />
 <div class="row">
     <div class="col-md-10 col-md-offset-1">
-        <h4 id="name" data-view="{{dataset_info.view_url}}">{{dataset_info.name}}
+        <strong>Dataset name</strong>
+        <h4 id="name" data-view="{{dataset_info.view_url}}">
+            {{dataset_info.name}}
             {% if dataset_info.update_freq %}
-            <br />Updated: {{dataset_info.update_freq}}
+                <br />Updated: {{dataset_info.update_freq}}
             {% endif %}
         </h4>
         {% if dataset_info.description %}
-            <p>{{dataset_info.description}}</p>
+            <p><strong>Description</strong></br>{{dataset_info.description}}</p>
         {% endif %}
         <!-- <form role="form">-->
         <form role="form" method="POST">
@@ -62,36 +65,45 @@
                 </select>
             </p>
 
-	    {% if submit_button_verb == 'Contribute' %}
-	    <div>
+            {% if submit_button_verb == 'Contribute' %}
 
-	     Finally, tell us about yourself so that the administrators of this Plenario instance can contact you about this dataset if necessary:<p>
+                <h3>About you</h3>
 
-	      <div class="row">
-	      <div class="col-md-4 col-md-offset-0">
-	      <div class="form-group">
-		  <input name="contributor_name" type="text" class="form-control" placeholder="Username" value="{{ '%s' % contributor_name if contributor_name }}" />
-		  <input name="contributor_organization" type="text" class="form-control" placeholder="Organization" value="{{ '%s' % contributor_organization if contributor_organization }}" />
-		  <input name="contributor_email" type="text" class="form-control" placeholder="Email address" value="{{ '%s' % contributor_email if contributor_email }}" />
-	      </div>
-	      </div>
-	      </div>
-	     </p>
-	     {% else %}
-	    <input type="hidden" name="contributor_name" value="{{dataset_info.contributor_name}}">
-	    <input type="hidden" name="contributor_organization" value="{{dataset_info.contributor_organization}}">
-	    <input type="hidden" name="contributor_email" value="{{dataset_info.contributor_email}}">
-	    {% endif %}
+                <p>Finally, tell us about yourself so that we can contact you about this dataset:</p>
 
-	    <div class="row">
-	      <div class="col-md-4 col-md-offset-0">
-	      <div class="form-group">
-              <button type="submit" class="btn btn-default" id="datatype-submit"><i class='fa fa-plus-circle'></i> 
-		{{ submit_button_verb }} this dataset
-		</button>
-	      </div>
-	      </div>
-	    </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="contributor_name" class="control-label">Name</label>
+                            <input id="contributor_name" name="contributor_name" type="text" class="form-control" placeholder="Jane Smith" value="{{ '%s' % contributor_name if contributor_name }}" />
+                        </div>
+                        <div class="form-group">
+                            <label for="contributor_organization" class="control-label">Organization</label>
+                            <input id="contributor_organization" name="contributor_organization" type="text" class="form-control" placeholder="Super Cool Organization" value="{{ '%s' % contributor_organization if contributor_organization }}" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="contributor_email" class="control-label">Email</label>
+                            <input id="contributor_email" name="contributor_email" type="text" class="form-control" placeholder="jane.smith@example.com" value="{{ '%s' % contributor_email if contributor_email }}" />
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <input type="hidden" name="contributor_name" value="{{dataset_info.contributor_name}}">
+        	    <input type="hidden" name="contributor_organization" value="{{dataset_info.contributor_organization}}">
+        	    <input type="hidden" name="contributor_email" value="{{dataset_info.contributor_email}}">
+    	    {% endif %}
+
+            <div class="row">
+                <div class="col-md-4 col-md-offset-0">
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-default" id="datatype-submit"><i class='fa fa-plus-circle'></i> 
+                            {{ submit_button_verb }} this dataset
+                        </button>
+                    </div>
+                </div>
+            </div>
         </form>
     </div>
 </div>
