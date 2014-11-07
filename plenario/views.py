@@ -112,7 +112,7 @@ def get_context_for_new_dataset(url):
     return (dataset_info, errors, socrata_source)
 
 # /contrib is similar to /admin/add-dataset, but sends an email instead of actually adding
-@views.route('/contrib', methods=['GET','POST'])
+@views.route('/contribute', methods=['GET','POST'])
 def contrib_view():
     dataset_info = {}
     errors = []
@@ -123,7 +123,7 @@ def contrib_view():
     context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source}
     return render_template('contribute.html', **context)
 
-@views.route('/contrib-thankyou')
+@views.route('/contribute-thankyou')
 def contrib_thankyou():
     context = {}
     return render_template('contribute_thankyou.html', **context)

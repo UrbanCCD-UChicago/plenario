@@ -1,12 +1,48 @@
 {% extends 'submit-dataset.html' %}
-{% block title %}Contribute a dataset - Plenar.io{% endblock %}
-{% block headline %}Contribute a dataset{% endblock %}
+{% block title %}Add a dataset to Plenar.io - Plenar.io{% endblock %}
+{% block headline %}Add a dataset to Plenar.io{% endblock %}
+
 {% block submit_instructions %}
-If you would like to suggest a dataset for incorporation into this instance of plenario,
-use the form below to point to a Socrata view URL or the URL of a hosted CSV file. After submitting
-the dataset URL, you will need to identify relevant unique identifiers (including primary key,
-date, latitude and longitude) before submitting, as well as some contact information. 
-Your contribution will need to be approved by the administrators before it will be added to the site.
+
+    <p>If you know of a dataset you would like to see in Plenar.io, suggest it here!</p>
+
+    <p>Currently Plenar.io is able to accept any URL to a <a href='#'>comma separated value (CSV)</a> or <a href='#'>Socrata view</a> file that has fields with the following attributes:</p>
+
+    <table class='table table-bordered'>
+        <thead>
+          <tr>
+            <th>Field type</th>
+            <th>Description</th>
+            <th>Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong><code>unique id</code></strong></td>
+            <td>a field that is guaranteed to be unique for every row in the dataset, even if rows are updated</td>
+            <td>194867</td>
+          </tr>
+          <tr>
+            <td><strong><code>date</code></strong></td>
+            <td>a date or datetime field for each observation</td>
+            <td>'1999-01-08', 'January 8, 1999', '1/8/1999' or <a href='http://www.postgresql.org/docs/9.3/static/datatype-datetime.html#DATATYPE-DATETIME-DATE-TABLE'>any date format supported by Postgres</a></td>
+          </tr>
+          <tr>
+            <td><strong><code>location</code></strong></td>
+            <td>either two fields with latitude and longitude , or a single field with both of them formatted <code>(latitude, longitude)</code></td>
+            <td>
+                <p>
+                    <code>latitude field</code>: 41.425 
+                    <br />
+                    <code>longitude field</code>: -88.419
+                </p>
+                <p><code>single field</code>: (41.425,-88.419)</p>
+            </td>
+          </tr>
+        </tbody>
+    </table>
+
+    <p>Once submitted, we'll review it. If approved we'll email when your data has been added!</p>
 {% endblock submit_instructions %}
 
 {% block submit_form %} 
@@ -16,7 +52,6 @@ Your contribution will need to be approved by the administrators before it will 
         {% else %}
              {{ add_csv_dataset(dataset_info, 'Contribute' ) }}
         {% endif %}
-
 
 {% endblock %} 
 
