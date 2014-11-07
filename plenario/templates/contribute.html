@@ -1,0 +1,29 @@
+{% extends 'submit-dataset.html' %}
+{% block title %}Contribute a dataset - Plenar.io{% endblock %}
+{% block headline %}Contribute a dataset{% endblock %}
+{% block submit_instructions %}
+If you would like to suggest a dataset for incorporation into this instance of plenario,
+use the form below to point to a Socrata view URL or the URL of a hosted CSV file. After submitting
+the dataset URL, you will need to identify relevant unique identifiers (including primary key,
+date, latitude and longitude) before submitting, as well as some contact information. 
+Your contribution will need to be approved by the administrators before it will be added to the site.
+{% endblock submit_instructions %}
+
+{% block submit_form %} 
+
+        {% if socrata_source %}
+             {{ add_socrata_dataset(dataset_info, 'Contribute' ) }}
+        {% else %}
+             {{ add_csv_dataset(dataset_info, 'Contribute' ) }}
+        {% endif %}
+
+
+{% endblock %} 
+
+{% block extra_javascript %}
+    {{ add_extra_javascript('Contribute', socrata_source)  }}
+{% endblock %}
+
+
+
+
