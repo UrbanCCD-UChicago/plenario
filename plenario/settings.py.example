@@ -1,7 +1,7 @@
 SECRET_KEY = 'abcdefghijklmnop'
 PLENARIO_SENTRY_URL = ''
 CELERY_SENTRY_URL = ''
-DATABASE_CONN = 'postgresql://plenario:@localhost:5432/plenario_test'
+DATABASE_CONN = 'postgresql://plenario:@localhost:5432/plenario_dev'
 DATA_DIR = '/tmp'
 
 # See: https://pythonhosted.org/Flask-Cache/#configuring-flask-cache
