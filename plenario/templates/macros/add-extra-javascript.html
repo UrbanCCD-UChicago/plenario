@@ -1,16 +1,29 @@
 {% macro add_extra_javascript(submit_button_verb, is_socrata_source) -%}
     <script type="text/javascript">
-            $(document).ready(function(){
 
-                function validateEmail(email) { 
-	            var re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-	            return re.test(email);
-                } 
+        // api and redirect URLs are different for public contributions vs admin
+        {% if submit_button_verb == 'Contribute' %}
 
+            var api_url = '/v1/api/contribute-dataset/';
+            var redirect_url = '/contrib-thankyou/';
+
+        {% else %}
+
+            var api_url = '/v1/api/submit-dataset/';
+            var redirect_url = '/admin/view-datasets/';
+
+        {% endif %}
+
+        $(document).ready(function(){
+            
+            function validateEmail(email) { 
+                var re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+                return re.test(email);
+            } 
        
             $('#datatype-submit').on('click', function(e){
-	        function appendError(message) {
-                     $('#errors').append('<div class="alert alert-danger alert-dismissible" role="alert"><button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>' + message + '</div>');
+    	        function appendError(message) {
+                    $('#errors').append('<div class="alert alert-danger alert-dismissible" role="alert"><button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>' + message + '</div>');
                 }
 
                 e.preventDefault();
@@ -33,13 +46,14 @@
                         if (field_type){
                             if (typeof definitions['field_definitions'][field_type] !== 'undefined'){
                                 valid = false
-		                appendError('You defined more than one ' + $(opt).text());
+    	                appendError('You defined more than one ' + $(opt).text());
                             } else {
                                 definitions['field_definitions'][field_type] = field_name;
                             }
                         }
                     }
                 });
+
                 $.each($('.data-type option'), function(i, opt){
                     var field_name = $(opt).parent().parent().prev().text();
                     if($(opt).is(':selected')){
@@ -55,14 +69,15 @@
                         }
                     }
 
-                })
+                });
+
                 var defined = []
                 $.each(definitions['field_definitions'], function(i, definition){
                     defined.push(i);
                 })
                 if(!(defined.indexOf('id_field') >= 0)){
                     valid = false
-	   
+       
                     appendError('You need to define a unique ID field');
                 }
                 if(!(defined.indexOf('date_field') >= 0)){
@@ -82,34 +97,26 @@
                     definitions['update_frequency'] = $('#update-select').val();
                 }
 
-	        definitions['contributor_name'] = $('input[name="contributor_name"]').val()
-	        definitions['contributor_organization'] = $('input[name="contributor_organization"]').val()
-	        definitions['contributor_email'] = $('input[name="contributor_email"]').val()
+    	        definitions['contributor_name'] = $('input[name="contributor_name"]').val()
+    	        definitions['contributor_organization'] = $('input[name="contributor_organization"]').val()
+    	        definitions['contributor_email'] = $('input[name="contributor_email"]').val()
+                    
                 if (!validateEmail(definitions['contributor_email'])) {
-	             valid= false;
-	             appendError('Not a valid email address:' + definitions['contributor_email']);
-	        }
+    	             valid= false;
+    	             appendError('Not a valid email address:' + definitions['contributor_email']);
+    	        }
 
-                if(valid){
+                if(valid) {
                     definitions['view_url'] = $('input[name="dataset_url"]').val()
                     var data = JSON.stringify(definitions);
 
-  	            {% if submit_button_verb == 'Contribute' %}
-	                $.post('/v1/api/contribute-dataset/', {'data': data}, function(resp){
-	                    window.location = "/contrib-thankyou/";
-	                })
-
-	            {% else %}
-
-                        $.post('/v1/api/submit-dataset/', {'data': data}, function(resp){
-                            window.location = "/admin/view-datasets/";
-                        })
-	   
- 	    {% endif %}
-                   } else {
-	                window.location = "#";
-	   
-               	    }
+                    $.post(api_url, {'data': data}, function(resp){
+                        window.location = redirect_url;
+                    })
+                       
+                } else { 
+                    window.location = "#"; 
+                }
             })
         })
     </script>
