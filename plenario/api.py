@@ -790,12 +790,13 @@ def add_dataset_to_metatable(request, approved_status=True):
                         'approved_status': approved_status,
                     }
                     if (post.get('data_types')):
-                        d['contributor_data_types'] = json.dumps(post.get('data_types'))
+                        d['contributed_data_types'] = json.dumps(post.get('data_types'))
                     
                     if len(d['dataset_name']) > 49:
                         d['dataset_name'] = d['dataset_name'][:50]
 
 
+                    print d
                     md = MetaTable(**d)
 
                     # add this to meta_master

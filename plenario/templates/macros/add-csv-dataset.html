@@ -1,22 +1,35 @@
 {% macro add_csv_dataset(dataset_info, submit_button_verb) -%}
 <div class="row">
     <div class="col-md-10 col-md-offset-1">
+        <strong>File name</strong>
         <h4 id="name" data-view="{{dataset_info.view_url}}">{{dataset_info.name}}
         </h4>
         <form role="form">
             <div id="errors"></div>
+
+            <p>
+                <label for="update-select"><strong>How often does this dataset update?</strong></label>
+                <select id="update-select">
+                    <option value="">-- Select an update interval --</option>
+                    <option value="yearly">Yearly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="daily">Daily</option>
+                </select>
+            </p>
+
             <table class="table">
                 <thead>
                     <th>Choose Type</th>
                     <th>Name</th>
-                    <th>Data Type (guess)</th>
+                    <th>Data Type</th>
                 </thead>
                 <tbody>
                     {% for info in dataset_info.columns %}
                         <tr>
                             <td>
                                 <select class="plenario-field">
-                                    <option value="">-----------</option>
+                                    <option value="">---------</option>
                                     <option value="{{info.human_name}}">Date Field</option>
                                     <option value="{{info.human_name}}">ID Field</option>
                                     <option value="{{info.human_name}}">Latitude</option>
@@ -26,7 +39,7 @@
                             <td>{{ info.human_name }}</td>
                             <td>
                                 <select class="data-type">
-                                    <option value="">-----------</option>
+                                    <option value="">-- Select data type --</option>
                                     <option value="{{info.human_name}}_type" {% if info.data_type == 'boolean' %}selected="selected"{% endif %}>Boolean</option>
                                     <option value="{{info.human_name}}_type" {% if info.data_type == 'integer' %}selected="selected"{% endif %}>Integer</option>
                                     <option value="{{info.human_name}}_type" {% if info.data_type == 'big_integer' %}selected="selected"{% endif %}>Big Integer</option>
@@ -42,21 +55,41 @@
                 </tbody>
             </table>
 
-            <p>
-                <label for="update-select">How often does this dataset update?</label>
-                <select id="update-select">
-                    <option value="">--------</option>
-                    <option value="yearly">Yearly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="daily">Daily</option>
-                </select>
-            </p>
+            {% if submit_button_verb == 'Contribute' %}
 
+                <h3>About you</h3>
+
+                <p>Finally, tell us about yourself so we can contact you about this dataset:</p>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="contributor_name" class="control-label">Name</label>
+                            <input id="contributor_name" name="contributor_name" type="text" class="form-control" placeholder="Jane Smith" value="{{ '%s' % contributor_name if contributor_name }}" />
+                        </div>
+                        <div class="form-group">
+                            <label for="contributor_organization" class="control-label">Organization</label>
+                            <input id="contributor_organization" name="contributor_organization" type="text" class="form-control" placeholder="Super Cool Organization" value="{{ '%s' % contributor_organization if contributor_organization }}" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="contributor_email" class="control-label">Email</label>
+                            <input id="contributor_email" name="contributor_email" type="text" class="form-control" placeholder="jane.smith@example.com" value="{{ '%s' % contributor_email if contributor_email }}" />
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <input type="hidden" name="contributor_name" value="{{dataset_info.contributor_name}}">
+                <input type="hidden" name="contributor_organization" value="{{dataset_info.contributor_organization}}">
+                <input type="hidden" name="contributor_email" value="{{dataset_info.contributor_email}}">
+            {% endif %}
+
+            <hr />
             <p>
-                <button type="submit" class="btn btn-default" id="datatype-submit"><i class='fa fa-plus-circle'></i>
-		  {{ submit_button_verb }} this dataset
-		</button>
+                <button type="submit" class="btn btn-success" id="datatype-submit">
+		          {{ submit_button_verb }} this dataset &raquo;
+		        </button>
             </p>
         </form>
     </div>

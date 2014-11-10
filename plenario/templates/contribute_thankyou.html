@@ -1,8 +1,13 @@
 {% extends 'base.html' %}
 {% block title %}Plenar.io - A spatio-temporal open data platform{% endblock %}
 {% block content %}
-<h3>Thank you!</h3>
+<h3>Thanks for submitting!</h3>
 
-Your content has been submitted for review for inclusion in Plenario.
+<p>Your dataset has been submitted! After we review it, we'll notify you when your data is available in Plenar.io.</p>
+
+<p>
+    <a href="{{ url_for('views.contrib_view') }}" class='btn btn-info'>&laquo; Add another dataset</a>
+    <a href="{{ url_for('views.explore_view') }}" class='btn btn-default'>Explore datasets &raquo;</a>
+</p>
 
 {% endblock content %}

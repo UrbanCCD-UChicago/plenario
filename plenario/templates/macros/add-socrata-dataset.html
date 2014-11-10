@@ -12,24 +12,38 @@
         {% if dataset_info.description %}
             <p><strong>Description</strong></br>{{dataset_info.description}}</p>
         {% endif %}
+
+        <hr />
         <!-- <form role="form">-->
         <form role="form" method="POST">
+
+            <p>
+                <label for="update-select"><strong>How often does this dataset update?</strong></label><br />
+                <select id="update-select">
+                    <option value="">-- Select an update interval --</option>
+                    <option value="yearly">Yearly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="daily">Daily</option>
+                </select>
+            </p>
+
             <table class="table">
                 <thead>
                     <th>Choose Type</th>
                     <th>Name</th>
                     <th>Description</th>
-                    <th>Socrata Data Type</th>
-                    <th>Width</th>
+                    <th>Data Type</th>
+                    <th>Field size</th>
                     <th>Value Range</th>
-                    <th>Nulls?</th>
+                    <th>Allow Nulls?</th>
                 </thead>
                 <tbody>
                     {% for info in dataset_info.columns %}
                         <tr>
                             <td>
                                 <select class="plenario-field">
-                                    <option value="">-----------</option>
+                                    <option value="">--------</option>
                                     <option value="{{info.human_name}}">Date Field</option>
                                     <option value="{{info.human_name}}">ID Field</option>
                                     <option value="{{info.human_name}}">Latitude</option>
@@ -54,22 +68,11 @@
                 </tbody>
             </table>
 
-            <p>
-                <label for="update-select">How often does this dataset update?</label>
-                <select id="update-select">
-                    <option value="">--------</option>
-                    <option value="yearly">Yearly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="daily">Daily</option>
-                </select>
-            </p>
-
             {% if submit_button_verb == 'Contribute' %}
 
                 <h3>About you</h3>
 
-                <p>Finally, tell us about yourself so that we can contact you about this dataset:</p>
+                <p>Finally, tell us about yourself so we can contact you about this dataset:</p>
 
                 <div class="row">
                     <div class="col-md-4">
@@ -95,11 +98,12 @@
         	    <input type="hidden" name="contributor_email" value="{{dataset_info.contributor_email}}">
     	    {% endif %}
 
+            <hr />
             <div class="row">
                 <div class="col-md-4 col-md-offset-0">
                     <div class="form-group">
-                        <button type="submit" class="btn btn-default" id="datatype-submit"><i class='fa fa-plus-circle'></i> 
-                            {{ submit_button_verb }} this dataset
+                        <button type="submit" class="btn btn-success" id="datatype-submit">
+                            {{ submit_button_verb }} this dataset &raquo;
                         </button>
                     </div>
                 </div>
