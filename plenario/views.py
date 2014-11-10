@@ -2,10 +2,9 @@ from flask import make_response, request, redirect, url_for, render_template, cu
     Blueprint, flash, session as flask_session
 from plenario.models import MasterTable, MetaTable, User
 from plenario.database import session, Base, app_engine as engine
-from plenario.utils.helpers import get_socrata_data_info, iter_column
+from plenario.utils.helpers import get_socrata_data_info, iter_column, send_mail
 from plenario.tasks import update_dataset as update_dataset_task, \
     delete_dataset as delete_dataset_task, add_dataset as add_dataset_task
-from plenario.api import mail
 from flask_login import login_required
 from datetime import datetime, timedelta
 from urlparse import urlparse
@@ -19,8 +18,7 @@ import re
 from cStringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader
 from sqlalchemy import Table
-from flask_mail import Mail, Message
-from plenario.settings import CACHE_CONFIG, MAIL_USERNAME
+from plenario.settings import CACHE_CONFIG
 import string
 
 views = Blueprint('views', __name__)
@@ -56,6 +54,7 @@ def get_context_for_new_dataset(url):
     errors = []
     socrata_source = False
     if url:
+        url = url.strip(' \t\n\r') # strip whitespace, tabs, etc
         four_by_four = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
         errors = True
         if four_by_four:
@@ -148,8 +147,9 @@ def add_dataset():
 @views.route('/admin/view-datasets')
 @login_required
 def view_datasets():
-    datasets = session.query(MetaTable).all()
-    return render_template('view-datasets.html', datasets=datasets)
+    datasets_pending = session.query(MetaTable).filter(MetaTable.approved_status != 'true').all()
+    datasets = session.query(MetaTable).filter(MetaTable.approved_status == 'true').all()
+    return render_template('view-datasets.html', datasets_pending=datasets_pending, datasets=datasets)
 
 class EditDatasetForm(Form):
     """ 
@@ -212,18 +212,21 @@ def approve_dataset(source_url_hash):
 
     # Email the user who submitted that their dataset has been approved.
     # email the response to somebody
-    msg = Message("Your contribution to Plenario has been approved",
-                  sender=MAIL_USERNAME,
-                  recipients=[meta.contributor_email])
 
-    msg.body = "Hello " + str(meta.contributor_name) + "!\r\n"
-    msg.body += "We have approved your contribution to Plenario: %s\r\n" % meta.human_name
-    msg.body += "It should appear on the site within 24 hours.\r\n"
-    msg.body += "Thanks!\nThe Plenario Team\nhttp://plenar.io\r\n"
-    
-    msg.html = string.replace(msg.body,'\r\n','<p>')
+    msg_body = """Hello %s,\r\n
+\r\n
+Your dataset has been approved and added to Plenar.io:\r\n
+\r\n
+%s\r\n
+\r\n
+It should appear on http://plenar.io within 24 hours.\r\n
+\r\n
+Thank you!\r\n
+The Plenario Team\r\n
+http://plenar.io""" % (meta.contributor_name, meta.human_name)
 
-    mail.send(msg)
+    send_mail(subject="Your dataset has been added to Plenar.io", 
+        recipient=meta.contributor_email, body=msg_body)
     
     return redirect(url_for('views.view_datasets'))
 

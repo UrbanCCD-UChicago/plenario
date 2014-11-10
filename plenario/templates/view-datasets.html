@@ -5,17 +5,65 @@
     <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
 {% endblock %}
 {% block content %}
+    <h1>View datasets</h1>
+
     {% if errors %}
         <h4>There were some problems with your submission: </h4>
         {% for error in errors %}
             <p>{{error}}</p>
         {% endfor %}
     {% endif %}
-    <h2>
-        {{ datasets|length }} datasets
-        <small><a href='/admin/add-dataset'>Add dataset &raquo;</a></small>
-    </h2>
+
     <div id="errors"></div>
+
+    {% if datasets_pending %}
+        <h3>
+            {{ datasets_pending|length }} datasets pending approval
+        </h3>
+        <table id='datasets-pending-table' class="table table-condensed">
+            <thead>
+                <th>Name</th>
+                <th>Attribution</th>
+                <th>Submitted by</th>
+                <th>Update frequency</th>
+                <th></th>
+                <th></th>
+            </thead>
+            <tbody>
+                {% for dataset in datasets_pending %}
+                    <tr>
+                        <td>{{ dataset.human_name }}</td>
+                        <td>{{ dataset.attribution }}</td>
+                        <td>
+                            <a href='mailto:{{ dataset.contributor_email }}'>{{ dataset.contributor_name }}</a>, 
+                            {{ dataset.contributor_organization }}
+                        </td>
+                        <td>{{ dataset.update_freq }}</td>
+                        <td>
+                            <a href="{{ url_for('views.edit_dataset', source_url_hash=dataset.source_url_hash) }}"
+                                class="btn btn-info btn-sm">
+                                <i class='fa fa-edit'></i> Edit
+                            </a>
+                            {% if dataset.approved_status != 'true' %}
+                                <a href="{{ url_for('views.approve_dataset', source_url_hash=dataset.source_url_hash) }}"
+                                    class="btn btn-success btn-sm">
+                                    <i class='fa fa-check'></i> Approve
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <br /><br />
+    {% endif %}
+    <!-- datasets loaded in the system -->
+    <h3>
+        {{ datasets|length }} datasets available
+        <small><a href='/admin/add-dataset'>Add dataset &raquo;</a></small>
+    </h3>
+
     <table id='datasets-table' class="table table-condensed">
         <thead>
             <th>Name</th>
@@ -39,17 +87,13 @@
                             class="btn btn-info btn-sm">
                             <i class='fa fa-edit'></i> Edit
                         </a>
+                        {% if dataset.approved_status == False %}
+                            <a href="{{ url_for('views.approve_dataset', source_url_hash=dataset.source_url_hash) }}"
+                                class="btn btn-success btn-sm">
+                                <i class='fa fa-check'></i> Approve
+                            </a>
+                        {% endif %}
                     </td>
-		    <td>
-		      {% if dataset.approved_status == 'false' %}
-                        <a href="{{ url_for('views.approve_dataset', source_url_hash=dataset.source_url_hash) }}"
-                            class="btn btn-info btn-sm">
-                            <i class='fa fa-edit'></i> Approve
-                        </a>
-		      {% else %}
-			approved
-		      {% endif %}
-		    </td>
                 </tr>
             {% endfor %}
         </tbody>
@@ -76,6 +120,21 @@
                     check_update(resp.task_id, btn);
                 })
             })
+
+            $('#datasets-pending-table').DataTable( {
+                "aaSorting": [ [0,'asc'] ],
+                "aoColumns": [
+                    null,
+                    null,
+                    null,
+                    null,
+                    { "bSortable": false }
+                ],
+                "paging": false,
+                "searching": false,
+                "info": false
+            } );
+
             $('#datasets-table').DataTable( {
                 "aaSorting": [ [0,'asc'] ],
                 "aoColumns": [

@@ -21,10 +21,14 @@ DEFAULT_USER = {
     'password': 'your password'
 }
 
+# Email address for notifying site administrators
+ADMIN_EMAIL = ''
+
 # For emailing users. ('MAIL_USERNAME' is an email address.)
 MAIL_SERVER = 'smtp.gmail.com'
 MAIL_PORT = 465
 MAIL_USE_SSL = True
+MAIL_DISPLAY_NAME = 'Plenar.io Team'
 MAIL_USERNAME = ''
 MAIL_PASSWORD = ''
 

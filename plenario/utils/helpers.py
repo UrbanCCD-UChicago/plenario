@@ -2,9 +2,14 @@ import requests
 import re
 from unicodedata import normalize
 import calendar
+import string
 from datetime import timedelta
 from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
+from flask_mail import Mail, Message
+from plenario.settings import MAIL_DISPLAY_NAME, MAIL_USERNAME, ADMIN_EMAIL
+
+mail = Mail()
 
 def iter_column(idx, f):
     f.seek(0)
@@ -118,3 +123,12 @@ def increment_datetime_aggregate(sourcedate, time_agg):
         delta = timedelta(days=days_to_add)
 
     return sourcedate + delta
+
+def send_mail(subject, recipient, body):
+    msg = Message(subject,
+              sender=(MAIL_DISPLAY_NAME, MAIL_USERNAME),
+              recipients=[recipient], bcc=ADMIN_EMAIL)
+
+    msg.body = body
+    msg.html = string.replace(msg.body,'\r\n','<br />')
+    mail.send(msg)

@@ -1,9 +1,6 @@
 from flask import make_response, request, render_template, current_app, g, \
     Blueprint, abort, session as flask_session
 from flask.ext.cache import Cache
-from flask_mail import Mail
-from flask_mail import Message
-
 from functools import update_wrapper
 import os
 import re
@@ -31,13 +28,12 @@ from hashlib import md5
 
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
-from plenario.utils.helpers import get_socrata_data_info, slugify, increment_datetime_aggregate
+from plenario.utils.helpers import get_socrata_data_info, slugify, increment_datetime_aggregate, send_mail
 from plenario.tasks import add_dataset
-from plenario.settings import CACHE_CONFIG, MAIL_USERNAME
+from plenario.settings import CACHE_CONFIG
 
 from plenario.auth import check_admin_status
 
-mail = Mail()
 cache = Cache(config=CACHE_CONFIG)
 
 API_VERSION = '/v1'
@@ -828,12 +824,9 @@ def contribute_dataset():
     contributor_name = post['contributor_name']
     contributor_email = post['contributor_email']
 
-    # email the response to somebody
-    msg = Message("Your dataset has been submitted to Plenar.io!",
-                  sender=MAIL_USERNAME,
-                  recipients=[contributor_email])
-
-    msg.body = """Hello %s,\r\n
+    # email a confirmation to the submitter
+    msg_body = """Hello %s,\r\n
+\r\n
 We received your recent dataset submission to Plenar.io:\r\n
 \r\n
 %s\r\n
@@ -843,9 +836,9 @@ After we review it, we'll notify you when your data is loaded and available.\r\n
 Thank you!\r\n
 The Plenario Team\r\n
 http://plenar.io""" % (contributor_name, resp['message'])
-    
-    msg.html = string.replace(msg.body,'\r\n','<br />')
-    mail.send(msg)
+
+    send_mail(subject="Your dataset has been submitted to Plenar.io", 
+        recipient=contributor_email, body=msg_body)
     
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
