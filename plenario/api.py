@@ -796,13 +796,24 @@ def add_dataset_to_metatable(request, approved_status=True):
                     # add this to meta_master
                     session.add(md)
                     session.commit()
-                if (approved_status == True):
-                    add_dataset.delay(md.source_url_hash, data_types=post.get('data_types'))
-                resp['message'] = "'%s' was submitted successfully." % dataset_info['name']
+                
+                    if (approved_status == True):
+                        add_dataset.delay(md.source_url_hash, data_types=post.get('data_types'))
+                    resp['message'] = "'%s' was submitted successfully." % dataset_info['name']
+
+                # dataset was found in the system already
+                else:
+                    resp['status'] = 'duplicate'
+                    resp['message'] = "A dataset with that URL has already been loaded: '" + md.human_name + "'"
+                    resp['details'] = { 'human_name': md.human_name,
+                                        'dataset_name': md.dataset_name,
+                                        'date_added': md.date_added }
+                    status_code = 200
         else:
             resp['status'] = 'error'
             resp['message'] = 'Must provide a url where data can be downloaded'
             status_code = 400
+
     return resp, status_code
     
 
@@ -818,14 +829,15 @@ def submit_dataset():
 def contribute_dataset():
     resp, status_code = add_dataset_to_metatable(request, approved_status=False)
 
-    post = request.form.get('data')
-    post = json.loads(post)
-    
-    contributor_name = post['contributor_name']
-    contributor_email = post['contributor_email']
+    if status_code == 200 and resp['status'] != 'duplicate' :
+        post = request.form.get('data')
+        post = json.loads(post)
+        
+        contributor_name = post['contributor_name']
+        contributor_email = post['contributor_email']
 
-    # email a confirmation to the submitter
-    msg_body = """Hello %s,\r\n
+        # email a confirmation to the submitter
+        msg_body = """Hello %s,\r\n
 \r\n
 We received your recent dataset submission to Plenar.io:\r\n
 \r\n
@@ -837,11 +849,12 @@ Thank you!\r\n
 The Plenario Team\r\n
 http://plenar.io""" % (contributor_name, resp['message'])
 
-    send_mail(subject="Your dataset has been submitted to Plenar.io", 
-        recipient=contributor_email, body=msg_body)
-    
+        send_mail(subject="Your dataset has been submitted to Plenar.io", 
+            recipient=contributor_email, body=msg_body)
+
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
+
     return resp
 
 # helper functions

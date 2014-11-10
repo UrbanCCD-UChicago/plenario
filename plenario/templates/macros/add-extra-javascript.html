@@ -111,11 +111,16 @@
                     var data = JSON.stringify(definitions);
 
                     $.post(api_url, {'data': data}, function(resp){
-                        window.location = redirect_url;
+                        if (resp['status'] == 'duplicate') {
+                            appendError('Unable to submit! ' + resp['message']);
+                            window.scrollTo(0,0);
+                        }
+                        else
+                            window.location = redirect_url;
                     })
                        
                 } else { 
-                    window.location = "#"; 
+                    window.scrollTo(0,0);
                 }
             })
         })

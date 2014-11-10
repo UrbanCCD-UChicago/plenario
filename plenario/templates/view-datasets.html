@@ -5,7 +5,10 @@
     <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
 {% endblock %}
 {% block content %}
-    <h1>View datasets</h1>
+    <h1>
+        View datasets
+        <small><a href='/admin/add-dataset'>Add dataset &raquo;</a></small>
+    </h1>
 
     {% if errors %}
         <h4>There were some problems with your submission: </h4>
@@ -26,7 +29,6 @@
                 <th>Attribution</th>
                 <th>Submitted by</th>
                 <th>Update frequency</th>
-                <th></th>
                 <th></th>
             </thead>
             <tbody>
@@ -61,17 +63,15 @@
     <!-- datasets loaded in the system -->
     <h3>
         {{ datasets|length }} datasets available
-        <small><a href='/admin/add-dataset'>Add dataset &raquo;</a></small>
     </h3>
 
     <table id='datasets-table' class="table table-condensed">
         <thead>
             <th>Name</th>
             <th>Attribution</th>
-            <th>Update frequency</th>
+            <th>Updated</th>
             <th>Last updated</th>
             <!-- <th></th> -->
-            <th></th>
             <th></th>
         </thead>
         <tbody>
