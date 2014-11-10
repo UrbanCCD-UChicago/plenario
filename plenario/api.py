@@ -795,8 +795,6 @@ def add_dataset_to_metatable(request, approved_status=True):
                     if len(d['dataset_name']) > 49:
                         d['dataset_name'] = d['dataset_name'][:50]
 
-
-                    print d
                     md = MetaTable(**d)
 
                     # add this to meta_master
@@ -804,7 +802,7 @@ def add_dataset_to_metatable(request, approved_status=True):
                     session.commit()
                 if (approved_status == True):
                     add_dataset.delay(md.source_url_hash, data_types=post.get('data_types'))
-                resp['message'] = 'Dataset %s submitted successfully' % dataset_info['name']
+                resp['message'] = "'%s' was submitted successfully." % dataset_info['name']
         else:
             resp['status'] = 'error'
             resp['message'] = 'Must provide a url where data can be downloaded'
@@ -831,17 +829,22 @@ def contribute_dataset():
     contributor_email = post['contributor_email']
 
     # email the response to somebody
-    msg = Message("Your contribution to Plenario",
+    msg = Message("Your dataset has been submitted to Plenar.io!",
                   sender=MAIL_USERNAME,
                   recipients=[contributor_email])
 
-    msg.body = "Hello " + str(contributor_name) + "!\r\n"
-    msg.body += "We received your recent contribution to Plenario. Our administrators will need to approve this dataset before it is added.\r\n"
-    msg.body += "Our server's automatic reply was: " + str(resp['message']) + "\r\n"
-    msg.body += "Thank you!\nThe Plenario Team\nhttp://plenar.io\r\n"
+    msg.body = """Hello %s,\r\n
+We received your recent dataset submission to Plenar.io:\r\n
+\r\n
+%s\r\n
+\r\n
+After we review it, we'll notify you when your data is loaded and available.\r\n
+\r\n
+Thank you!\r\n
+The Plenario Team\r\n
+http://plenar.io""" % (contributor_name, resp['message'])
     
-    msg.html = string.replace(msg.body,'\r\n','<p>')
-
+    msg.html = string.replace(msg.body,'\r\n','<br />')
     mail.send(msg)
     
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
