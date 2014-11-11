@@ -43,15 +43,13 @@
                         <td>{{ dataset.update_freq }}</td>
                         <td>
                             <a href="{{ url_for('views.edit_dataset', source_url_hash=dataset.source_url_hash) }}"
-                                class="btn btn-info btn-sm">
-                                <i class='fa fa-edit'></i> Edit
+                                class="btn btn-default btn-sm">
+                                <i class='fa fa-edit'></i> Review
                             </a>
-                            {% if dataset.approved_status != 'true' %}
-                                <a href="{{ url_for('views.approve_dataset', source_url_hash=dataset.source_url_hash) }}"
-                                    class="btn btn-success btn-sm">
-                                    <i class='fa fa-check'></i> Approve
-                                </a>
-                            {% endif %}
+                            <a href="{{ url_for('views.approve_dataset_view', source_url_hash=dataset.source_url_hash) }}"
+                                class="btn btn-success btn-sm">
+                                <i class='fa fa-check'></i> Approve
+                            </a>
                         </td>
                     </tr>
                 {% endfor %}

@@ -110,6 +110,39 @@ def get_context_for_new_dataset(url):
         errors.append('Need a URL')
     return (dataset_info, errors, socrata_source)
 
+def approve_dataset(source_url_hash):
+    # get the MetaTable row and change the approved_status and bounce back to view-datasets.
+
+    meta = session.query(MetaTable).get(source_url_hash)
+    json_data_types = None
+    if (meta.contributed_data_types):
+        json_data_types = json.loads(meta.contributed_data_types)
+        
+    add_dataset_task.delay(source_url_hash, data_types=json_data_types)
+    
+    upd = { 'approved_status': 'true' }
+
+    meta.approved_status = 'true'
+    session.commit()
+
+    # Email the user who submitted that their dataset has been approved.
+    # email the response to somebody
+
+    msg_body = """Hello %s,\r\n
+\r\n
+Your dataset has been approved and added to Plenar.io:\r\n
+\r\n
+%s\r\n
+\r\n
+It should appear on http://plenar.io within 24 hours.\r\n
+\r\n
+Thank you!\r\n
+The Plenario Team\r\n
+http://plenar.io""" % (meta.contributor_name, meta.human_name)
+
+    send_mail(subject="Your dataset has been added to Plenar.io", 
+        recipient=meta.contributor_email, body=msg_body)
+
 # /contrib is similar to /admin/add-dataset, but sends an email instead of actually adding
 @views.route('/contribute', methods=['GET','POST'])
 def contrib_view():
@@ -195,38 +228,9 @@ class EditDatasetForm(Form):
 
 @views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
-def approve_dataset(source_url_hash):
-    # get the MetaTable row and change the approved_status and bounce back to view-datasets.
-
-    meta = session.query(MetaTable).get(source_url_hash)
-    json_data_types = None
-    if (meta.contributed_data_types):
-        json_data_types = json.loads(meta.contributed_data_types)
-        
-    add_dataset_task.delay(source_url_hash, data_types=json_data_types)
+def approve_dataset_view(source_url_hash):
     
-    upd = { 'approved_status': 'true' }
-
-    meta.approved_status = 'true'
-    session.commit()
-
-    # Email the user who submitted that their dataset has been approved.
-    # email the response to somebody
-
-    msg_body = """Hello %s,\r\n
-\r\n
-Your dataset has been approved and added to Plenar.io:\r\n
-\r\n
-%s\r\n
-\r\n
-It should appear on http://plenar.io within 24 hours.\r\n
-\r\n
-Thank you!\r\n
-The Plenario Team\r\n
-http://plenar.io""" % (meta.contributor_name, meta.human_name)
-
-    send_mail(subject="Your dataset has been added to Plenar.io", 
-        recipient=meta.contributor_email, body=msg_body)
+    approve_dataset(source_url_hash)
     
     return redirect(url_for('views.view_datasets'))
 
@@ -236,16 +240,23 @@ http://plenar.io""" % (meta.contributor_name, meta.human_name)
 def edit_dataset(source_url_hash):
     form = EditDatasetForm()
     meta = session.query(MetaTable).get(source_url_hash)
-    table = Table('dat_%s' % meta.dataset_name, Base.metadata,
-        autoload=True, autoload_with=engine)
-    fieldnames = table.columns.keys()
+
+    if (meta.approved_status == 'true'):
+        table = Table('dat_%s' % meta.dataset_name, Base.metadata,
+            autoload=True, autoload_with=engine)
+        fieldnames = table.columns.keys()
+    else:
+        fieldnames = []
+        if meta.contributed_data_types:
+            fieldnames = [f['field_name'] for f in json.loads(meta.contributed_data_types)]
     if form.validate_on_submit():
+
+        approve_dataset(source_url_hash)
+
         upd = {
             'human_name': form.human_name.data,
             'description': form.description.data,
             'attribution': form.attribution.data,
-            'obs_from': form.obs_from.data,
-            'obs_to': form.obs_to.data,
             'update_freq': form.update_freq.data,
             'business_key': form.business_key.data,
             'latitude': form.latitude.data,

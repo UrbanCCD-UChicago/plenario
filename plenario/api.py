@@ -787,6 +787,8 @@ def add_dataset_to_metatable(request, approved_status=True):
                     }
                     if (post.get('data_types')):
                         d['contributed_data_types'] = json.dumps(post.get('data_types'))
+                    elif dataset_info['columns']: 
+                        d['contributed_data_types'] = json.dumps(dataset_info['columns'])
                     
                     if len(d['dataset_name']) > 49:
                         d['dataset_name'] = d['dataset_name'][:50]

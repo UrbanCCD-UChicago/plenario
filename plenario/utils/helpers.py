@@ -64,6 +64,7 @@ def get_socrata_data_info(view_url):
                 d = {
                     'human_name': column['name'],
                     'machine_name': column['fieldName'],
+                    'field_name': column['fieldName'], # duplicate definition for code compatibility
                     'data_type': column['dataTypeName'],
                     'description': column.get('description', ''),
                     'width': column['width'],
