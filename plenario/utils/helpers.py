@@ -72,6 +72,7 @@ def get_socrata_data_info(view_url):
                     'smallest': '',
                     'largest': '',
                 }
+
                 if column.get('cachedContents'):
                     cached = column['cachedContents']
                     if cached.get('top'):
@@ -132,4 +133,7 @@ def send_mail(subject, recipient, body):
 
     msg.body = body
     msg.html = string.replace(msg.body,'\r\n','<br />')
-    mail.send(msg)
+    try: 
+        mail.send(msg)
+    except SMTPAuthenticationError, e:
+        print "error sending email"

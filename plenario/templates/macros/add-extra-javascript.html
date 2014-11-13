@@ -40,7 +40,8 @@
                 var valid = true;
                 $('#errors').empty()
                 $.each($('.plenario-field option'), function(i, opt){
-                    var field_name = $(opt).parent().parent().next().text();
+                    //var field_name = $(opt).parent().parent().next().text();
+                    var field_name = $(opt).val();
                     if($(opt).is(':selected')){
                         var field_type = $(opt).text().split(' ').join('_').toLowerCase().replace(/-/g, '');
                         if (field_type){

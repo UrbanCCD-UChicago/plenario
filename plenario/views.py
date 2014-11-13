@@ -251,8 +251,6 @@ def edit_dataset(source_url_hash):
             fieldnames = [f['field_name'] for f in json.loads(meta.contributed_data_types)]
     if form.validate_on_submit():
 
-        approve_dataset(source_url_hash)
-
         upd = {
             'human_name': form.human_name.data,
             'description': form.description.data,
@@ -268,6 +266,7 @@ def edit_dataset(source_url_hash):
             .filter(MetaTable.source_url_hash == meta.source_url_hash)\
             .update(upd)
         session.commit()
+        approve_dataset(source_url_hash)
         flash('%s updated successfully!' % meta.human_name, 'success')
         return redirect(url_for('views.view_datasets'))
     context = {
