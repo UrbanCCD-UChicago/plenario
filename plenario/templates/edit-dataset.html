@@ -96,11 +96,11 @@
                 <div class="form-group has-error has-feedback">
                 {% else %}
                 <div class="form-group">
-                {% endif %}
-                    <label for="id_obvervation_date">Date Field Name</label>
-                    <select id="id_obvervation_date" name="observed_date" class="form-control" autocomplete=off>
+                  {% endif %}
+                  <label for="id_observation_date">Date Field Name</label>
+                    <select id="id_observation_date" name="observed_date" class="form-control" autocomplete=off>
                         {% for column in fieldnames %}
-                            {% if column == meta.observed_date|slugify %}
+                            {% if column == meta.observed_date %}
                                 <option value="{{ column }}" selected>{{ column }}</option>
                             {% else %}
                                 <option value="{{ column }}">{{column}}</option>
@@ -125,7 +125,7 @@
                     <label for="id_business_key">Unique Id Field Name</label>
                     <select id="id_business_key" name="business_key" class="form-control" autocomplete=off>
                         {% for column in fieldnames %}
-                            {% if column == meta.business_key|slugify %}
+                            {% if column == meta.business_key %}
                                 <option selected="selected" value="{{ column }}">{{column}}</option>
                             {% else %}
                                 <option value="{{ column }}">{{column}}</option>
@@ -149,7 +149,7 @@
                     <select id="id_location" name="location" class="form-control" autocomplete=off>
                         <option value="">------------</option>
                         {% for column in fieldnames %}
-                            {% if column == meta.location|slugify %}
+                            {% if column == meta.location %}
                                 <option value="{{ column }}" selected="selected">{{column}}</option>
                             {% else %}
                                 <option value="{{ column }}">{{column}}</option>
@@ -175,7 +175,7 @@
                     <select id="id_latitude" name="latitude" class="form-control" autocomplete=off>
                         <option value="">------------</option>
                         {% for column in fieldnames %}
-                            {% if column == meta.latitude|slugify %}
+                            {% if column == meta.latitude %}
                                 <option selected="selected" value="{{ column }}">{{column}}</option>
                             {% else %}
                                 <option value="{{ column }}">{{column}}</option>
@@ -199,7 +199,7 @@
                     <select id="id_longitude" name="longitude" class="form-control" autocomplete=off>
                         <option value="">------------</option>
                         {% for column in fieldnames %}
-                            {% if column == meta.longitude|slugify %}
+                            {% if column == meta.longitude %}
                                 <option value="{{ column }}" selected="selected">{{column}}</option>
                             {% else %}
                                 <option value="{{ column }}">{{column}}</option>

@@ -40,6 +40,7 @@ class MetaTable(Base):
     contributor_organization = Column(String)
     contributor_email = Column(String)
     contributed_data_types = Column(Text) # Temporarily store user-submitted data types for later approval
+    is_socrata_source = Column(Boolean)
     
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)

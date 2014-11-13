@@ -42,13 +42,13 @@
                     {% for info in dataset_info.columns %}
                         <tr>
                             <td>
-                                <select class="plenario-field" name="type_{{info.machine_name}}">
+                                <select class="plenario-field">
                                     <option value="">--------</option>
-                                    <option value="{{info.machine_name}}">Date Field</option>
-                                    <option value="{{info.machine_name}}">ID Field</option>
-                                    <option value="{{info.machine_name}}">Latitude</option>
-                                    <option value="{{info.machine_name}}">Longitude</option>
-                                    <option value="{{info.machine_name}}">Location</option>
+                                    <option value="{{info.human_name|slugify}}">Date Field</option>
+                                    <option value="{{info.human_name|slugify}}">ID Field</option>
+                                    <option value="{{info.human_name|slugify}}">Latitude</option>
+                                    <option value="{{info.human_name|slugify}}">Longitude</option>
+                                    <option value="{{info.human_name|slugify}}">Location</option>
                                 </select>
                             </td>
                             <td>{{ info.human_name }}</td>

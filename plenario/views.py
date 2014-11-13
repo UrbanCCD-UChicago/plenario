@@ -108,14 +108,16 @@ def get_context_for_new_dataset(url):
                     dataset_info['columns'].append(d)
     else:
         errors.append('Need a URL')
+    #print "get_context_for_new_dataset(): returning ", dataset_info, errors, socrata_source
     return (dataset_info, errors, socrata_source)
 
 def approve_dataset(source_url_hash):
     # get the MetaTable row and change the approved_status and bounce back to view-datasets.
 
     meta = session.query(MetaTable).get(source_url_hash)
+
     json_data_types = None
-    if (meta.contributed_data_types):
+    if ((not meta.is_socrata_source) and meta.contributed_data_types):
         json_data_types = json.loads(meta.contributed_data_types)
         
     add_dataset_task.delay(source_url_hash, data_types=json_data_types)
