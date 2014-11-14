@@ -33,9 +33,9 @@
                     'socrata': '{{ is_socrata_source }}'
                 }
                 if(definitions['socrata'] == 'True'){
-                    definitions['socrata'] = true
+                    definitions['socrata'] = true;
                 } else {
-                    definitions['socrata'] = false
+                  definitions['socrata'] = false;
                 }
                 var valid = true;
                 $('#errors').empty()
@@ -56,7 +56,8 @@
                 });
 
                 $.each($('.data-type option'), function(i, opt){
-                    var field_name = $(opt).parent().parent().prev().text();
+                    //var field_name = $(opt).parent().parent().prev().text();
+	            var field_name = $(opt).val();
                     if($(opt).is(':selected')){
                         var d_type = $(opt).text().split(' ').join('_').toLowerCase().replace(/-/g, "")
                         if(d_type){

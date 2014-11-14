@@ -249,7 +249,8 @@ class PlenarioETL(object):
             ]
             with gzip.GzipFile(fileobj=s, mode='rb') as f:
                 reader = UnicodeCSVReader(f)
-                header = reader.next()
+                header = map(slugify, reader.next())
+
                 col_types = []
                 try:
                     types = getattr(self, 'data_types')
@@ -261,7 +262,7 @@ class PlenarioETL(object):
                     for col in range(len(header)):
                         col_types.append(iter_column(col, f))
             for col_name,d_type in zip(header, col_types):
-                cols.append(Column(slugify(col_name), d_type))
+                cols.append(Column(col_name, d_type))
             cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver', 
                     name='%s_ix' % self.dataset_name[:50]))
             self.dat_table = Table('dat_%s' % self.dataset_name, Base.metadata, 

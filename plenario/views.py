@@ -193,8 +193,8 @@ class EditDatasetForm(Form):
     human_name = TextField('human_name', validators=[DataRequired()])
     description = TextField('description', validators=[DataRequired()])
     attribution = TextField('attribution', validators=[DataRequired()])
-    obs_from = DateField('obs_from', validators=[DataRequired(message="Start of date range must be a valid date")])
-    obs_to = DateField('obs_to', validators=[DataRequired(message="End of date range must be a valid date")])
+    #obs_from = DateField('obs_from', validators=[DataRequired(message="Start of date range must be a valid date")])
+    #obs_to = DateField('obs_to', validators=[DataRequired(message="End of date range must be a valid date")])
     update_freq = SelectField('update_freq', 
                               choices=[('daily', 'Daily'),
                                        ('houly', 'Hourly'),
@@ -271,6 +271,8 @@ def edit_dataset(source_url_hash):
         approve_dataset(source_url_hash)
         flash('%s updated successfully!' % meta.human_name, 'success')
         return redirect(url_for('views.view_datasets'))
+    else:
+        pass
     context = {
         'form': form,
         'meta': meta,
