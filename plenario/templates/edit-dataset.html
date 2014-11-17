@@ -7,10 +7,15 @@
 {% block content %}
     <p><a href='{{ url_for('views.view_datasets') }}'>&laquo; view datasets</a></p>
     <h2>
-        Edit {{ meta.human_name }}
+        Editing '{{ meta.human_name }}'
     </h2>
     <p><strong>Source URL: </strong>{{ meta.source_url }}</p>
     <p><strong>Machine name: </strong>{{ meta.dataset_name }}</p>
+    {% if meta.contributor_email %}
+    <p><strong>Contributor: </strong>{{ meta.contributor_name }} (<i>{{ meta.contributor_email }}</i>) / {{ meta.contributor_organization }}</p>
+    {% else %}
+    <p><strong>Contributor: <i>no contributor info</i></strong></p>
+    {% endif %}
     <form role="form" method="POST">
         {{ form.csrf_token }}
         <div class="row">
@@ -91,11 +96,11 @@
                 <div class="form-group has-error has-feedback">
                 {% else %}
                 <div class="form-group">
-                {% endif %}
-                    <label for="id_obvervation_date">Observation Date Field Name</label>
-                    <select id="id_obvervation_date" name="observed_date" class="form-control" autocomplete=off>
+                  {% endif %}
+                  <label for="id_observation_date">Date Field Name</label>
+                    <select id="id_observation_date" name="observed_date" class="form-control" autocomplete=off>
                         {% for column in fieldnames %}
-                            {% if column == meta.observed_date|slugify %}
+                            {% if column == meta.observed_date %}
                                 <option value="{{ column }}" selected>{{ column }}</option>
                             {% else %}
                                 <option value="{{ column }}">{{column}}</option>
@@ -109,40 +114,6 @@
                     {% endif %}
                 </div>
             </div>
-            <div class="col-sm-6">
-                <div class="row">
-                    <div class="col-sm-6">
-                        {% if form.obs_from.errors %}
-                        <div class="form-group has-error has-feedback">
-                        {% else %}
-                        <div class="form-group">
-                        {% endif %}
-                            <label for="id_obs_from">Date Range</label>
-                            <input type="text" name="obs_from" class="form-control" id="id_obs_from" value="{{ meta.obs_from }}" />
-                            {% if form.obs_from.errors %}
-                                {% for error in form.obs_from.errors %}
-                                    <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
-                                {% endfor %}
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="col-sm-6">
-                        {% if form.obs_to.errors %}
-                        <div class="form-group has-error has-feedback">
-                        {% else %}
-                        <div class="form-group">
-                        {% endif %}
-                            <label for="id_obs_to">&nbsp;</label>
-                            <input type="text" name="obs_to" class="form-control" id="id_obs_to" value="{{ meta.obs_to }}" />
-                            {% if form.obs_to.errors %}
-                                {% for error in form.obs_to.errors %}
-                                    <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
-                                {% endfor %}
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
         <div class="row">
             <div class="col-sm-6">
@@ -151,10 +122,10 @@
                 {% else %}
                 <div class="form-group">
                 {% endif %}
-                    <label for="id_business_key">Business Key Field Name</label>
+                    <label for="id_business_key">Unique Id Field Name</label>
                     <select id="id_business_key" name="business_key" class="form-control" autocomplete=off>
                         {% for column in fieldnames %}
-                            {% if column == meta.business_key|slugify %}
+                            {% if column == meta.business_key %}
                                 <option selected="selected" value="{{ column }}">{{column}}</option>
                             {% else %}
                                 <option value="{{ column }}">{{column}}</option>
@@ -178,7 +149,7 @@
                     <select id="id_location" name="location" class="form-control" autocomplete=off>
                         <option value="">------------</option>
                         {% for column in fieldnames %}
-                            {% if column == meta.location|slugify %}
+                            {% if column == meta.location %}
                                 <option value="{{ column }}" selected="selected">{{column}}</option>
                             {% else %}
                                 <option value="{{ column }}">{{column}}</option>
@@ -204,7 +175,7 @@
                     <select id="id_latitude" name="latitude" class="form-control" autocomplete=off>
                         <option value="">------------</option>
                         {% for column in fieldnames %}
-                            {% if column == meta.latitude|slugify %}
+                            {% if column == meta.latitude %}
                                 <option selected="selected" value="{{ column }}">{{column}}</option>
                             {% else %}
                                 <option value="{{ column }}">{{column}}</option>
@@ -228,7 +199,7 @@
                     <select id="id_longitude" name="longitude" class="form-control" autocomplete=off>
                         <option value="">------------</option>
                         {% for column in fieldnames %}
-                            {% if column == meta.longitude|slugify %}
+                            {% if column == meta.longitude %}
                                 <option value="{{ column }}" selected="selected">{{column}}</option>
                             {% else %}
                                 <option value="{{ column }}">{{column}}</option>
@@ -243,7 +214,12 @@
                 </div>
             </div>
         </div>
-        <button type="submit" class="btn btn-success">Save</button>
+
+        {% if meta.approved_status != 'true' %}
+            <button type="submit" class="btn btn-success"><i class='fa fa-check'></i> Approve</button>
+        {% else %}
+            <button type="submit" class="btn btn-success">Save</button>
+        {% endif %}
         <button type="button" data-toggle="modal" data-target="#confirm-modal" class="btn btn-link"><i class='fa fa-times'></i> Delete</button>
     </form>
     <div id="confirm-modal" class="modal fade">
@@ -262,12 +238,15 @@
   </div><!-- /.modal -->
 {% endblock content %}
 {% block extra_javascript %}
-    <script type="text/javascript">
+  <script type="text/javascript">
         $(document).ready(function(){
             $('#delete').on('click', function(e){
                 var hash = $(this).data('hash');
                 $.getJSON('/admin/delete-dataset/' + hash, {}, function(resp){
-                    console.log(resp);
+	            // Slight hack: reload the view-datasets page after waiting for a couple seconds.
+ 	            setTimeout( function(){
+                        window.location = "/admin/view-datasets/?" +new Date().getTime();
+                    }, 2500 );
                 })
             })
         })

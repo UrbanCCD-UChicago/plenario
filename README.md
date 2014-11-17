@@ -26,13 +26,13 @@ Create a PostgreSQL database for Plenario. (If you aren't
   installing version 9.3 or later.)
 
 ```
-createdb plenario_test
+createdb plenario_dev
 ```
 
 Make sure your local database has the [PostGIS](http://postgis.net/) extension:
 
 ```
-psql plenario_test
+psql plenario_dev
 plenario_test=# CREATE EXTENSION postgis;
 ```
 

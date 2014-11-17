@@ -7,10 +7,43 @@ from flask_wtf import Form
 from flask_wtf import CsrfProtect
 from wtforms import TextField, PasswordField
 from wtforms.validators import DataRequired, Email
+from functools import wraps
+import json
 
 auth = Blueprint('auth', __name__)
 login_manager = LoginManager()
 csrf = CsrfProtect()
+
+
+
+def check_admin_status():
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            api_key = None
+            resp = {
+                'status': 'ok',
+                'message': ''
+            }
+            status_code = 200
+            if flask_session.get('user_id'):
+                api_key = flask_session['user_id']
+            elif request.form.get('api_key'):
+                api_key = request.form['api_key']
+            elif request.args.get('api_key'):
+                api_key = request.args['api_key']
+            else:
+                try:
+                    api_key = json.loads(request.data).get('api_key')
+                except ValueError:
+                    api_key = None
+            if (api_key):
+                user = db_session.query(User).get(api_key)
+            flask_session['user_id'] = api_key
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
 
 class LoginForm(Form):
     email = TextField('email', validators=[DataRequired(), Email()])

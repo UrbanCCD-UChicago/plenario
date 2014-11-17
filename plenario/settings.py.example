@@ -1,7 +1,7 @@
 SECRET_KEY = 'abcdefghijklmnop'
 PLENARIO_SENTRY_URL = ''
 CELERY_SENTRY_URL = ''
-DATABASE_CONN = 'postgresql://plenario:@localhost:5432/plenario_test'
+DATABASE_CONN = 'postgresql://plenario:@localhost:5432/plenario_dev'
 DATA_DIR = '/tmp'
 
 # See: https://pythonhosted.org/Flask-Cache/#configuring-flask-cache
@@ -20,6 +20,18 @@ DEFAULT_USER = {
     'email': 'youremail@example.com',
     'password': 'your password'
 }
+
+# Email address for notifying site administrators
+ADMIN_EMAIL = ''
+
+# For emailing users. ('MAIL_USERNAME' is an email address.)
+MAIL_SERVER = 'smtp.gmail.com'
+MAIL_PORT = 465
+MAIL_USE_SSL = True
+MAIL_DISPLAY_NAME = 'Plenar.io Team'
+MAIL_USERNAME = ''
+MAIL_PASSWORD = ''
+
 
 CENSUS_BLOCKS = {
     'dataset_name': 'census_blocks',

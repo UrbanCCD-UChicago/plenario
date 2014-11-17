@@ -6,7 +6,7 @@ from plenario.models import bcrypt
 from plenario.api import api, cache
 from plenario.auth import auth, login_manager
 from plenario.views import views
-from plenario.utils.helpers import slugify as slug
+from plenario.utils.helpers import mail, slugify as slug
 from urllib import quote_plus
 from plenario.settings import PLENARIO_SENTRY_URL
 
@@ -22,6 +22,8 @@ def create_app():
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
     bcrypt.init_app(app)
+    mail.init_app(app)
+    
     if sentry:
         sentry.init_app(app)
     app.register_blueprint(api)

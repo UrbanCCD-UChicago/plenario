@@ -2,9 +2,15 @@ import requests
 import re
 from unicodedata import normalize
 import calendar
+import string
 from datetime import timedelta
 from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
+from flask_mail import Mail, Message
+from plenario.settings import MAIL_DISPLAY_NAME, MAIL_USERNAME, ADMIN_EMAIL
+
+mail = Mail()
+
 
 def iter_column(idx, f):
     f.seek(0)
@@ -59,6 +65,9 @@ def get_socrata_data_info(view_url):
                 d = {
                     'human_name': column['name'],
                     'machine_name': column['fieldName'],
+                    #'field_name': column['fieldName'], # duplicate definition for code compatibility
+                    #'field_name': column['name'], # duplicate definition for code compatibility
+                    'field_name': slugify(column['name']), # duplicate definition for code compatibility
                     'data_type': column['dataTypeName'],
                     'description': column.get('description', ''),
                     'width': column['width'],
@@ -66,6 +75,7 @@ def get_socrata_data_info(view_url):
                     'smallest': '',
                     'largest': '',
                 }
+
                 if column.get('cachedContents'):
                     cached = column['cachedContents']
                     if cached.get('top'):
@@ -118,3 +128,15 @@ def increment_datetime_aggregate(sourcedate, time_agg):
         delta = timedelta(days=days_to_add)
 
     return sourcedate + delta
+
+def send_mail(subject, recipient, body):
+    msg = Message(subject,
+              sender=(MAIL_DISPLAY_NAME, MAIL_USERNAME),
+              recipients=[recipient], bcc=ADMIN_EMAIL)
+
+    msg.body = body
+    msg.html = string.replace(msg.body,'\r\n','<br />')
+    try: 
+        mail.send(msg)
+    except SMTPAuthenticationError, e:
+        print "error sending email"
