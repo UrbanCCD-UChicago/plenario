@@ -108,14 +108,16 @@ def get_context_for_new_dataset(url):
                     dataset_info['columns'].append(d)
     else:
         errors.append('Need a URL')
+    #print "get_context_for_new_dataset(): returning ", dataset_info, errors, socrata_source
     return (dataset_info, errors, socrata_source)
 
 def approve_dataset(source_url_hash):
     # get the MetaTable row and change the approved_status and bounce back to view-datasets.
 
     meta = session.query(MetaTable).get(source_url_hash)
+
     json_data_types = None
-    if (meta.contributed_data_types):
+    if ((not meta.is_socrata_source) and meta.contributed_data_types):
         json_data_types = json.loads(meta.contributed_data_types)
         
     add_dataset_task.delay(source_url_hash, data_types=json_data_types)
@@ -191,8 +193,8 @@ class EditDatasetForm(Form):
     human_name = TextField('human_name', validators=[DataRequired()])
     description = TextField('description', validators=[DataRequired()])
     attribution = TextField('attribution', validators=[DataRequired()])
-    obs_from = DateField('obs_from', validators=[DataRequired(message="Start of date range must be a valid date")])
-    obs_to = DateField('obs_to', validators=[DataRequired(message="End of date range must be a valid date")])
+    #obs_from = DateField('obs_from', validators=[DataRequired(message="Start of date range must be a valid date")])
+    #obs_to = DateField('obs_to', validators=[DataRequired(message="End of date range must be a valid date")])
     update_freq = SelectField('update_freq', 
                               choices=[('daily', 'Daily'),
                                        ('houly', 'Hourly'),
@@ -251,8 +253,6 @@ def edit_dataset(source_url_hash):
             fieldnames = [f['field_name'] for f in json.loads(meta.contributed_data_types)]
     if form.validate_on_submit():
 
-        approve_dataset(source_url_hash)
-
         upd = {
             'human_name': form.human_name.data,
             'description': form.description.data,
@@ -268,8 +268,11 @@ def edit_dataset(source_url_hash):
             .filter(MetaTable.source_url_hash == meta.source_url_hash)\
             .update(upd)
         session.commit()
+        approve_dataset(source_url_hash)
         flash('%s updated successfully!' % meta.human_name, 'success')
         return redirect(url_for('views.view_datasets'))
+    else:
+        pass
     context = {
         'form': form,
         'meta': meta,

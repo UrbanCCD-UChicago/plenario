@@ -734,6 +734,7 @@ def add_dataset_to_metatable(request, approved_status=True):
     status_code = 200
     errors = []
     post = request.form.get('data')
+    is_socrata = False
     if not post:
         try:
             post = request.form.keys()[0]
@@ -751,6 +752,7 @@ def add_dataset_to_metatable(request, approved_status=True):
                 view_url = 'http://%s/api/views/%s' % (source_domain, four_by_four)
                 dataset_info, errors, status_code = get_socrata_data_info(view_url)
                 source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url
+                is_socrata = True
             else:
                 dataset_info = {
                     'attribution': '',
@@ -758,6 +760,7 @@ def add_dataset_to_metatable(request, approved_status=True):
                 }
                 source_url = post['view_url']
                 dataset_info['name'] = urlparse(source_url).path.split('/')[-1]
+                is_socrata = False
             if errors:
                 resp['message'] = ', '.join([e for e in errors])
                 resp['status'] = 'error'
@@ -784,6 +787,7 @@ def add_dataset_to_metatable(request, approved_status=True):
                         'contributor_organization': post['contributor_organization'],
                         'contributor_email': post['contributor_email'],
                         'approved_status': approved_status,
+                        'is_socrata_source': is_socrata
                     }
                     if (post.get('data_types')):
                         d['contributed_data_types'] = json.dumps(post.get('data_types'))
@@ -830,11 +834,12 @@ def submit_dataset():
 @api.route(API_VERSION + '/api/contribute-dataset/', methods=['POST'])
 def contribute_dataset():
     resp, status_code = add_dataset_to_metatable(request, approved_status=False)
-
     if status_code == 200 and resp['status'] != 'duplicate' :
         post = request.form.get('data')
         post = json.loads(post)
         
+        #print "contribute_dataset: post data is ", post
+
         contributor_name = post['contributor_name']
         contributor_email = post['contributor_email']
 

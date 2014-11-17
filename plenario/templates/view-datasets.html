@@ -106,7 +106,7 @@
                 if (updated != 'None')
                     $(row).html(moment(updated + "+0000").from(moment()));
                 else
-                    $(row).html('Never');
+                    $(row).html('Update pending');
             });
 
             $('.update-dataset').on('click', function(e){

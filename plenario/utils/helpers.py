@@ -11,6 +11,7 @@ from plenario.settings import MAIL_DISPLAY_NAME, MAIL_USERNAME, ADMIN_EMAIL
 
 mail = Mail()
 
+
 def iter_column(idx, f):
     f.seek(0)
     reader = UnicodeCSVReader(f)
@@ -64,7 +65,9 @@ def get_socrata_data_info(view_url):
                 d = {
                     'human_name': column['name'],
                     'machine_name': column['fieldName'],
-                    'field_name': column['fieldName'], # duplicate definition for code compatibility
+                    #'field_name': column['fieldName'], # duplicate definition for code compatibility
+                    #'field_name': column['name'], # duplicate definition for code compatibility
+                    'field_name': slugify(column['name']), # duplicate definition for code compatibility
                     'data_type': column['dataTypeName'],
                     'description': column.get('description', ''),
                     'width': column['width'],
@@ -72,6 +75,7 @@ def get_socrata_data_info(view_url):
                     'smallest': '',
                     'largest': '',
                 }
+
                 if column.get('cachedContents'):
                     cached = column['cachedContents']
                     if cached.get('top'):
@@ -132,4 +136,7 @@ def send_mail(subject, recipient, body):
 
     msg.body = body
     msg.html = string.replace(msg.body,'\r\n','<br />')
-    mail.send(msg)
+    try: 
+        mail.send(msg)
+    except SMTPAuthenticationError, e:
+        print "error sending email"
