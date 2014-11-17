@@ -2,8 +2,8 @@ import requests
 import re
 import os
 from datetime import datetime, date, time
-from plenario.database import task_session as session, task_engine as engine, \
-    Base
+from plenario.database import task_session as session, task_engine as engine
+
 from plenario.models import MetaTable, MasterTable
 from plenario.utils.helpers import slugify, iter_column
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET, DATA_DIR
@@ -13,7 +13,7 @@ from plenario.utils.typeinference import normalize_column_type
 import gzip
 from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
     Integer, Table, text, func, select, or_, and_, cast, UniqueConstraint, \
-    join, outerjoin, over, BigInteger
+    join, outerjoin, over, BigInteger, MetaData
 from sqlalchemy.dialects.postgresql import TIMESTAMP, ARRAY, TIME
 from sqlalchemy.exc import NoSuchTableError, InternalError
 from types import NoneType
@@ -115,6 +115,8 @@ class PlenarioETL(object):
 
         self.s3_key = None
 
+        self.metadata = MetaData()
+        
         if (AWS_ACCESS_KEY != ''):
             s3_path = '%s/%s.csv.gz' % (self.dataset_name, 
                                         datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
@@ -141,14 +143,14 @@ class PlenarioETL(object):
             table_names = ['src', 'dup', 'new', 'dat']
             for table in table_names:
                 try:
-                    t = Table('%s_%s' % (table, self.dataset_name), Base.metadata,
+                    t = Table('%s_%s' % (table, self.dataset_name), self.metadata,
                         autoload=True, autoload_with=engine, extend_existing=True)
                     setattr(self, '%s_table' % table, t)
                 except NoSuchTableError:
                     pass
         else:
             try:
-                t = Table('%s_%s' % (table_name, self.dataset_name), Base.metadata,
+                t = Table('%s_%s' % (table_name, self.dataset_name), self.metadata,
                     autoload=True, autoload_with=engine, extend_existing=True)
                 setattr(self, '%s_table' % table_name, t)
             except NoSuchTableError:
@@ -229,7 +231,7 @@ class PlenarioETL(object):
     def _get_or_create_data_table(self):
         # Step One: Make a table where the data will eventually live
         try:
-            self.dat_table = Table('dat_%s' % self.dataset_name, Base.metadata, 
+            self.dat_table = Table('dat_%s' % self.dataset_name, self.metadata, 
                 autoload=True, autoload_with=engine, extend_existing=True)
         except NoSuchTableError:
             s = StringIO()
@@ -265,7 +267,7 @@ class PlenarioETL(object):
                 cols.append(Column(col_name, d_type))
             cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver', 
                     name='%s_ix' % self.dataset_name[:50]))
-            self.dat_table = Table('dat_%s' % self.dataset_name, Base.metadata, 
+            self.dat_table = Table('dat_%s' % self.dataset_name, self.metadata, 
                           *cols, extend_existing=True)
             self.dat_table.create(engine, checkfirst=True)
 
@@ -280,7 +282,7 @@ class PlenarioETL(object):
                     kwargs['server_default'] = col.server_default
                 cols.append(Column(col.name, col.type, **kwargs))
         cols.append(Column('line_num', Integer, primary_key=True))
-        self.src_table = Table('src_%s' % self.dataset_name, Base.metadata,
+        self.src_table = Table('src_%s' % self.dataset_name, self.metadata,
                           *cols, extend_existing=True)
         self.src_table.drop(bind=engine, checkfirst=True)
         self.src_table.create(bind=engine)
@@ -329,7 +331,7 @@ class PlenarioETL(object):
             Column('line_num', Integer),
             Column('dup_ver', Integer, primary_key=True)
         ]
-        self.new_table = Table('new_%s' % self.dataset_name, Base.metadata,
+        self.new_table = Table('new_%s' % self.dataset_name, self.metadata,
             *cols, extend_existing=True)
         self.new_table.drop(bind=engine, checkfirst=True)
         self.new_table.create(bind=engine)
@@ -339,7 +341,7 @@ class PlenarioETL(object):
             Column('line_num', Integer),
             Column('dup_ver', Integer, primary_key=True)
         ]
-        self.dup_table = Table('dup_%s' % self.dataset_name, Base.metadata,
+        self.dup_table = Table('dup_%s' % self.dataset_name, self.metadata,
             *cols, extend_existing=True)
         self.dup_table.drop(bind=engine, checkfirst=True)
         self.dup_table.create(bind=engine)
@@ -598,7 +600,7 @@ class PlenarioETL(object):
     def _find_changes(self):
         # Step Eight: Find changes
         bk = slugify(self.business_key)
-        self.chg_table = Table('chg_%s' % self.dataset_name, Base.metadata,
+        self.chg_table = Table('chg_%s' % self.dataset_name, self.metadata,
                       Column('id', Integer), 
                       extend_existing=True)
         self.chg_table.drop(bind=engine, checkfirst=True)

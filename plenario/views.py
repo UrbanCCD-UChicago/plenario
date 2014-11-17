@@ -243,16 +243,21 @@ def edit_dataset(source_url_hash):
     form = EditDatasetForm()
     meta = session.query(MetaTable).get(source_url_hash)
 
+    fieldnames = None
     if (meta.approved_status == 'true'):
-        table = Table('dat_%s' % meta.dataset_name, Base.metadata,
-            autoload=True, autoload_with=engine)
-        fieldnames = table.columns.keys()
-    else:
+        try:
+            table = Table('dat_%s' % meta.dataset_name, Base.metadata,
+                          autoload=True, autoload_with=engine)
+            fieldnames = table.columns.keys()
+        except sqlalchemy.exc.NoSuchTableError, e:
+            # dataset has been approved, but perhaps still processing.
+            pass
+
+    if (not fieldnames):
         fieldnames = []
         if meta.contributed_data_types:
             fieldnames = [f['field_name'] for f in json.loads(meta.contributed_data_types)]
     if form.validate_on_submit():
-
         upd = {
             'human_name': form.human_name.data,
             'description': form.description.data,
@@ -268,7 +273,11 @@ def edit_dataset(source_url_hash):
             .filter(MetaTable.source_url_hash == meta.source_url_hash)\
             .update(upd)
         session.commit()
-        approve_dataset(source_url_hash)
+
+        
+        if (meta.approved_status != 'true'):
+            approve_dataset(source_url_hash)
+        
         flash('%s updated successfully!' % meta.human_name, 'success')
         return redirect(url_for('views.view_datasets'))
     else:
