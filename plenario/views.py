@@ -20,6 +20,7 @@ from csvkit.unicsv import UnicodeCSVReader
 from sqlalchemy import Table
 from plenario.settings import CACHE_CONFIG
 import string
+import sqlalchemy
 
 views = Blueprint('views', __name__)
 
