@@ -76,13 +76,7 @@ redis-server &
 celery -A plenario.celery_app worker --loglevel=info &
 ```
 
-Initialize the plenario database: 
-
-```
-python
->>> from plenario import database
->>> database.init_db()
-```
+Initialize the plenario database by running `python init_db.py`. 
 
 Finally, run the server:
 
@@ -96,13 +90,13 @@ from `settings.py`. Once logged in, go to 'Add a dataset' under the
 'Admin' menu to add your own datasets.
 
 ## Running with Docker
-Additionally, we support installing Plenario using Docker containers. Because of the variety of PostgresQL+Docker config options, there are two containers needed for Plenario. One is web server plenario docker container, which we provide a dockerfile for. The other is a postgresql+postgis database. We recommend using [helmi03/docker-postgis](https://github.com/helmi03/docker-postgis). Please read carefully about persisting data to the database. 
+Additionally, we support installing Plenario using Docker containers. Because of the variety of PostgreSQL/Docker configuration options, there are two containers needed for Plenario. One is a Plenario web server Docker container, which we provide a Dockerfile for. The other is a PostgreSQL+PostGIS database Docker container. We recommend using [helmi03/docker-postgis](https://github.com/helmi03/docker-postgis). Please read carefully about persisting data to the database. 
 
-1) Boot a Postgis/Postgres setup. See above. 
-2) Alter settings in settings.py.docker. 
-3) Run `docker build .`
-4) Run `docker run`
-5) Congrats! Plenario should now be running in the container. 
+1. Boot a PostGIS/PostgreSQL setup. See above. 
+2. Alter settings in settings.py.docker. 
+3. Run `docker build .`
+4. Run `docker run`
+5. Congrats! Plenario should now be running in the container. 
 
 # Data
 
