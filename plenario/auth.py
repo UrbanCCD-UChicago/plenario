@@ -120,7 +120,7 @@ def login():
         login_user(user)
         return redirect(request.args.get('next') or url_for('views.index'))
     email = form.email.data
-    return render_template('login.html', form=form, email=email)
+    return render_template('admin/login.html', form=form, email=email)
 
 @auth.route('/admin/add-user/', methods=['GET', 'POST'])
 @login_required
@@ -141,7 +141,7 @@ def add_user():
         'email': form.email.data,
         'users': db_session.query(User).all()
     }
-    return render_template('add-user.html', **context)
+    return render_template('admin/add-user.html', **context)
 
 @auth.route('/admin/reset-password/', methods=['GET', 'POST'])
 @login_required
@@ -158,4 +158,4 @@ def reset_password():
             flash('Password reset successful!', 'success')
         else:
             errors.append('Password is not correct')
-    return render_template('reset-password.html', form=form, errors=errors)
+    return render_template('admin/reset-password.html', form=form, errors=errors)

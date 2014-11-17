@@ -178,14 +178,14 @@ def add_dataset():
         dataset_info['contributor_organization'] = 'Plenario Admin'
         dataset_info['contributor_email'] = user.email
     context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source}
-    return render_template('add-dataset.html', **context)
+    return render_template('admin/add-dataset.html', **context)
 
 @views.route('/admin/view-datasets')
 @login_required
 def view_datasets():
     datasets_pending = session.query(MetaTable).filter(MetaTable.approved_status != 'true').all()
     datasets = session.query(MetaTable).filter(MetaTable.approved_status == 'true').all()
-    return render_template('view-datasets.html', datasets_pending=datasets_pending, datasets=datasets)
+    return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets)
 
 class EditDatasetForm(Form):
     """ 
@@ -288,7 +288,7 @@ def edit_dataset(source_url_hash):
         'meta': meta,
         'fieldnames': fieldnames,
     }
-    return render_template('edit-dataset.html', **context)
+    return render_template('admin/edit-dataset.html', **context)
 
 @views.route('/admin/delete-dataset/<source_url_hash>')
 @login_required
