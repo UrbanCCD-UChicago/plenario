@@ -24,7 +24,6 @@ from shapely.wkb import loads
 from shapely.geometry import box, asShape
 from collections import OrderedDict
 from urlparse import urlparse
-from hashlib import md5
 
 from plenario.models import MasterTable, MetaTable
 from plenario.database import session, app_engine as engine, Base
@@ -719,149 +718,12 @@ def grid():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-def add_dataset_to_metatable(request, approved_status=True):
-    # Slightly dumb way to make sure that POSTs are only coming from
-    # originating domain for the time being
-    referer = request.headers.get('Referer')
-    if referer:
-        referer = urlparse(referer).netloc
-        req_url = urlparse(request.url).netloc
-        if referer != req_url:
-            abort(401)
-    else:
-        abort(401)
-    resp = {'status': 'ok', 'message': ''}
-    status_code = 200
-    errors = []
-    post = request.form.get('data')
-    is_socrata = False
-    if not post:
-        try:
-            post = request.form.keys()[0]
-        except IndexError:
-            resp['status'] = 'error'
-            resp['message'] = 'Unable to decode POST data'
-            status_code = 400
-    if status_code == 200:
-        post = json.loads(post)
-
-        if post.get('view_url'):
-            if post.get('socrata'):
-                source_domain = urlparse(post['view_url']).netloc
-                four_by_four = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', post['view_url'])[-1]
-                view_url = 'http://%s/api/views/%s' % (source_domain, four_by_four)
-                dataset_info, errors, status_code = get_socrata_data_info(view_url)
-                source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url
-                is_socrata = True
-            else:
-                dataset_info = {
-                    'attribution': '',
-                    'description': '',
-                }
-                source_url = post['view_url']
-                dataset_info['name'] = urlparse(source_url).path.split('/')[-1]
-                is_socrata = False
-            if errors:
-                resp['message'] = ', '.join([e for e in errors])
-                resp['status'] = 'error'
-                status_code = 400
-            else:
-                dataset_id = md5(source_url).hexdigest()
-                md = session.query(MetaTable).get(dataset_id)
-
-                if not md:
-                    d = {
-                        'dataset_name': slugify(dataset_info['name'], delim=u'_'),
-                        'human_name': dataset_info['name'],
-                        'attribution': dataset_info['attribution'],
-                        'description': dataset_info['description'],
-                        'source_url': source_url,
-                        'source_url_hash': dataset_id,
-                        'update_freq': post['update_frequency'],
-                        'business_key': post['field_definitions']['id_field'],
-                        'observed_date': post['field_definitions']['date_field'],
-                        'latitude': post['field_definitions'].get('latitude'),
-                        'longitude': post['field_definitions'].get('longitude'),
-                        'location': post['field_definitions'].get('location'),
-                        'contributor_name': post['contributor_name'],
-                        'contributor_organization': post['contributor_organization'],
-                        'contributor_email': post['contributor_email'],
-                        'approved_status': approved_status,
-                        'is_socrata_source': is_socrata
-                    }
-                    if (post.get('data_types')):
-                        d['contributed_data_types'] = json.dumps(post.get('data_types'))
-                    elif dataset_info['columns']: 
-                        d['contributed_data_types'] = json.dumps(dataset_info['columns'])
-                    
-                    if len(d['dataset_name']) > 49:
-                        d['dataset_name'] = d['dataset_name'][:50]
-
-                    md = MetaTable(**d)
-
-                    # add this to meta_master
-                    session.add(md)
-                    session.commit()
-                
-                    if (approved_status == True):
-                        add_dataset.delay(md.source_url_hash, data_types=post.get('data_types'))
-                    resp['message'] = "'%s' was submitted successfully." % dataset_info['name']
-
-                # dataset was found in the system already
-                else:
-                    resp['status'] = 'duplicate'
-                    resp['message'] = "A dataset with that URL has already been loaded: '" + md.human_name + "'"
-                    resp['details'] = { 'human_name': md.human_name,
-                                        'dataset_name': md.dataset_name,
-                                        'date_added': md.date_added }
-                    status_code = 200
-        else:
-            resp['status'] = 'error'
-            resp['message'] = 'Must provide a url where data can be downloaded'
-            status_code = 400
-
-    return resp, status_code
-    
-
 @api.route(API_VERSION + '/api/submit-dataset/', methods=['POST'])
 def submit_dataset():
     resp, status_code = add_dataset_to_metatable(request, approved_status=True)
 
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
-    return resp
-
-@api.route(API_VERSION + '/api/contribute-dataset/', methods=['POST'])
-def contribute_dataset():
-    resp, status_code = add_dataset_to_metatable(request, approved_status=False)
-    if status_code == 200 and resp['status'] != 'duplicate' :
-        post = request.form.get('data')
-        post = json.loads(post)
-        
-        #print "contribute_dataset: post data is ", post
-
-        contributor_name = post['contributor_name']
-        contributor_email = post['contributor_email']
-
-        # email a confirmation to the submitter
-        msg_body = """Hello %s,\r\n
-\r\n
-We received your recent dataset submission to Plenar.io:\r\n
-\r\n
-%s\r\n
-\r\n
-After we review it, we'll notify you when your data is loaded and available.\r\n
-\r\n
-Thank you!\r\n
-The Plenario Team\r\n
-http://plenar.io""" % (contributor_name, resp['message'])
-
-        send_mail(subject="Your dataset has been submitted to Plenar.io", 
-            recipient=contributor_email, body=msg_body)
-
-    resp = make_response(json.dumps(resp, default=dthandler), status_code)
-    resp.headers['Content-Type'] = 'application/json'
-
     return resp
 
 # helper functions

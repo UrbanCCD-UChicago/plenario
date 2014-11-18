@@ -37,7 +37,7 @@
       	      {% endblock %}
       	    </p>
 	    
-            <form role="form" method="POST" id="fetch-details-form">
+            <form role="form" method="GET" id="fetch-details-form">
                 <div class="form-group">
                     {% if dataset_info %}
                     <input type="text" class="form-control" name="dataset_url" value="{{dataset_info.submitted_url}}" />
@@ -64,7 +64,3 @@
   {% endif %}
 
 {% endblock content %}
-
-{% block extra_javascript %}
-    {{ add_extra_javascript(null, socrata_source)  }}
-{% endblock %}

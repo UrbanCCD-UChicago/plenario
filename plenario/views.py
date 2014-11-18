@@ -2,7 +2,7 @@ from flask import make_response, request, redirect, url_for, render_template, cu
     Blueprint, flash, session as flask_session
 from plenario.models import MasterTable, MetaTable, User
 from plenario.database import session, Base, app_engine as engine
-from plenario.utils.helpers import get_socrata_data_info, iter_column, send_mail
+from plenario.utils.helpers import get_socrata_data_info, iter_column, send_mail, slugify
 from plenario.tasks import update_dataset as update_dataset_task, \
     delete_dataset as delete_dataset_task, add_dataset as add_dataset_task
 from flask_login import login_required
@@ -21,6 +21,7 @@ from sqlalchemy import Table
 from plenario.settings import CACHE_CONFIG
 import string
 import sqlalchemy
+from hashlib import md5
 
 views = Blueprint('views', __name__)
 
@@ -49,7 +50,6 @@ def maintenance():
     return render_template('maintenance.html'), 503
 
 # Given a URL, this function returns a tuple (dataset_info, errors, socrata_source)
-# 
 def get_context_for_new_dataset(url):
     dataset_info = {}
     errors = []
@@ -146,16 +146,89 @@ http://plenar.io""" % (meta.contributor_name, meta.human_name)
     send_mail(subject="Your dataset has been added to Plenar.io", 
         recipient=meta.contributor_email, body=msg_body)
 
-# /contrib is similar to /admin/add-dataset, but sends an email instead of actually adding
+# /contribute is similar to /admin/add-dataset, but sends an email instead of actually adding
 @views.route('/contribute', methods=['GET','POST'])
 def contrib_view():
     dataset_info = {}
     errors = []
     socrata_source = False
-    if request.method == 'POST':
-        url = request.form.get('dataset_url')
+
+    url = ""
+    dataset_id = None
+    md = None
+
+    if request.args.get('dataset_url'):
+
+        url = request.args.get('dataset_url')
         (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url)
-    context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source}
+
+        # check if dataset with the same URL has already been loaded
+        dataset_id = md5(url).hexdigest()
+        md = session.query(MetaTable).get(dataset_id)
+        if md:
+            errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
+
+    if request.method == 'POST' and not md:
+
+        data_types = []
+        business_key = None
+        observed_date = None
+        latitude = None
+        longitude = None 
+        location = None
+        for k, v in request.form.iteritems():
+            if k.startswith('data_type_'):
+                key = k.replace("data_type_", "")
+                data_types.append({"field_name": key, "data_type": v})
+
+            if k.startswith('key_type_'):
+                key = k.replace("key_type_", "")
+                if (v == "business_key"): business_key = key
+                if (v == "observed_date"): observed_date = key
+                if (v == "latitude"): latitude = key
+                if (v == "longitude"): longitude = key
+                if (v == "location"): location = key
+
+        d = {
+            'dataset_name': slugify(request.form.get('dataset_name'), delim=u'_')[:50],
+            'human_name': request.form.get('dataset_name'),
+            'attribution': request.form.get('dataset_attribution'),
+            'description': request.form.get('dataset_description'),
+            'source_url': url,
+            'source_url_hash': dataset_id,
+            'update_freq': request.form.get('update_frequency'),
+            'business_key': business_key,
+            'observed_date': observed_date,
+            'latitude': latitude,
+            'longitude': longitude,
+            'location': location,
+            'contributor_name': request.form.get('contributor_name'),
+            'contributor_organization': request.form.get('contributor_organization'),
+            'contributor_email': request.form.get('contributor_email'),
+            'contributed_data_types': json.dumps(data_types),
+            'approved_status': 'false',
+            'is_socrata_source': socrata_source
+        }
+
+        print d
+
+        # add this to meta_master
+        md = MetaTable(**d)
+        session.add(md)
+        session.commit()
+
+        # email a confirmation to the submitter
+        msg_body = """Hello %s,\r\n\r\n
+We received your recent dataset submission to Plenar.io:\r\n\r\n%s\r\n\r\n
+After we review it, we'll notify you when your data is loaded and available.\r\n\r\n
+Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (d['contributor_name'], md.human_name)
+
+        send_mail(subject="Your dataset has been submitted to Plenar.io", 
+            recipient=d['contributor_email'], body=msg_body)
+
+        return redirect(url_for('views.contrib_thankyou'))
+
+    context = {'dataset_info': dataset_info, 'form': request.form, 'errors': errors, 'socrata_source': socrata_source}
     return render_template('contribute.html', **context)
 
 @views.route('/contribute-thankyou')
@@ -198,9 +271,9 @@ class EditDatasetForm(Form):
     #obs_to = DateField('obs_to', validators=[DataRequired(message="End of date range must be a valid date")])
     update_freq = SelectField('update_freq', 
                               choices=[('daily', 'Daily'),
-                                       ('houly', 'Hourly'),
                                        ('weekly', 'Weekly'),
-                                       ('monthly', 'Monthly')], 
+                                       ('monthly', 'Monthly'),
+                                       ('yearly', 'Yearly')], 
                               validators=[DataRequired()])
     business_key = TextField('business_key', validators=[DataRequired()])
     observed_date = TextField('observed_date', validators=[DataRequired()])

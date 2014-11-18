@@ -7,18 +7,22 @@
             <p>Fill out the name, description and frequency of update for your dataset. <span class="red">*</span> denotes a required field</p>
             
             <div class="form-group">
-                <label for="name"><span class="red">*</span>File name</label>
-                <input id="name" name="name" class="form-control" data-view="{{dataset_info.view_url}}" type="text" value="{{dataset_info.name}}" />
+                <label for="dataset_name"><span class="red">*</span>File name</label>
+                <input id="dataset_name" name="dataset_name" class="form-control" type="text" value="{{dataset_info.name}}" />
             </div>
 
             <div class="form-group">
-                <label for="description"><span class="red">*</span>Description</label>
-                <textarea rows="4" class="form-control" id="description" name="description">Dataset imported from {{dataset_info.name}}</textarea>
+                <label for="dataset_attribution"><span class="red">*</span>Attribution</label>
+                <input id="dataset_attribution" name="dataset_attribution" class="form-control" type="text" value="" placeholder="Please cite the original source of this data"/>
+            </div>
+
+            <div class="form-group">
+                <label for="dataset_description"><span class="red">*</span>Description</label>
+                <textarea rows="4" class="form-control" id="dataset_description" name="dataset_description">Dataset imported from {{dataset_info.name}}</textarea>
             </div>
             <div class="form-group">
                 <label for="update-select"><span class="red">*</span>How often does this dataset update?</label>
-                <select id="update-select" class="form-control">
-                    <option value="">-- Select an update interval --</option>
+                <select id="update_frequency" name="update_frequency" class="form-control">
                     <option value="yearly">Yearly</option>
                     <option value="monthly">Monthly</option>
                     <option value="weekly">Weekly</option>
@@ -26,7 +30,7 @@
                 </select>
             </div>
 
-            <p>Below, select which columns correspond to the <code>Unique&nbsp;ID</code>, <code>Observation date</code>, <code>Latitude</code> and <code>Longitude</code> fields for your dataset.</p>
+            <p>Below, select which columns correspond to the <code>Unique&nbsp;ID</code>, <code>Observation date</code>, <code>Latitude</code> and <code>Longitude</code> fields for your dataset. These are all <span class="red">*</span>required. We also guessed the data type of each field, feel free to change it if you think it's incorrect.</p>
 
             <table class="table">
                 <thead>
@@ -38,26 +42,26 @@
                     {% for info in dataset_info.columns %}
                         <tr>
                             <td>
-                                <select class="plenario-field">
+                                <select id="key_type_{{info.human_name|slugify}}" name="key_type_{{info.human_name|slugify}}" class="form-control">
                                     <option value="">---------</option>
-                                    <option value="{{info.human_name|slugify}}">Unique ID</option>
-                                    <option value="{{info.human_name|slugify}}">Observation date</option>
-                                    <option value="{{info.human_name|slugify}}">Latitude</option>
-                                    <option value="{{info.human_name|slugify}}">Longitude</option>
+                                    <option value="business_key">Unique ID</option>
+                                    <option value="observed_date">Observation date</option>
+                                    <option value="latitude">Latitude</option>
+                                    <option value="longitude">Longitude</option>
                                 </select>
                             </td>
                             <td>{{ info.human_name }}</td>
                             <td>
-                                <select class="data-type">
+                                <select id="data_type_{{info.human_name|slugify}}" name="data_type_{{info.human_name|slugify}}" class="form-control">
                                     <option value="">-- Select data type --</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'boolean' %}selected="selected"{% endif %}>Boolean</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'integer' %}selected="selected"{% endif %}>Integer</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'big_integer' %}selected="selected"{% endif %}>Big Integer</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'float' %}selected="selected"{% endif %}>Float</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'string' %}selected="selected"{% endif %}>String</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'date' %}selected="selected"{% endif %}>Date</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'time' %}selected="selected"{% endif %}>Time</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'timestamp' %}selected="selected"{% endif %}>Datetime</option>
+                                    <option value="boolean" {% if info.data_type == 'boolean' %}selected="selected"{% endif %}>Boolean</option>
+                                    <option value="integer" {% if info.data_type == 'integer' %}selected="selected"{% endif %}>Integer</option>
+                                    <option value="big_integer" {% if info.data_type == 'big_integer' %}selected="selected"{% endif %}>Big Integer</option>
+                                    <option value="float" {% if info.data_type == 'float' %}selected="selected"{% endif %}>Float</option>
+                                    <option value="string" {% if info.data_type == 'string' %}selected="selected"{% endif %}>String</option>
+                                    <option value="date" {% if info.data_type == 'date' %}selected="selected"{% endif %}>Date</option>
+                                    <option value="time" {% if info.data_type == 'time' %}selected="selected"{% endif %}>Time</option>
+                                    <option value="timestamp" {% if info.data_type == 'timestamp' %}selected="selected"{% endif %}>Datetime</option>
                                 </select>
                             </td>
                         </tr>
@@ -98,7 +102,7 @@
             <hr />
             <p>
                 <button type="submit" class="btn btn-success" id="datatype-submit">
-		          {{ submit_button_verb }} this dataset &raquo;
+		          Submit &raquo;
 		        </button>
             </p>
         </form>
