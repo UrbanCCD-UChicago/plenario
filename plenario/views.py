@@ -62,9 +62,8 @@ def get_context_for_new_dataset(url):
             parsed = urlparse(url)
             host = 'https://%s' % parsed.netloc
             path = 'api/views'
-            view_url = '%s/%s/%s' % (host, path, four_by_four[-1])
 
-            dataset_info, errors, status_code = get_socrata_data_info(view_url)
+            dataset_info, errors, status_code = get_socrata_data_info(host, path, four_by_four[-1])
             if not errors:
                 socrata_source = True
                 dataset_info['submitted_url'] = url
@@ -134,6 +133,7 @@ def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_sou
 
     if socrata_source:
         data_types = dataset_info['columns']
+        url = dataset_info['source_url']
 
     d = {
         'dataset_name': slugify(request.form.get('dataset_name'), delim=u'_')[:50],

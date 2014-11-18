@@ -27,10 +27,13 @@ def iter_column(idx, f):
     col_type = normalize_column_type(col)
     return col_type
 
-def get_socrata_data_info(view_url):
+def get_socrata_data_info(host, path, four_by_four):
     errors = []
     status_code = None
     dataset_info = {}
+    view_url = '%s/%s/%s' % (host, path, four_by_four)
+    source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url
+
     try:
         r = requests.get(view_url)
         status_code = r.status_code
@@ -48,13 +51,15 @@ def get_socrata_data_info(view_url):
         resp = None
     if resp:
         columns = resp.get('columns')
+
         if columns:
             dataset_info = {
                 'name': resp['name'],
                 'description': resp.get('description'),
                 'attribution': resp.get('attribution'),
                 'columns': [],
-                'view_url': view_url
+                'view_url': view_url,
+                'source_url': source_url
             }
             try:
                 dataset_info['update_freq'] = \

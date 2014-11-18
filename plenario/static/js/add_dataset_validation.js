@@ -67,7 +67,7 @@ $('#datatype-submit').on('click', function(e){
     }
     if(!$('#update_frequency').val()){
         valid = false
-        appendError('You need to select an update frequency');
+        appendError('You need to specify how often should we check for updates');
     } else {
         definitions['update_frequency'] = $('#update_frequency').val();
     }
