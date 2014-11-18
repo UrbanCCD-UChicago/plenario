@@ -138,7 +138,7 @@ def increment_datetime_aggregate(sourcedate, time_agg):
 def send_mail(subject, recipient, body):
     msg = Message(subject,
               sender=(MAIL_DISPLAY_NAME, MAIL_USERNAME),
-              recipients=[recipient], bcc=ADMIN_EMAIL)
+              recipients=[recipient], bcc=[ADMIN_EMAIL])
 
     msg.body = body
     msg.html = string.replace(msg.body,'\r\n','<br />')
