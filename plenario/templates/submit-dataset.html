@@ -18,6 +18,52 @@
       	      {% endblock %}
       	    </p>
 
+            <div class="panel-group" id="accordion-api-datasets">
+              <div class="panel panel-default">
+                <div class="panel-heading">
+                  <a data-toggle="collapse" data-parent="#accordion-api-datasets" href="#collapse-api-datasets" id="api-datasets">
+                    <span class='label label-info'>Requirements</span>
+                    Dataset must include fields with a <strong>Unique id</strong>, <strong>Observation date</strong> and <strong>Location</strong>. Read more &raquo;
+                  </a>
+                </div>
+                <div id="collapse-api-datasets" class="panel-collapse collapse">
+                  <div class="panel-body">
+
+                      <p>Currently, Plenar.io is able to accept any URL to a <strong>comma separated value (CSV)</strong> or link to a dataset on a <strong>Socrata data portal</strong> (like <a href='https://data.cityofchicago.org/'>data.cityofchicago.org</a>) that has fields with the following attributes:</p>
+
+                      <table class='table table-bordered'>
+                          <thead>
+                            <tr>
+                              <th>Column</th>
+                              <th>Description</th>
+                              <th>Example</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td><strong><code>Unique&nbsp;id</code></strong></td>
+                              <td>a field that is guaranteed to contain a unique number for every row in the dataset, even if rows are updated</td>
+                              <td>'194867'</td>
+                            </tr>
+                            <tr>
+                              <td><strong><code>Observation&nbsp;date</code></strong></td>
+                              <td>a date or datetime field for each observation</td>
+                              <td>'1999-01-08'<br />'January 8, 1999'<br />'1/8/1999' <br />or <a href='http://www.postgresql.org/docs/9.3/static/datatype-datetime.html#DATATYPE-DATETIME-DATE-TABLE'>any date format supported by Postgres</a></td>
+                            </tr>
+                            <tr>
+                              <td><strong><code>Latitude/Longitude</code></strong> or <strong><code>Location</code></strong></td>
+                              <td>either two fields with latitude and longitude , or a single field with both of them formatted <code>(latitude, longitude)</code></td>
+                              <td>'41.425, -88.419'</td>
+                            </tr>
+                          </tbody>
+                      </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <h3>Link to a dataset</h3>
+
             {% if errors %}
               <div class="row">
                   <div class='col-md-10'>
