@@ -123,7 +123,11 @@ var MapView = Backbone.View.extend({
             query['location_geom__within'] = JSON.stringify(this.map.dataLayer);
             this.map.fitBounds(this.map.drawnItems.getBounds());
         }
+        else if (this.attributes.resp.query.location_geom__within) {
+            query['location_geom__within'] = this.attributes.resp.query.location_geom__within
+        }
         query['agg'] = $('#time-agg-filter').val();
+
         if(valid){
             if (resp) { resp.undelegateEvents(); }
             resp = new ResponseView({el: '#list-view', attributes: {query: query}})
