@@ -42,11 +42,8 @@
                 <thead>
                     <th>Choose Type</th>
                     <th>Name</th>
-                    <th>Description</th>
                     <th>Data Type</th>
-                    <th>Field size</th>
-                    <th>Value Range</th>
-                    <th>Allow Nulls?</th>
+                    <th style="width: 30%">Description</th>
                 </thead>
                 <tbody>
                     {% for info in dataset_info.columns %}
@@ -62,17 +59,8 @@
                                 </select>
                             </td>
                             <td>{{ info.human_name }}</td>
-                            <td>{{ info.description }}</td>
                             <td>{{ info.data_type }}</td>
-                            <td>{{ info.width }}</td>
-                            <td>{{ info.smallest }} — {{info.largest}}</td>
-                            <td>
-                                {% if info.null_values %}
-                                    Yes
-                                {% else %}
-                                    No
-                                {% endif %}
-                            </td>
+                            <td>{{ info.description }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>
