@@ -8,6 +8,7 @@ from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
 from flask_mail import Mail, Message
 from plenario.settings import MAIL_DISPLAY_NAME, MAIL_USERNAME, ADMIN_EMAIL
+from smtplib import SMTPAuthenticationError
 
 mail = Mail()
 
