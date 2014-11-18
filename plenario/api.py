@@ -31,8 +31,6 @@ from plenario.utils.helpers import get_socrata_data_info, slugify, increment_dat
 from plenario.tasks import add_dataset
 from plenario.settings import CACHE_CONFIG
 
-from plenario.auth import check_admin_status
-
 cache = Cache(config=CACHE_CONFIG)
 
 API_VERSION = '/v1'
@@ -40,6 +38,9 @@ RESPONSE_LIMIT = 1000
 CACHE_TIMEOUT = 60*60*6
 VALID_DATA_TYPE = ['csv', 'json']
 VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
+METATABLE_KEYS_TO_EXCLUDE = [   'contributor_name', 'contributor_organization', 
+                                'contributor_email', 'contributed_data_types', 
+                                'is_socrata_source', 'approved_status']
 WEATHER_COL_LOOKUP = {
     'daily': {
         'temp_lo': 'temp_min',
@@ -115,7 +116,6 @@ def flush_cache():
 @api.route(API_VERSION + '/api/datasets')
 #@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-@check_admin_status()
 def meta():
     status_code = 200
     resp = {
@@ -133,8 +133,12 @@ def meta():
         metas = session.query(MetaTable)
 
     metas=metas.filter(MetaTable.approved_status == 'true')
-        
-    resp['objects'].extend([m.as_dict() for m in metas.all()])
+
+    for m in metas.all():
+        keys = m.as_dict()
+        for e in METATABLE_KEYS_TO_EXCLUDE: del keys[e]
+        resp['objects'].append(keys)
+
     resp['meta']['total'] = len(resp['objects'])
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
@@ -143,7 +147,6 @@ def meta():
 @api.route(API_VERSION + '/api/fields/<dataset_name>/')
 @cache.cached(timeout=CACHE_TIMEOUT)
 @crossdomain(origin="*")
-@check_admin_status()
 def dataset_fields(dataset_name):
     try:
         table = Table('dat_%s' % dataset_name, Base.metadata,
