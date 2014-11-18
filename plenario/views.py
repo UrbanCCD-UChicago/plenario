@@ -272,8 +272,12 @@ def add_dataset():
 
     if request.method == 'POST' and not md:
         md = add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_source, approved_status=True)
+        
+        json_data_types = None
+        if ((not md.is_socrata_source) and md.contributed_data_types):
+            json_data_types = json.loads(md.contributed_data_types)
 
-        add_dataset_task.delay(md.source_url_hash, data_types=json.loads(md.contributed_data_types))
+        add_dataset_task.delay(md.source_url_hash, data_types=json_data_types)
         
         flash('%s added successfully!' % md.human_name, 'success')
         return redirect(url_for('views.view_datasets'))
