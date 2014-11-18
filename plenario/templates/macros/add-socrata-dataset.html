@@ -102,9 +102,9 @@
                     </div>
                 </div>
             {% else %}
-                <input type="hidden" name="contributor_name" value="{{dataset_info.contributor_name}}">
-                <input type="hidden" name="contributor_organization" value="{{dataset_info.contributor_organization}}">
-                <input type="hidden" name="contributor_email" value="{{dataset_info.contributor_email}}">
+                <input type="hidden" id="contributor_name" name="contributor_name" value="{{dataset_info.contributor_name}}">
+                <input type="hidden" id="contributor_organization" name="contributor_organization" value="{{dataset_info.contributor_organization}}">
+                <input type="hidden" id="contributor_email" name="contributor_email" value="{{dataset_info.contributor_email}}">
             {% endif %}
 
             <hr />

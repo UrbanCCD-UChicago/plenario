@@ -718,14 +718,6 @@ def grid():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-@api.route(API_VERSION + '/api/submit-dataset/', methods=['POST'])
-def submit_dataset():
-    resp, status_code = add_dataset_to_metatable(request, approved_status=True)
-
-    resp = make_response(json.dumps(resp, default=dthandler), status_code)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
-
 # helper functions
 def make_query(table, raw_query_params):
     table_keys = table.columns.keys()

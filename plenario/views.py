@@ -112,6 +112,59 @@ def get_context_for_new_dataset(url):
     #print "get_context_for_new_dataset(): returning ", dataset_info, errors, socrata_source
     return (dataset_info, errors, socrata_source)
 
+def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_source, approved_status):
+    data_types = []
+    business_key = None
+    observed_date = None
+    latitude = None
+    longitude = None 
+    location = None
+    for k, v in request.form.iteritems():
+        if k.startswith('data_type_'):
+            key = k.replace("data_type_", "")
+            data_types.append({"field_name": key, "data_type": v})
+
+        if k.startswith('key_type_'):
+            key = k.replace("key_type_", "")
+            if (v == "business_key"): business_key = key
+            if (v == "observed_date"): observed_date = key
+            if (v == "latitude"): latitude = key
+            if (v == "longitude"): longitude = key
+            if (v == "location"): location = key
+
+    if socrata_source:
+        data_types = dataset_info['columns']
+
+    d = {
+        'dataset_name': slugify(request.form.get('dataset_name'), delim=u'_')[:50],
+        'human_name': request.form.get('dataset_name'),
+        'attribution': request.form.get('dataset_attribution'),
+        'description': request.form.get('dataset_description'),
+        'source_url': url,
+        'source_url_hash': dataset_id,
+        'update_freq': request.form.get('update_frequency'),
+        'business_key': business_key,
+        'observed_date': observed_date,
+        'latitude': latitude,
+        'longitude': longitude,
+        'location': location,
+        'contributor_name': request.form.get('contributor_name'),
+        'contributor_organization': request.form.get('contributor_organization'),
+        'contributor_email': request.form.get('contributor_email'),
+        'contributed_data_types': json.dumps(data_types),
+        'approved_status': approved_status,
+        'is_socrata_source': socrata_source
+    }
+
+    print d
+
+    # add this to meta_master
+    md = MetaTable(**d)
+    session.add(md)
+    session.commit()
+
+    return md
+
 def approve_dataset(source_url_hash):
     # get the MetaTable row and change the approved_status and bounce back to view-datasets.
 
@@ -158,7 +211,6 @@ def contrib_view():
     md = None
 
     if request.args.get('dataset_url'):
-
         url = request.args.get('dataset_url')
         (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url)
 
@@ -169,65 +221,16 @@ def contrib_view():
             errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
 
     if request.method == 'POST' and not md:
-
-        data_types = []
-        business_key = None
-        observed_date = None
-        latitude = None
-        longitude = None 
-        location = None
-        for k, v in request.form.iteritems():
-            if k.startswith('data_type_'):
-                key = k.replace("data_type_", "")
-                data_types.append({"field_name": key, "data_type": v})
-
-            if k.startswith('key_type_'):
-                key = k.replace("key_type_", "")
-                if (v == "business_key"): business_key = key
-                if (v == "observed_date"): observed_date = key
-                if (v == "latitude"): latitude = key
-                if (v == "longitude"): longitude = key
-                if (v == "location"): location = key
-
-        if socrata_source:
-            data_types = dataset_info['columns']
-
-        d = {
-            'dataset_name': slugify(request.form.get('dataset_name'), delim=u'_')[:50],
-            'human_name': request.form.get('dataset_name'),
-            'attribution': request.form.get('dataset_attribution'),
-            'description': request.form.get('dataset_description'),
-            'source_url': url,
-            'source_url_hash': dataset_id,
-            'update_freq': request.form.get('update_frequency'),
-            'business_key': business_key,
-            'observed_date': observed_date,
-            'latitude': latitude,
-            'longitude': longitude,
-            'location': location,
-            'contributor_name': request.form.get('contributor_name'),
-            'contributor_organization': request.form.get('contributor_organization'),
-            'contributor_email': request.form.get('contributor_email'),
-            'contributed_data_types': json.dumps(data_types),
-            'approved_status': 'false',
-            'is_socrata_source': socrata_source
-        }
-
-        print d
-
-        # add this to meta_master
-        md = MetaTable(**d)
-        session.add(md)
-        session.commit()
+        md = add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_source, approved_status=False)
 
         # email a confirmation to the submitter
         msg_body = """Hello %s,\r\n\r\n
 We received your recent dataset submission to Plenar.io:\r\n\r\n%s\r\n\r\n
 After we review it, we'll notify you when your data is loaded and available.\r\n\r\n
-Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (d['contributor_name'], md.human_name)
+Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (request.form.get('contributor_name'), md.human_name)
 
         send_mail(subject="Your dataset has been submitted to Plenar.io", 
-            recipient=d['contributor_email'], body=msg_body)
+            recipient=request.form.get('contributor_email'), body=msg_body)
 
         return redirect(url_for('views.contrib_thankyou'))
 
@@ -246,13 +249,32 @@ def add_dataset():
     dataset_info = {}
     errors = []
     socrata_source = False
-    if request.method == 'POST':
-        url = request.form.get('dataset_url')
+
+    url = ""
+    dataset_id = None
+    md = None
+
+    if request.args.get('dataset_url'):
+        url = request.args.get('dataset_url')
         (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url)
+
+        # populate contributor info from session
         user = session.query(User).get(flask_session['user_id'])
         dataset_info['contributor_name'] = user.name
         dataset_info['contributor_organization'] = 'Plenario Admin'
         dataset_info['contributor_email'] = user.email
+
+        # check if dataset with the same URL has already been loaded
+        dataset_id = md5(url).hexdigest()
+        md = session.query(MetaTable).get(dataset_id)
+        if md:
+            errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
+
+    if request.method == 'POST' and not md:
+        md = add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_source, approved_status=True)
+        flash('%s added successfully!' % md.human_name, 'success')
+        return redirect(url_for('views.view_datasets'))
+        
     context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source}
     return render_template('admin/add-dataset.html', **context)
 
