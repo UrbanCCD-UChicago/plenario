@@ -189,6 +189,9 @@ def contrib_view():
                 if (v == "longitude"): longitude = key
                 if (v == "location"): location = key
 
+        if socrata_source:
+            data_types = dataset_info['columns']
+
         d = {
             'dataset_name': slugify(request.form.get('dataset_name'), delim=u'_')[:50],
             'human_name': request.form.get('dataset_name'),

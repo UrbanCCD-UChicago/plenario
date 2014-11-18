@@ -6,23 +6,6 @@
 {% block title %}Submit a dataset - Plenar.io{% endblock %}
 {% block content %}
 
-     {% if errors %}
-     <div class="row">
-          <div class='col-md-10'>
-            <h4>There were some problems with your submission: </h4>
-                {% for error in errors %}
-                  <div class="alert alert-danger alert-dismissible" role="alert">
-                      <button type="button" class="close" data-dismiss="alert">
-                          <span aria-hidden="true">&times;</span>
-                          <span class="sr-only">Close</span>
-                      </button>
-                      {{ error }}
-                  </div>
-                {% endfor %}   
-          </div>
-      </div>
-      {% endif %}
-
     <div class="row">
         <div class='col-md-10 col-md-offset-1'>
             <h2>
@@ -34,6 +17,23 @@
       	      {% block submit_instructions %}
       	      {% endblock %}
       	    </p>
+
+            {% if errors %}
+              <div class="row">
+                  <div class='col-md-10'>
+                        {% for error in errors %}
+                          <div class="alert alert-danger alert-dismissible" role="alert">
+                              <button type="button" class="close" data-dismiss="alert">
+                                  <span aria-hidden="true">&times;</span>
+                                  <span class="sr-only">Close</span>
+                              </button>
+                              <p><strong>There were some errors with your submission:</strong></p>
+                              {{ error }}
+                          </div>
+                        {% endfor %}   
+                  </div>
+              </div>
+            {% endif %}
 	    
             <form role="form" method="GET" id="fetch-details-form">
                 <div class="form-group">
