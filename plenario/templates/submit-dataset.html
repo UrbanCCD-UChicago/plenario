@@ -2,7 +2,6 @@
 
 {% from "macros/add-socrata-dataset.html" import add_socrata_dataset %}
 {% from "macros/add-csv-dataset.html" import add_csv_dataset %}
-{% from "macros/add-extra-javascript.html" import add_extra_javascript %}
 
 {% block title %}Submit a dataset - Plenar.io{% endblock %}
 {% block content %}
@@ -23,7 +22,6 @@
           </div>
       </div>
       {% endif %}
-      <div id="errors"></div>
 
     <div class="row">
         <div class='col-md-10 col-md-offset-1'>
@@ -64,3 +62,7 @@
   {% endif %}
 
 {% endblock content %}
+
+{% block extra_javascript %}
+    <script src="{{ url_for('static', filename='js/add_dataset_validation.js') }}"></script>
+{% endblock %}

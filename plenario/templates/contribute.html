@@ -63,6 +63,6 @@
 
 {% endblock %}
 
-
-
-
+{% block extra_javascript %}
+    <script src="{{ url_for('static', filename='js/add_dataset_validation.js') }}"></script>
+{% endblock %}

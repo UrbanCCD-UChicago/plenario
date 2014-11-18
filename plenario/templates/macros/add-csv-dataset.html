@@ -3,7 +3,13 @@
 <div class="row">
     <div class="col-md-10 col-md-offset-1">
         <form role="form" class="form" method="POST">
-            <div id="errors"></div>
+            <div id="errors" class="alert alert-danger alert-dismissible" role="alert" style="display: none;">
+                <button type="button" class="close" data-dismiss="alert">
+                    <span aria-hidden="true">&times;</span><span class="sr-only">Close</span>
+                </button>
+                <p><strong>There were some errors with your submission:</strong></p>
+                <p id="error-list"></p>
+            </div>
             <p>Fill out the name, description and frequency of update for your dataset. <span class="red">*</span> denotes a required field</p>
             
             <div class="form-group">
@@ -12,12 +18,12 @@
             </div>
 
             <div class="form-group">
-                <label for="dataset_attribution"><span class="red">*</span>Attribution</label>
+                <label for="dataset_attribution">Attribution</label>
                 <input id="dataset_attribution" name="dataset_attribution" class="form-control" type="text" value="" placeholder="Please cite the original source of this data"/>
             </div>
 
             <div class="form-group">
-                <label for="dataset_description"><span class="red">*</span>Description</label>
+                <label for="dataset_description">Description</label>
                 <textarea rows="4" class="form-control" id="dataset_description" name="dataset_description">Dataset imported from {{dataset_info.name}}</textarea>
             </div>
             <div class="form-group">
@@ -42,7 +48,7 @@
                     {% for info in dataset_info.columns %}
                         <tr>
                             <td>
-                                <select id="key_type_{{info.human_name|slugify}}" name="key_type_{{info.human_name|slugify}}" class="form-control">
+                                <select id="key_type_{{info.human_name|slugify}}" name="key_type_{{info.human_name|slugify}}" class="plenario-field form-control">
                                     <option value="">---------</option>
                                     <option value="business_key">Unique ID</option>
                                     <option value="observed_date">Observation date</option>
@@ -52,7 +58,7 @@
                             </td>
                             <td>{{ info.human_name }}</td>
                             <td>
-                                <select id="data_type_{{info.human_name|slugify}}" name="data_type_{{info.human_name|slugify}}" class="form-control">
+                                <select id="data_type_{{info.human_name|slugify}}" name="data_type_{{info.human_name|slugify}}" class="form-control data_type">
                                     <option value="">-- Select data type --</option>
                                     <option value="boolean" {% if info.data_type == 'boolean' %}selected="selected"{% endif %}>Boolean</option>
                                     <option value="integer" {% if info.data_type == 'integer' %}selected="selected"{% endif %}>Integer</option>
@@ -82,7 +88,7 @@
                             <input id="contributor_name" name="contributor_name" type="text" class="form-control" placeholder="Jane Smith" value="{{ '%s' % contributor_name if contributor_name }}" />
                         </div>
                         <div class="form-group">
-                            <label for="contributor_organization" class="control-label"><span class="red">*</span>Organization</label>
+                            <label for="contributor_organization" class="control-label">Organization</label>
                             <input id="contributor_organization" name="contributor_organization" type="text" class="form-control" placeholder="Super Cool Organization" value="{{ '%s' % contributor_organization if contributor_organization }}" />
                         </div>
                     </div>
