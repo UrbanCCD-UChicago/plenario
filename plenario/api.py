@@ -132,9 +132,7 @@ def meta():
     else:
         metas = session.query(MetaTable)
 
-
-    if (not flask_session['user_id']):
-        metas=metas.filter(MetaTable.approved_status == 'true')
+    metas=metas.filter(MetaTable.approved_status == 'true')
         
     resp['objects'].extend([m.as_dict() for m in metas.all()])
     resp['meta']['total'] = len(resp['objects'])
