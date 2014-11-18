@@ -2,28 +2,9 @@
 
 {% from "macros/add-socrata-dataset.html" import add_socrata_dataset %}
 {% from "macros/add-csv-dataset.html" import add_csv_dataset %}
-{% from "macros/add-extra-javascript.html" import add_extra_javascript %}
 
 {% block title %}Submit a dataset - Plenar.io{% endblock %}
 {% block content %}
-
-     {% if errors %}
-     <div class="row">
-          <div class='col-md-10'>
-            <h4>There were some problems with your submission: </h4>
-                {% for error in errors %}
-                  <div class="alert alert-danger alert-dismissible" role="alert">
-                      <button type="button" class="close" data-dismiss="alert">
-                          <span aria-hidden="true">&times;</span>
-                          <span class="sr-only">Close</span>
-                      </button>
-                      {{ error }}
-                  </div>
-                {% endfor %}   
-          </div>
-      </div>
-      {% endif %}
-      <div id="errors"></div>
 
     <div class="row">
         <div class='col-md-10 col-md-offset-1'>
@@ -36,8 +17,25 @@
       	      {% block submit_instructions %}
       	      {% endblock %}
       	    </p>
+
+            {% if errors %}
+              <div class="row">
+                  <div class='col-md-10'>
+                        {% for error in errors %}
+                          <div class="alert alert-danger alert-dismissible" role="alert">
+                              <button type="button" class="close" data-dismiss="alert">
+                                  <span aria-hidden="true">&times;</span>
+                                  <span class="sr-only">Close</span>
+                              </button>
+                              <p><strong>There were some errors with your submission:</strong></p>
+                              {{ error }}
+                          </div>
+                        {% endfor %}   
+                  </div>
+              </div>
+            {% endif %}
 	    
-            <form role="form" method="POST" id="fetch-details-form">
+            <form role="form" method="GET" id="fetch-details-form">
                 <div class="form-group">
                     {% if dataset_info %}
                     <input type="text" class="form-control" name="dataset_url" value="{{dataset_info.submitted_url}}" />
@@ -66,5 +64,5 @@
 {% endblock content %}
 
 {% block extra_javascript %}
-    {{ add_extra_javascript(null, socrata_source)  }}
+    <script src="{{ url_for('static', filename='js/add_dataset_validation.js') }}"></script>
 {% endblock %}

@@ -1,22 +1,42 @@
 {% macro add_csv_dataset(dataset_info, submit_button_verb) -%}
+<hr />
 <div class="row">
     <div class="col-md-10 col-md-offset-1">
-        <strong>File name</strong>
-        <h4 id="name" data-view="{{dataset_info.view_url}}">{{dataset_info.name}}
-        </h4>
-        <form role="form">
-            <div id="errors"></div>
+        <form role="form" class="form" method="POST">
+            <div id="errors" class="alert alert-danger alert-dismissible" role="alert" style="display: none;">
+                <button type="button" class="close" data-dismiss="alert">
+                    <span aria-hidden="true">&times;</span><span class="sr-only">Close</span>
+                </button>
+                <p><strong>There were some errors with your submission:</strong></p>
+                <p id="error-list"></p>
+            </div>
+            <p>Fill out the name, description and frequency of update for your dataset. <span class="red">*</span> denotes a required field</p>
+            
+            <div class="form-group">
+                <label for="dataset_name"><span class="red">*</span>File name</label>
+                <input id="dataset_name" name="dataset_name" class="form-control" type="text" value="{{dataset_info.name}}" />
+            </div>
 
-            <p>
-                <label for="update-select"><strong>How often does this dataset update?</strong></label><br />
-                <select id="update-select">
-                    <option value="">-- Select an update interval --</option>
+            <div class="form-group">
+                <label for="dataset_attribution">Attribution</label>
+                <input id="dataset_attribution" name="dataset_attribution" class="form-control" type="text" value="" placeholder="Please cite the original source of this data"/>
+            </div>
+
+            <div class="form-group">
+                <label for="dataset_description">Description</label>
+                <textarea rows="4" class="form-control" id="dataset_description" name="dataset_description">Dataset imported from {{dataset_info.name}}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="update-select"><span class="red">*</span>How often does this dataset update?</label>
+                <select id="update_frequency" name="update_frequency" class="form-control">
                     <option value="yearly">Yearly</option>
                     <option value="monthly">Monthly</option>
                     <option value="weekly">Weekly</option>
                     <option value="daily">Daily</option>
                 </select>
-            </p>
+            </div>
+
+            <p>Below, select which columns correspond to the <code>Unique&nbsp;ID</code>, <code>Observation date</code>, <code>Latitude</code> and <code>Longitude</code> fields for your dataset. These are all <span class="red">*</span>required. We also guessed the data type of each field, feel free to change it if you think it's incorrect.</p>
 
             <table class="table">
                 <thead>
@@ -28,26 +48,26 @@
                     {% for info in dataset_info.columns %}
                         <tr>
                             <td>
-                                <select class="plenario-field">
+                                <select id="key_type_{{info.human_name|slugify}}" name="key_type_{{info.human_name|slugify}}" class="plenario-field form-control">
                                     <option value="">---------</option>
-                                    <option value="{{info.human_name|slugify}}">Date Field</option>
-                                    <option value="{{info.human_name|slugify}}">ID Field</option>
-                                    <option value="{{info.human_name|slugify}}">Latitude</option>
-                                    <option value="{{info.human_name|slugify}}">Longitude</option>
+                                    <option value="business_key">Unique ID</option>
+                                    <option value="observed_date">Observation date</option>
+                                    <option value="latitude">Latitude</option>
+                                    <option value="longitude">Longitude</option>
                                 </select>
                             </td>
                             <td>{{ info.human_name }}</td>
                             <td>
-                                <select class="data-type">
+                                <select id="data_type_{{info.human_name|slugify}}" name="data_type_{{info.human_name|slugify}}" class="form-control data_type">
                                     <option value="">-- Select data type --</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'boolean' %}selected="selected"{% endif %}>Boolean</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'integer' %}selected="selected"{% endif %}>Integer</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'big_integer' %}selected="selected"{% endif %}>Big Integer</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'float' %}selected="selected"{% endif %}>Float</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'string' %}selected="selected"{% endif %}>String</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'date' %}selected="selected"{% endif %}>Date</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'time' %}selected="selected"{% endif %}>Time</option>
-                                    <option value="{{info.human_name|slugify}}" {% if info.data_type == 'timestamp' %}selected="selected"{% endif %}>Datetime</option>
+                                    <option value="boolean" {% if info.data_type == 'boolean' %}selected="selected"{% endif %}>Boolean</option>
+                                    <option value="integer" {% if info.data_type == 'integer' %}selected="selected"{% endif %}>Integer</option>
+                                    <option value="big_integer" {% if info.data_type == 'big_integer' %}selected="selected"{% endif %}>Big Integer</option>
+                                    <option value="float" {% if info.data_type == 'float' %}selected="selected"{% endif %}>Float</option>
+                                    <option value="string" {% if info.data_type == 'string' %}selected="selected"{% endif %}>String</option>
+                                    <option value="date" {% if info.data_type == 'date' %}selected="selected"{% endif %}>Date</option>
+                                    <option value="time" {% if info.data_type == 'time' %}selected="selected"{% endif %}>Time</option>
+                                    <option value="timestamp" {% if info.data_type == 'timestamp' %}selected="selected"{% endif %}>Datetime</option>
                                 </select>
                             </td>
                         </tr>
@@ -59,12 +79,12 @@
 
                 <h3>About you</h3>
 
-                <p>Finally, tell us about yourself so we can contact you about this dataset:</p>
+                <p>Finally, tell us about yourself so we can contact you about this dataset.</p>
 
                 <div class="row">
                     <div class="col-md-4">
                         <div class="form-group">
-                            <label for="contributor_name" class="control-label">Name</label>
+                            <label for="contributor_name" class="control-label"><span class="red">*</span>Name</label>
                             <input id="contributor_name" name="contributor_name" type="text" class="form-control" placeholder="Jane Smith" value="{{ '%s' % contributor_name if contributor_name }}" />
                         </div>
                         <div class="form-group">
@@ -74,21 +94,21 @@
                     </div>
                     <div class="col-md-4">
                         <div class="form-group">
-                            <label for="contributor_email" class="control-label">Email</label>
+                            <label for="contributor_email" class="control-label"><span class="red">*</span>Email</label>
                             <input id="contributor_email" name="contributor_email" type="text" class="form-control" placeholder="jane.smith@example.com" value="{{ '%s' % contributor_email if contributor_email }}" />
                         </div>
                     </div>
                 </div>
             {% else %}
-                <input type="hidden" name="contributor_name" value="{{dataset_info.contributor_name}}">
-                <input type="hidden" name="contributor_organization" value="{{dataset_info.contributor_organization}}">
-                <input type="hidden" name="contributor_email" value="{{dataset_info.contributor_email}}">
+                <input type="hidden" id="contributor_name" name="contributor_name" value="{{dataset_info.contributor_name}}">
+                <input type="hidden" id="contributor_organization" name="contributor_organization" value="{{dataset_info.contributor_organization}}">
+                <input type="hidden" id="contributor_email" name="contributor_email" value="{{dataset_info.contributor_email}}">
             {% endif %}
 
             <hr />
             <p>
                 <button type="submit" class="btn btn-success" id="datatype-submit">
-		          {{ submit_button_verb }} this dataset &raquo;
+		          Submit &raquo;
 		        </button>
             </p>
         </form>

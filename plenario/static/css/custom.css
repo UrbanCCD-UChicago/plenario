@@ -33,6 +33,8 @@ body {
 
 .well h2, .detail-header { margin-top: 0; }
 
+.red { color: red; }
+
 .examples { word-wrap: break-word; }
 
 .highcharts-sparkline { height: 80px; width: 350px;}
