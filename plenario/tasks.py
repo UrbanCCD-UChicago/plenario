@@ -89,7 +89,9 @@ def update_dataset(source_url_hash, s3_path=None):
     return 'Finished updating %s' % md.human_name
 
 @celery_app.task
-def update_weather(month, year):
+def update_weather():
+    month, year = datetime.now().month, datetime.now().year
+    stations = ['94846', '14855', '04807', '14819', '94866', '04831', '04838']
     w = WeatherETL()
-    w.initialize_month(month, year)
+    w.initialize_month(year, month, weather_station_list=stations)
     return 'Added weather for %s %s' % (month, year)
