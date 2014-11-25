@@ -10,6 +10,7 @@ from raven.conf import setup_logging
 from plenario.settings import CELERY_SENTRY_URL
 from sqlalchemy import Table
 from sqlalchemy.exc import NoSuchTableError, InternalError
+from datetime import datetime
 
 if CELERY_SENTRY_URL:
     handler = SentryHandler(CELERY_SENTRY_URL)
