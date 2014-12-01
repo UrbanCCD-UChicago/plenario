@@ -5,6 +5,7 @@ from plenario.models import MetaTable, MasterTable
 from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.utils.etl import PlenarioETL
+from plenario.utils.weather import WeatherETL
 from raven.handlers.logging import SentryHandler
 from raven.conf import setup_logging
 from plenario.settings import CELERY_SENTRY_URL
