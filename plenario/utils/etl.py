@@ -264,7 +264,8 @@ class PlenarioETL(object):
                     for col in range(len(header)):
                         col_types.append(iter_column(col, f))
             for col_name,d_type in zip(header, col_types):
-                cols.append(Column(col_name, d_type))
+                dt, nullable = d_type
+                cols.append(Column(col_name, dt, nullable=nullable))
             cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver', 
                     name='%s_ix' % self.dataset_name[:50]))
             self.dat_table = Table('dat_%s' % self.dataset_name, self.metadata, 

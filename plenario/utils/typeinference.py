@@ -22,16 +22,20 @@ def normalize_column_type(l):
     """
     Docs to come...
     """
+    
+    null_values = False
 
     # Convert "NA", "N/A", etc. to null types.
     for i, x in enumerate(l):
         if x is not None and x.lower() in NULL_VALUES:
             l[i] = None
+            null_values = True
+
     # Are they boolean?
     try:
         for i, x in enumerate(l):
             if x == '' or x is None:
-                continue
+                raise ValueError('Not boolean')
             elif x.lower() in TRUE_VALUES:
                 continue
             elif x.lower() in FALSE_VALUES:
@@ -39,7 +43,7 @@ def normalize_column_type(l):
             else:
                 raise ValueError('Not boolean')
 
-        return Boolean
+        return Boolean, null_values
     except ValueError:
         pass
 
@@ -58,15 +62,17 @@ def normalize_column_type(l):
             if x.isspace():
                 raise TypeError('Integer is nothing but spaces so falling back to string')
 
-            if int_x > 1000000000:
+            if 9000000000000000000 > int_x > 1000000000:
                 add(BigInteger)
-            else:
+            elif 1000000000 > int_x:
                 add(Integer)
+            else:
+                raise ValueError
 
         if BigInteger in normal_types_set:
-            return BigInteger
+            return BigInteger, null_values
         else:
-            return Integer
+            return Integer, null_values
 
     except TypeError:
         pass
@@ -82,7 +88,7 @@ def normalize_column_type(l):
 
             float_x  = float(x.replace(',', ''))
 
-        return Float
+        return Float, null_values
     except ValueError:
         pass
 
@@ -131,11 +137,11 @@ def normalize_column_type(l):
         elif normal_types_set == set([TIME]) and ampm:
             normal_types_set = set([String])
  
-        return normal_types_set.pop()
+        return normal_types_set.pop(), null_values
     except ValueError:
         pass
     except TypeError: #https://bugs.launchpad.net/dateutil/+bug/1247643
         pass
 
     # Don't know what they are, so they must just be strings 
-    return String
+    return String, null_values

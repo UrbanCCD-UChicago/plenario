@@ -25,8 +25,8 @@ def iter_column(idx, f):
             except IndexError:
                 # Bad data. Maybe we can fill with nulls?
                 pass
-    col_type = normalize_column_type(col)
-    return col_type
+    col_type, null_values = normalize_column_type(col)
+    return col_type, null_values
 
 def get_socrata_data_info(host, path, four_by_four):
     errors = []
