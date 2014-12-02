@@ -95,5 +95,5 @@ def update_weather():
     month, year = datetime.now().month, datetime.now().year
     stations = ['94846', '14855', '04807', '14819', '94866', '04831', '04838']
     w = WeatherETL()
-    w.initialize_month(year, month, weather_station_list=stations)
+    w.initialize_month(year, month, weather_stations_list=stations)
     return 'Added weather for %s %s' % (month, year)
