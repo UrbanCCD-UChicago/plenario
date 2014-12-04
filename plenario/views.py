@@ -98,7 +98,7 @@ def get_context_for_new_dataset(url):
                 col_types = []
                 inp.seek(0)
                 for col in range(len(header)):
-                    col_types.append(iter_column(col, inp))
+                    col_types.append(iter_column(col, inp)[0])
                 dataset_info['columns'] = []
                 for idx, col in enumerate(col_types):
                     d = {
