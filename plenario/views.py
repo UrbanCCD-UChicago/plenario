@@ -17,7 +17,7 @@ import json
 import re
 from cStringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader
-from sqlalchemy import Table
+from sqlalchemy import Table, select, func
 from plenario.settings import CACHE_CONFIG
 import string
 import sqlalchemy
@@ -348,19 +348,25 @@ def edit_dataset(source_url_hash):
     meta = session.query(MetaTable).get(source_url_hash)
 
     fieldnames = None
+    num_rows = None
     if (meta.approved_status == 'true'):
         try:
             table = Table('dat_%s' % meta.dataset_name, Base.metadata,
                           autoload=True, autoload_with=engine)
             fieldnames = table.columns.keys()
+            pk_name  =[p.name for p in table.primary_key][0]
+            pk = table.c[pk_name]
+            num_rows = session.query(pk).count()
         except sqlalchemy.exc.NoSuchTableError, e:
             # dataset has been approved, but perhaps still processing.
             pass
 
     if (not fieldnames):
+        # This is the case when the csv dataset was not from Socrata
         fieldnames = []
         if meta.contributed_data_types:
             fieldnames = [f['field_name'] for f in json.loads(meta.contributed_data_types)]
+
     if form.validate_on_submit():
         upd = {
             'human_name': form.human_name.data,
@@ -386,10 +392,12 @@ def edit_dataset(source_url_hash):
         return redirect(url_for('views.view_datasets'))
     else:
         pass
+
     context = {
         'form': form,
         'meta': meta,
         'fieldnames': fieldnames,
+        'num_rows': num_rows
     }
     return render_template('admin/edit-dataset.html', **context)
 

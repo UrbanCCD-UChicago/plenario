@@ -16,6 +16,9 @@
     {% else %}
     <p><strong>Contributor: <i>no contributor info</i></strong></p>
     {% endif %}
+
+    <p><strong>Number of rows in table:</strong> {{ num_rows }} </p>
+
     <form role="form" method="POST">
         {{ form.csrf_token }}
         <div class="row">
