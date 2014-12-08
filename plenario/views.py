@@ -359,19 +359,16 @@ def edit_dataset(source_url_hash):
                           autoload=True, autoload_with=engine)
             fieldnames = table.columns.keys()
             pk_name  =[p.name for p in table.primary_key][0]
-            print "pk_name is " , pk_name
             pk = table.c[pk_name]
             num_rows = session.query(pk).count()
 
             dat_master = Table('dat_master', Base.metadata, autoload=True, autoload_with=engine)
 
-            print "meta.dataset_name is", meta.dataset_name
             sel = session.query(func.count(dat_master.c.master_row_id)).filter(and_(dat_master.c.dataset_name==meta.dataset_name,
                                                                                     dat_master.c.dataset_row_id==pk,
                                                                                     dat_master.c.weather_observation_id.isnot(None)))
 
             num_weather_observations = sel.first()[0]
-            print "num_weather_observations=", num_weather_observations
             
         except sqlalchemy.exc.NoSuchTableError, e:
             # dataset has been approved, but perhaps still processing.
