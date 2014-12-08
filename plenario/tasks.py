@@ -37,14 +37,14 @@ def delete_dataset(source_url_hash):
     except InternalError, e:
         raise delete_dataset.retry(exc=e)
     conn.close()
-    return 'Deleted %s' % md.human_name
+    return 'Deleted {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task
 def add_dataset(source_url_hash, s3_path=None, data_types=None):
     md = session.query(MetaTable).get(source_url_hash)
     etl = PlenarioETL(md.as_dict(), data_types=data_types)
     etl.add(s3_path=s3_path)
-    return 'Finished adding %s' % md.human_name
+    return 'Finished adding {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task
 def monthly_update():
@@ -52,8 +52,7 @@ def monthly_update():
         .filter(MetaTable.update_freq == 'monthly').all()
     for m in md:
         update_dataset.delay(m.source_url_hash)
-        print 'Updating %s' % m.human_name
-    return 'Weekly update complere'
+    return 'Monthly update complete'
 
 @celery_app.task
 def weekly_update():
@@ -61,8 +60,7 @@ def weekly_update():
         .filter(MetaTable.update_freq == 'weekly').all()
     for m in md:
         update_dataset.delay(m.source_url_hash)
-        print 'Updating %s' % m.human_name
-    return 'Weekly update complere'
+    return 'Weekly update complete'
 
 @celery_app.task
 def daily_update():
@@ -70,7 +68,6 @@ def daily_update():
         .filter(MetaTable.update_freq == 'daily').all()
     for m in md:
         update_dataset.delay(m.source_url_hash)
-        print 'Updating %s' % m.human_name
     return 'Daily update complete'
 
 @celery_app.task
@@ -79,16 +76,14 @@ def hourly_update():
         .filter(MetaTable.update_freq == 'hourly').all()
     for m in md:
         update_dataset.delay(m.source_url_hash)
-        print 'Updating %s' % m.human_name
     return 'yay'
 
 @celery_app.task
 def update_dataset(source_url_hash, s3_path=None):
-    
     md = session.query(MetaTable).get(source_url_hash)
     etl = PlenarioETL(md.as_dict())
     etl.update(s3_path=s3_path)
-    return 'Finished updating %s' % md.human_name
+    return 'Finished updating {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task
 def update_weather():

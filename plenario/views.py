@@ -22,6 +22,7 @@ from plenario.settings import CACHE_CONFIG
 import string
 import sqlalchemy
 from hashlib import md5
+import traceback
 
 views = Blueprint('views', __name__)
 
@@ -292,25 +293,66 @@ def view_datasets():
     celery_table = Table('celery_taskmeta', Base.metadata, 
                          autoload=True, autoload_with=engine)
     q = text(''' 
-        SELECT m.*, c.status 
+        SELECT m.*, c.status, c.task_id
         FROM meta_master AS m 
-        JOIN celery_taskmeta AS c 
+        LEFT JOIN celery_taskmeta AS c 
           ON c.id = (
             SELECT id FROM celery_taskmeta 
-            WHERE POSITION(m.human_name IN ENCODE(result, 'escape'))<>0 
+            WHERE POSITION(m.source_url_hash IN ENCODE(result, 'escape'))<>0 
               OR POSITION(m.dataset_name IN ENCODE(result, 'escape'))<>0 
             ORDER BY date_done DESC 
             LIMIT 1
           )
+        WHERE m.approved_status = 'true'
     ''')
     datasets = []
     with engine.begin() as c:
-        datasets = c.execute(q)
-    datasets = [d for d in datasets]
-   #datasets = session.query(MetaTable, celery_table.c.status)\
-   #    .join(celery_table, )
-   #    .all()
+        datasets = list(c.execute(q))
     return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets)
+
+@views.route('/admin/dataset-status/<source_url_hash>')
+@login_required
+def dataset_status(source_url_hash):
+    celery_table = Table('celery_taskmeta', Base.metadata, 
+                         autoload=True, autoload_with=engine)
+    results = []
+    q = text(''' 
+        SELECT 
+          m.human_name, 
+          c.status, 
+          c.task_id, 
+          c.traceback, 
+          c.date_done
+        FROM meta_master AS m 
+        JOIN celery_taskmeta AS c 
+          ON c.id IN (
+            SELECT id FROM celery_taskmeta 
+            WHERE POSITION(m.source_url_hash IN ENCODE(result, 'escape'))<>0 
+              OR POSITION(m.dataset_name IN ENCODE(result, 'escape'))<>0 
+            ORDER BY date_done DESC 
+          )
+        WHERE m.source_url_hash = :source_url_hash
+    ''')
+    with engine.begin() as c:
+        results = list(c.execute(q, source_url_hash=source_url_hash))
+    r = []
+    for result in results:
+        tb = None
+        if result.traceback:
+            tb = result.traceback\
+                .replace('\r\n', '<br />')\
+                .replace('\n\r', '<br />')\
+                .replace('\n', '<br />')\
+                .replace('\r', '<br />')
+        d = {
+            'human_name': result.human_name,
+            'status': result.status,
+            'task_id': result.task_id,
+            'traceback': tb,
+            'date_done': result.date_done.strftime('%B %d, %Y %H:%M'),
+        }
+        r.append(d)
+    return render_template('admin/dataset-status.html', results=r)
 
 class EditDatasetForm(Form):
     """ 

@@ -37,7 +37,7 @@
                         <td>{{ dataset.human_name }}</td>
                         <td>{{ dataset.attribution }}</td>
                         <td>
-                            <a href='mailto:{{ dataset.contributor_email }}'>{{ dataset.contributor_name }}</a>, 
+                            <a href='mailto:{{ dataset.contributor_email }}'>{{ dataset.contributor_name }}</a>,
                             {{ dataset.contributor_organization }}
                         </td>
                         <td>{{ dataset.update_freq }}</td>
@@ -65,8 +65,8 @@
             <th>Attribution</th>
             <th>Updated</th>
             <th>Last updated</th>
-            <!-- <th></th> -->
             <th></th>
+            <th>ETL Status</th>
         </thead>
         <tbody>
             {% for dataset in datasets %}
@@ -86,6 +86,20 @@
                                 class="btn btn-success btn-sm">
                                 <i class='fa fa-check'></i> Approve
                             </a>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if dataset.status %}
+                        <a href="{{url_for('views.dataset_status', source_url_hash=dataset.source_url_hash) }}">
+                            <span class="label
+                                {% if dataset.status == 'SUCCESS' %}
+                                    label-success
+                                {% else %}
+                                    label-primary
+                                {% endif %}">
+                                {{ dataset.status|title }}
+                            </span>
+                        </a>
                         {% endif %}
                     </td>
                 </tr>
