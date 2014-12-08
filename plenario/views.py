@@ -290,24 +290,31 @@ def view_datasets():
     datasets_pending = session.query(MetaTable)\
         .filter(MetaTable.approved_status != 'true')\
         .all()
-    celery_table = Table('celery_taskmeta', Base.metadata, 
-                         autoload=True, autoload_with=engine)
-    q = text(''' 
-        SELECT m.*, c.status, c.task_id
-        FROM meta_master AS m 
-        LEFT JOIN celery_taskmeta AS c 
-          ON c.id = (
-            SELECT id FROM celery_taskmeta 
-            WHERE POSITION(m.source_url_hash IN ENCODE(result, 'escape'))<>0 
-              OR POSITION(m.dataset_name IN ENCODE(result, 'escape'))<>0 
-            ORDER BY date_done DESC 
-            LIMIT 1
-          )
-        WHERE m.approved_status = 'true'
-    ''')
-    datasets = []
-    with engine.begin() as c:
-        datasets = list(c.execute(q))
+
+    try:
+        celery_table = Table('celery_taskmeta', Base.metadata, 
+                             autoload=True, autoload_with=engine)
+        q = text(''' 
+            SELECT m.*, c.status, c.task_id
+            FROM meta_master AS m 
+            LEFT JOIN celery_taskmeta AS c 
+              ON c.id = (
+                SELECT id FROM celery_taskmeta 
+                WHERE POSITION(m.source_url_hash IN ENCODE(result, 'escape'))<>0 
+                  OR POSITION(m.dataset_name IN ENCODE(result, 'escape'))<>0 
+                ORDER BY date_done DESC 
+                LIMIT 1
+              )
+            WHERE m.approved_status = 'true'
+        ''')
+        datasets = []
+        with engine.begin() as c:
+            datasets = list(c.execute(q))
+    except NoSuchTableError, e:
+        datasets = session.query(MetaTable)\
+        .filter(MetaTable.approved_status == 'true')\
+        .all()
+
     return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets)
 
 @views.route('/admin/dataset-status/<source_url_hash>')
@@ -319,6 +326,7 @@ def dataset_status(source_url_hash):
     q = text(''' 
         SELECT 
           m.human_name, 
+          m.source_url_hash,
           c.status, 
           c.task_id, 
           c.traceback, 
@@ -346,6 +354,7 @@ def dataset_status(source_url_hash):
                 .replace('\r', '<br />')
         d = {
             'human_name': result.human_name,
+            'source_url_hash': result.source_url_hash,
             'status': result.status,
             'task_id': result.task_id,
             'traceback': tb,
@@ -412,9 +421,9 @@ def edit_dataset(source_url_hash):
     meta = session.query(MetaTable).get(source_url_hash)
 
     fieldnames = None
-    num_rows = None
-    num_weather_observations = None
-    num_rows_w_censusblocks = None
+    num_rows = 0
+    num_weather_observations = 0
+    num_rows_w_censusblocks = 0
     
     if (meta.approved_status == 'true'):
         try:

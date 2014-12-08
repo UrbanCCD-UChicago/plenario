@@ -6,21 +6,59 @@
 {% endblock %}
 {% block content %}
     <p><a href='{{ url_for('views.view_datasets') }}'>&laquo; view datasets</a></p>
-    <h2>
-        Editing '{{ meta.human_name }}'
-    </h2>
-    <p><strong>Source URL: </strong>{{ meta.source_url }}</p>
-    <p><strong>Machine name: </strong>{{ meta.dataset_name }}</p>
-    {% if meta.contributor_email %}
-    <p><strong>Contributor: </strong>{{ meta.contributor_name }} (<i>{{ meta.contributor_email }}</i>) / {{ meta.contributor_organization }}</p>
-    {% else %}
-    <p><strong>Contributor: <i>no contributor info</i></strong></p>
+    <h1>{{ meta.human_name }}</h1>
+
+    {% if meta.approved_status == 'true' %}
+        <ul class="nav nav-tabs">
+          <li role="presentation" class="active"><a href="{{ url_for('views.edit_dataset', source_url_hash=meta.source_url_hash) }}">Edit metadata</a></li>
+          <li role="presentation"><a href="{{ url_for('views.dataset_status', source_url_hash=meta.source_url_hash) }}">ETL status</a></li>
+        </ul>
     {% endif %}
+    <div class='row'>
+        <div class='col-sm-8'>
+            <table class='table'>
+                <tbody>
+                    <tr>
+                        <td><strong>Source</strong></td>
+                        <td>{{ meta.source_url }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Table name</strong></td>
+                        <td>{{ meta.dataset_name }}</td>
+                    </tr>
+                    <tr>
+                    {% if meta.contributor_email %}
+                        <td><strong>Contributor</strong></td>
+                        <td>{{ meta.contributor_name }} (<i>{{ meta.contributor_email }}</i>) / {{ meta.contributor_organization }}</td>
+                    {% else %}
+                        <td><strong>Contributor</td>
+                        <td>No contributor info</strong></td>
+                    {% endif %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class='col-sm-4'>
+            <table class='table'>
+                <tbody>
+                    <tr>
+                        <td><strong><i class='fa fa-align-justify'></i> Rows</strong></td>
+                        <td>{{ '{:,}'.format(num_rows) }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong><i class='fa fa-umbrella'></i> Weather observations</strong></td>
+                        <td>{{ '{:,}'.format(num_weather_observations) }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong><i class='fa fa-square'></i> Census blocks</strong></td>
+                        <td>{{ '{:,}'.format(num_rows_w_censusblocks) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-    <p><strong>Number of rows in table:</strong> {{ num_rows }} </p>
-    <p><strong>Number of rows with valid associated weather observations in table:</strong> {{ num_weather_observations }} </p>
-    <p><strong>Number of rows with valid associated census blocks in table:</strong> {{ num_rows_w_censusblocks }} </p>
-
+    <h2>Edit metadata</h2>
     <form role="form" method="POST">
         {{ form.csrf_token }}
         <div class="row">

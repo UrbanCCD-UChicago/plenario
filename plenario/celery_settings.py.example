@@ -1,7 +1,7 @@
 from celery.schedules import crontab
 
 BROKER_URL = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'postgresql://plenario:@localhost:5432/plenario_dev'
+CELERY_RESULT_BACKEND = 'db+postgresql://plenario:@localhost:5432/plenario_dev'
 
 CELERYBEAT_SCHEDULE = {
     'monthly_update': {
