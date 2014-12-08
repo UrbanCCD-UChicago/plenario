@@ -25,12 +25,15 @@ task_session = scoped_session(sessionmaker(bind=task_engine,
 Base = declarative_base()
 Base.query = session.query_property()
 
-def init_db():
+def init_db(no_create=False):
     import plenario.models
     from plenario.utils.weather import WeatherETL, WeatherStationsETL
     from plenario.utils.shapefile_helpers import PlenarioShapeETL
     import datetime
 
+    if no_create:
+        return
+    
     print 'creating master, meta and user tables'
     Base.metadata.create_all(bind=app_engine)
     if plenario.settings.DEFAULT_USER:
@@ -41,7 +44,8 @@ def init_db():
             session.commit()
         except IntegrityError:
             pass
-
+    
+        
     print 'initializing NOAA weather stations'
     s = WeatherStationsETL()
     s.initialize()
@@ -55,3 +59,4 @@ def init_db():
     print 'this will *also* take a few minutes ...'
     shp = PlenarioShapeETL(plenario.settings.CENSUS_BLOCKS)
     shp.add()
+    

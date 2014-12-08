@@ -18,6 +18,7 @@
     {% endif %}
 
     <p><strong>Number of rows in table:</strong> {{ num_rows }} </p>
+    <p><strong>Number of rows with valid associated weather observations in table:</strong> {{ num_weather_observations }} </p>
 
     <form role="form" method="POST">
         {{ form.csrf_token }}

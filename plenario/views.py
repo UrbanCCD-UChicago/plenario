@@ -17,7 +17,7 @@ import json
 import re
 from cStringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader
-from sqlalchemy import Table, select, func
+from sqlalchemy import Table, select, func, and_
 from plenario.settings import CACHE_CONFIG
 import string
 import sqlalchemy
@@ -349,14 +349,30 @@ def edit_dataset(source_url_hash):
 
     fieldnames = None
     num_rows = None
+    num_weather_observations = None
+    
     if (meta.approved_status == 'true'):
         try:
-            table = Table('dat_%s' % meta.dataset_name, Base.metadata,
+            table_name = 'dat_%s' % meta.dataset_name
+            
+            table = Table(table_name, Base.metadata,
                           autoload=True, autoload_with=engine)
             fieldnames = table.columns.keys()
             pk_name  =[p.name for p in table.primary_key][0]
+            print "pk_name is " , pk_name
             pk = table.c[pk_name]
             num_rows = session.query(pk).count()
+
+            dat_master = Table('dat_master', Base.metadata, autoload=True, autoload_with=engine)
+
+            print "meta.dataset_name is", meta.dataset_name
+            sel = session.query(func.count(dat_master.c.master_row_id)).filter(and_(dat_master.c.dataset_name==meta.dataset_name,
+                                                                                    dat_master.c.dataset_row_id==pk,
+                                                                                    dat_master.c.weather_observation_id.isnot(None)))
+
+            num_weather_observations = sel.first()[0]
+            print "num_weather_observations=", num_weather_observations
+            
         except sqlalchemy.exc.NoSuchTableError, e:
             # dataset has been approved, but perhaps still processing.
             pass
@@ -397,7 +413,8 @@ def edit_dataset(source_url_hash):
         'form': form,
         'meta': meta,
         'fieldnames': fieldnames,
-        'num_rows': num_rows
+        'num_rows': num_rows,
+        'num_weather_observations': num_weather_observations
     }
     return render_template('admin/edit-dataset.html', **context)
 
