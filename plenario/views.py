@@ -17,7 +17,7 @@ import json
 import re
 from cStringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader
-from sqlalchemy import Table, select, func, and_
+from sqlalchemy import Table, select, func, text, and_
 from plenario.settings import CACHE_CONFIG
 import string
 import sqlalchemy
@@ -286,8 +286,30 @@ def add_dataset():
 @views.route('/admin/view-datasets')
 @login_required
 def view_datasets():
-    datasets_pending = session.query(MetaTable).filter(MetaTable.approved_status != 'true').all()
-    datasets = session.query(MetaTable).filter(MetaTable.approved_status == 'true').all()
+    datasets_pending = session.query(MetaTable)\
+        .filter(MetaTable.approved_status != 'true')\
+        .all()
+    celery_table = Table('celery_taskmeta', Base.metadata, 
+                         autoload=True, autoload_with=engine)
+    q = text(''' 
+        SELECT m.*, c.status 
+        FROM meta_master AS m 
+        JOIN celery_taskmeta AS c 
+          ON c.id = (
+            SELECT id FROM celery_taskmeta 
+            WHERE POSITION(m.human_name IN ENCODE(result, 'escape'))<>0 
+              OR POSITION(m.dataset_name IN ENCODE(result, 'escape'))<>0 
+            ORDER BY date_done DESC 
+            LIMIT 1
+          )
+    ''')
+    datasets = []
+    with engine.begin() as c:
+        datasets = c.execute(q)
+    datasets = [d for d in datasets]
+   #datasets = session.query(MetaTable, celery_table.c.status)\
+   #    .join(celery_table, )
+   #    .all()
     return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets)
 
 class EditDatasetForm(Form):
