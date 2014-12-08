@@ -350,6 +350,7 @@ def edit_dataset(source_url_hash):
     fieldnames = None
     num_rows = None
     num_weather_observations = None
+    num_rows_w_censusblocks = None
     
     if (meta.approved_status == 'true'):
         try:
@@ -369,6 +370,13 @@ def edit_dataset(source_url_hash):
                                                                                     dat_master.c.weather_observation_id.isnot(None)))
 
             num_weather_observations = sel.first()[0]
+
+            sel = session.query(func.count(dat_master.c.master_row_id)).filter(and_(dat_master.c.dataset_name==meta.dataset_name,
+                                                                                    dat_master.c.dataset_row_id==pk,
+                                                                                    dat_master.c.census_block.isnot(None)))
+
+            num_rows_w_censusblocks = sel.first()[0]
+
             
         except sqlalchemy.exc.NoSuchTableError, e:
             # dataset has been approved, but perhaps still processing.
@@ -411,7 +419,8 @@ def edit_dataset(source_url_hash):
         'meta': meta,
         'fieldnames': fieldnames,
         'num_rows': num_rows,
-        'num_weather_observations': num_weather_observations
+        'num_weather_observations': num_weather_observations,
+        'num_rows_w_censusblocks': num_rows_w_censusblocks
     }
     return render_template('admin/edit-dataset.html', **context)
 
