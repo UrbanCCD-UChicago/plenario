@@ -193,6 +193,7 @@ class PlenarioShapeETL(object):
                 values = []
                 shp_count = 0
         # out of the loop -- add the remaining records
-        conn.execute(ins, values)
+        if (len(values) != 0):
+            conn.execute(ins, values)
 
         conn.close()
