@@ -17,8 +17,8 @@ if CELERY_SENTRY_URL:
     handler = SentryHandler(CELERY_SENTRY_URL)
     setup_logging(handler)
 
-@celery_app.task
-def delete_dataset(source_url_hash):
+@celery_app.task(bind=True)
+def delete_dataset(self, source_url_hash):
     md = session.query(MetaTable).get(source_url_hash)
     try:
         dat_table = Table('dat_%s' % md.dataset_name, Base.metadata, 
@@ -39,9 +39,18 @@ def delete_dataset(source_url_hash):
     conn.close()
     return 'Deleted {0} ({1})'.format(md.human_name, md.source_url_hash)
 
-@celery_app.task
-def add_dataset(source_url_hash, s3_path=None, data_types=None):
+@celery_app.task(bind=True)
+def add_dataset(self, source_url_hash, s3_path=None, data_types=None):
     md = session.query(MetaTable).get(source_url_hash)
+    if md.result_ids:
+        ids = md.result_ids
+        ids.append(self.request.id)
+    else:
+        ids = [self.request.id]
+    with engine.begin() as c:
+        c.execute(MetaTable.__table__.update()\
+            .where(MetaTable.source_url_hash == source_url_hash)\
+            .values(result_ids=ids))
     etl = PlenarioETL(md.as_dict(), data_types=data_types)
     etl.add(s3_path=s3_path)
     return 'Finished adding {0} ({1})'.format(md.human_name, md.source_url_hash)
@@ -78,9 +87,18 @@ def hourly_update():
         update_dataset.delay(m.source_url_hash)
     return 'yay'
 
-@celery_app.task
-def update_dataset(source_url_hash, s3_path=None):
+@celery_app.task(bind=True)
+def update_dataset(self, source_url_hash, s3_path=None):
     md = session.query(MetaTable).get(source_url_hash)
+    if md.result_ids:
+        ids = md.result_ids
+        ids.append(self.request.id)
+    else:
+        ids = [self.request.id]
+    with engine.begin() as c:
+        c.execute(MetaTable.__table__.update()\
+            .where(MetaTable.source_url_hash == source_url_hash)\
+            .values(result_ids=ids))
     etl = PlenarioETL(md.as_dict())
     etl.update(s3_path=s3_path)
     return 'Finished updating {0} ({1})'.format(md.human_name, md.source_url_hash)

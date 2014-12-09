@@ -290,7 +290,6 @@ def view_datasets():
     datasets_pending = session.query(MetaTable)\
         .filter(MetaTable.approved_status != 'true')\
         .all()
-
     try:
         celery_table = Table('celery_taskmeta', Base.metadata, 
                              autoload=True, autoload_with=engine)
@@ -300,8 +299,7 @@ def view_datasets():
             LEFT JOIN celery_taskmeta AS c 
               ON c.id = (
                 SELECT id FROM celery_taskmeta 
-                WHERE POSITION(m.source_url_hash IN ENCODE(result, 'escape'))<>0 
-                  OR POSITION(m.dataset_name IN ENCODE(result, 'escape'))<>0 
+                WHERE task_id = ANY(m.result_ids) 
                 ORDER BY date_done DESC 
                 LIMIT 1
               )
@@ -314,7 +312,6 @@ def view_datasets():
         datasets = session.query(MetaTable)\
         .filter(MetaTable.approved_status == 'true')\
         .all()
-
     return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets)
 
 @views.route('/admin/dataset-status/<source_url_hash>')
@@ -328,17 +325,13 @@ def dataset_status(source_url_hash):
           m.human_name, 
           m.source_url_hash,
           c.status, 
-          c.task_id, 
-          c.traceback, 
-          c.date_done
-        FROM meta_master AS m 
-        JOIN celery_taskmeta AS c 
-          ON c.id IN (
-            SELECT id FROM celery_taskmeta 
-            WHERE POSITION(m.source_url_hash IN ENCODE(result, 'escape'))<>0 
-              OR POSITION(m.dataset_name IN ENCODE(result, 'escape'))<>0 
-            ORDER BY date_done DESC 
-          )
+          c.date_done,
+          c.traceback,
+          c.task_id
+        FROM meta_master AS m, 
+        UNNEST(m.result_ids) AS ids 
+        LEFT JOIN celery_taskmeta AS c 
+          ON c.task_id = ids
         WHERE m.source_url_hash = :source_url_hash
     ''')
     with engine.begin() as c:
