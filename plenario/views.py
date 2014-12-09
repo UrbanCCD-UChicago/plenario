@@ -23,6 +23,7 @@ import string
 import sqlalchemy
 from hashlib import md5
 import traceback
+from sqlalchemy.exc import NoSuchTableError
 
 views = Blueprint('views', __name__)
 
