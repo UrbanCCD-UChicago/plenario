@@ -8,10 +8,11 @@
       <div class="row" style="display:inline-block"><img src='/static/images/logo-large.png' class='img-responsive' alt='Plenar.io logo' height="100px" width="100px"/></div>
       <h2 style="font-size: 40px;">The next stage in open data.</h2>
        <p>Plenario is a centralized hub for open datasets from around the world, ready to search and download.</p>
-      <p><a class="btn btn-primary btn-lg" role="button" href="{{ url_for('views.explore_view') }}">Get Started</a></p>
+      <p>
+        <a class="btn btn-primary btn-lg" role="button" href="{{ url_for('views.explore_view') }}"><i class='fa fa-globe'></i> Explore</a>
+        <a class="btn btn-info btn-lg" role="button" href="{{ url_for('views.contrib_view') }}"><i class='fa fa-plus-circle'></i> Add data</a>
+      </p>
     </div>
-
-
 
     <h3>One database. One map.</h3>
     <p class="lead">All data in Plenario exists on a single map and a single timeline, making it incredibly easy to access multiple datasets at once&mdash;especially those originally housed at different data portals.</p>
@@ -25,6 +26,11 @@
         </div>
       </div>
     </div>
+
+    <h3>Anyone can add data.</h3>
+    <p>Anyone can add datasets to Plenario via the <a href='http://plenar.io/contribute'>Add dataset form</a>. You can add any publicly available URL for a CSV or Socrata dataset that includes a unique ID, date, and location information.</p>
+
+    <p class="text-center"><a class="btn btn-info btn-lg" href="{{ url_for('views.contrib_view') }}">Add a dataset&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a></p>
 
     <h3>Extremely easy to access.</h3>
     <p class="lead">No coding, no NDAs, no navigating government websites older than you are. Accessing the data is as easy as selecting dates and drawing on a map. (Don't worry, you can still <a href="{{ url_for('views.api_docs_view') }}#docs">code</a>.)</p>
