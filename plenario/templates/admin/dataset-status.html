@@ -11,8 +11,8 @@
         <h1>{{ results[0].human_name }}</h1>
 
         <ul class="nav nav-tabs">
-          <li role="presentation"><a href="{{ url_for('views.edit_dataset', source_url_hash=results[0].source_url_hash) }}">Edit metadata</a></li>
-          <li role="presentation" class="active"><a href="{{ url_for('views.dataset_status', source_url_hash=results[0].source_url_hash) }}">ETL status</a></li>
+          <li role="presentation"><a href="{{ url_for('views.edit_dataset', source_url_hash=results[0].source_url_hash) }}"><i class='fa fa-edit'></i> Edit metadata</a></li>
+          <li role="presentation" class="active"><a href="{{ url_for('views.dataset_status', source_url_hash=results[0].source_url_hash) }}"><i class='fa fa-database'></i> ETL status</a></li>
         </ul>
     {% else %}
         <p>This dataset has no ETL status history.</p>

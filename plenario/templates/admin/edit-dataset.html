@@ -10,8 +10,8 @@
 
     {% if meta.approved_status == 'true' %}
         <ul class="nav nav-tabs">
-          <li role="presentation" class="active"><a href="{{ url_for('views.edit_dataset', source_url_hash=meta.source_url_hash) }}">Edit metadata</a></li>
-          <li role="presentation"><a href="{{ url_for('views.dataset_status', source_url_hash=meta.source_url_hash) }}">ETL status</a></li>
+          <li role="presentation" class="active"><a href="{{ url_for('views.edit_dataset', source_url_hash=meta.source_url_hash) }}"><i class='fa fa-edit'></i> Edit metadata</a></li>
+          <li role="presentation"><a href="{{ url_for('views.dataset_status', source_url_hash=meta.source_url_hash) }}"><i class='fa fa-database'></i> ETL status</a></li>
         </ul>
     {% endif %}
     <div class='row'>
@@ -124,7 +124,7 @@
                 <div class="form-group">
                 {% endif %}
                     <label for="id_description">Description</label>
-                    <textarea rows="10" class="form-control" id="id_description" name="description">{{ meta.description }}</textarea>
+                    <textarea rows="5" class="form-control" id="id_description" name="description">{{ meta.description }}</textarea>
                     {% if form.description.errors %}
                         {% for error in form.description.errors %}
                             <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
