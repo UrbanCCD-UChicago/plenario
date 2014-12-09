@@ -2,7 +2,7 @@ import os
 from sqlalchemy import Column, Integer, String, Boolean, Table, Date, DateTime, \
     Float, Numeric, Text, TypeDecorator, BigInteger
 from sqlalchemy.dialects.postgresql import TIMESTAMP, DOUBLE_PRECISION, TIME,\
-    DATE
+    DATE, ARRAY
 from geoalchemy2 import Geometry
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref, deferred, synonym
@@ -41,7 +41,8 @@ class MetaTable(Base):
     contributor_email = Column(String)
     contributed_data_types = Column(Text) # Temporarily store user-submitted data types for later approval
     is_socrata_source = Column(Boolean, default=False)
-    
+    result_ids = Column(ARRAY(String))
+
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
 

@@ -17,11 +17,12 @@ import json
 import re
 from cStringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader
-from sqlalchemy import Table
+from sqlalchemy import Table, select, func, text, and_
 from plenario.settings import CACHE_CONFIG
 import string
 import sqlalchemy
 from hashlib import md5
+import traceback
 
 views = Blueprint('views', __name__)
 
@@ -286,9 +287,74 @@ def add_dataset():
 @views.route('/admin/view-datasets')
 @login_required
 def view_datasets():
-    datasets_pending = session.query(MetaTable).filter(MetaTable.approved_status != 'true').all()
-    datasets = session.query(MetaTable).filter(MetaTable.approved_status == 'true').all()
+    datasets_pending = session.query(MetaTable)\
+        .filter(MetaTable.approved_status != 'true')\
+        .all()
+    try:
+        celery_table = Table('celery_taskmeta', Base.metadata, 
+                             autoload=True, autoload_with=engine)
+        q = text(''' 
+            SELECT m.*, c.status, c.task_id
+            FROM meta_master AS m 
+            LEFT JOIN celery_taskmeta AS c 
+              ON c.id = (
+                SELECT id FROM celery_taskmeta 
+                WHERE task_id = ANY(m.result_ids) 
+                ORDER BY date_done DESC 
+                LIMIT 1
+              )
+            WHERE m.approved_status = 'true'
+        ''')
+        datasets = []
+        with engine.begin() as c:
+            datasets = list(c.execute(q))
+    except NoSuchTableError, e:
+        datasets = session.query(MetaTable)\
+        .filter(MetaTable.approved_status == 'true')\
+        .all()
     return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets)
+
+@views.route('/admin/dataset-status/<source_url_hash>')
+@login_required
+def dataset_status(source_url_hash):
+    celery_table = Table('celery_taskmeta', Base.metadata, 
+                         autoload=True, autoload_with=engine)
+    results = []
+    q = text(''' 
+        SELECT 
+          m.human_name, 
+          m.source_url_hash,
+          c.status, 
+          c.date_done,
+          c.traceback,
+          c.task_id
+        FROM meta_master AS m, 
+        UNNEST(m.result_ids) AS ids 
+        LEFT JOIN celery_taskmeta AS c 
+          ON c.task_id = ids
+        WHERE m.source_url_hash = :source_url_hash
+    ''')
+    with engine.begin() as c:
+        results = list(c.execute(q, source_url_hash=source_url_hash))
+    r = []
+    for result in results:
+        tb = None
+        if result.traceback:
+            tb = result.traceback\
+                .replace('\r\n', '<br />')\
+                .replace('\n\r', '<br />')\
+                .replace('\n', '<br />')\
+                .replace('\r', '<br />')
+        d = {
+            'human_name': result.human_name,
+            'source_url_hash': result.source_url_hash,
+            'status': result.status,
+            'task_id': result.task_id,
+            'traceback': tb,
+            'date_done': result.date_done.strftime('%B %d, %Y %H:%M'),
+        }
+        r.append(d)
+    return render_template('admin/dataset-status.html', results=r)
 
 class EditDatasetForm(Form):
     """ 
@@ -348,19 +414,46 @@ def edit_dataset(source_url_hash):
     meta = session.query(MetaTable).get(source_url_hash)
 
     fieldnames = None
+    num_rows = 0
+    num_weather_observations = 0
+    num_rows_w_censusblocks = 0
+    
     if (meta.approved_status == 'true'):
         try:
-            table = Table('dat_%s' % meta.dataset_name, Base.metadata,
+            table_name = 'dat_%s' % meta.dataset_name
+            
+            table = Table(table_name, Base.metadata,
                           autoload=True, autoload_with=engine)
             fieldnames = table.columns.keys()
+            pk_name  =[p.name for p in table.primary_key][0]
+            pk = table.c[pk_name]
+            num_rows = session.query(pk).count()
+
+            dat_master = Table('dat_master', Base.metadata, autoload=True, autoload_with=engine)
+
+            sel = session.query(func.count(dat_master.c.master_row_id)).filter(and_(dat_master.c.dataset_name==meta.dataset_name,
+                                                                                    dat_master.c.dataset_row_id==pk,
+                                                                                    dat_master.c.weather_observation_id.isnot(None)))
+
+            num_weather_observations = sel.first()[0]
+
+            sel = session.query(func.count(dat_master.c.master_row_id)).filter(and_(dat_master.c.dataset_name==meta.dataset_name,
+                                                                                    dat_master.c.dataset_row_id==pk,
+                                                                                    dat_master.c.census_block.isnot(None)))
+
+            num_rows_w_censusblocks = sel.first()[0]
+
+            
         except sqlalchemy.exc.NoSuchTableError, e:
             # dataset has been approved, but perhaps still processing.
             pass
 
     if (not fieldnames):
+        # This is the case when the csv dataset was not from Socrata
         fieldnames = []
         if meta.contributed_data_types:
             fieldnames = [f['field_name'] for f in json.loads(meta.contributed_data_types)]
+
     if form.validate_on_submit():
         upd = {
             'human_name': form.human_name.data,
@@ -386,10 +479,14 @@ def edit_dataset(source_url_hash):
         return redirect(url_for('views.view_datasets'))
     else:
         pass
+
     context = {
         'form': form,
         'meta': meta,
         'fieldnames': fieldnames,
+        'num_rows': num_rows,
+        'num_weather_observations': num_weather_observations,
+        'num_rows_w_censusblocks': num_rows_w_censusblocks
     }
     return render_template('admin/edit-dataset.html', **context)
 
