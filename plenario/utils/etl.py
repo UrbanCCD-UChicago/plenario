@@ -15,7 +15,8 @@ from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
     Integer, Table, text, func, select, or_, and_, cast, UniqueConstraint, \
     join, outerjoin, over, BigInteger, MetaData
 from sqlalchemy.dialects.postgresql import TIMESTAMP, ARRAY, TIME
-from sqlalchemy.exc import NoSuchTableError, InternalError
+from sqlalchemy.exc import NoSuchTableError, InternalError, \
+    IntegrityError, DataError
 from types import NoneType
 import plenario.settings
 from geoalchemy2.shape import from_shape
@@ -303,7 +304,6 @@ class PlenarioETL(object):
         else:
             copy_st += "FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
         conn = engine.raw_connection()
-        cursor = conn.cursor()
         s = StringIO()
         if (self.s3_key):
             self.s3_key.get_contents_to_file(s)
@@ -313,28 +313,33 @@ class PlenarioETL(object):
         s.seek(0)
         with gzip.GzipFile(fileobj=s, mode='rb') as f:
             try:
+                cursor = conn.cursor()
                 cursor.copy_expert(copy_st, f)
+                cursor.close()
                 conn.commit()
-            except DataError, e:
-                conn.rollback()
-                raise PlenarioETLError('DataError in %s: %s' % \
-                    (self.dataset_name, e.message))
-            except IntegrityError, e:
-                conn.rollback()
-                raise PlenarioETLError('IntegrityError in %s: %s' % \
-                    (self.dataset_name, e.message))
-            except InternalError, e:
-                conn.rollback()
-                raise PlenarioETLError('InternalError in %s: %s' % \
-                    (self.dataset_name, e.message))
+            finally:
+                conn.close()
+           #    conn.commit()
+           #except DataError, e:
+           #    conn.rollback()
+           #    raise PlenarioETLError('DataError in %s: %s' % \
+           #        (self.dataset_name, e.message))
+           #except IntegrityError, e:
+           #    conn.rollback()
+           #    raise PlenarioETLError('IntegrityError in %s: %s' % \
+           #        (self.dataset_name, e.message))
+           #except InternalError, e:
+           #    conn.rollback()
+           #    raise PlenarioETLError('InternalError in %s: %s' % \
+           #        (self.dataset_name, e.message))
 
         # Also need to remove rows that have an empty business key
         # There might be a better way to do this...
         del_st = """ 
             DELETE FROM src_%s WHERE %s IS NULL
             """ % (self.dataset_name, slugify(self.business_key))
-        with conn.cursor() as cursor:
-            cursor.execute(del_st)
+        with engine.begin() as conn:
+            conn.execute(del_st)
 
     def _make_new_and_dup_table(self):
         # Step Four
