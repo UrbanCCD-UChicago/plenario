@@ -707,5 +707,10 @@ class PlenarioETL(object):
                                             .first()
             xmin, ymin, xmax, ymax = xmin[0], ymin[0], xmax[0], ymax[0]
         md.bbox = from_shape(box(xmin, ymin, xmax, ymax), srid=4326)
-        session.add(md)
-        session.commit()
+        try:
+            session.add(md)
+            session.commit()
+        except:
+            session.rollback()
+            session.add(md)
+            session.commit()
