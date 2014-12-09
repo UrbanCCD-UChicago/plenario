@@ -7,7 +7,7 @@
 {% block content %}
     <p><a href='{{ url_for('views.view_datasets') }}'>&laquo; view datasets</a></p>
 
-    {% if results|length > 1 %}
+    {% if results|length > 0 %}
         <h1>{{ results[0].human_name }}</h1>
 
         <ul class="nav nav-tabs">
@@ -15,7 +15,7 @@
           <li role="presentation" class="active"><a href="{{ url_for('views.dataset_status', source_url_hash=results[0].source_url_hash) }}">ETL status</a></li>
         </ul>
     {% else %}
-    <p>This dataset has no ETL status history.</p>
+        <p>This dataset has no ETL status history.</p>
     {% endif %}
 
     <table id='datasets-pending-table' class="table table-condensed">
