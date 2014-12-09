@@ -700,13 +700,18 @@ class PlenarioETL(object):
                 cast(func.regexp_matches(loc_col, '\(.*,(.*)\)'), 
                     ARRAY(Float)).label('lon'))\
                 .subquery()
-            xmin, ymin, xmax, ymax = session.query(func.min(subq.c.lat), 
-                                                   func.min(subq.c.lon), 
-                                                   func.max(subq.c.lat), 
-                                                   func.min(subq.c.lon))\
-                                            .first()
-            xmin, ymin, xmax, ymax = xmin[0], ymin[0], xmax[0], ymax[0]
-        md.bbox = from_shape(box(xmin, ymin, xmax, ymax), srid=4326)
+            try:
+                xmin, ymin, xmax, ymax = session.query(func.min(subq.c.lat), 
+                                                      func.min(subq.c.lon), 
+                                                      func.max(subq.c.lat), 
+                                                      func.min(subq.c.lon))\
+                                                .first()
+                xmin, ymin, xmax, ymax = xmin[0], ymin[0], xmax[0], ymax[0]
+            except:
+                session.rollback()
+                xmin, ymin, xmax, ymax = 0, 0, 0, 0
+        bbox = from_shape(box(xmin, ymin, xmax, ymax), srid=4326)
+        print bbox
         try:
             session.add(md)
             session.commit()
