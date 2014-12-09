@@ -312,17 +312,29 @@ class PlenarioETL(object):
                 s.write(f.read())
         s.seek(0)
         with gzip.GzipFile(fileobj=s, mode='rb') as f:
-            cursor.copy_expert(copy_st, f)
-        conn.commit()
+            try:
+                cursor.copy_expert(copy_st, f)
+                conn.commit()
+            except DataError, e:
+                conn.rollback()
+                raise PlenarioETLError('DataError in %s: %s' % \
+                    (self.dataset_name, e.message))
+            except IntegrityError, e:
+                conn.rollback()
+                raise PlenarioETLError('IntegrityError in %s: %s' % \
+                    (self.dataset_name, e.message))
+            except InternalError, e:
+                conn.rollback()
+                raise PlenarioETLError('InternalError in %s: %s' % \
+                    (self.dataset_name, e.message))
 
         # Also need to remove rows that have an empty business key
         # There might be a better way to do this...
         del_st = """ 
             DELETE FROM src_%s WHERE %s IS NULL
             """ % (self.dataset_name, slugify(self.business_key))
-        cursor = conn.cursor()
-        cursor.execute(del_st)
-        conn.commit()
+        with conn.cursor() as cursor:
+            cursor.execute(del_st)
 
     def _make_new_and_dup_table(self):
         # Step Four
@@ -360,12 +372,8 @@ class PlenarioETL(object):
         sel = select(cols, from_obj=self.src_table)
         ins = self.dup_table.insert()\
             .from_select([c for c in self.dup_table.columns], sel)
-        conn = engine.connect()
-        try:
+        with engine.begin() as conn:
             conn.execute(ins)
-        except InternalError, e:
-            raise PlenarioETLError('Database error when finding duplicates in %s: %s' % (self.dataset_name, e))
-        conn.close()
 
     def _insert_new_data(self, added=False):
         # Step Six
@@ -387,17 +395,13 @@ class PlenarioETL(object):
             sel = sel.where(self.dat_table.c['%s_row_id' % self.dataset_name] == None)
         ins = self.new_table.insert()\
             .from_select([c for c in self.new_table.columns], sel)
-        conn = engine.connect()
         try:
-            try:
+            with engine.begin() as conn:
                 conn.execute(ins)
                 return True
-            except InternalError, e:
-                raise PlenarioETLError('Database Error when finding new records in %s: %s' % (self.dataset_name, e))
         except TypeError:
             # There are no new records
             return False
-        conn.close()
 
     def _insert_data_table(self):
         # Step Seven
@@ -420,12 +424,8 @@ class PlenarioETL(object):
                         )
                     ))
             )
-        conn = engine.connect()
-        try:
+        with engine.begin() as conn:
             conn.execute(ins)
-        except InternalError, e:
-            raise PlenarioETLError('Database Error when inserting data into data table for %s: %s' % (self.dataset_name, e))
-        conn.close()
 
     def _update_master(self, added=False):
         # Step Eight: Insert new records into master table
@@ -496,12 +496,8 @@ class PlenarioETL(object):
                         )
                     )
                 )
-        conn = engine.connect()
-        try:
+        with engine.begin() as conn:
             conn.execute(ins)
-        except InternalError, e:
-            raise PlenarioETLError('Database error raised when updating master table from %s: %s' % (self.dataset_name, e))
-        conn.close()
 
     def _add_weather_info(self):
         """ 
@@ -560,12 +556,8 @@ class PlenarioETL(object):
                    date_col_name, weather_table, temp_col,
                    date_col_name, weather_table, temp_col,)
         )
-        conn = engine.connect()
-        try:
+        with engine.begin() as conn:
             conn.execute(upd, dname=self.dataset_name)
-        except InternalError, e:
-            raise PlenarioETLError('Database Error raised when updating weather data for %s: %s' % (self.dataset_name, e))
-        conn.close()
         
     def _add_census_block(self):
         """ 
@@ -587,12 +579,8 @@ class PlenarioETL(object):
                 ) as subq
                 WHERE dat_master.master_row_id = subq.master_id
             """)
-        conn = engine.contextual_connect()
-        try:
+        with engine.begin() as conn:
             conn.execute(upd, dname=self.dataset_name)
-        except InternalError, e:
-            raise PlenarioETLError('Database error raised when adding census blocks for %s: %s' % (self.dataset_name, e))
-        conn.close()
 
     def _update_geotags(self):
         # self._add_weather_info()
@@ -633,15 +621,12 @@ class PlenarioETL(object):
             )
         conn = engine.connect()
         try:
-            try:
+            with engine.begin() as conn:
                 conn.execute(ins)
                 return True
-            except InternalError, e:
-                raise PlenarioETLError('Database error when finding changes in %s: %s' (self.dataset_name, e))
         except TypeError:
             # No changes found
             return False
-        conn.close()
 
     def _update_dat_current_flag(self):
         # Step Nine: Update data table with changed records
@@ -654,12 +639,8 @@ class PlenarioETL(object):
             .values(current_flag=False, end_date=datetime.now().strftime('%Y-%m-%d'))\
             .where(pk == self.chg_table.c.id)\
             .where(self.dat_table.c.current_flag == True)
-        conn = engine.connect()
-        try:
+        with engine.begin() as conn:
             conn.execute(update)
-        except InternalError, e:
-            raise PlenarioETLError('Database error when updating current flag for %s' % (self.dataset_name, e))
-        conn.close()
         return None
 
     def _update_master_current_flag(self):
@@ -674,12 +655,8 @@ class PlenarioETL(object):
             .where(mt.c.dataset_row_id == getattr(self.dat_table.c, '%s_row_id' % self.dataset_name))\
             .where(self.dat_table.c.current_flag == False)\
             .where(self.dat_table.c.end_date == datetime.now().strftime('%Y-%m-%d'))
-        conn = engine.connect()
-        try:
+        with engine.begin() as conn:
             conn.execute(update)
-        except InternalError, e:
-            raise PlenarioETLError('Database error when updating master current flag for %s: %s' (self.dataset_name, e))
-        conn.close()
         return None
 
     def _update_meta(self, added=False):
