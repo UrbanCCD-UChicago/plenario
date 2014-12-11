@@ -40,7 +40,11 @@
                         {% endif %}
                     </td>
                     <td>
+                      {% if result.date_done %}
                         {{ result.date_done }}
+                      {% else %}
+                        Pending
+                      {% endif %}
                     </td>
                     <td>
                         {% if result.traceback %}
