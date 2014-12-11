@@ -16,7 +16,7 @@
               <li role="presentation" class="active"><a href="{{ url_for('views.dataset_status', source_url_hash=results[0].source_url_hash) }}"><i class='fa fa-database'></i> ETL status</a></li>
             </ul>
         {% else %}
-            <h1>ETL log</h1>
+            <h1>Global ETL log</h1>
         {% endif %}
     {% else %}
         <p>This dataset has no ETL status history.</p>
@@ -35,7 +35,7 @@
             {% for result in results %}
                 <tr>
                     {% if not request.args.get("source_url_hash") %}
-                        <td>{{result.human_name}}</td>
+                        <td><a href="{{ url_for('views.dataset_status', source_url_hash=result.source_url_hash) }}">{{result.human_name}}</a></td>
                     {% endif %}
                     <td>
                         {% if result.status %}
