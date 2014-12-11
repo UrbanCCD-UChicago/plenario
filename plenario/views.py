@@ -334,6 +334,7 @@ def dataset_status(source_url_hash):
         LEFT JOIN celery_taskmeta AS c 
           ON c.task_id = ids
         WHERE m.source_url_hash = :source_url_hash
+        ORDER BY c.date_done DESC
     ''')
     with engine.begin() as c:
         results = list(c.execute(q, source_url_hash=source_url_hash))

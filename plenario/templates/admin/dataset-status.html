@@ -37,11 +37,13 @@
                                 {% endif %}">
                                 {{ result.status|title }}
                             </span>
+                        {% elif not result.date_done %}
+                            <span class="label label-default">Running</span>
                         {% endif %}
                     </td>
                     <td>
                       {% if result.date_done %}
-                        {{ result.date_done }}
+                        {{ result.date_done[0] }}
                       {% else %}
                         Pending
                       {% endif %}
