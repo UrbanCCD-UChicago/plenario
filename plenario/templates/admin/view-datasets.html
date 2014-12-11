@@ -5,6 +5,26 @@
     <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
 {% endblock %}
 {% block content %}
+    <div class='pull-right'>
+        <table class='table table-bordered'>
+            <thead>
+                <tr>
+                    <td><span class='label label-info'>Need approval</span></td>
+                    <td><span class='label label-success'>Loaded</span></td>
+                    <td><span class='label label-default'>Update pending</span></td>
+                    <td><span class='label label-primary'>ETL error</span></td>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td id='num-approval'></td>
+                    <td id='num-loaded'></td>
+                    <td id='num-running'></td>
+                    <td id='num-error'></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
     <h1>
         View datasets
         <small><a href='/admin/add-dataset'>Add dataset &raquo;</a></small>
@@ -43,7 +63,7 @@
                         <td>{{ dataset.update_freq }}</td>
                         <td>
                             <a href="{{ url_for('views.edit_dataset', source_url_hash=dataset.source_url_hash) }}"
-                                class="btn btn-success btn-sm">
+                                class="btn btn-success btn-sm dataset-approval">
                                 <i class='fa fa-edit'></i> Review
                             </a>
                         </td>
@@ -79,16 +99,20 @@
                     <td>
                         {% if dataset.status %}
                             {% if dataset.status == 'SUCCESS' %}
-                                <a href="{{url_for('views.dataset_status', source_url_hash=dataset.source_url_hash) }}" class='btn btn-success btn-sm'>
+                                <a href="{{url_for('views.dataset_status', source_url_hash=dataset.source_url_hash) }}" class='btn btn-success btn-sm dataset-success'>
                                     <i class='fa fa-check'></i>
                                     {{ dataset.status|title }}
                                 </a>
                             {% else %}
-                                <a href="{{url_for('views.dataset_status', source_url_hash=dataset.source_url_hash) }}" class='btn btn-primary btn-sm'>
+                                <a href="{{url_for('views.dataset_status', source_url_hash=dataset.source_url_hash) }}" class='btn btn-primary btn-sm dataset-error'>
                                     <i class='fa fa-exclamation'></i>
                                     {{ dataset.status|title }}
                                 </a>
                             {% endif %}
+                        {% elif not dataset.date_done %}
+                            <a href="{{url_for('views.dataset_status', source_url_hash=dataset.source_url_hash) }}" class='btn btn-default btn-sm dataset-running'>
+                                    Update pending
+                                </a>
                         {% endif %}
                     </td>
                     <td>
@@ -119,6 +143,11 @@
                 else
                     $(row).html('Update pending');
             });
+
+            $("#num-loaded").html($(".dataset-success").length);
+            $("#num-error").html($(".dataset-error").length);
+            $("#num-approval").html($(".dataset-approval").length);
+            $("#num-running").html($(".dataset-running").length);
 
             $('.update-dataset').on('click', function(e){
                 e.preventDefault()
