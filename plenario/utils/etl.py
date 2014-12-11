@@ -317,7 +317,7 @@ class PlenarioETL(object):
                 cursor.copy_expert(copy_st, f)
                 cursor.close()
                 conn.commit()
-            except, e:
+            except Exception, e:
                 conn.rollback()
                 raise PlenarioETLError(e)
             finally:
