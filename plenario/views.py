@@ -315,13 +315,15 @@ def view_datasets():
         .all()
     return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets)
 
-@views.route('/admin/dataset-status/<source_url_hash>')
+@views.route('/admin/dataset-status/')
 @login_required
-def dataset_status(source_url_hash):
+def dataset_status():
+
+    source_url_hash = request.args.get("source_url_hash")
     celery_table = Table('celery_taskmeta', Base.metadata, 
                          autoload=True, autoload_with=engine)
     results = []
-    q = text(''' 
+    q = ''' 
         SELECT 
           m.human_name, 
           m.source_url_hash,
@@ -333,11 +335,15 @@ def dataset_status(source_url_hash):
         UNNEST(m.result_ids) AS ids 
         LEFT JOIN celery_taskmeta AS c 
           ON c.task_id = ids
-        WHERE m.source_url_hash = :source_url_hash
-        ORDER BY c.date_done DESC
-    ''')
+    '''
+
+    if source_url_hash:
+        q = q + "WHERE m.source_url_hash = :source_url_hash"
+
+    q = q + " ORDER BY c.date_done DESC"
+
     with engine.begin() as c:
-        results = list(c.execute(q, source_url_hash=source_url_hash))
+        results = list(c.execute(text(q), source_url_hash=source_url_hash))
     r = []
     for result in results:
         tb = None
