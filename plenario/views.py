@@ -340,7 +340,7 @@ def dataset_status():
     if source_url_hash:
         q = q + "WHERE m.source_url_hash = :source_url_hash"
 
-    q = q + " ORDER BY c.date_done DESC"
+    q = q + " ORDER BY c.id DESC"
 
     with engine.begin() as c:
         results = list(c.execute(text(q), source_url_hash=source_url_hash))
