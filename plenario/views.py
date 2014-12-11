@@ -352,8 +352,10 @@ def dataset_status(source_url_hash):
             'status': result.status,
             'task_id': result.task_id,
             'traceback': tb,
-            'date_done': result.date_done.strftime('%B %d, %Y %H:%M'),
+            'date_done': None,
         }
+        if result.date_done:
+            d['date_done'] = result.date_done.strftime('%B %d, %Y %H:%M'),
         r.append(d)
     return render_template('admin/dataset-status.html', results=r)
 
