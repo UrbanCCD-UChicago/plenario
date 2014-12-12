@@ -59,7 +59,7 @@ def add_dataset(self, source_url_hash, s3_path=None, data_types=None):
 def frequency_update(frequency):
     # hourly, daily, weekly, monthly, yearly
     md = session.query(MetaTable)\
-        .filter(MetaTable.update_freq == 'frequency').all()
+        .filter(MetaTable.update_freq == frequency).all()
     for m in md:
         update_dataset.delay(m.source_url_hash)
     return '%s update complete' % frequency
