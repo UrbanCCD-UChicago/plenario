@@ -5,19 +5,23 @@ CELERY_RESULT_BACKEND = 'db+postgresql://plenario:@localhost:5432/plenario_dev'
 
 CELERYBEAT_SCHEDULE = {
     'monthly_update': {
-        'task': 'plenario.tasks.monthly_update',
+        'task': 'plenario.tasks.frequency_update',
+        'args': ('monthly',),
         'schedule': crontab(0, 0, 0, day_of_month=1),
     },
     'weekly_update': {
-        'task': 'plenario.tasks.weekly_update',
+        'task': 'plenario.tasks.frequency_update',
+        'args': ('weekly',),
         'schedule': crontab(minute=0, hour=0, day_of_week='sunday'),
     },
     'daily_update': {
-        'task': 'plenario.tasks.daily_update',
+        'task': 'plenario.tasks.frequency_update',
+        'args': ('daily',),
         'schedule': crontab(minute=0, hour=8),
     },
     'hourly_update': {
-        'task': 'plenario.tasks.hourly_update',
+        'task': 'plenario.tasks.frequency_update',
+        'args': ('hourly',),
         'schedule': crontab(minute=0)
     }
 }
