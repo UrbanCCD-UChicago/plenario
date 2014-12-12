@@ -20,7 +20,7 @@
                 <tbody>
                     <tr>
                         <td><strong>Source</strong></td>
-                        <td>{{ meta.source_url }}</td>
+                        <td id="source_url">{{ meta.source_url }}</td>
                     </tr>
                     <tr>
                         <td><strong>Table name</strong></td>
@@ -263,7 +263,7 @@
         {% else %}
             <button type="submit" class="btn btn-success">Save</button>
         {% endif %}
-        <button type="button" data-toggle="modal" data-target="#confirm-modal" class="btn btn-link"><i class='fa fa-times'></i> Delete</button>
+        <button type="button" data-toggle="modal" data-target="#confirm-modal" class="btn btn-link"><i class='fa fa-times'></i> Delete dataset</button>
     </form>
     <div id="confirm-modal" class="modal fade">
       <div class="modal-dialog">
@@ -274,7 +274,8 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-primary" data-dismiss="modal" id="delete" data-hash="{{meta.source_url_hash}}">Yes!</button>
+            <button type="button" class="btn btn-primary" data-dismiss="modal" id="delete" data-hash="{{meta.source_url_hash}}"><i class='fa fa-times'></i> Delete</button>
+            <button type="button" class="btn btn-primary" data-dismiss="modal" id="delete-import" data-hash="{{meta.source_url_hash}}"><i class='fa fa-refresh'></i> Delete and re-import</button>
           </div>
         </div><!-- /.modal-content -->
       </div><!-- /.modal-dialog -->
@@ -286,10 +287,19 @@
             $('#delete').on('click', function(e){
                 var hash = $(this).data('hash');
                 $.getJSON('/admin/delete-dataset/' + hash, {}, function(resp){
-	            // Slight hack: reload the view-datasets page after waiting for a couple seconds.
- 	            setTimeout( function(){
-                        window.location = "/admin/view-datasets/?" +new Date().getTime();
-                    }, 2500 );
+    	            // Slight hack: reload the view-datasets page after waiting for a couple seconds.
+     	            setTimeout( function(){
+                            window.location = "/admin/view-datasets/?" +new Date().getTime();
+                        }, 2500 );
+                })
+            })
+            $('#delete-import').on('click', function(e){
+                var hash = $(this).data('hash');
+                $.getJSON('/admin/delete-dataset/' + hash, {}, function(resp){
+                    // Slight hack: reload the view-datasets page after waiting for a couple seconds.
+                    setTimeout( function(){
+                            window.location = "/admin/add-dataset?dataset_url=" + $("#source_url").html();
+                        }, 2500 );
                 })
             })
         })
