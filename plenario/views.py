@@ -335,10 +335,11 @@ def dataset_status():
         UNNEST(m.result_ids) AS ids 
         LEFT JOIN celery_taskmeta AS c 
           ON c.task_id = ids
+        WHERE c.date_done IS NOT NULL 
     '''
 
     if source_url_hash:
-        q = q + "WHERE m.source_url_hash = :source_url_hash"
+        q = q + "AND m.source_url_hash = :source_url_hash"
 
     q = q + " ORDER BY c.id DESC"
 
