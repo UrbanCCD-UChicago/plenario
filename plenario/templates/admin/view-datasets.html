@@ -37,21 +37,28 @@
                 </tbody>
             </table>
         </div>
-        <div class='col-sm-2'>
+        <div class='col-sm-5'>
             <table class='table table-bordered'>
                 <thead>
                     <tr>
                         <td><i class='fa fa-align-justify'></i> Total rows</td>
+                        <td><i class='fa fa-umbrella'></i> Weather observations</td>
+                        <td><i class='fa fa-square'></i> Census blocks</td>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>{{ '{:,}'.format(master_row_count) }}</td>
+                        <td>{{ '{:,}'.format(counts.master_row_count) }}</td>
+                        <td>
+                            Daily: {{ '{:,}'.format(counts.weather_daily_row_count) }}<br />
+                            Hourly: {{ '{:,}'.format(counts.weather_hourly_row_count) }}
+                        </td>
+                        <td>{{ '{:,}'.format(counts.census_block_row_count) }}</td>
                     </tr>
                 </tbody>
             </table>
         </div>
-        <div class='col-sm-5'>
+        <div class='col-sm-2'>
             <p>
                 <a href='/admin/add-dataset'>Add dataset &raquo;</a><br />
                 <a href='/admin/dataset-status'>Global ETL log &raquo;</a>

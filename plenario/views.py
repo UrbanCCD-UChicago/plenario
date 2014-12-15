@@ -113,6 +113,16 @@ def get_context_for_new_dataset(url):
     #print "get_context_for_new_dataset(): returning ", dataset_info, errors, socrata_source
     return (dataset_info, errors, socrata_source)
 
+def table_row_estimate(table_name):
+    try:
+        q = text(''' 
+            SELECT reltuples::bigint AS estimate FROM pg_class where relname=:table_name;
+        ''')
+        with engine.begin() as c:
+            return list(c.execute(q, table_name=table_name))[0][0]
+    except NoSuchTableError, e:
+        print "Table %s doesn't exist" % table_name 
+
 def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_source, approved_status):
     data_types = []
     business_key = None
@@ -292,8 +302,12 @@ def view_datasets():
         .filter(MetaTable.approved_status != 'true')\
         .all()
 
-    dat_master = Table('dat_master', Base.metadata, autoload=True, autoload_with=engine)
-    master_row_count = session.query(func.count(dat_master.c.master_row_id)).first()[0]
+    counts = {
+        'master_row_count': table_row_estimate('dat_master'),
+        'weather_daily_row_count': table_row_estimate('dat_weather_observations_daily'),
+        'weather_hourly_row_count': table_row_estimate('dat_weather_observations_hourly'),
+        'census_block_row_count': table_row_estimate('census_blocks'),
+    }
 
     try:
         celery_table = Table('celery_taskmeta', Base.metadata, 
@@ -317,7 +331,7 @@ def view_datasets():
         datasets = session.query(MetaTable)\
         .filter(MetaTable.approved_status == 'true')\
         .all()
-    return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets, master_row_count=master_row_count)
+    return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets, counts=counts)
 
 @views.route('/admin/dataset-status/')
 @login_required
