@@ -43,15 +43,15 @@
                 <tbody>
                     <tr>
                         <td><strong><i class='fa fa-align-justify'></i> Rows</strong></td>
-                        <td>{{ '{:,}'.format(num_rows) }}</td>
+                        <td>{{ num_rows | format_number }}</td>
                     </tr>
                     <tr>
                         <td><strong><i class='fa fa-umbrella'></i> Weather observations</strong></td>
-                        <td>{{ '{:,}'.format(num_weather_observations) }}</td>
+                        <td>{{ num_weather_observations | format_number }}</td>
                     </tr>
                     <tr>
                         <td><strong><i class='fa fa-square'></i> Census blocks</strong></td>
-                        <td>{{ '{:,}'.format(num_rows_w_censusblocks) }}</td>
+                        <td>{{ num_rows_w_censusblocks | format_number }}</td>
                     </tr>
                 </tbody>
             </table>

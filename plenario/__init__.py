@@ -60,5 +60,16 @@ def create_app():
     def slugify(s):
         return slug(s)
 
+    @app.template_filter('format_number')
+    def reverse_filter(s):
+        return '{:,}'.format(s)
+
+    @app.template_filter('format_date')
+    def reverse_filter(s):
+        if s:
+            return s.strftime('%Y%m%d')
+        else:
+            return '0'
+
     return app
 

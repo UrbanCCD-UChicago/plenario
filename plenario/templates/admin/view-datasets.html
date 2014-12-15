@@ -48,12 +48,12 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>{{ '{:,}'.format(counts.master_row_count) }}</td>
+                        <td>{{ counts.master_row_count | format_number }}</td>
                         <td>
-                            Daily: {{ '{:,}'.format(counts.weather_daily_row_count) }}<br />
-                            Hourly: {{ '{:,}'.format(counts.weather_hourly_row_count) }}
+                            Daily: {{ counts.weather_daily_row_count | format_number }}<br />
+                            Hourly: {{ counts.weather_hourly_row_count | format_number }}
                         </td>
-                        <td>{{ '{:,}'.format(counts.census_block_row_count) }}</td>
+                        <td>{{ counts.census_block_row_count | format_number }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -120,11 +120,10 @@
         <tbody>
             {% for dataset in datasets %}
                 <tr>
-                    <td>{{ dataset.human_name }}</td>
+                    <td><a href="{{ url_for('views.edit_dataset', source_url_hash=dataset.source_url_hash) }}">{{ dataset.human_name }}</a></td>
                     <td>{{ dataset.attribution }}</td>
                     <td>{{ dataset.update_freq }}</td>
-                    <td class='last-update'>{{ dataset.last_update }}</td>
-                    <!-- <td><button class="btn btn-default btn-sm update-dataset" data-dataset="{{dataset.source_url_hash}}"><i class='fa fa-refresh'></i> Update now</button></td> -->
+                    <td><span datetime='{{ dataset.last_update | format_date }}' class='last-update'>{{ dataset.last_update }}</span></td>
                     <td>
                         {% if dataset.status %}
                             {% if dataset.status == 'SUCCESS' %}
@@ -162,7 +161,8 @@
     </table>
 {% endblock content %}
 {% block extra_javascript %}
-    <script type="text/javascript" charset="utf8" src="//cdn.datatables.net/1.10.2/js/jquery.dataTables.js"></script>
+    <script type="text/javascript" charset="utf8" src="/static/js/jquery.dataTables.js"></script>
+    <script type="text/javascript" charset="utf8" src="/static/js/jquery.dataTables.sorting.js"></script>
     <script type="text/javascript">
         $(document).ready(function(){
             $('.last-update').each(function(i, row){
@@ -208,7 +208,7 @@
                     null,
                     null,
                     null,
-                    null,
+                    { "sType": "datetime" },
                     null,
                     { "bSortable": false }
                 ],
