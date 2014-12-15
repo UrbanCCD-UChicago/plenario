@@ -291,6 +291,10 @@ def view_datasets():
     datasets_pending = session.query(MetaTable)\
         .filter(MetaTable.approved_status != 'true')\
         .all()
+
+    dat_master = Table('dat_master', Base.metadata, autoload=True, autoload_with=engine)
+    master_row_count = session.query(func.count(dat_master.c.master_row_id)).first()[0]
+
     try:
         celery_table = Table('celery_taskmeta', Base.metadata, 
                              autoload=True, autoload_with=engine)
@@ -313,7 +317,7 @@ def view_datasets():
         datasets = session.query(MetaTable)\
         .filter(MetaTable.approved_status == 'true')\
         .all()
-    return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets)
+    return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets, master_row_count=master_row_count)
 
 @views.route('/admin/dataset-status/')
 @login_required

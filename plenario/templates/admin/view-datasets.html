@@ -37,7 +37,21 @@
                 </tbody>
             </table>
         </div>
-        <div class='col-sm-6'>
+        <div class='col-sm-2'>
+            <table class='table table-bordered'>
+                <thead>
+                    <tr>
+                        <td><i class='fa fa-align-justify'></i> Total rows</td>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ '{:,}'.format(master_row_count) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class='col-sm-5'>
             <p>
                 <a href='/admin/add-dataset'>Add dataset &raquo;</a><br />
                 <a href='/admin/dataset-status'>Global ETL log &raquo;</a>
