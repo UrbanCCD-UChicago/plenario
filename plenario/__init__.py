@@ -64,10 +64,10 @@ def create_app():
     def reverse_filter(s):
         return '{:,}'.format(s)
 
-    @app.template_filter('format_date')
+    @app.template_filter('format_date_sort')
     def reverse_filter(s):
         if s:
-            return s.strftime('%Y%m%d')
+            return s.strftime('%Y%m%d%H%M')
         else:
             return '0'
 

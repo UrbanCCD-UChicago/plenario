@@ -123,7 +123,7 @@
                     <td><a href="{{ url_for('views.edit_dataset', source_url_hash=dataset.source_url_hash) }}">{{ dataset.human_name }}</a></td>
                     <td>{{ dataset.attribution }}</td>
                     <td>{{ dataset.update_freq }}</td>
-                    <td><span datetime='{{ dataset.last_update | format_date }}' class='last-update'>{{ dataset.last_update }}</span></td>
+                    <td><span datetime='{{ dataset.last_update | format_date_sort }}' class='last-update'>{{ dataset.last_update }}</span></td>
                     <td>
                         {% if dataset.status %}
                             {% if dataset.status == 'SUCCESS' %}
