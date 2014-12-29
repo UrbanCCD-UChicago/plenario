@@ -10,12 +10,15 @@ from csvkit.unicsv import UnicodeCSVReader, UnicodeCSVWriter, \
     UnicodeCSVDictReader, FieldSizeLimitError
 from dateutil import parser
 from datetime import datetime, date, timedelta
+from dateutil import relativedelta
+import operator
+
 import calendar
 from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.settings import DATA_DIR
 from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float, \
-    VARCHAR, BigInteger, and_, select, text
+    VARCHAR, BigInteger, and_, select, text, distinct, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
 from uuid import uuid4
@@ -98,10 +101,10 @@ class WeatherETL(object):
                 print "INITIALIZE: doing fname", fname
             self._do_etl(fname)
 
-    def initialize_month(self, year, month, no_daily=False, no_hourly=False, weather_stations_list = None, start_line=0, end_line=None):
+    def initialize_month(self, year, month, no_daily=False, no_hourly=False, weather_stations_list = None, banned_weather_stations_list = None, start_line=0, end_line=None):
         self.make_tables()
         fname = self._extract_fname(year,month)
-        self._do_etl(fname, no_daily, no_hourly, weather_stations_list, start_line, end_line)
+        self._do_etl(fname, no_daily, no_hourly, weather_stations_list, banned_weather_stations_list, start_line, end_line)
         
 
     ######################################################################
@@ -109,15 +112,17 @@ class WeatherETL(object):
     #    weather_stations_list: a list of WBAN codes (as strings) in order to only read a subset of station observations
     #    start_line, end_line: optional parameters for testing which will only read a subset of lines from the file
     ######################################################################
-    def _do_etl(self, fname, no_daily=False, no_hourly=False, weather_stations_list=None, start_line=0, end_line=None):
+    def _do_etl(self, fname, no_daily=False, no_hourly=False, weather_stations_list=None, banned_weather_stations_list = None, start_line=0, end_line=None):
         raw_hourly, raw_daily, file_type = self._extract(fname)
         if (not no_daily):
             t_daily = self._transform_daily(raw_daily, file_type, 
-                                            weather_stations_list=weather_stations_list, 
+                                            weather_stations_list=weather_stations_list,
+                                            banned_weather_stations_list=banned_weather_stations_list,
                                             start_line=start_line, end_line=end_line)
         if (not no_hourly):
             t_hourly = self._transform_hourly(raw_hourly, file_type, 
                                               weather_stations_list=weather_stations_list, 
+                                              banned_weather_stations_list=banned_weather_stations_list,
                                               start_line=start_line, end_line=end_line)
         if (not no_daily):
             self._load_daily(t_daily)                          # this actually imports the transformed StringIO csv
@@ -264,7 +269,7 @@ class WeatherETL(object):
     # Transformations of daily data e.g. '200704daily.txt' (from tarfile) or '201101daily.txt' (from zipfile)
     ########################################
     ########################################
-    def _transform_daily(self, raw_weather, file_type,  weather_stations_list = None, start_line=0, end_line=None):
+    def _transform_daily(self, raw_weather, file_type,  weather_stations_list = None, banned_weather_stations_list=None, start_line=0, end_line=None):
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
         header = reader.next()
@@ -410,7 +415,7 @@ class WeatherETL(object):
     # Transformations of hourly data e.g. 200704hourly.txt (from tarfile) or 201101hourly.txt (from zipfile)
     ########################################
     ########################################
-    def _transform_hourly(self, raw_weather, file_type,  weather_stations_list = None, start_line=0, end_line=None):
+    def _transform_hourly(self, raw_weather, file_type,  weather_stations_list = None,  banned_weather_stations_list=None, start_line=0, end_line=None):
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
         header = reader.next()
@@ -459,6 +464,12 @@ class WeatherETL(object):
                     # Only include observations from the specified list of wban_code values
                     if (row_dict['wban_code'] not in weather_stations_list):
                         continue
+                    
+                if (banned_weather_stations_list is not None):
+                    if (row_dict['wban_code'] in banned_weather_stations_list):
+                        continue
+                
+                
              
                 writer.writerow(row_vals)
             except FieldSizeLimitError:
@@ -1024,6 +1035,22 @@ class WeatherETL(object):
         day = min(sourcedate.day, calendar.monthrange(year, month)[1])
         return date(year, month, day)
 
+    def _get_distinct_weather_stations_by_month(self,year, month, daily_or_hourly='daily'):
+        table = Table('dat_weather_observations_%s' % daily_or_hourly, Base.metadata, autoload=True, autoload_with=engine)
+        column = None
+        if (daily_or_hourly == 'daily'):
+            column = table.c.date
+        elif (daily_or_hourly == 'hourly'):
+            column = table.c.datetime
+        
+        dt = datetime(year, month,01)
+        dt_nextmonth = dt + relativedelta.relativedelta(months=1)
+        
+        q = session.query(distinct(table.c.wban_code)).filter(and_(column >= dt,
+                                                                   column < dt_nextmonth))
+        
+        station_list = map(operator.itemgetter(0), q.all())
+        return station_list
 
 class WeatherStationsETL(object):
     """ 
@@ -1133,3 +1160,7 @@ class WeatherStationsETL(object):
             if not station:
                 ins = self.station_table.insert().values(**row)
                 conn.execute(ins)
+
+
+        
+        

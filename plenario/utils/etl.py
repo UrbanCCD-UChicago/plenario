@@ -507,6 +507,11 @@ class PlenarioETL(object):
         with engine.begin() as conn:
             conn.execute(ins)
 
+    def _add_weather_stations(self):
+        date_type = str(getattr(self.dat_table.c, slugify(self.observed_date)).type)
+        #print "_add_weather_info(): date_type is", date_type
+        # XXX TODO: get all the rows in the dataset and calculate a bounding box
+
     def _add_weather_info(self):
         """ 
         This is just adding the weather observation id to the master table right now.
@@ -592,6 +597,7 @@ class PlenarioETL(object):
 
     def _update_geotags(self):
         # self._add_weather_info()
+        # self._add_weather_stations()
         self._add_census_block()
 
     def _find_changes(self):
