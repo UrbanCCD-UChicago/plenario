@@ -230,8 +230,23 @@ class WeatherETL(object):
 
     def _extract(self, fname):
         file_type = 'zipfile'
-        if fname.endswith('tar.gz'):
+
+        if fname.endswith('.zip'):
+            file_type = 'zipfile'
+        elif fname.endswith('tar.gz'):
             file_type = 'tarfile'
+        else:
+            print "file type for ", fname, "not found: quitting"
+            sys.exit(1) # XXXXXX
+
+        # extract the year and month from the QCLCD filename
+        fname_spl = fname.split('.')
+        # look at the 2nd to last string
+        fname_yearmonth = (fname_spl[:-1])[0]
+        yearmonth_str = fname_yearmonth[-6:]
+        year_str = yearmonth_str[0:4]
+        month_str = yearmonth_str[4:6]
+        
         fpath = os.path.join(self.data_dir, fname)
         raw_weather_hourly = StringIO()
         raw_weather_daily = StringIO()
@@ -249,9 +264,10 @@ class WeatherETL(object):
         if file_type == 'tarfile':
             with tarfile.open(fpath, 'r') as tar:
                 for tarinfo in tar:
-                    if tarinfo.name.endswith('hourly.txt'):
+                    if tarinfo.name.endswith('hourly.txt') and (yearmonth_str in tarinfo.name):
                         raw_weather_hourly.write(tar.extractfile(tarinfo).read())
-                    elif tarinfo.name.endswith('daily.txt'):
+                    elif tarinfo.name.endswith('daily.txt') and (yearmonth_str in tarinfo.name): 
+                        # need this 2nd caveat above to handle ridiculous stuff like 200408.tar.gz containing 200512daily.txt for no reason
                         raw_weather_daily.write(tar.extractfile(tarinfo).read())
         else:
             if (self.debug==True):
@@ -272,7 +288,7 @@ class WeatherETL(object):
     def _transform_daily(self, raw_weather, file_type,  weather_stations_list = None, banned_weather_stations_list=None, start_line=0, end_line=None):
         raw_weather.seek(0)
         reader = UnicodeCSVReader(raw_weather)
-        header = reader.next()
+        header = reader.next() # skip header
         header = [x.strip() for x in header]
 
         self.clean_observations_daily = StringIO()
@@ -293,6 +309,7 @@ class WeatherETL(object):
         while True:
             try:
                 row = reader.next()
+
                 self.current_row = row
                 if (row_count % 100 == 0):
                     if (self.debug == True):
@@ -334,9 +351,9 @@ class WeatherETL(object):
     def _parse_zipfile_row_daily(self, row, header, out_header):
         wban_code = row[header.index('WBAN')]
         date = row[header.index('YearMonthDay')] # e.g. 20140801
-        temp_max = self.floatOrNA(row[header.index('Tmax')])
-        temp_min = self.floatOrNA(row[header.index('Tmin')])
-        temp_avg = self.floatOrNA(row[header.index('Tavg')])
+        temp_max = self.getTemp(row[header.index('Tmax')])
+        temp_min = self.getTemp(row[header.index('Tmin')])
+        temp_avg = self.getTemp(row[header.index('Tavg')])
         departure_from_normal = self.floatOrNA(row[header.index('Depart')])
         dewpoint_avg = self.floatOrNA(row[header.index('DewPoint')])
         wetbulb_avg = self.floatOrNA(row[header.index('WetBulb')])
@@ -371,11 +388,14 @@ class WeatherETL(object):
         return vals
 
     def _parse_tarfile_row_daily(self, row, header, out_header):
-        wban_code = row[header.index('Wban Number')]
+        print "_parse_tarfile_row_daily: ", row
+        sys.stdout.flush()
+
+        wban_code = self.getWBAN(row[header.index('Wban Number')])
         date = row[header.index('YearMonthDay')] # e.g. 20140801
-        temp_max = self.floatOrNA(row[header.index('Max Temp')])
-        temp_min = self.floatOrNA(row[header.index('Min Temp')])
-        temp_avg = self.floatOrNA(row[header.index('Avg Temp')])
+        temp_max = self.getTemp(row[header.index('Max Temp')])
+        temp_min = self.getTemp(row[header.index('Min Temp')])
+        temp_avg = self.getTemp(row[header.index('Avg Temp')])
         departure_from_normal = self.floatOrNA(row[header.index('Dep from Normal')])
         dewpoint_avg = self.floatOrNA(row[header.index('Avg Dew Pt')])
         wetbulb_avg = self.floatOrNA(row[header.index('Avg Wet Bulb')])
@@ -751,6 +771,15 @@ class WeatherETL(object):
     def list_to_postgres_array(self, l):
         return "{" +  ', '.join(l) + "}"
 
+    def getWBAN(self,wban):
+        return wban
+    
+    def getTemp(self, temp):
+        if temp[-1] == '*':
+            temp = temp[:-1]
+        return self.floatOrNA(temp)
+        
+    
     def getWind(self, wind_speed, wind_direction):
         wind_cardinal = None
         wind_direction = wind_direction.strip()
@@ -761,8 +790,12 @@ class WeatherETL(object):
             wind_direction =None
             wind_cardinal = None
         else:
+            wind_direction_int = None
             try:
-                wind_direction_int = int(wind_direction)
+                # XXX: NOTE: rounding wind_direction to integer. Sorry.
+                # XXX: Examine this field more carefully to determine what its range is.
+                wind_direction_int = int(round(float(wind_direction)))
+                wind_direction = wind_direction_int
             except ValueError, e:
                 if (self.debug==True):
                     if (self.current_row): 
@@ -772,7 +805,7 @@ class WeatherETL(object):
                     self.debug_outfile.flush()
                 return None, None
 
-            wind_cardinal = self.degToCardinal(int(wind_direction))
+            wind_cardinal = self.degToCardinal(wind_direction_int)
         if (wind_speed == 0):
             wind_direction = None
             wind_cardinal = None
