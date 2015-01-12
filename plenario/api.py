@@ -127,18 +127,25 @@ def meta():
         }
     dataset_name = request.args.get('dataset_name')
     if dataset_name:
-        metas = session.query(MetaTable)\
+        # We need to get the bbox separately so we can request it as json
+        metas = session.query(MetaTable, func.ST_AsGeoJSON(MetaTable.bbox))\
                        .filter(MetaTable.dataset_name == dataset_name)
     else:
-        metas = session.query(MetaTable)
+        metas = session.query(MetaTable, func.ST_AsGeoJSON(MetaTable.bbox))
 
     metas=metas.filter(MetaTable.approved_status == 'true')
 
-    for m in metas.all():
+    for (m, m_bbox) in metas.all():
+        print "m_bbox is ", m_bbox ," for source ", m.source_url
         keys = m.as_dict()
+        # If we have bounding box data, add it
+        if (m_bbox is not None):
+            keys['bbox'] = json.loads(m_bbox)
         for e in METATABLE_KEYS_TO_EXCLUDE: del keys[e]
         resp['objects'].append(keys)
 
+
+        
     resp['meta']['total'] = len(resp['objects'])
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'

@@ -5,7 +5,8 @@ import tarfile
 import zipfile
 import re
 from ftplib import FTP
-from cStringIO import StringIO
+#from cStringIO import StringIO
+from StringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader, UnicodeCSVWriter, \
     UnicodeCSVDictReader, FieldSizeLimitError
 from dateutil import parser
@@ -77,8 +78,11 @@ class WeatherETL(object):
         self.data_dir = data_dir
         self.debug_outfile = sys.stdout
         self.debug = debug
+        self.out_header = None
         if (self.debug == True):
-            self.debug_outfile = open(os.path.join(self.data_dir, 'weather_etl_debug_out.txt'), 'w+')
+            self.debug_filename = os.path.join(self.data_dir, 'weather_etl_debug_out.txt')
+            print "writing out debug_file ", self.debug_filename
+            self.debug_outfile = open(self.debug_filename, 'w+')
 
     # WeatherETL.initialize_last(): for debugging purposes, only initialize the most recent month of weather data.
     def initialize_last(self, start_line=0, end_line=None):
@@ -113,7 +117,12 @@ class WeatherETL(object):
     #    start_line, end_line: optional parameters for testing which will only read a subset of lines from the file
     ######################################################################
     def _do_etl(self, fname, no_daily=False, no_hourly=False, weather_stations_list=None, banned_weather_stations_list = None, start_line=0, end_line=None):
+
         raw_hourly, raw_daily, file_type = self._extract(fname)
+
+        if (self.debug):
+            self.debug_outfile.write("Extracting: %s\n" % fname)
+        
         if (not no_daily):
             t_daily = self._transform_daily(raw_daily, file_type, 
                                             weather_stations_list=weather_stations_list,
@@ -237,7 +246,7 @@ class WeatherETL(object):
             file_type = 'tarfile'
         else:
             print "file type for ", fname, "not found: quitting"
-            sys.exit(1) # XXXXXX
+            return None
 
         # extract the year and month from the QCLCD filename
         fname_spl = fname.split('.')
@@ -287,29 +296,40 @@ class WeatherETL(object):
     ########################################
     def _transform_daily(self, raw_weather, file_type,  weather_stations_list = None, banned_weather_stations_list=None, start_line=0, end_line=None):
         raw_weather.seek(0)
-        reader = UnicodeCSVReader(raw_weather)
-        header = reader.next() # skip header
+        # NOTE: not using UnicodeCSVReader because it.. (ironically) won't let us bail on a unicode error [mcc]
+        #reader = UnicodeCSVReader(raw_weather)
+        #header = reader.next() # skip header
+        raw_header= raw_weather.readline() # skip header
+        raw_header.strip()
+        header = raw_header.split(',')
         header = [x.strip() for x in header]
+        print "header is ", header
 
         self.clean_observations_daily = StringIO()
         writer = UnicodeCSVWriter(self.clean_observations_daily)
-        out_header = ["wban_code","date","temp_max","temp_min",
-                      "temp_avg","departure_from_normal",
-                      "dewpoint_avg", "wetbulb_avg","weather_types",
-                      "snowice_depth", "snowice_waterequiv",
-                      "snowfall","precip_total", "station_pressure",
-                      "sealevel_pressure", 
-                      "resultant_windspeed", "resultant_winddirection", "resultant_winddirection_cardinal",
-                      "avg_windspeed",
-                      "max5_windspeed", "max5_winddirection","max5_winddirection_cardinal",
-                      "max2_windspeed", "max2_winddirection","max2_winddirection_cardinal"]
-        writer.writerow(out_header)
+        self.out_header = ["wban_code","date","temp_max","temp_min",
+                           "temp_avg","departure_from_normal",
+                           "dewpoint_avg", "wetbulb_avg","weather_types",
+                           "snowice_depth", "snowice_waterequiv",
+                           "snowfall","precip_total", "station_pressure",
+                           "sealevel_pressure", 
+                           "resultant_windspeed", "resultant_winddirection", "resultant_winddirection_cardinal",
+                           "avg_windspeed",
+                           "max5_windspeed", "max5_winddirection","max5_winddirection_cardinal",
+                           "max2_windspeed", "max2_winddirection","max2_winddirection_cardinal"]
+        writer.writerow(self.out_header)
 
         row_count = 0
         while True:
             try:
-                row = reader.next()
-
+                #row = reader.next()
+                # DIY csv parsing for QCLCD to avoid buffering issues in UnicodeCVSReader
+                raw_row = raw_weather.readline()
+                if (raw_row == ''):
+                    break
+                raw_row.strip()
+                row = raw_row.split(',')
+                
                 self.current_row = row
                 if (row_count % 100 == 0):
                     if (self.debug == True):
@@ -323,16 +343,13 @@ class WeatherETL(object):
                     break
              
                 row_count += 1
-                #print len(header)
-                #print len(row)
-                #print zip(header,row)
              
                 if (len(row) == 0):
                     continue
+
+                row_vals = getattr(self, '_parse_%s_row_daily' % file_type)(row, header, self.out_header)
              
-                row_vals = getattr(self, '_parse_%s_row_daily' % file_type)(row, header, out_header)
-             
-                row_dict = dict(zip(out_header, row_vals))
+                row_dict = dict(zip(self.out_header, row_vals))
                 if (weather_stations_list is not None):
                     # Only include observations from the specified list of wban_code values
                     if (row_dict['wban_code'] not in weather_stations_list):
@@ -340,11 +357,21 @@ class WeatherETL(object):
              
                 writer.writerow(row_vals)
             except UnicodeDecodeError:
-                print 'uhhhh %s' % row_count
-                break
+                if (self.debug == True):
+                    self.debug_outfile.write("UnicodeDecodeError caught\n")
+                    self.debug_outfile.write(str(row))
+                    self.debug_outfile.write(str(row_count) + "\n" + str(zip(self.out_header,row)) + "\n")
+                    self.debug_outfile.flush()
+                # Skip this line, it has non-ASCII characters and probably shouldn't.
+                # We may not get this error anymore (ironically) after rolling our own CSV parser
+                #   as opposed to UnicodeCSVReeder
+                pass
+                
+                continue
             except StopIteration:
                 break
-        print 'finished %s rows' % row_count
+
+        self.debug_outfile.write('finished %s rows\n' % row_count)
         return self.clean_observations_daily
 
 
@@ -388,9 +415,6 @@ class WeatherETL(object):
         return vals
 
     def _parse_tarfile_row_daily(self, row, header, out_header):
-        print "_parse_tarfile_row_daily: ", row
-        sys.stdout.flush()
-
         wban_code = self.getWBAN(row[header.index('Wban Number')])
         date = row[header.index('YearMonthDay')] # e.g. 20140801
         temp_max = self.getTemp(row[header.index('Max Temp')])
@@ -437,6 +461,7 @@ class WeatherETL(object):
     ########################################
     def _transform_hourly(self, raw_weather, file_type,  weather_stations_list = None,  banned_weather_stations_list=None, start_line=0, end_line=None):
         raw_weather.seek(0)
+        # XXX mcc: should probably convert this to DIY CSV parsing a la _transform_daily()
         reader = UnicodeCSVReader(raw_weather)
         header = reader.next()
         # strip leading and trailing whitespace from header (e.g. from tarfiles)
@@ -444,14 +469,14 @@ class WeatherETL(object):
 
         self.clean_observations_hourly = StringIO()
         writer = UnicodeCSVWriter(self.clean_observations_hourly)
-        out_header = ["wban_code","datetime","old_station_type","station_type", \
-                      "sky_condition","sky_condition_top","visibility",\
-                      "weather_types","drybulb_fahrenheit","wetbulb_fahrenheit",\
-                      "dewpoint_fahrenheit","relative_humidity",\
-                      "wind_speed","wind_direction","wind_direction_cardinal",\
-                      "station_pressure","sealevel_pressure","report_type",\
-                      "hourly_precip"]
-        writer.writerow(out_header)
+        self.out_header = ["wban_code","datetime","old_station_type","station_type", \
+                           "sky_condition","sky_condition_top","visibility",\
+                           "weather_types","drybulb_fahrenheit","wetbulb_fahrenheit",\
+                           "dewpoint_fahrenheit","relative_humidity",\
+                           "wind_speed","wind_direction","wind_direction_cardinal",\
+                           "station_pressure","sealevel_pressure","report_type",\
+                           "hourly_precip"]
+        writer.writerow(self.out_header)
 
         row_count = 0
         while True:
@@ -475,11 +500,11 @@ class WeatherETL(object):
              
                 # this calls either self._parse_zipfile_row_hourly
                 # or self._parse_tarfile_row_hourly
-                row_vals = getattr(self, '_parse_%s_row_hourly' % file_type)(row, header, out_header)
+                row_vals = getattr(self, '_parse_%s_row_hourly' % file_type)(row, header, self.out_header)
                 if (not row_vals):
                     continue
              
-                row_dict = dict(zip(out_header, row_vals))
+                row_dict = dict(zip(self.out_header, row_vals))
                 if (weather_stations_list is not None):
                     # Only include observations from the specified list of wban_code values
                     if (row_dict['wban_code'] not in weather_stations_list):
@@ -706,7 +731,8 @@ class WeatherETL(object):
                          ('FC','Funnel Cloud'),
                          ('+FC','Tornado Waterspout'),
                          ('SS','Sandstorm'),
-                         ('DS','Duststorm')]
+                         ('DS','Duststorm'),
+                         ('GL','Glaze')]
                 
         (l, precips) = self._do_weather_parse(l, precip_phenoms, multiple =True)
         (l, obscuration) = self._do_weather_parse(l, obscuration_phenoms)
@@ -779,7 +805,6 @@ class WeatherETL(object):
             temp = temp[:-1]
         return self.floatOrNA(temp)
         
-    
     def getWind(self, wind_speed, wind_direction):
         wind_cardinal = None
         wind_direction = wind_direction.strip()
@@ -799,8 +824,10 @@ class WeatherETL(object):
             except ValueError, e:
                 if (self.debug==True):
                     if (self.current_row): 
-                        self.debug_outfile.write("\n")
-                        self.debug_outfile.write(str(self.current_row))
+                        self.debug_outfile.write("\n")                        
+                        zipped_row = zip(self.out_header,self.current_row)
+                        for column in zipped_row:
+                            self.debug_outfile.write(str(column) + "\n")
                     self.debug_outfile.write("\nValueError: [%s], could not convert wind_direction '%s' to int\n" % (e, wind_direction))
                     self.debug_outfile.flush()
                 return None, None
@@ -844,7 +871,9 @@ class WeatherETL(object):
                 if (self.debug==True):
                     if (self.current_row): 
                         self.debug_outfile.write("\n")
-                        self.debug_outfile.write(str(self.current_row))
+                        zipped_row = zip(self.out_header,self.current_row)
+                        for column in zipped_row:
+                            self.debug_outfile.write(str(column)+ "\n")
                     self.debug_outfile.write("\nValueError: [%s], could not convert '%s' to float\n" % (e, val_str))
                     self.debug_outfile.flush()
                 return None
@@ -871,7 +900,9 @@ class WeatherETL(object):
                 if (self.debug==True):
                     if (self.current_row): 
                         self.debug_outfile.write("\n")
-                        self.debug_outfile.write(str(self.current_row))
+                        zipped_row = zip(self.out_header,self.current_row)
+                        for column in zipped_row:
+                            self.debug_outfile.write(str(column) + "\n")
                     self.debug_outfile.write("\nValueError [%s] could not convert '%s' to int\n" % (e, val))
                     self.debug_outfile.flush()
                 return None

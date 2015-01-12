@@ -720,7 +720,7 @@ class PlenarioETL(object):
                 session.rollback()
                 xmin, ymin, xmax, ymax = 0, 0, 0, 0
         bbox = from_shape(box(xmin, ymin, xmax, ymax), srid=4326)
-        print bbox
+        md.bbox = bbox
         try:
             session.add(md)
             session.commit()
