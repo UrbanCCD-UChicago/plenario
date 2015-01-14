@@ -195,7 +195,10 @@ def dataset_fields(dataset_name):
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def weather_stations():
+    #print "weather_stations()"
     raw_query_params = request.args.copy()
+    #print "weather_stations(): raw_query_params=", raw_query_params
+
     stations_table = Table('weather_stations', Base.metadata, 
         autoload=True, autoload_with=engine, extend_existing=True)
     valid_query, query_clauses, resp, status_code = make_query(stations_table,raw_query_params)
@@ -203,6 +206,7 @@ def weather_stations():
         resp['meta']['status'] = 'ok'
         base_query = session.query(stations_table)
         for clause in query_clauses:
+            print "weather_stations(): filtering on clause", clause
             base_query = base_query.filter(clause)
         values = [r for r in base_query.all()]
         fieldnames = [f for f in stations_table.columns.keys()]
@@ -740,6 +744,9 @@ def make_query(table, raw_query_params):
     status_code = 200
     query_clauses = []
     valid_query = True
+
+    #print "make_query(): args_keys = ", args_keys
+    
     if 'offset' in args_keys:
         args_keys.remove('offset')
     if 'limit' in args_keys:
@@ -751,6 +758,7 @@ def make_query(table, raw_query_params):
     for query_param in args_keys:
         try:
             field, operator = query_param.split('__')
+            #print "make_query(): field, operator =", field, operator
         except ValueError:
             field = query_param
             operator = 'eq'
@@ -765,6 +773,7 @@ def make_query(table, raw_query_params):
             query_clauses.append(query)
         elif operator == 'within':
             geo = json.loads(query_value)
+            #print "make_query(): geo is", geo.items()
             if 'features' in geo.keys():
                 val = geo['features'][0]['geometry']
             elif 'geometry' in geo.keys():
@@ -779,6 +788,8 @@ def make_query(table, raw_query_params):
                 val = shape.buffer(y).__geo_interface__
             val['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
             query = column.ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val)))
+            #print "make_query: val=", val
+            #print "make_query(): query = ", query
             query_clauses.append(query)
         elif operator.startswith('time_of_day'):
             if operator.endswith('ge'):
@@ -801,7 +812,8 @@ def make_query(table, raw_query_params):
                 query_value = None
             query = getattr(column, attr)(query_value)
             query_clauses.append(query)
-            
+
+    #print "make_query(): query_clauses=", query_clauses
     return valid_query, query_clauses, resp, status_code
 
 def getSizeInDegrees(meters, latitude):
