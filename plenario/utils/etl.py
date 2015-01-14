@@ -507,6 +507,11 @@ class PlenarioETL(object):
         with engine.begin() as conn:
             conn.execute(ins)
 
+    def _add_weather_stations(self):
+        date_type = str(getattr(self.dat_table.c, slugify(self.observed_date)).type)
+        #print "_add_weather_info(): date_type is", date_type
+        # XXX TODO: get all the rows in the dataset and calculate a bounding box
+
     def _add_weather_info(self):
         """ 
         This is just adding the weather observation id to the master table right now.
@@ -592,6 +597,7 @@ class PlenarioETL(object):
 
     def _update_geotags(self):
         # self._add_weather_info()
+        # self._add_weather_stations()
         self._add_census_block()
 
     def _find_changes(self):
@@ -690,10 +696,10 @@ class PlenarioETL(object):
             lat_col = getattr(self.dat_table.c, slugify(self.latitude))
             lon_col = getattr(self.dat_table.c, slugify(self.longitude))
             xmin, ymin, xmax, ymax = session.query(
-                                         func.min(lat_col),
                                          func.min(lon_col),
-                                         func.max(lat_col),
-                                         func.max(lon_col))\
+                                         func.min(lat_col),
+                                         func.max(lon_col),
+                                         func.max(lat_col))\
                                          .first()
         elif self.location:
             loc_col = getattr(self.dat_table.c, slugify(self.location))
@@ -704,17 +710,17 @@ class PlenarioETL(object):
                     ARRAY(Float)).label('lon'))\
                 .subquery()
             try:
-                xmin, ymin, xmax, ymax = session.query(func.min(subq.c.lat), 
-                                                      func.min(subq.c.lon), 
-                                                      func.max(subq.c.lat), 
-                                                      func.min(subq.c.lon))\
+                xmin, ymin, xmax, ymax = session.query(func.min(subq.c.lon), 
+                                                       func.min(subq.c.lat), 
+                                                       func.max(subq.c.lon), 
+                                                       func.max(subq.c.lat))\
                                                 .first()
                 xmin, ymin, xmax, ymax = xmin[0], ymin[0], xmax[0], ymax[0]
             except:
                 session.rollback()
                 xmin, ymin, xmax, ymax = 0, 0, 0, 0
         bbox = from_shape(box(xmin, ymin, xmax, ymax), srid=4326)
-        print bbox
+        md.bbox = bbox
         try:
             session.add(md)
             session.commit()
