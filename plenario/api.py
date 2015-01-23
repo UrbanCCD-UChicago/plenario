@@ -11,7 +11,7 @@ from datetime_truncate import truncate
 import time
 import json
 import string
-from sqlalchemy import func, distinct, Column, Float, Table
+from sqlalchemy import func, distinct, Column, Float, Table, text
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.types import NullType
 from sqlalchemy.sql.expression import cast
@@ -38,9 +38,7 @@ RESPONSE_LIMIT = 1000
 CACHE_TIMEOUT = 60*60*6
 VALID_DATA_TYPE = ['csv', 'json']
 VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
-METATABLE_KEYS_TO_EXCLUDE = [   'contributor_name', 'contributor_organization', 
-                                'contributor_email', 'contributed_data_types', 
-                                'is_socrata_source', 'approved_status']
+
 WEATHER_COL_LOOKUP = {
     'daily': {
         'temp_lo': 'temp_min',
@@ -126,25 +124,42 @@ def meta():
             'objects': []
         }
     dataset_name = request.args.get('dataset_name')
+
+    q = ''' 
+        SELECT  m.obs_from, m.location, m.latitude, m.last_update, 
+                m.source_url_hash, m.attribution, m.description, m.source_url, 
+                m.obs_to, m.date_added, m.business_key, m.result_ids, 
+                m.longitude, m.observed_date, m.human_name, m.dataset_name, 
+                m.update_freq, ST_AsGeoJSON(m.bbox) as bbox, 
+                c.status, c.task_id
+        FROM meta_master AS m 
+        LEFT JOIN celery_taskmeta AS c 
+          ON c.id = (
+            SELECT id FROM celery_taskmeta 
+            WHERE task_id = ANY(m.result_ids) 
+            ORDER BY date_done DESC 
+            LIMIT 1
+          )
+        WHERE m.approved_status = 'true'
+        AND c.status = 'SUCCESS'
+    '''
+
     if dataset_name:
         # We need to get the bbox separately so we can request it as json
-        metas = session.query(MetaTable, func.ST_AsGeoJSON(MetaTable.bbox))\
-                       .filter(MetaTable.dataset_name == dataset_name)
+        q = text('{0} AND m.dataset_name=:dataset_name'.format(q))
+
+        with engine.begin() as c:
+            metas = list(c.execute(q, dataset_name=dataset_name))
     else:
-        metas = session.query(MetaTable, func.ST_AsGeoJSON(MetaTable.bbox))
+        with engine.begin() as c:
+            metas = list(c.execute(q))
 
-    metas=metas.filter(MetaTable.approved_status == 'true')
-
-    for (m, m_bbox) in metas.all():
-        print "m_bbox is ", m_bbox ," for source ", m.source_url
-        keys = m.as_dict()
-        # If we have bounding box data, add it
-        if (m_bbox is not None):
-            keys['bbox'] = json.loads(m_bbox)
-        for e in METATABLE_KEYS_TO_EXCLUDE: del keys[e]
+    for m in metas:
+        keys = dict(zip(m.keys(), m.values()))
+        # # If we have bounding box data, add it
+        if (m['bbox'] is not None):
+            keys['bbox'] = json.loads(m.bbox)
         resp['objects'].append(keys)
-
-
         
     resp['meta']['total'] = len(resp['objects'])
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
