@@ -12,6 +12,7 @@
         <ul class="nav nav-tabs">
           <li role="presentation" class="active"><a href="{{ url_for('views.edit_dataset', source_url_hash=meta.source_url_hash) }}"><i class='fa fa-edit'></i> Edit metadata</a></li>
           <li role="presentation"><a href="{{ url_for('views.dataset_status', source_url_hash=meta.source_url_hash) }}"><i class='fa fa-database'></i> ETL status</a></li>
+          <li role="presentation"><a href="/explore#detail/dataset_name={{meta.dataset_name}}" target='_blank'><i class='fa fa-globe'></i> Public view (Explore)</a></li>
         </ul>
     {% endif %}
     <div class='row'>
