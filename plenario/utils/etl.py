@@ -260,7 +260,7 @@ class PlenarioETL(object):
                     col_map = {c['field_name']: c['data_type'] for c in types}
                     for col in header:
                         t = col_map[col]
-                        col_types.append(COL_TYPES[t])
+                        col_types.append((COL_TYPES[t], True)) # always nullable
                 except AttributeError:
                     for col in range(len(header)):
                         col_types.append(iter_column(col, f))
@@ -336,6 +336,37 @@ class PlenarioETL(object):
            #    raise PlenarioETLError('InternalError in %s: %s' % \
            #        (self.dataset_name, e.message))
 
+        # The following code sets lat/lng to NULL when the given coordinate is (0,0) (e.g. off the coast of Africa).
+        # This was a problem for: http://plenario-dev.s3.amazonaws.com/sfpd_incident_all_datetime.csv
+        if self.latitude and self.longitude:        
+            upd_st = """
+                     UPDATE src_%s SET %s = NULL , %s = NULL FROM 
+                     (SELECT %s FROM src_%s WHERE %s=0 and %s =0) AS ids 
+                     WHERE src_%s.%s=ids.%s
+                     """ % (self.dataset_name,
+                            slugify(self.latitude), slugify(self.longitude),
+                            slugify(self.business_key), self.dataset_name, slugify(self.latitude), slugify(self.longitude),
+                            self.dataset_name, slugify(self.business_key),slugify(self.business_key))
+            with engine.begin() as conn:
+                conn.execute(upd_st)
+        elif self.location:
+            #upd_st = """
+            #         UPDATE src_%s SET %s = NULL WHERE 
+            #            FLOAT8((regexp_matches(%s, '\((.*),.*\)'))[1]) = 0 AND
+            #            FLOAT8((regexp_matches(%s, '\(.*,(.*)\)'))[1]) = 0                         
+            #         """ % (self.dataset_name, slugify(self.location), slugify(self.location))
+            upd_st = """
+                     UPDATE src_%s SET %s = NULL 
+                     FROM (SELECT %s FROM src_%s WHERE 
+                             FLOAT8((regexp_matches(%s, '\((.*),.*\)'))[1]) = 0 AND FLOAT8((regexp_matches(%s, '\(.*,(.*)\)'))[1]) = 0)
+                          AS ids
+                     WHERE src_%s.%s = ids.%s
+                     """ % (self.dataset_name, slugify(self.location),
+                            slugify(self.business_key), self.dataset_name,
+                            slugify(self.location), slugify(self.location),
+                            self.dataset_name, slugify(self.business_key), slugify(self.business_key))
+            with engine.begin() as conn:
+                conn.execute(upd_st)
         # Also need to remove rows that have an empty business key
         # There might be a better way to do this...
         del_st = """ 
@@ -343,7 +374,7 @@ class PlenarioETL(object):
             """ % (self.dataset_name, slugify(self.business_key))
         with engine.begin() as conn:
             conn.execute(del_st)
-
+            
     def _make_new_and_dup_table(self):
         # Step Four
         bk_col = self.dat_table.c[slugify(self.business_key)]

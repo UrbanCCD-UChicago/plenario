@@ -81,7 +81,7 @@ class WeatherETL(object):
         self.out_header = None
         if (self.debug == True):
             self.debug_filename = os.path.join(self.data_dir, 'weather_etl_debug_out.txt')
-            print "writing out debug_file ", self.debug_filename
+            sys.stderr.write( "writing out debug_file %s\n" % self.debug_filename)
             self.debug_outfile = open(self.debug_filename, 'w+')
 
     # WeatherETL.initialize_last(): for debugging purposes, only initialize the most recent month of weather data.
