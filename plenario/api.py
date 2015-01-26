@@ -315,6 +315,23 @@ def dataset():
     if raw_query_params.get('data_type'):
         datatype = raw_query_params['data_type']
         del raw_query_params['data_type']
+    q = '''
+        SELECT m.dataset_name
+        FROM meta_master AS m 
+        LEFT JOIN celery_taskmeta AS c 
+          ON c.id = (
+            SELECT id FROM celery_taskmeta 
+            WHERE task_id = ANY(m.result_ids) 
+            ORDER BY date_done DESC 
+            LIMIT 1
+          )
+        WHERE m.approved_status = 'true'
+        AND c.status = 'SUCCESS'
+    '''
+    with engine.begin() as c:
+        dataset_names = [d[0] for d in c.execute(q)]
+    
+    raw_query_params['dataset_name__in'] = ','.join(dataset_names)
 
     mt = MasterTable.__table__
     valid_query, query_clauses, resp, status_code = make_query(mt,raw_query_params)
