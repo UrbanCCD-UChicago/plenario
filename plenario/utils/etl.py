@@ -350,21 +350,20 @@ class PlenarioETL(object):
             with engine.begin() as conn:
                 conn.execute(upd_st)
         elif self.location:
-            #upd_st = """
-            #         UPDATE src_%s SET %s = NULL WHERE 
-            #            FLOAT8((regexp_matches(%s, '\((.*),.*\)'))[1]) = 0 AND
-            #            FLOAT8((regexp_matches(%s, '\(.*,(.*)\)'))[1]) = 0                         
-            #         """ % (self.dataset_name, slugify(self.location), slugify(self.location))
             upd_st = """
-                     UPDATE src_%s SET %s = NULL 
-                     FROM (SELECT %s FROM src_%s WHERE 
-                             FLOAT8((regexp_matches(%s, '\((.*),.*\)'))[1]) = 0 AND FLOAT8((regexp_matches(%s, '\(.*,(.*)\)'))[1]) = 0)
-                          AS ids
-                     WHERE src_%s.%s = ids.%s
-                     """ % (self.dataset_name, slugify(self.location),
-                            slugify(self.business_key), self.dataset_name,
-                            slugify(self.location), slugify(self.location),
-                            self.dataset_name, slugify(self.business_key), slugify(self.business_key))
+                     UPDATE src_%s 
+                     SET %s=NULL FROM                                     
+                     (select %s,                                                                                              FLOAT8((regexp_matches(%s, '\((.*),(.*)\)'))[1]) as l1,
+                     FLOAT8((regexp_matches(%s, '\((.*),(.*)\)'))[2]) as l2 
+                     from  src_%s) as foo 
+                     WHERE foo.l1=0 and foo.l2 = 0 AND src_%s.%s = foo.%s
+                     """ % (self.dataset_name,
+                            slugify(self.location),
+                            slugify(self.business_key),
+                            slugify(self.location),
+                            slugify(self.location),
+                            self.dataset_name,
+                            self.dataset_name,slugify(self.business_key),slugify(self.business_key))
             with engine.begin() as conn:
                 conn.execute(upd_st)
         # Also need to remove rows that have an empty business key
