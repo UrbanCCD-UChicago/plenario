@@ -264,7 +264,7 @@ var DetailView = Backbone.View.extend({
                 header: 'Woops!',
                 body: message,
             }
-            new ErrorView({el: '#errorModal', model: resp});
+            new ErrorView({el: '#errorModal', model: error});
         }
     },
 
