@@ -536,6 +536,7 @@ def detail():
                 values = [r for r in base_query.all()]
                 for value in values:
                     d = {f:getattr(value, f) for f in dataset_fields}
+                    d['location_geom'] = loads(value.location_geom.desc, hex=True).__geo_interface__
                     if include_weather:
                         d = {
                             'observation': {f:getattr(value, f) for f in dataset_fields},
@@ -558,16 +559,12 @@ def detail():
         }
 
         for o in resp['objects']:
-            if o['latitude'] is not None and o['longitude'] is not None:
-                g = {
-                  "type": "Feature",
-                  "geometry": {
-                    "type": "Point",
-                    "coordinates": [o['longitude'], o['latitude']]
-                  },
-                  "properties": {f:getattr(value, f) for f in o}
-                }
-                geojson_resp['features'].append(g)
+            g = {
+              "type": "Feature",
+              "geometry": o['location_geom'],
+              "properties": {f:getattr(value, f) for f in o}
+            }
+            geojson_resp['features'].append(g)
 
         resp = make_response(json.dumps(geojson_resp, default=dthandler), status_code)
         resp.headers['Content-Type'] = 'application/json'
