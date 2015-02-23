@@ -70,9 +70,11 @@
                     <span class="caret"></span>
                 </button>
                 <ul class="dropdown-menu" role="menu">
-                    <li><a class='download-geojson data-download' href="#" target="_blank" ><i class='fa fa-download'></i> Map grid (GeoJSON)</a></li>
+                    <li><a href="<%= points + '&data_type=csv' %>" class="data-download" target="_blank"><i class='fa fa-download'></i> Raw data (CSV, first 1,000 records)</a></li>
+                    <li><a class='data-download' href="<%= points + '&data_type=geojson' %>" target="_blank" ><i class='fa fa-download'></i> Raw data (GeoJSON, first 1,000 records)</a></li>
+                    <li><a class='download-map-grid data-download' href="#" target="_blank" ><i class='fa fa-download'></i> Map grid (GeoJSON, with count aggregate)</a></li>
                     <li><a href="<%= time_series + '&data_type=csv' %>" class="data-download" target="_blank"><i class='fa fa-download'></i> Time series (CSV)</a></li>
-                    <li><a href="<%= points + '&data_type=csv' %>" class="data-download" target="_blank"><i class='fa fa-download'></i> Raw data (CSV)</a></li>
+                    
                 </ul>
             </div>
         </form>

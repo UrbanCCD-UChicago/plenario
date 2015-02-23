@@ -78,7 +78,11 @@ var ResponseView = Backbone.View.extend({
                 } );
             }
         ).fail(function(resp){
-            new ErrorView({el: '#errorModal', model: resp});
+            var error = {
+                header: 'Woops!',
+                body: "Error fetching data.",
+            }
+            new ErrorView({el: '#errorModal', model: error});
         });
     },
     resultsFetcher: function(){

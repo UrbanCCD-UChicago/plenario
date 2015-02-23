@@ -94,7 +94,7 @@ var DetailView = Backbone.View.extend({
         $('#detail-view').hide();
         $('#list-view').hide();
 
-        $('.download-geojson').attr('href','/v1/api/grid/?' + $.param(self.getQuery()))
+        $('.download-map-grid').attr('href','/v1/api/grid/?' + $.param(self.getQuery()))
         $('.date-filter').datepicker({
             dayNamesMin: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
             prevText: '',
@@ -264,7 +264,7 @@ var DetailView = Backbone.View.extend({
                 header: 'Woops!',
                 body: message,
             }
-            new ErrorView({el: '#errorModal', model: resp});
+            new ErrorView({el: '#errorModal', model: error});
         }
     },
 
