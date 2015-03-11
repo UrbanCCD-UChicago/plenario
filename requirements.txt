@@ -19,3 +19,4 @@ pytz
 datetime_truncate
 pyshp
 Flask-Mail
+git+https://github.com/phobson/python-metar.git#egg=metar
