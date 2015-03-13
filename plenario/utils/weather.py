@@ -24,6 +24,15 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
 from uuid import uuid4
 
+from metar.metar import Metar
+
+# from http://stackoverflow.com/questions/7490660/converting-wind-direction-in-angles-to-text-words
+def degToCardinal(num):
+    val=int((num/22.5)+.5)
+    arr=["N","NNE","NE","ENE","E","ESE", "SE", "SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"]
+    return arr[(val % 16)]
+
+
 class WeatherError(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
@@ -832,17 +841,12 @@ class WeatherETL(object):
                     self.debug_outfile.flush()
                 return None, None
 
-            wind_cardinal = self.degToCardinal(wind_direction_int)
+            wind_cardinal = degToCardinal(wind_direction_int)
         if (wind_speed == 0):
             wind_direction = None
             wind_cardinal = None
         return wind_direction, wind_cardinal
 
-    # from http://stackoverflow.com/questions/7490660/converting-wind-direction-in-angles-to-text-words
-    def degToCardinal(self,num):
-        val=int((num/22.5)+.5)
-        arr=["N","NNE","NE","ENE","E","ESE", "SE", "SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"]
-        return arr[(val % 16)]
         
     def getPrecip(self, precip_str):
         precip_total = None
@@ -1116,6 +1120,12 @@ class WeatherETL(object):
         station_list = map(operator.itemgetter(0), q.all())
         return station_list
 
+    def parse_metar(self, metar_str):
+        # using the metar library: https://github.com/phobson/python-metar
+        obs = Metar(metar_str)
+        pass
+
+    
 class WeatherStationsETL(object):
     """ 
     Download, transform and create table with info about weather stations

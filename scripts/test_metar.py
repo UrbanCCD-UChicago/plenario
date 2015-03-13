@@ -9,6 +9,7 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 import sys
 import grequests
+from plenario.utils.weather import degToCardinal
 
 import pdb
 from lxml import etree
@@ -62,27 +63,56 @@ obs = Metar(code)
 #result = foo.execute()
 
 def callSign2Wban(call_sign):
-    sql = "SELECT wban_code FROM weather_stations where call_sign='%s'" % obs.station_id
+    sql = "SELECT wban_code FROM weather_stations where call_sign='%s'" % call_sign
     result = engine.execute(sql)
     print "result=", result
     x = result.first()
     wban = None
     if x:
         wban = x[0]
-        print "wban=", wban
+        #print "wban=", wban
     else:
-        print "could not find call sign ", obs.station_id
+        print "could not find call sign:", call_sign
     return wban
 
-def getCurrentWeather(call_signs, all_stations=False):
+def wban2CallSign(wban_code):
+    sql = "SELECT call_sign FROM weather_stations where wban_code='%s'" % wban_code
+    result = engine.execute(sql)
+    print "result=", result
+    x = result.first()
+    cs = None
+    if x:
+        cs = x[0]
+        #print "wban=", wban
+    else:
+        print "could not find wban:", wban_code
+    return cs
+        
+
+def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False):
     xml_METAR_url = 'https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25'
+    # example of multiple stations: https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25&stationString=KORD,KMDW
 
     if (all_stations == True):
         pass
-    else:
+    elif (call_signs and wban_codes):
+        print "error: define only call_signs or wban_codes and not both"
+    elif (wban_codes):
+        # convert all wban_codes to call_signs
+        call_signs = []
+        for wban_code in wban_codes:
+            call_sign = wban2CallSign(wban_code)
+            if (call_sign):
+                call_signs.append(call_sign)
+
+    if (call_signs):
+        # OK, we have call signs now
         xml_METAR_url += '&stationString='
         xml_METAR_url += ','.join(map(lambda x:x.upper(), call_signs))
-            
+    else:
+        # doing all stations
+        pass
+    
     print "xml_METAR_url:", xml_METAR_url
     req = grequests.get(xml_METAR_url)
     result_list =  grequests.map([req])
@@ -114,12 +144,13 @@ def getWban(obs):
 
 def getSkyCondition(obs):
     skies = obs.sky
-    print "skies=", skies
+    #print "skies=", skies
     sky_list =  []
     height_max = 0
     sky_top = None
     sky_str = None
     for (sky_cond, height, detail) in skies:
+        print "sky_cond, height, detail=",sky_cond, height, detail
         if height:
             height_100s_feet = height.value() / 100.00
         else:
@@ -176,30 +207,81 @@ def getWeatherTypes(obs):
         
     return ret_weather_types
 
+def getTempFahrenheit(obs):
+    if (obs.temp):
+        curr_f = obs.temp.value(units='F')
+    else:
+        curr_f = None
+    return curr_f
+
+def getDewpointFahrenheit(obs):
+    if (obs.dewpt):
+        dp = obs.dewpt.value(units='F')
+    else:
+        dp = None
+    return dp
+    
+def getWind(obs):
+    wind_speed = None
+    wind_direction = None
+    wind_direction_int = None
+    wind_direction_cardinal = None
+
+    if (obs.wind_speed):
+        wind_speed = obs.wind_speed.value(units="MPH")
+    if (obs.wind_dir):
+        wind_direction = obs.wind_dir.value()
+        wind_direction_int = int(round(float(wind_direction)))
+        wind_direction_cardinal = degToCardinal(wind_direction_int)
+    
+    return wind_speed, wind_direction_int, wind_direction_cardinal
+
+def getPressure(obs):
+    pressure_in = None
+    if (obs.press):
+        pressure_in = obs.press.value(units="IN")
+    return pressure_in
+
 def dumpMetar(metar):
-    wban_code = getWban(obs)
-    datetime = obs.time
-    sky_condition, sky_condition_top = getSkyCondition(obs)
+    wban_code = getWban(metar)
+    datetime = metar.time
+    sky_condition, sky_condition_top = getSkyCondition(metar)
     visibility = getVisibility(metar)
     weather_types = getWeatherTypes(metar)
+    f = getTempFahrenheit(metar)
+    dp = getDewpointFahrenheit(metar)
+    wind_speed, wind_direction_int, wind_direction_cardinal = getWind(metar)
+    pressure = getPressure(metar)
+    #XXX
     
     print "wban: ", wban_code
     print "datetime: ", datetime
-    print "sky_condition", sky_condition
-    print "sky_condition_top", sky_condition_top
-    print "weather_types", weather_types
-                
+    print "sky_condition: ", sky_condition
+    print "sky_condition_top: ", sky_condition_top
+    print "weather_types: ", weather_types
+    print "temp: " , f, "F"
+    print "dewpoint: ", dp, "F"
+    print "wind speed:", wind_speed, "MPH", "wind_direction: ", wind_direction_int, "wind_direction_cardinal:", wind_direction_cardinal
+    print "pressure: ", pressure, "IN"
+    
 def dumpRawMetar(raw_metar):
     print "raw_metar=", raw_metar
     obs = Metar(raw_metar)
     dumpMetar(obs)
 
-kord = getCurrentWeather(['KORD'])
-dumpRawMetar(kord[0])
-allw = getCurrentWeather(None,all_stations = True)
+#kord = getCurrentWeather(['KORD'])
+#dumpRawMetar(kord[0])
+allw = getCurrentWeather(None,None,all_stations = True)
+
+# here's a list of Illinois-area wban_codes (from python scripts/get_weather_station_bboxes.py where whitelist_urls=['ce29323c565cbd4a97eb61c73426fb01'] (idol_public_works_prohibited_contractors)
+
+illinois_wbans = [u'14855', u'54808', u'14834', u'04838', u'04876', u'03887', u'04871', u'04873', u'04831', u'04879', u'04996', u'14880', u'04899', u'94892', u'94891', u'04890', u'54831', u'94870', u'04894', u'94854', u'14842', u'93822', u'04807', u'04808', u'54811', u'94822', u'94846', u'04868', u'04845', u'04896', u'04867', u'04866', u'04889', u'14816', u'04862', u'94866', u'04880', u'14819']
+
+#illinois_w = getCurrentWeather(wban_codes=illinois_wbans)
 
 metars = []
 for w in allw:
+#for w in illinois_w:
     print w
     try:
         metar = Metar(w)
@@ -209,6 +291,7 @@ for w in allw:
     #print "metar is", metar
     dumpMetar(metar)
 
+    
 for obs in metars:
     #print obs.weather
     pass
