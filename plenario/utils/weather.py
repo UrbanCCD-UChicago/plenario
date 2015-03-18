@@ -106,7 +106,8 @@ class WeatherETL(object):
         self._update(span='hourly')
         self._cleanup_temp_tables()
 
-    def initialize(self): 
+    def initialize(self):
+        print "WeatherETL.initialize()!"
         self.make_tables()
         fnames = self._extract_fnames()
         for fname in fnames:
@@ -245,6 +246,7 @@ class WeatherETL(object):
     def make_tables(self):
         self._make_daily_table()
         self._make_hourly_table()
+        self._make_metar_table()
 
     def _extract(self, fname):
         file_type = 'zipfile'
@@ -922,6 +924,11 @@ class WeatherETL(object):
         self.hourly_table.append_column(Column('id', BigInteger, primary_key=True))
         self.hourly_table.create(engine, checkfirst=True)
 
+    def _make_metar_table(self):
+        self.metar_table = self._get_metar_table()
+        self.metar_table.append_column(Column('id', BigInteger, primary_key=True))
+        self.metar_table.create(engine, checkfirst=True)
+        
     def _get_daily_table(self, name='dat'):
         return Table('%s_weather_observations_daily' % name, Base.metadata,
                             Column('wban_code', String(5), nullable=False),
@@ -988,6 +995,34 @@ class WeatherETL(object):
                 Column('latitude', Float),
                 keep_existing=True)
 
+    def _get_metar_table(self, name='dat'):
+        return Table('%s_weather_observations_metar' % name, Base.metadata,
+                Column('wban_code', String(5), nullable=False),
+                Column('call_sign', String(5), nullable=False),  
+                Column('datetime', DateTime, nullable=False),
+                Column('sky_condition', String),
+                Column('sky_condition_top', String), # top-level sky condition, e.g.
+                                                        # if 'FEW018 BKN029 OVC100'
+                                                        # we have overcast at 10,000 feet (100 * 100).
+                                                        # BKN017TCU means broken clouds at 1700 feet w/ towering cumulonimbus
+                                                        # BKN017CB means broken clouds at 1700 feet w/ cumulonimbus
+                Column('visibility', Float), #  in Statute Miles
+                Column('weather_types', ARRAY(String)),
+                Column('temp_fahrenheit', Float, index=True), # These can be NULL bc of missing data
+                Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
+                Column('wind_speed', Integer),
+                Column('wind_direction', String(3)), # 000 to 360
+                Column('wind_direction_cardinal', String(3)), # e.g. NNE, NNW
+                Column('wind_gust', Integer),
+                Column('station_pressure', Float),
+                Column('sealevel_pressure', Float),
+                Column('precip_1hr', Float, index=True),
+                Column('precip_3hr', Float, index=True),
+                Column('precip_6hr', Float, index=True),
+                Column('precip_24hr', Float, index=True),
+                keep_existing=True)
+
+    
     def _extract_last_fname(self):
         # XX: tar files are all old and not recent.
         #tar_last = 

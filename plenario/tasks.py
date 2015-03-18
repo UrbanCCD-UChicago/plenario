@@ -81,6 +81,12 @@ def update_dataset(self, source_url_hash, s3_path=None):
     return 'Finished updating {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task
+def update_metar():
+    stations = 'blah'
+    print "hello update_metar()"
+    
+
+@celery_app.task
 def update_weather():
     month, year = datetime.now().month, datetime.now().year
     stations = ['94846', '14855', '04807', '14819', '94866', '04831', '04838']

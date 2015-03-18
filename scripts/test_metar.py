@@ -29,51 +29,30 @@ weather_etl = weather.WeatherETL(debug=True)
 # - Visibility is 2 statute miles
 #code = "METAR KEWR 111851Z VRB03G19KT 2SM R04R/3000VP6000FT TSRA BR FEW015 BKN040CB BKN065 OVC200 22/22 A2987 RMK AO2 PK WND 29028/1817 WSHFT 1812 TSB05RAB22 SLP114 FRQ LTGICCCCG TS OHD AND NW-N-E MOV NE P0013 T02270215"
 code = "METAR KEWR 111851Z VRB03G19KT 2SM R04R/3000VP6000FT TSRA BR FEW015 BKN040CB BKN065 OVC200 22/22 A2987 RMK AO2 PK WND 29028/1817 WSHFT 1812 TSB05RAB22 SLP114 FRQ LTGICCCCG TS OHD AND NW-N-E MOV NE P0013 T02270215"
-
 # using the python-metar library
 obs = Metar(code)
 
-# what we want to get out of this is something like the dat_weather_observations_hourly table:
-#wban_code               | 00102
-#datetime                | 2014-09-01 00:01:00
-#old_station_type        |
-#station_type            | 0
-#sky_condition           | OVC015
-#sky_condition_top       | OVC015
-#visibility              | 10
-#weather_types           | {{-,NULL,NULL,RA,NULL,NULL}}
-#drybulb_fahrenheit      | 46
-#wetbulb_fahrenheit      | 46
-#dewpoint_fahrenheit     | 45
-#relative_humidity       | 96
-#wind_speed              | 8
-#wind_direction          | 200
-#wind_direction_cardinal | SSW
-#station_pressure        | 29.36
-#sealevel_pressure       | 29.65
-#report_type             | AA
-#hourly_precip           |
-#longitude               |
-#latitude                |
-#id                      | 3625751
+def all_callSigns():
+    sql = "SELECT call_sign FROM weather_stations ORDER by call_sign"
+    result=engine.execute(sql)
+    #x = result.first()
+    return [x[0] for x in result.fetchall()]
 
-#ws = weather.WeatherStationsETL()
-#wst=Table('weather_stations', Base.metadata, autoload=True, autoload_with=engine)
-#foo = wst.select(wst.c.call_sign == obs.station_id)
-#result = foo.execute()
 
 def callSign2Wban(call_sign):
     sql = "SELECT wban_code FROM weather_stations where call_sign='%s'" % call_sign
     result = engine.execute(sql)
-    print "result=", result
+    #print "result=", result
     x = result.first()
     wban = None
     if x:
         wban = x[0]
         #print "wban=", wban
+        #print "found call sign:", call_sign, "wban=", wban
+        return wban
     else:
-        print "could not find call sign:", call_sign
-    return wban
+        #print "could not find call sign:", call_sign
+        return None
 
 def wban2CallSign(wban_code):
     sql = "SELECT call_sign FROM weather_stations where wban_code='%s'" % wban_code
@@ -94,7 +73,9 @@ def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False):
     # example of multiple stations: https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25&stationString=KORD,KMDW
 
     if (all_stations == True):
-        pass
+        # We should grab our list from weather_stations and only ask for 100 (1000 is max) at a time. UGHH
+        #print "all_callSigns is ", all_callSigns()
+        print "len(all_callSigns) is ", len(all_callSigns())
     elif (call_signs and wban_codes):
         print "error: define only call_signs or wban_codes and not both"
     elif (wban_codes):
@@ -132,8 +113,20 @@ def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False):
     for m in metars:
         metar_raw = m['raw_text'].text
         metar_raws.append(metar_raw)
-    
+
+    print "completed len(metar_raws)= ", len(metar_raws)
     return metar_raws
+
+def getAllCurrentWeather():
+    all_calls = all_callSigns()
+    all_metars = []
+    for i in range(0, len(all_calls), 1000):
+        calls_range = all_calls[i:(i+1000)]
+        metars = getCurrentWeather(call_signs=calls_range)
+        all_metars.extend(metars)
+
+    print "getAllCurrentWeather(): total metar collection is length", len(all_metars)
+    return all_metars
 
 
 def getWban(obs):
@@ -157,12 +150,16 @@ def getSkyCondition(obs):
             height_100s_feet = None
         sky_str = None
         if detail:
-            sky_str = '%s%03d%s' % (sky_cond, height_100s_feet, detail)
+            try:
+                sky_str = '%s%03d%s' % (sky_cond, height_100s_feet, detail)
+            except TypeError, e:
+                print "parsing error on ", (sky_cond, height, detail), e
         elif height:
             sky_str = '%s%03d' % (sky_cond, height_100s_feet)
         else:
             sky_str = '%s' % sky_cond
-        sky_list.append(sky_str)
+        if sky_str:
+            sky_list.append(sky_str)
         if (height_100s_feet is not None) and (height_100s_feet > height_max):
             sky_top = sky_str
     if not sky_top:
@@ -226,15 +223,18 @@ def getWind(obs):
     wind_direction = None
     wind_direction_int = None
     wind_direction_cardinal = None
-
+    wind_gust = None
+    
     if (obs.wind_speed):
         wind_speed = obs.wind_speed.value(units="MPH")
     if (obs.wind_dir):
         wind_direction = obs.wind_dir.value()
         wind_direction_int = int(round(float(wind_direction)))
         wind_direction_cardinal = degToCardinal(wind_direction_int)
+    if (obs.wind_gust):
+        wind_gust = obs.wind_gust.value()    
     
-    return wind_speed, wind_direction_int, wind_direction_cardinal
+    return wind_speed, wind_direction_int, wind_direction_cardinal, wind_gust
 
 def getPressure(obs):
     pressure_in = None
@@ -242,17 +242,44 @@ def getPressure(obs):
         pressure_in = obs.press.value(units="IN")
     return pressure_in
 
+def getPressureSeaLevel(obs):
+    pressure_in = None
+    if (obs.press_sea_level):
+        pressure_in = obs.press_sea_level.value(units="IN")
+    return pressure_in
+
+def getPrecip(obs):
+    precip_1hr = None
+    precip_3hr = None
+    precip_6hr = None
+    precip_24hr = None
+
+    if (hasattr(obs,'precip_1hr')):
+        precip_1hr = obs.precip_1hr.value()
+    if (hasattr(obs,'precip_3hr')):
+        precip_3hr = obs.precip_3hr.value()
+    if (hasattr(obs,'precip_6hr')):
+        precip_6hr = obs.precip_6hr.value()
+    if (hasattr(obs,'precip_24hr')):
+        precip_24hr = obs.precip_24hr.value()
+
+    return precip_1hr, precip_3hr, precip_6hr, precip_24hr
+        
 def dumpMetar(metar):
     wban_code = getWban(metar)
+    call_sign = metar.station_id
     datetime = metar.time
     sky_condition, sky_condition_top = getSkyCondition(metar)
     visibility = getVisibility(metar)
     weather_types = getWeatherTypes(metar)
     f = getTempFahrenheit(metar)
     dp = getDewpointFahrenheit(metar)
-    wind_speed, wind_direction_int, wind_direction_cardinal = getWind(metar)
-    pressure = getPressure(metar)
-    #XXX
+    wind_speed, wind_direction_int, wind_direction_cardinal, wind_gust = getWind(metar)
+    pressure = getPressure(metar) 
+    pressure_sea_level = getPressureSeaLevel(metar) 
+    # XXX do snow depth ("Usually found in the 06 and 18Z observations.")
+    # (XXX: snow depth not found in current metar parse, but could be wrong.)
+    precip_1hr, precip_3hr, precip_6hr, precip_24hr = getPrecip(weather)
     
     print "wban: ", wban_code
     print "datetime: ", datetime
@@ -263,31 +290,43 @@ def dumpMetar(metar):
     print "dewpoint: ", dp, "F"
     print "wind speed:", wind_speed, "MPH", "wind_direction: ", wind_direction_int, "wind_direction_cardinal:", wind_direction_cardinal
     print "pressure: ", pressure, "IN"
+    print "pressure (sea_level): ", pressure_sea_level, "IN"
+    print "precip (1hr, 3hr, 6hr, 24hr):", precip_1hr, precip_3hr, precip_6hr, precip_24hr
     
 def dumpRawMetar(raw_metar):
     print "raw_metar=", raw_metar
     obs = Metar(raw_metar)
     dumpMetar(obs)
 
-#kord = getCurrentWeather(['KORD'])
-#dumpRawMetar(kord[0])
-allw = getCurrentWeather(None,None,all_stations = True)
+allw = getAllCurrentWeather()
 
 # here's a list of Illinois-area wban_codes (from python scripts/get_weather_station_bboxes.py where whitelist_urls=['ce29323c565cbd4a97eb61c73426fb01'] (idol_public_works_prohibited_contractors)
-
 illinois_wbans = [u'14855', u'54808', u'14834', u'04838', u'04876', u'03887', u'04871', u'04873', u'04831', u'04879', u'04996', u'14880', u'04899', u'94892', u'94891', u'04890', u'54831', u'94870', u'04894', u'94854', u'14842', u'93822', u'04807', u'04808', u'54811', u'94822', u'94846', u'04868', u'04845', u'04896', u'04867', u'04866', u'04889', u'14816', u'04862', u'94866', u'04880', u'14819']
 
 #illinois_w = getCurrentWeather(wban_codes=illinois_wbans)
 
 metars = []
+om = None
+rain_metar = None
+all_metars = []
 for w in allw:
 #for w in illinois_w:
-    print w
     try:
         metar = Metar(w)
     except ParserError, e:
         print "parser error! on error" , e
-    metars.append(metar)
+
+    all_metars.append(metar)
+    wban = getWban(metar)
+    if (wban in illinois_wbans):
+        print w
+        if (wban =='94846'):
+            om = metar # ohare metar
+        if metar.precip_1hr:
+            rain_metar = metar
+        print "got Wban from metar: ", wban
+        
+        metars.append(metar)
     #print "metar is", metar
     dumpMetar(metar)
 
