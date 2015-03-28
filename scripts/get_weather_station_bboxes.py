@@ -162,6 +162,7 @@ if __name__=="__main__":
     ]
 
     #whitelist_urls = ['ce29323c565cbd4a97eb61c73426fb01']
+    #whitelist_urls = ['ce29323c565cbd4a97eb61c73426fb01']
     whitelist_urls = []
     
     bboxes = get_all_bboxes(whitelist_urls, blacklist_urls)
@@ -232,3 +233,9 @@ if __name__=="__main__":
             ws = wban_dict[s]
             print "%s,%s,%s,%f,%f"  % (ws['state'], ws['station_name'], ws['wban_code'], ws['location']['coordinates'][0], ws['location']['coordinates'][1])
         
+    print '"Final list of WBANS:"'
+    wlist = []
+    for ws in wban_dict.values():
+        wlist.append(ws['wban_code'])
+
+    print wlist

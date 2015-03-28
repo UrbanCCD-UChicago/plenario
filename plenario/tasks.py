@@ -82,9 +82,13 @@ def update_dataset(self, source_url_hash, s3_path=None):
 
 @celery_app.task
 def update_metar():
-    stations = 'blah'
-    print "hello update_metar()"
-    
+    print "update_metar()"
+    celery_metar_illinois_area_wbans = [u'14855', u'54808', u'14834', u'04838', u'04876', u'03887', u'04871', u'04873', u'04831', u'04879', u'04996', u'14880', u'04899', u'94892', u'94891', u'04890', u'54831', u'94870', u'04894', u'94854', u'14842', u'93822', u'04807', u'04808', u'54811', u'94822', u'94846', u'04868', u'04845', u'04896', u'04867', u'04866', u'04889', u'14816', u'04862', u'94866', u'04880', u'14819']
+    ohare_mdw= ['94846', '14819']
+    w = WeatherETL()
+    w.metar_initialize_current(weather_stations_list = celery_metar_illinois_area_wbans)
+    #w.metar_initialize_current(weather_stations_list = ohare_mdw)
+    return 'Added current metars'
 
 @celery_app.task
 def update_weather():
