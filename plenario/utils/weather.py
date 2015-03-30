@@ -18,6 +18,7 @@ import calendar
 from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.settings import DATA_DIR
+import sqlalchemy
 from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float, \
     VARCHAR, BigInteger, and_, select, text, distinct, func
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -330,7 +331,11 @@ class WeatherETL(object):
         new_table.append_column(Column('datetime', DateTime))
         new_date_col = new_table.c.datetime
         new_table.drop(engine, checkfirst=True)
-        new_table.create(engine)
+        try:
+            new_table.create(engine)
+        except sql.exc.ProgrammingError:
+            print "got ProgrammingError on new metar table create"
+            return None
 
         ## Essentially, insert into the new observations table for any src observations that are not in the current dat observations.
         #ins = """
@@ -362,6 +367,8 @@ class WeatherETL(object):
             new = True
         except TypeError:
             new = False
+        except sql.exc.ProgrammingError:
+            print "got ProgrammingError on insert to new table"
         if new:
 
             # There were no new records.. soo, insert into the dat observations any records
@@ -1344,7 +1351,15 @@ class WeatherETL(object):
         names = [c.name for c in self.metar_table.columns if c.name not in skip_cols]
         self.src_metar_table = self._get_metar_table(name='src')
         self.src_metar_table.drop(engine, checkfirst=True)
-        self.src_metar_table.create(engine, checkfirst=True)
+
+        try:
+            self.src_metar_table.create(engine, checkfirst=True)
+        except sqlalchemy.exc.ProgrammingError:
+            print "got ProgrammingError on src metar table create"
+            return None
+
+        
+            
         ins_st = "COPY src_weather_observations_metar ("
         for idx, name in enumerate(names):
             if idx < len(names) - 1:
@@ -1400,11 +1415,28 @@ class WeatherETL(object):
         station_list = map(operator.itemgetter(0), q.all())
         return station_list
 
-    #def parse_metar(self, metar_str):
-    #    # using the metar library: https://github.com/phobson/python-metar
-    #    obs = Metar(metar_str)
-    #    pass
-
+    # Given that this was the most recent month, year, call this function,
+    # which will figure out the most recent hourly weather observation and
+    # delete all metars before that datetime.
+    def clear_metars(self, lastYear, lastMonth, weather_stations_list):
+        # build a datetime and then remove all metars after the max datetime
+        date_1st = datetime(year=lastYear, month=lastMonth, day=1)
+        date_1st_str = datetime.strftime(date_1st, "%Y-%m-%d %H:%M:%S")        
+        conn = engine.contextual_connect()
+        for wban in weather_stations_list:
+            sql = "SELECT wban_code, max (datetime) from dat_weather_observations_hourly where wban_code='%s' AND datetime >= '%s' GROUP BY wban_code" % (wban, date_1st_str)
+            # given this time, delete all from dat_weather_observations_metar
+            # 
+            results = conn.execute(sql)
+            res = results.fetchone()
+            print "clear_metars : results are...", res
+            res_dt = res[1]
+            res_dt_str = datetime.strftime(res_dt, "%Y-%m-%d %H:%M:%S")        
+            # given this most recent time, delete any metars from before that time
+            sql2 = "DELETE FROM dat_weather_observations_metar WHERE wban_code='%s' AND datetime < '%s'" % (wban, res_dt_str)
+            print "executing: " , sql2
+            results = conn.execute(sql2)
+            conn.commit()
     
 class WeatherStationsETL(object):
     """ 

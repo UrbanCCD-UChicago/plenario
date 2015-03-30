@@ -8,7 +8,8 @@ from sqlalchemy import Table, select, func, and_, distinct
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 import sys
-import grequests
+#import grequests
+import requests
 
 import pdb
 from lxml import etree
@@ -97,9 +98,11 @@ def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban
         pass
     
     print "xml_METAR_url: '%s'" % xml_METAR_url
-    req = grequests.get(xml_METAR_url)
-    result_list =  grequests.map([req])
-    xml = result_list[0].text
+    #req = grequests.get(xml_METAR_url)
+    #result_list =  grequests.map([req])
+    #xml = result_list[0].text
+    req = requests.get(xml_METAR_url)
+    xml = req.text
 
     xml_u = xml.encode('utf-8')
     
