@@ -226,6 +226,7 @@ def getDewpointFahrenheit(obs):
 def getWind(obs):
     from weather import degToCardinal
     wind_speed = None
+    wind_speed_int = None
     wind_direction = None
     wind_direction_int = None
     wind_direction_cardinal = None
