@@ -81,7 +81,10 @@ def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban
     elif (wban_codes):
         # Convert all wban_codes to call_signs
         if (wban2callsigns):
-            call_signs = [wban2callsigns[wban] for wban in wban_codes]
+            call_signs = []
+            for wban in wban_codes:
+                if wban in wban2callsigns:
+                    call_signs.append(wban2callsigns[wban])
         else:
             call_signs = []
             for wban_code in wban_codes:
