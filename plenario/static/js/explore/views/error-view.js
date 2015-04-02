@@ -3,7 +3,7 @@ var ErrorView = Backbone.View.extend({
         this.render()
     },
     render: function(){
-        this.$el.html(template_cache('modalTemplate', this.model));
+        this.$el.html(template_cache('errorTemplate', this.model));
         this.$el.modal();
         return this;
     }

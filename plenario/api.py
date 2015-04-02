@@ -36,7 +36,7 @@ cache = Cache(config=CACHE_CONFIG)
 API_VERSION = '/v1'
 RESPONSE_LIMIT = 1000
 CACHE_TIMEOUT = 60*60*6
-VALID_DATA_TYPE = ['csv', 'json']
+VALID_DATA_TYPE = ['csv', 'json', 'geojson']
 VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
 
 WEATHER_COL_LOOKUP = {
@@ -536,6 +536,8 @@ def detail():
                 values = [r for r in base_query.all()]
                 for value in values:
                     d = {f:getattr(value, f) for f in dataset_fields}
+                    if value.location_geom is not None:
+                        d['location_geom'] = loads(value.location_geom.desc, hex=True).__geo_interface__
                     if include_weather:
                         d = {
                             'observation': {f:getattr(value, f) for f in dataset_fields},
@@ -549,6 +551,24 @@ def detail():
                 resp['meta']['total'] = len(resp['objects'])
     if datatype == 'json':
         resp = make_response(json.dumps(resp, default=dthandler), status_code)
+        resp.headers['Content-Type'] = 'application/json'
+    
+    elif datatype == 'geojson' and not include_weather:
+        geojson_resp = {
+          "type": "FeatureCollection",
+          "features": []
+        }
+
+        for o in resp['objects']:
+            if o.get('location_geom'):
+                g = {
+                  "type": "Feature",
+                  "geometry": o['location_geom'],
+                  "properties": {f:getattr(value, f) for f in o}
+                }
+                geojson_resp['features'].append(g)
+
+        resp = make_response(json.dumps(geojson_resp, default=dthandler), status_code)
         resp.headers['Content-Type'] = 'application/json'
     elif datatype == 'csv':
         csv_resp = [dataset_fields]

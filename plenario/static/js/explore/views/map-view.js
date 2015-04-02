@@ -115,7 +115,7 @@ var MapView = Backbone.View.extend({
             end = end.endOf('day').format('YYYY/MM/DD');
         } else {
             valid = false;
-            message = 'Your dates are not entered correctly';
+            message = 'Your dates are not entered correctly. Please enter them in the format month/day/year.';
         }
         query['obs_date__le'] = end;
         query['obs_date__ge'] = start;
@@ -123,8 +123,12 @@ var MapView = Backbone.View.extend({
             query['location_geom__within'] = JSON.stringify(this.map.dataLayer);
             this.map.fitBounds(this.map.drawnItems.getBounds());
         }
-        else if (this.attributes.resp.query.location_geom__within) {
+        else if (this.attributes.resp && this.attributes.resp.query.location_geom__within) {
             query['location_geom__within'] = this.attributes.resp.query.location_geom__within
+        }
+        else {
+            valid = false;
+            message = 'You must draw a shape on the map to continue your search.';
         }
         query['agg'] = $('#time-agg-filter').val();
 
@@ -140,7 +144,7 @@ var MapView = Backbone.View.extend({
                 header: 'Woops!',
                 body: message,
             }
-            new ErrorView({el: '#errorModal', model: resp});
+            new ErrorView({el: '#errorModal', model: error});
         }
     }
 });
