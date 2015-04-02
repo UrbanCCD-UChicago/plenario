@@ -18,7 +18,7 @@
 
       <ul>
         <li>All API calls should be made with <code>HTTP GET</code></li>
-        <li>All API responses are in <a href='http://www.json.org/'>JSON format</a> by default. Some responses support <a href='http://en.wikipedia.org/wiki/Comma-separated_values'>CSV format</a>.</li>
+        <li>All API responses are in <a href='http://www.json.org/'>JSON format</a> by default. Some responses support <a href='http://en.wikipedia.org/wiki/Comma-separated_values'>CSV</a> and <a href='http://geojson.org/'>GeoJSON</a> format.</li>
         <li>All methods are accessed via: <code>http://plenar.io/v1/api/SOME-ENDPOINT</code></li>
       </ul>
 
@@ -816,7 +816,7 @@
                   <tr>
                     <td><strong><code>data_type</code></strong></td>
                     <td>json</td>
-                    <td>Response data format. Current options are <code>json</code> and <code>csv</code>. </td>
+                    <td>Response data format. Current options are <code>json</code> <code>csv</code> and <code>geojson</code>.</td>
                   </tr>
                   <tr>
                     <td><strong><code>offset</code></strong></td>
@@ -1361,6 +1361,187 @@
         </div>
       </div>
 
+      <div class="panel-group" id="accordion-api-weather-metar">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <a data-toggle="collapse" data-parent="#accordion-api-weather-metar" href="#collapse-api-weather-metar" id="api-weather-metar">
+              <span class='label label-info'>GET</span>
+              <strong><code>/v1/api/weather/metar/</code></strong>
+              <p class='pull-right'>metar weather observations from NOAA stations</p>
+              <div class='clearfix'></div>
+            </a>
+          </div>
+          <div id="collapse-api-weather-metar" class="panel-collapse collapse">
+            <div class="panel-body">
+              <p>Query METAR weather observations. METARs (Meterological Terminal Air Reports) are a frequently updated (every hour or more) form of surface weather data.
+		<p>METAR data is only stored for recent dates (e.g. the last 2-3 days) for which there is not yet an hourly QCLCD (quality-controlled) observation. If METARs are unavailable for a range of recent dates, check the <a href="http://localhost:5001/api-docs#collapse-api-weather-hourly">hourly weather API.</a>
+
+              <p><strong>Query Parameters</strong></p>
+              <p>All query parameters are optional</p>
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>wban_code</code></strong></td>
+                    <td>The WBAN (Weather Bureau Army Navy) number is the unique identifier for weather stations</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>call_sign</code></strong></td>
+                    <td>Call sign of weather station</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>datetime</code></strong></td>
+                    <td>In SQL datetime form (e.g. '2003-10-05 23:04:00')</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>sky_condition</code></strong></td>
+                    <td>
+                      <p>Up to three strings representing up to three layers of cloud cover. Each string is one of the below abbreviations with (in the case of clouds) a three-digit height following, representing hundreds of feet.</p>
+
+                      <ul>
+                        <li>CLR: Clear below 12,000 feet</li>
+                        <li>FEW: > 0/8 - 2/8 sky cover</li>
+                        <li>SCT (SCATTERED):  3/8 - 4/8 sky cover</li>
+                        <li>BKN (BROKEN): 5/8 - 7/8 sky cover</li>
+                        <li>OVC (OVERCAST): 8/8 sky cover</li>
+                      </ul>
+            		    </td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>sky_condition_top</code></strong></td>
+                    <td>This parameter represents the highest observed sky condition (in hundreds of feet), taken from <code>sky_condition</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>visibility</code></strong></td>
+                    <td>Distance at which objects can be discerned, in statute miles</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>weather_types</code></strong></td>
+                    <td>
+                      <p>A multidimensional PostgreSQL array which contains values from <a href="http://www.ofcm.gov/fmh-1/fmh1.htm">Federal Meterological Handbook No. 1: Surface Weather Observations and Reports</a>, in the following six-tuple: [vicinity, intensity, desc, precip, obscuration, other]</p>
+
+            		      <p>For example, in the event of an observation of a thunderstorm with heavy rain and snow with fog, one might see: <code>[NULL, +, TS, RA, DG, NULL]</code></p>
+
+            		      <p>But if it were also snowing, there would be an additional six-tuple: <code>[NULL, NULL, NULL, SN, NULL, NULL]</code></p>
+            		    </td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>temp_fahrenheit</code></strong></td>
+                    <td>Current temperature at current level of humidity (in Fahrenheit)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>dewpoint_fahrenheit</code></strong></td>
+                    <td>The temperature at which water vapor condenses into water at the same rate at which it evaporates (in Fahrenheit)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>relative_humidity</code></strong></td>
+                    <td>Expressed as a percentage (0 to 100), the ratio of the partial pressure of water vapor to the saturated vapor pressure at the current temperature</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wind_speed</code></strong></td>
+                    <td> Observed wind speed (averaged?) (in miles per hour)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wind_direction</code></strong></td>
+                    <td>Observed wind direction (averaged?) in degrees (0 to 360)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>wind_direction_cardinal</code></strong></td>
+                    <td>Observed wind direction (averaged?) as a human-readable direction, e.g. N, NE, NNE, NNW</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>station_pressure</code></strong></td>
+                    <td>Average pressure in "Hg (inches of Mercury)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>sealevel_pressure</code></strong></td>
+                    <td>Average sea-level pressure in "Hg (inches of Mercury)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>precip_1hr</code></strong></td>
+                    <td>Precipitation total (in inches)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>precip_3hr</code></strong></td>
+                    <td>Precipitation total (in inches)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>precip_6hr</code></strong></td>
+                    <td>Precipitation total (in inches)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>precip_24hr</code></strong></td>
+                    <td>Precipitation total (in inches)</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p><strong>Query operators</strong><br/> For any given parameter above, the query can be modified with any of the following operators:</p>
+
+              <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Operator</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong><code>__gt</code></strong> </td>
+                    <td>greater than (<code>&gt;</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ge</code></strong></td>
+                    <td> greater than or equal to (<code>&gt;=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__lt</code></strong> </td>
+                    <td>less than (<code>&lt;</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__le</code></strong></td>
+                    <td> less than or equal to (<code>&lt;=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ne</code></strong> </td>
+                    <td>not equal (<code>!=</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__like</code></strong> </td>
+                    <td>like value with % wildcards, case sensitive (<code>LIKE 'State%'</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__ilike</code></strong> </td>
+                    <td>like value with % wildcards, case insensitive (<code>ILIKE 'state%'</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><strong><code>__in</code></strong> </td>
+                    <td>within a list of provided values (<code>IN ('list', 'of', 'values')</code>)</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p><strong>Response</strong></p>
+              <p>Metar weather observations and attributes (described above) that match the provided query parameters. Response is limited to 500 results, which can be paginated by using the <code>offset</code> parameter.</p>
+
+              <div class='well examples'>
+                <p><strong>Example</strong></p>
+
+                <p><a href='/v1/api/weather/metar/?wban_code=94846&datetime__ge={{yesterday.strftime('%Y-%m-%d')}}'>http://plenar.io/v1/api/weather/metar/?wban_code=94846&datetime__ge={{yesterday.strftime('%Y-%m-%d')}}</a><br />
+                All metar weather observations at CHICAGO/MIDWAY since September 1st, 2014</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      
       <h2 id='responses'>Response format</h2>
       <p>All JSON API calls return their data in the <code>objects</code> block. Additional information is returned in the <code>meta</code> block:</p>
 

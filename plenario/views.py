@@ -37,7 +37,9 @@ def explore_view():
 
 @views.route('/api-docs')
 def api_docs_view():
-    return render_template('api-docs.html')
+    dt_now = datetime.now()
+    
+    return render_template('api-docs.html', yesterday=dt_now-timedelta(days=1))
 
 @views.route('/about')
 def about_view():
