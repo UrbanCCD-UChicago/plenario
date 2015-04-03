@@ -330,8 +330,8 @@
                     <div class='well examples'>
                       <p><strong>Examples</strong></p>
                       
-                      <p><a href='/v1/api/timeseries/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1'>http://plenar.io/v1/api/timeseries/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2012-1-1</a>
-                      <br />Count of all Chicago crime reports since Jan 1st 2012, aggregated by year</p>
+                      <p><a href='/v1/api/timeseries/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2015-1-1'>http://plenar.io/v1/api/timeseries/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2015-1-1</a>
+                      <br />Count of all Chicago crime reports since Jan 1st 2015, aggregated by year</p>
 
                       <p><a href='/v1/api/timeseries/?obs_date__ge=2007-11-12&obs_date__le=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day'>http://plenar.io/v1/api/timeseries/?obs_date__ge=2007-11-12&obs_date__le=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day</a>
                       <br />Count of crime and environmental complaints that were observed after November 12, 2007 but before November 12, 2008, aggregated by day</p>
@@ -1353,8 +1353,8 @@
               <div class='well examples'>
                 <p><strong>Example</strong></p>
 
-                <p><a href='/v1/api/weather/hourly/?wban_code=14819&datetime__ge=2014-09-01'>http://plenar.io/v1/api/weather/hourly/?wban_code=14819&datetime__ge=2014-09-01</a><br />
-                All hourly weather observations at CHICAGO/MIDWAY since September 1st, 2014</p>
+                <p><a href='/v1/api/weather/hourly/?wban_code=14819&datetime__ge={{yesterday.strftime('%Y-%m-%d')}}'>http://plenar.io/v1/api/weather/hourly/?wban_code=14819&datetime__ge={{yesterday.strftime('%Y-%m-%d')}}</a><br />
+                All hourly weather observations at CHICAGO/MIDWAY since yesterday</p>
               </div>
             </div>
           </div>
@@ -1464,19 +1464,19 @@
                   </tr>
                   <tr>
                     <td><strong><code>precip_1hr</code></strong></td>
-                    <td>Precipitation total (in inches)</td>
+                    <td>Precipitation total in the last 1 hour (in inches)</td>
                   </tr>
                   <tr>
                     <td><strong><code>precip_3hr</code></strong></td>
-                    <td>Precipitation total (in inches)</td>
+                    <td>Precipitation total in the last 3 hours (in inches)</td>
                   </tr>
                   <tr>
                     <td><strong><code>precip_6hr</code></strong></td>
-                    <td>Precipitation total (in inches)</td>
+                    <td>Precipitation total in the last 6 hours (in inches)</td>
                   </tr>
                   <tr>
                     <td><strong><code>precip_24hr</code></strong></td>
-                    <td>Precipitation total (in inches)</td>
+                    <td>Precipitation total in the last 24 hours (in inches)</td>
                   </tr>
                 </tbody>
               </table>
