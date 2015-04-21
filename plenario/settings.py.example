@@ -26,8 +26,8 @@ ADMIN_EMAIL = ''
 
 # For emailing users. ('MAIL_USERNAME' is an email address.)
 MAIL_SERVER = 'smtp.gmail.com'
-MAIL_PORT = 465
-MAIL_USE_SSL = True
+MAIL_PORT = 587
+MAIL_USE_TLS = True
 MAIL_DISPLAY_NAME = 'Plenar.io Team'
 MAIL_USERNAME = ''
 MAIL_PASSWORD = ''
