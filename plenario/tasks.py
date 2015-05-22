@@ -11,7 +11,7 @@ from raven.conf import setup_logging
 from plenario.settings import CELERY_SENTRY_URL
 from sqlalchemy import Table
 from sqlalchemy.exc import NoSuchTableError, InternalError
-from datetime import datetime
+from datetime import datetime, timedelta
 
 if CELERY_SENTRY_URL:
     handler = SentryHandler(CELERY_SENTRY_URL)
@@ -94,7 +94,7 @@ def update_metar():
 def update_weather():
     # This should do the current month AND the previous month, just in case.
 
-    lastMonth_dt = datetime.now() - datetime.timedelta(days=1)
+    lastMonth_dt = datetime.now() - timedelta(days=1)
     lastMonth = lastMonth_dt.month
     lastYear = lastMonth_dt.year
 
