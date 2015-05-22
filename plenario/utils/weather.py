@@ -100,7 +100,7 @@ class WeatherETL(object):
     current_row = None
 
     def __init__(self, data_dir=DATA_DIR, debug=False):
-        self.base_url = 'http://cdo.ncdc.noaa.gov/qclcd_ascii'
+        self.base_url = 'http://www.ncdc.noaa.gov/orders/qclcd'
         self.data_dir = data_dir
         self.debug_outfile = sys.stdout
         self.debug = debug
