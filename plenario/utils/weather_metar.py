@@ -67,7 +67,7 @@ def wban2CallSign(wban_code):
         
 
 def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban2callsigns=None):
-    xml_METAR_url = 'https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25'
+    xml_METAR_url = 'http://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25'
     # Example of multiple stations: https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25&stationString=KORD,KMDW
 
     if (all_stations == True):
