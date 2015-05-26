@@ -404,6 +404,19 @@ class WeatherETL(object):
     # Extract (from filename / URL to some raw StringIO()
     ########################################
     ########################################
+    def _download_write(self, fname):
+        fpath = os.path.join(self.data_dir, fname)
+        url = '%s/%s' % (self.base_url, fname)
+        if (self.debug==True):
+            self.debug_outfile.write("Extracting: %s\n" % url)
+        r = requests.get(url, stream=True)
+        with open(fpath, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=1024):
+                if chunk:
+                    f.write(chunk)
+                    f.flush()
+        f.close() # Explicitly close before re-opening to read.
+
     def _extract(self, fname):
         file_type = 'zipfile'
 
@@ -426,17 +439,14 @@ class WeatherETL(object):
         fpath = os.path.join(self.data_dir, fname)
         raw_weather_hourly = StringIO()
         raw_weather_daily = StringIO()
-        if not os.path.exists(fpath):
-            url = '%s/%s' % (self.base_url, fname)
-            if (self.debug==True):
-                self.debug_outfile.write("Extracting: %s\n" % url)
-            r = requests.get(url, stream=True)
-            with open(fpath, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=1024):
-                    if chunk:
-                        f.write(chunk)
-                        f.flush()
-            f.close() # Explicitly close before re-opening to read.
+        
+        now_month, now_year = str(datetime.now().month), str(datetime.now().year)
+        if '%s%s' % (now_year.zfill(2), now_month.zfill(2)) == yearmonth_str:
+            self._download_write(fname)
+
+        elif not os.path.exists(fpath):
+            self._download_write(fname)
+
         if file_type == 'tarfile':
             with tarfile.open(fpath, 'r') as tar:
                 for tarinfo in tar:
