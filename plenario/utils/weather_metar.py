@@ -19,7 +19,7 @@ from lxml import objectify
 
 # Example METAR URL: 'https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25&stationString=KORD'
 
-current_METAR_url = 'https://aviationweather.gov/adds/dataserver_current/current/'
+current_METAR_url = 'http://aviationweather.gov/adds/dataserver_current/current/'
 
 # An example code:
 # - In this example, we have "few clouds at 1500 feet, broken clouds at 4,000 feet w/ cumulonimbus,
