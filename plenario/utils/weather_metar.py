@@ -296,7 +296,7 @@ def getMetarVals(metar):
     pressure_sea_level = getPressureSeaLevel(metar) 
     # XXX do snow depth ("Usually found in the 06 and 18Z observations.")
     # (XXX: snow depth not found in current metar parse, but could be wrong.)
-    precip_1hr, precip_3hr, precip_6hr, precip_24hr = getPrecip(weather)
+    precip_1hr, precip_3hr, precip_6hr, precip_24hr = getPrecip(metar)
     
     #print "wban: ", wban_code
     #print "datetime: ", datetime
