@@ -267,13 +267,13 @@ def getPrecip(obs):
     precip_6hr = None
     precip_24hr = None
 
-    if (hasattr(obs,'precip_1hr')):
+    if obs.precip_1hr:
         precip_1hr = obs.precip_1hr.value()
-    if (hasattr(obs,'precip_3hr')):
+    if obs.precip_3hr:
         precip_3hr = obs.precip_3hr.value()
-    if (hasattr(obs,'precip_6hr')):
+    if obs.precip_6hr:
         precip_6hr = obs.precip_6hr.value()
-    if (hasattr(obs,'precip_24hr')):
+    if obs.precip_24hr:
         precip_24hr = obs.precip_24hr.value()
 
     return precip_1hr, precip_3hr, precip_6hr, precip_24hr
