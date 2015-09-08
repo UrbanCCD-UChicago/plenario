@@ -27,7 +27,6 @@ from uuid import uuid4
 
 from weather_metar import getMetar, getMetarVals, getAllCurrentWeather, getCurrentWeather
 
-
 # from http://stackoverflow.com/questions/7490660/converting-wind-direction-in-angles-to-text-words
 def degToCardinal(num):
     val=int((num/22.5)+.5)
@@ -876,7 +875,13 @@ class WeatherETL(object):
 
 
     def _parse_row_metar(self, row, header):
-        m = getMetar(row)
+        import metar
+
+        try:
+            m = getMetar(row)
+        except metar.ParserError:
+            return []
+        
         vals = getMetarVals(m)
         #print "_parse_row_metar(): header=", header
         #print "_parse_row_metar(): vals=",vals

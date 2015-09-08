@@ -267,13 +267,13 @@ def getPrecip(obs):
     precip_6hr = None
     precip_24hr = None
 
-    if (hasattr(obs,'precip_1hr')):
+    if obs.precip_1hr:
         precip_1hr = obs.precip_1hr.value()
-    if (hasattr(obs,'precip_3hr')):
+    if obs.precip_3hr:
         precip_3hr = obs.precip_3hr.value()
-    if (hasattr(obs,'precip_6hr')):
+    if obs.precip_6hr:
         precip_6hr = obs.precip_6hr.value()
-    if (hasattr(obs,'precip_24hr')):
+    if obs.precip_24hr:
         precip_24hr = obs.precip_24hr.value()
 
     return precip_1hr, precip_3hr, precip_6hr, precip_24hr
@@ -296,7 +296,7 @@ def getMetarVals(metar):
     pressure_sea_level = getPressureSeaLevel(metar) 
     # XXX do snow depth ("Usually found in the 06 and 18Z observations.")
     # (XXX: snow depth not found in current metar parse, but could be wrong.)
-    precip_1hr, precip_3hr, precip_6hr, precip_24hr = getPrecip(weather)
+    precip_1hr, precip_3hr, precip_6hr, precip_24hr = getPrecip(metar)
     
     #print "wban: ", wban_code
     #print "datetime: ", datetime
