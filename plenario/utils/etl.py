@@ -103,6 +103,7 @@ class PlenarioETL(object):
           'timestamp'
         """
 
+        # Add init parameters to PlenarioETL object
         for k,v in meta.items():
             setattr(self, k, v)
 
@@ -112,8 +113,10 @@ class PlenarioETL(object):
         self.s3_key = None
 
         self.metadata = MetaData()
-        
-        if (AWS_ACCESS_KEY != ''):
+
+        # AWS_ACCESS_KEY as empty string is signal to operate locally.
+        if AWS_ACCESS_KEY != '':
+            # Name of file in S3 bucket will be dataset name appended with current time.
             s3_path = '%s/%s.csv.gz' % (self.dataset_name, 
                                         datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
             try:
@@ -137,24 +140,6 @@ class PlenarioETL(object):
 
         self.fname = '%s.csv.gz' % dataset_name
         self.data_dir = DATA_DIR
-
-    def _get_tables(self, table_name=None, all_tables=False):
-        if all_tables:
-            table_names = ['src', 'dup', 'new', 'dat']
-            for table in table_names:
-                try:
-                    t = Table('%s_%s' % (table, self.dataset_name), self.metadata,
-                        autoload=True, autoload_with=engine, extend_existing=True)
-                    setattr(self, '%s_table' % table, t)
-                except NoSuchTableError:
-                    pass
-        else:
-            try:
-                t = Table('%s_%s' % (table_name, self.dataset_name), self.metadata,
-                    autoload=True, autoload_with=engine, extend_existing=True)
-                setattr(self, '%s_table' % table_name, t)
-            except NoSuchTableError:
-                pass
 
     def add(self, s3_path=None):
         if s3_path and s3_key:
