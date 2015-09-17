@@ -32,6 +32,7 @@ COL_TYPES = {
     'datetime': TIMESTAMP,
 }
 
+
 class PlenarioETLError(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
@@ -58,7 +59,7 @@ class PlenarioETL(object):
         source_url:    This is used to download the raw data.
 
         business_key:  Name of the user identified business key from the
-                       source data.
+                       source data. AKA unique ID.
 
         observed_date: Name of the user identified observed date column 
                        from the source data
@@ -143,6 +144,7 @@ class PlenarioETL(object):
 
     def add(self, s3_path=None):
         if s3_path and s3_key:
+            # It looks like s3_key is unresolved, so this branch should never be taken?
             self.s3_key.key = s3_path
         else:
             self._download_csv()
@@ -181,9 +183,13 @@ class PlenarioETL(object):
         self._cleanup_temp_tables()
 
     def _download_csv(self):
+        """
+        If self.s3_key is set, download CSV to S3 bucket.
+        Else, download to local directory.
+        """
         r = requests.get(self.source_url, stream=True)
  
-        if (self.s3_key):
+        if self.s3_key:
             s = StringIO()
             with gzip.GzipFile(fileobj=s, mode='wb') as f:
                 for chunk in r.iter_content(chunk_size=1024):
@@ -196,13 +202,15 @@ class PlenarioETL(object):
         else:
             # write out a la shapefile_helpers
             self.fpath = os.path.join(self.data_dir, self.fname)
+
+            # If file already exists locally, don't perform copy.
             if not os.path.exists(self.fpath):
                 gz_f = gzip.open(self.fpath, 'wb')
                 for chunk in r.iter_content(chunk_size=1024):
                     if chunk:
                         gz_f.write(chunk)
                         gz_f.flush()
-                gz_f.close() # Explicitly close before re-opening to read.
+                gz_f.close()  # Explicitly close before re-opening to read.
  
     def _cleanup_temp_tables(self):
         self.src_table.drop(bind=engine, checkfirst=True)
@@ -214,19 +222,53 @@ class PlenarioETL(object):
             pass
 
     def _get_or_create_data_table(self):
-        # Step One: Make a table where the data will eventually live
-        try:
+        """
+        Step One: Make a table where the data will eventually live
+
+        True after this function: self.dat_table refers to a (possibly empty)
+        table in the database.
+        """
+
+        try:  # Maybe this table already exists in the database.
             self.dat_table = Table('dat_%s' % self.dataset_name, self.metadata, 
-                autoload=True, autoload_with=engine, extend_existing=True)
-        except NoSuchTableError:
+                                   autoload=True, autoload_with=engine, extend_existing=True)
+
+        except NoSuchTableError:  # Nope, we'll need to create it.
             s = StringIO()
-            if (self.s3_key):
+
+            # If reading from AWS...
+            if self.s3_key:
+                # ...dump the contents into s.
                 self.s3_key.get_contents_to_file(s)
+            # If reading locally...
             else:
-                # XX read the file out of DATA_DIR
+                # ... read the file out of DATA_DIR.
                 with open(self.fpath, 'r') as f:
                     s.write(f.read())
+
+            # Go to start of file.
             s.seek(0)
+
+            # Find out what types of columns we'll need to store the data.
+            with gzip.GzipFile(fileobj=s, mode='rb') as f:
+                reader = UnicodeCSVReader(f)
+                header = map(slugify, reader.next())
+
+                col_types = []  # Will be list of pairs: (column_type, is_nullable)
+
+                try:  # Were data_types specified at init?
+                    types = getattr(self, 'data_types')
+                    col_map = {c['field_name']: c['data_type'] for c in types}
+                    for col in header:
+                        t = col_map[col]
+                        col_types.append((COL_TYPES[t], True))  # always nullable
+
+                except AttributeError:  # Try to infer column types.
+                    for col in range(len(header)):
+                        col_types.append(iter_column(col, f))
+
+            # Create rows that will be used to keep track of the version of the source dataset
+            # that each particular row came from.
             cols = [
                 Column('%s_row_id' % self.dataset_name, Integer, primary_key=True),
                 Column('start_date', TIMESTAMP, server_default=text('CURRENT_TIMESTAMP')),
@@ -234,50 +276,63 @@ class PlenarioETL(object):
                 Column('current_flag', Boolean, server_default=text('TRUE')),
                 Column('dup_ver', Integer)
             ]
-            with gzip.GzipFile(fileobj=s, mode='rb') as f:
-                reader = UnicodeCSVReader(f)
-                header = map(slugify, reader.next())
 
-                col_types = []
-                try:
-                    types = getattr(self, 'data_types')
-                    col_map = {c['field_name']: c['data_type'] for c in types}
-                    for col in header:
-                        t = col_map[col]
-                        col_types.append((COL_TYPES[t], True)) # always nullable
-                except AttributeError:
-                    for col in range(len(header)):
-                        col_types.append(iter_column(col, f))
+            # Generate columns for each column in the source dataset.
             for col_name,d_type in zip(header, col_types):
                 dt, nullable = d_type
                 cols.append(Column(col_name, dt, nullable=nullable))
-            cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver', 
-                    name='%s_ix' % self.dataset_name[:50]))
-            self.dat_table = Table('dat_%s' % self.dataset_name, self.metadata, 
-                          *cols, extend_existing=True)
+
+            # Final column has columns whose values must be unique.
+            # Generated from business_key, dup_ver, and dataset_name.
+            cols.append(UniqueConstraint(slugify(self.business_key), 'dup_ver',
+                                         name='%s_ix' % self.dataset_name[:50]))
+
+            # Assemble data table from the columns...
+            self.dat_table = Table('dat_%s' % self.dataset_name, self.metadata,
+                                   *cols, extend_existing=True)
+            # ... and load it into the database.
             self.dat_table.create(engine, checkfirst=True)
 
     def _make_src_table(self):
-        # Step Two
+        """
+        Step Two
+        Creates a table that is a simple copy of the source data.
+        (That is, it doesn't have the fancy extra columns like start_date that dat_table has)
+
+        True after this function: self.src_table refers to an empty table in the database.
+        """
         cols = []
         skip_cols = ['%s_row_id' % self.dataset_name, 'start_date', 'end_date', 'current_flag', 'dup_ver']
         for col in self.dat_table.columns:
             if col.name not in skip_cols:
+                # Is there a default value that we need to give the coumn?
                 kwargs = {}
                 if col.server_default:
                     kwargs['server_default'] = col.server_default
+                # Add the column as it was in dat_table
                 cols.append(Column(col.name, col.type, **kwargs))
+
+        # Use the source CSV's line numbers as primary key.
         cols.append(Column('line_num', Integer, primary_key=True))
         self.src_table = Table('src_%s' % self.dataset_name, self.metadata,
-                          *cols, extend_existing=True)
+                               *cols, extend_existing=True)
+        # If there is an old version of this raw dataset in the DB, kick it out.
         self.src_table.drop(bind=engine, checkfirst=True)
+        # Add the table to the database.
         self.src_table.create(bind=engine)
 
     def _insert_src_data(self):
-        # Step Three: Insert data directly from CSV
-        cols = []
+        """
+        Step Three: Insert data directly from CSV
+
+        True after this function: self.src_data is populated with the original dataset's values
+        or a PlenarioETLError is triggered that brings the process to a halt.
+        """
+
         skip_cols = ['line_num']
         names = [c.name for c in self.src_table.columns]
+
+        # Create the COPY statement... creatively.
         copy_st = 'COPY src_%s (' % self.dataset_name
         for idx, name in enumerate(names):
             if name not in skip_cols:
@@ -285,40 +340,31 @@ class PlenarioETL(object):
                     copy_st += '%s, ' % name
                 else:
                     copy_st += '%s)' % name
-        else:
-            copy_st += "FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
-        conn = engine.raw_connection()
+            else:
+                copy_st += "FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
+
+        # Load the raw file from S3 or a local drive.
         s = StringIO()
-        if (self.s3_key):
+        if self.s3_key:
             self.s3_key.get_contents_to_file(s)
         else:
             with open(self.fpath, 'r') as f:
                 s.write(f.read())
+
+        # Dump the contents into the src_table we've created.
         s.seek(0)
+        conn = engine.raw_connection()
         with gzip.GzipFile(fileobj=s, mode='rb') as f:
             try:
                 cursor = conn.cursor()
                 cursor.copy_expert(copy_st, f)
                 cursor.close()
                 conn.commit()
-            except Exception, e:
+            except Exception, e:  # When the bulk copy fails on _any_ row, roll back the entire operation.
                 conn.rollback()
                 raise PlenarioETLError(e)
             finally:
                 conn.close()
-           #    conn.commit()
-           #except DataError, e:
-           #    conn.rollback()
-           #    raise PlenarioETLError('DataError in %s: %s' % \
-           #        (self.dataset_name, e.message))
-           #except IntegrityError, e:
-           #    conn.rollback()
-           #    raise PlenarioETLError('IntegrityError in %s: %s' % \
-           #        (self.dataset_name, e.message))
-           #except InternalError, e:
-           #    conn.rollback()
-           #    raise PlenarioETLError('InternalError in %s: %s' % \
-           #        (self.dataset_name, e.message))
 
         # The following code sets lat/lng to NULL when the given coordinate is (0,0) (e.g. off the coast of Africa).
         # This was a problem for: http://plenario-dev.s3.amazonaws.com/sfpd_incident_all_datetime.csv
@@ -350,6 +396,7 @@ class PlenarioETL(object):
                             self.dataset_name,slugify(self.business_key),slugify(self.business_key))
             with engine.begin() as conn:
                 conn.execute(upd_st)
+
         # Also need to remove rows that have an empty business key
         # There might be a better way to do this...
         del_st = """ 
@@ -359,15 +406,22 @@ class PlenarioETL(object):
             conn.execute(del_st)
             
     def _make_new_and_dup_table(self):
-        # Step Four
+        """
+        True after this function: self.new_table and self.dup_table
+        are created with columns for line_num, dup_ver, and business_key.
+        """
+        # Grab the data table's business key column.
         bk_col = self.dat_table.c[slugify(self.business_key)]
+
+        # TODO: DRY
         cols = [
             Column(slugify(self.business_key), bk_col.type, primary_key=True),
             Column('line_num', Integer),
             Column('dup_ver', Integer, primary_key=True)
         ]
+
         self.new_table = Table('new_%s' % self.dataset_name, self.metadata,
-            *cols, extend_existing=True)
+                               *cols, extend_existing=True)
         self.new_table.drop(bind=engine, checkfirst=True)
         self.new_table.create(bind=engine)
         
@@ -377,44 +431,71 @@ class PlenarioETL(object):
             Column('dup_ver', Integer, primary_key=True)
         ]
         self.dup_table = Table('dup_%s' % self.dataset_name, self.metadata,
-            *cols, extend_existing=True)
+                               *cols, extend_existing=True)
         self.dup_table.drop(bind=engine, checkfirst=True)
         self.dup_table.create(bind=engine)
 
     def _find_dup_data(self):
-        # Step Five
+        """
+        Step Five
+        Construct dup_ver column of dup_table and populate dup_table.
+        """
+
+        # Taking the business key and line numbers of the source data...
         cols = [
             self.src_table.c[slugify(self.business_key)],
             self.src_table.c['line_num'],
         ]
-        cols.append(func.rank()\
-            .over(partition_by=getattr(self.src_table.c, slugify(self.business_key)), 
-                order_by=self.src_table.columns['line_num'].desc())\
-            .label('dup_ver'))
+
+        cols.append(func.rank()
+                    # ... group by business key,
+                    .over(partition_by=getattr(self.src_table.c, slugify(self.business_key)),
+                          # ... and rank by line number.
+                          order_by=self.src_table.columns['line_num'].desc())
+                    # Call this our dup_ver column.
+                    .label('dup_ver'))
+
+        # Make these three columns our dup_table.
         sel = select(cols, from_obj=self.src_table)
         ins = self.dup_table.insert()\
-            .from_select([c for c in self.dup_table.columns], sel)
+            .from_select(self.dup_table.columns, sel)
         with engine.begin() as conn:
             conn.execute(ins)
 
     def _insert_new_data(self, added=False):
-        # Step Six
+        """
+        Step Six
+        Find which rows in dup_table aren't present in dat_table.
+        Add those new rows to new_table.
+        """
         bk = slugify(self.business_key)
+
+        # Align on line_num and bk (Shouldn't that include every entry of both tables?)
+        j = join(self.src_table, self.dup_table, 
+                 and_(self.src_table.c['line_num'] == self.dup_table.c['line_num'],
+                      self.src_table.c[bk] == self.dup_table.c[bk]))
+
+        dup_tablename = self.dup_table.name
+
+        # Where possible, find where bk's and dup_ver's line up
+        outer = outerjoin(j, self.dat_table,
+                          and_(self.dat_table.c[bk] == j.c['%s_%s' % (dup_tablename, bk)],
+                               self.dat_table.c['dup_ver'] == j.c['%s_dup_ver' % dup_tablename]))
+
         sel_cols = [
-            self.src_table.c[bk], 
-            self.src_table.c['line_num'], 
+            self.src_table.c[bk],
+            self.src_table.c['line_num'],
             self.dup_table.c['dup_ver']
         ]
-        j = join(self.src_table, self.dup_table, 
-            and_(self.src_table.c['line_num'] == self.dup_table.c['line_num'], 
-                self.src_table.c[bk] == self.dup_table.c[bk]))
-        dup_tablename = self.dup_table.name
-        outer = outerjoin(j, self.dat_table, 
-              and_(self.dat_table.c[bk] == j.c['%s_%s' % (dup_tablename, bk)], 
-                   self.dat_table.c['dup_ver'] == j.c['%s_dup_ver' % dup_tablename]))
+
+        # If we are adding this dataset for the first time, bring in all of the deup_ver info
         sel = select(sel_cols).select_from(outer)
-        if not added:
+
+        if not added:  # If we are updating, (not adding)
+            # only grab the dup_ver info not found in dat_table
             sel = sel.where(self.dat_table.c['%s_row_id' % self.dataset_name] == None)
+
+        # Insert the new dup_ver info into new_table.
         ins = self.new_table.insert()\
             .from_select([c for c in self.new_table.columns], sel)
         try:
@@ -426,16 +507,21 @@ class PlenarioETL(object):
             return False
 
     def _insert_data_table(self):
-        # Step Seven
-        bk = slugify(self.business_key)
+        """
+        Step Seven
+        """
         skip_cols = ['%s_row_id' % self.dataset_name,'end_date', 'current_flag', 'line_num']
         from_vals = []
         from_vals.append(text("'%s' AS start_date" % datetime.now().isoformat()))
         from_vals.append(self.new_table.c.dup_ver)
+
+        #
         for c_src in self.src_table.columns:
             if c_src.name not in skip_cols:
                 from_vals.append(c_src)
-        sel = select(from_vals, from_obj = self.src_table)
+        sel = select(from_vals, from_obj=self.src_table)
+
+        bk = slugify(self.business_key)
         ins = self.dat_table.insert()\
             .from_select(
                 [c for c in self.dat_table.columns if c.name not in skip_cols], 

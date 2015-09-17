@@ -14,9 +14,23 @@ mail = Mail()
 
 
 def iter_column(idx, f):
+    """
+
+    :param idx: index of column
+    :param f: gzip file object of CSV dataset
+    :return: col_type, null_values
+             where col_type is inferred type from typeinference.py
+             and null_values is whether null values were found and normalized.
+
+             (It looks like normalize_column_type goes to the trouble
+             of mutating a column that nobody ever uses. IDK why.)
+    """
     f.seek(0)
     reader = UnicodeCSVReader(f)
-    header = reader.next()
+
+    # Discard the header
+    reader.next()
+
     col = []
     for row in reader:
         if row:
@@ -101,7 +115,13 @@ def get_socrata_data_info(host, path, four_by_four):
             errors.append('Views endpoint not structured as expected')
     return dataset_info, errors, status_code
 
+
 def slugify(text, delim=u'_'):
+    """
+    Given text, return lowercase ASCII slug that gets as close as possible to the original.
+    Will fail on Asian characters.
+    Taken from http://flask.pocoo.org/snippets/5/
+    """
     if text:
         punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.:;]+')
         result = []
