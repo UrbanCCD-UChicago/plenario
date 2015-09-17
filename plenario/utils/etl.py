@@ -1,29 +1,24 @@
-import requests
-import re
 import os
-from datetime import datetime, date, time
-from plenario.database import task_session as session, task_engine as engine
-
-from plenario.models import MetaTable, MasterTable
-from plenario.utils.helpers import slugify, iter_column
-from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET, DATA_DIR
-from urlparse import urlparse
-from csvkit.unicsv import UnicodeCSVReader
-from plenario.utils.typeinference import normalize_column_type
+from datetime import datetime
 import gzip
-from sqlalchemy import Boolean, Float, DateTime, Date, Time, String, Column, \
+from cStringIO import StringIO
+
+import requests
+from csvkit.unicsv import UnicodeCSVReader
+from sqlalchemy import Boolean, Float, Date, String, Column, \
     Integer, Table, text, func, select, or_, and_, cast, UniqueConstraint, \
-    join, outerjoin, over, BigInteger, MetaData
+    join, outerjoin, BigInteger, MetaData
 from sqlalchemy.dialects.postgresql import TIMESTAMP, ARRAY, TIME
-from sqlalchemy.exc import NoSuchTableError, InternalError, \
-    IntegrityError, DataError
-from types import NoneType
-import plenario.settings
+from sqlalchemy.exc import NoSuchTableError
 from geoalchemy2.shape import from_shape
 from shapely.geometry import box
 from boto.s3.connection import S3Connection, S3ResponseError
 from boto.s3.key import Key
-from cStringIO import StringIO
+
+from plenario.database import task_session as session, task_engine as engine
+from plenario.models import MetaTable, MasterTable
+from plenario.utils.helpers import slugify, iter_column
+from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET, DATA_DIR
 
 COL_TYPES = {
     'boolean': Boolean,
@@ -134,8 +129,12 @@ class PlenarioETL(object):
             self._init_local(self.dataset_name)
     
     def _init_local(self, dataset_name):
+        """
+        Set directory to download and process data file as DATA_DIR/dataset_name.csv.gz
+        """
+
         print "PlenarioETL._init_local('%s')" % dataset_name
-        # nothing to do here?
+
         self.fname = '%s.csv.gz' % dataset_name
         self.data_dir = DATA_DIR
 
