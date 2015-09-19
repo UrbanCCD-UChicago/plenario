@@ -509,13 +509,16 @@ class PlenarioETL(object):
     def _insert_data_table(self):
         """
         Step Seven
+
+        Insert the new data we identified in new_table into dat_table
+        by joining the references in new_table to the actual data living in src_table.
         """
+        # Take all columns from src_table (excluding most of the 'meta' columns)
         skip_cols = ['%s_row_id' % self.dataset_name,'end_date', 'current_flag', 'line_num']
         from_vals = []
         from_vals.append(text("'%s' AS start_date" % datetime.now().isoformat()))
         from_vals.append(self.new_table.c.dup_ver)
 
-        #
         for c_src in self.src_table.columns:
             if c_src.name not in skip_cols:
                 from_vals.append(c_src)
@@ -536,7 +539,11 @@ class PlenarioETL(object):
             conn.execute(ins)
 
     def _update_master(self, added=False):
-        # Step Eight: Insert new records into master table
+        """
+        Step Eight: Insert new records into master table
+        """
+
+        # Enumerate all the columns we'll be populating from dat_table
         dat_cols = [
             self.dat_table.c.start_date,
             self.dat_table.c.end_date,
@@ -563,6 +570,8 @@ class PlenarioETL(object):
         dat_cols.append(text("'%s' AS dataset_name" % self.dataset_name))
         dat_pk = '%s_row_id' % self.dataset_name
         dat_cols.append(getattr(self.dat_table.c, dat_pk))
+
+        # Derive point in space from either lat/long columns or single location column
         if self.latitude and self.longitude:
             dat_cols.append(text(
                 "ST_PointFromText('POINT(' || dat_%s.%s || ' ' || dat_%s.%s || ')', 4326) \
@@ -583,15 +592,21 @@ class PlenarioETL(object):
                           slugify(self.location), slugify(self.location),
                           self.dataset_name, dat_pk, self.dataset_name, dat_pk,
                       )))
+
+        # Insert the data
         mt = MasterTable.__table__
         bk = slugify(self.business_key)
+
+        # If we're adding the dataset for the first time,
         if added:
+            # just throw everything in.
             ins = mt.insert()\
                 .from_select(
                     [c for c in mt.columns.keys() if c != 'master_row_id'], 
                     select(dat_cols)
                 )
-        else:
+        else:  # If we're updating,
+            # just add the new stuff by joining on new_table.
             ins = mt.insert()\
                 .from_select(
                     [c for c in mt.columns.keys() if c != 'master_row_id'],
@@ -607,10 +622,13 @@ class PlenarioETL(object):
         with engine.begin() as conn:
             conn.execute(ins)
 
+    # Unused
+    '''
     def _add_weather_stations(self):
         date_type = str(getattr(self.dat_table.c, slugify(self.observed_date)).type)
         #print "_add_weather_info(): date_type is", date_type
         # XXX TODO: get all the rows in the dataset and calculate a bounding box
+    '''
 
     def _add_weather_info(self):
         """ 
@@ -700,6 +718,9 @@ class PlenarioETL(object):
         # self._add_weather_stations()
         self._add_census_block()
 
+    # _find_changes, _update_dat_current_flag, and _update_master_current_flag have been unused since Sept. 2014
+    # As a result, current_flag is always TRUE
+    '''
     def _find_changes(self):
         # Step Eight: Find changes
         bk = slugify(self.business_key)
@@ -772,6 +793,7 @@ class PlenarioETL(object):
         with engine.begin() as conn:
             conn.execute(update)
         return None
+    '''
 
     def _update_meta(self, added=False):
         """ 
@@ -781,6 +803,8 @@ class PlenarioETL(object):
         md = session.query(MetaTable)\
             .filter(MetaTable.source_url_hash == self.source_url_hash)\
             .first()
+
+        # Update time columns
         now = datetime.now()
         md.last_update = now
         if added:
@@ -792,6 +816,8 @@ class PlenarioETL(object):
                                .first()
         md.obs_from = obs_from
         md.obs_to = obs_to
+
+        # Caluculate bounding box
         if self.latitude and self.longitude:
             lat_col = getattr(self.dat_table.c, slugify(self.latitude))
             lon_col = getattr(self.dat_table.c, slugify(self.longitude))
