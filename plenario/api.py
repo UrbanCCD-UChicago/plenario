@@ -140,7 +140,6 @@ def meta():
             LIMIT 1
           )
         WHERE m.approved_status = 'true'
-        AND c.status = 'SUCCESS'
     '''
 
     if dataset_name:
