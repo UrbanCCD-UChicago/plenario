@@ -1,7 +1,7 @@
 SECRET_KEY = 'abcdefghijklmnop'
 PLENARIO_SENTRY_URL = ''
 CELERY_SENTRY_URL = ''
-DATABASE_CONN = 'postgresql://docker:docker@172.17.0.103:5432/docker'
+DATABASE_CONN = 'postgresql://docker:docker@172.17.0.50:5432/docker'
 DATA_DIR = '/tmp'
 
 # See: https://pythonhosted.org/Flask-Cache/#configuring-flask-cache
@@ -14,12 +14,23 @@ AWS_ACCESS_KEY = ''
 AWS_SECRET_KEY = ''
 S3_BUCKET = ''
 
-# Optional dict with attributes for a default web admin 
+# Optional dict with attributes for a default web admin
 DEFAULT_USER = {
     'name': 'plenario_user',
     'email': 'youremail@example.com',
     'password': 'your password'
 }
+
+# Email address for notifying site administrators
+ADMIN_EMAIL = ''
+
+# For emailing users. ('MAIL_USERNAME' is an email address.)
+MAIL_SERVER = 'smtp.gmail.com'
+MAIL_PORT = 587
+MAIL_USE_TLS = True
+MAIL_DISPLAY_NAME = 'Plenar.io Team'
+MAIL_USERNAME = ''
+MAIL_PASSWORD = ''
 
 CENSUS_BLOCKS = {
     'dataset_name': 'census_blocks',

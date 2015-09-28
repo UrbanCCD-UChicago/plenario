@@ -1,29 +1,34 @@
-FROM ubuntu
-MAINTAINER hunter@hunterowens.net 
+# Inspired by Docker Python 2.7 onbuild Dockerfile,
+# available at https://github.com/docker-library/python/blob/master/2.7/onbuild/Dockerfile
 
-RUN echo "deb http://archive.ubuntu.com/ubuntu trusty main universe" > /etc/apt/sources.list
+# python:2.7 is official Docker image for python.
+# It includes most common dev dependencies (eg libxslt-dev)
+FROM python:2.7
+MAINTAINER willengler@uchicago.edu
+
 RUN apt-get -y update
-RUN apt-get -y upgrade
-RUN apt-get -y install aptitude 
+RUN apt-get install -y --no-install-recommends \
+  # Postgres wrapper
+  python-psycopg2 \
+  # For Flask bcrypt
+  python-bcrypt \
+  # For shapely
+  libgeos-dev \
+  redis-server
 
+# Clone the plenario repo
+RUN mkdir -p /usr/src/plenario
+RUN git clone https://github.com/UrbanCCD-UChicago/plenario.git /usr/src/plenario
+WORKDIR /usr/src/plenario
 
-RUN aptitude -y install wget git curl build-essential make gcc 
-RUN aptitude -y install python-dev python-pip
-RUN aptitude -y install libpq-dev python-psycopg2 python-bcrypt
-RUN git clone https://github.com/UrbanCCD-UChicago/plenario.git 
-RUN pip install -r plenario/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN ls
+COPY plenario/settings.py.docker plenario/settings.py
+COPY plenario/celery_settings.py.example plenario/celery_settings.py
 
-RUN cp plenario/settings.py.docker plenario/settings.py
-
-RUN cp plenario/celery_settings.py.example plenario/celery_settings.py
-
-RUN aptitude -y install redis-server
-
+# Start background task queuing
 RUN redis server &
-
 RUN celery -A plenario.celery_app worker --loglevel=info &
 
-RUN python runserver.py
-
+# Start the dev server with "docker run [name] [optional args]"
+ENTRYPOINT ["python", "runserver.py"]
