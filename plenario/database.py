@@ -8,6 +8,7 @@ from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.declarative import declarative_base
 from psycopg2.extensions import adapt, register_adapter, AsIs
 import plenario.settings
+import traceback
 
 app_engine = create_engine(plenario.settings.DATABASE_CONN, convert_unicode=True)
 task_engine = create_engine(
@@ -24,6 +25,22 @@ task_session = scoped_session(sessionmaker(bind=task_engine,
                                       autoflush=False))
 Base = declarative_base()
 Base.query = session.query_property()
+
+
+def init_t_db():
+    import plenario.models
+
+    print 'creating master, meta and user tables'
+    Base.metadata.create_all(bind=app_engine)
+    if plenario.settings.DEFAULT_USER:
+        print 'creating default user %s' % plenario.settings.DEFAULT_USER['name']
+        user = plenario.models.User(**plenario.settings.DEFAULT_USER)
+        session.add(user)
+        try:
+            session.commit()
+        except IntegrityError:
+            pass
+
 
 def init_db(no_create=False):
     import plenario.models

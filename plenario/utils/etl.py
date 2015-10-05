@@ -702,7 +702,7 @@ class PlenarioETL(object):
                         c.geoid10 as census_block
                     FROM
                        dat_master as d
-                    JOIN census_blocks as c
+                    JOIN dat_census_blocks as c
                        ON ST_Within(d.location_geom, c.geom)
                     WHERE d.census_block IS NULL
                         AND d.location_geom IS NOT NULL

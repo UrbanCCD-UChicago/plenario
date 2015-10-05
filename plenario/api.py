@@ -123,6 +123,8 @@ def meta():
             },
             'objects': []
         }
+
+    #TODO: remove dataset_name parameter
     dataset_name = request.args.get('dataset_name')
 
     q = ''' 
@@ -131,14 +133,7 @@ def meta():
                 m.obs_to, m.date_added, m.business_key, m.result_ids, 
                 m.longitude, m.observed_date, m.human_name, m.dataset_name, 
                 m.update_freq, ST_AsGeoJSON(m.bbox) as bbox
-        FROM meta_master AS m 
-        LEFT JOIN celery_taskmeta AS c 
-          ON c.id = (
-            SELECT id FROM celery_taskmeta 
-            WHERE task_id = ANY(m.result_ids) 
-            ORDER BY date_done DESC 
-            LIMIT 1
-          )
+        FROM meta_master AS m
         WHERE m.approved_status = 'true'
     '''
 

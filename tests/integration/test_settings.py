@@ -1,7 +1,7 @@
-PLENARIO_SENTRY_URL = ''
-CELERY_SENTRY_URL = ''
-DATABASE_CONN = 'postgresql://plenario:@localhost:5432/plenario_dev'
-DATA_DIR = '/tmp'
+PLENARIO_SENTRY_URL = None
+CELERY_SENTRY_URL = None
+DATABASE_CONN = 'postgresql://willengler:@localhost:5432/plenario_test'
+DATA_DIR = '/Users/willengler/Sandbox/test-plenario'
 
 # See: https://pythonhosted.org/Flask-Cache/#configuring-flask-cache
 # for config options
@@ -13,7 +13,7 @@ AWS_ACCESS_KEY = ''
 AWS_SECRET_KEY = ''
 S3_BUCKET = ''
 
-# Optional dict with attributes for a default web admin 
+# Optional dict with attributes for a default web admin
 DEFAULT_USER = {
     'name': 'plenario_user',
     'email': 'youremail@example.com',
