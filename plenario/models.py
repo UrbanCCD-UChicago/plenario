@@ -52,8 +52,10 @@ class MetaTable(Base):
 class MasterTable(Base):
     __tablename__ = 'dat_master'
     master_row_id = Column(BigInteger, primary_key=True)
+    # Looks like start_date and end_date aren't used.
     start_date = Column(TIMESTAMP)
     end_date = Column(TIMESTAMP)
+    # current_flag is never updated. We can probably get rid of this
     current_flag = Column(Boolean, default=True)
     location = Column(String(200))
     latitude = Column(DOUBLE_PRECISION(precision=53))
@@ -61,6 +63,7 @@ class MasterTable(Base):
     obs_date = Column(TIMESTAMP, index=True)
     weather_observation_id = Column(BigInteger, index=True)
     census_block = Column(String(15), index=True)
+    # Looks like geotag3 is unused
     geotag3 = Column(String(50))
     dataset_name = Column(String(100), index=True)
     dataset_row_id = Column(Integer)
@@ -68,6 +71,22 @@ class MasterTable(Base):
 
     def __repr__(self):
         return '<Master %r (%r)>' % (self.dataset_row_id, self.dataset_name)
+
+
+class PolygonDataset(Base):
+    __tablename__ = 'meta_polygon'
+    dataset_name = Column(String(100), primary_key=True)
+    source_url = Column(String)
+    source_srid = Column(Integer, nullable=False)
+    source_hash = Column(String(40), nullable=False)  # SHA-1 digest, stored as 40 hex characters
+    last_update = Column(DateTime, nullable=False)
+    date_added = Column(DateTime, nullable=False)
+    # Wait, there's a 2DBox data type!
+    bbox = Column(Geometry('POLYGON', srid=4326), nullable=False)
+    # Candidates to add, but don't need them now:
+    # bounding box
+    # approved_status
+    # update_freq
 
 def get_uuid():
     return unicode(uuid4())
@@ -115,7 +134,7 @@ class User(Base):
 
     def get_id(self):
         return self.id
-
+''' Not used
 def crime_table(name, metadata):
     table = Table(name, metadata,
             Column('id', Integer),
@@ -142,3 +161,4 @@ def crime_table(name, metadata):
             Column('location', Point),
     extend_existing=True)
     return table
+'''

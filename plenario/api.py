@@ -1,35 +1,30 @@
-from flask import make_response, request, render_template, current_app, g, \
-    Blueprint, abort, session as flask_session
-from flask.ext.cache import Cache
 from functools import update_wrapper
 import os
-import re
 import math
 from datetime import date, datetime, timedelta
-from dateutil.parser import parse
-from datetime_truncate import truncate
-import time
 import json
-import string
-from sqlalchemy import func, distinct, Column, Float, Table, text
-from sqlalchemy.exc import NoSuchTableError
-from sqlalchemy.types import NullType
-from sqlalchemy.sql.expression import cast
-from geoalchemy2 import Geometry
 from operator import itemgetter
 from itertools import groupby
 from cStringIO import StringIO
 import csv
+from collections import OrderedDict
+import subprocess
+
+from flask import make_response, request, current_app, Blueprint
+from flask.ext.cache import Cache
+from dateutil.parser import parse
+from datetime_truncate import truncate
+from sqlalchemy import func, Table, text
+from sqlalchemy.exc import NoSuchTableError
+from sqlalchemy.types import NullType
 from shapely.wkb import loads
 from shapely.geometry import box, asShape
-from collections import OrderedDict
-from urlparse import urlparse
 
-from plenario.models import MasterTable, MetaTable
+from plenario.models import MasterTable, MetaTable, PolygonDataset
 from plenario.database import session, app_engine as engine, Base
-from plenario.utils.helpers import get_socrata_data_info, slugify, increment_datetime_aggregate, send_mail
-from plenario.tasks import add_dataset
-from plenario.settings import CACHE_CONFIG
+from plenario.utils.helpers import slugify, increment_datetime_aggregate
+from plenario.settings import CACHE_CONFIG, DATA_DIR
+import plenario.settings
 
 cache = Cache(config=CACHE_CONFIG)
 
@@ -57,6 +52,7 @@ WEATHER_COL_LOOKUP = {
 api = Blueprint('api', __name__)
 dthandler = lambda obj: obj.isoformat() if isinstance(obj, date) else None
 
+# http://flask.pocoo.org/snippets/56/
 def crossdomain(origin=None, methods=None, headers=None,
                 max_age=21600, attach_to_all=True,
                 automatic_options=True): # pragma: no cover
@@ -124,7 +120,6 @@ def meta():
             'objects': []
         }
 
-    #TODO: remove dataset_name parameter
     dataset_name = request.args.get('dataset_name')
 
     q = ''' 
@@ -158,6 +153,7 @@ def meta():
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
 
 @api.route(API_VERSION + '/api/fields/<dataset_name>/')
 @cache.cached(timeout=CACHE_TIMEOUT)
@@ -198,6 +194,97 @@ def dataset_fields(dataset_name):
     resp = make_response(json.dumps(data), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
+
+@api.route(API_VERSION + '/api/polygons/')
+@crossdomain(origin="*")
+def get_all_polygon_datasets():
+    """
+    Fetches metadata for every polygon dataset in meta_polygon
+    """
+    try:
+        response_skeleton = {
+                'meta': {
+                    'status': 'ok',
+                    'message': '',
+                },
+                'objects': []
+            }
+
+        all_polygon_datasets = session.query(PolygonDataset).all()
+        for dataset in all_polygon_datasets:
+            attributes = {key: str(val) for key, val in dataset.__dict__.iteritems()}
+            del attributes['_sa_instance_state']
+            response_skeleton['objects'].append(attributes)
+        status_code = 200
+
+    except Exception as e:
+        print e.message
+        response_skeleton = {
+            'meta': {
+                'status': 'error',
+                'message': '',
+            }
+        }
+        status_code = 500
+
+    resp = make_response(json.dumps(response_skeleton), status_code)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
+@api.route(API_VERSION + '/api/polygons/intersections/<geojson>')
+@crossdomain(origin="*")
+def find_intersecting_polygons(geojson):
+    """
+    Respond with all polygon datasets that intersect with the geojson provided.
+    Also include how many geom rows of the dataset intersect.
+    :param geojson: URL encoded geojson.
+    """
+
+    # First, do a bounding box check on all polygon datasets.
+        # Take union of geoms
+        # 2dbox(union)
+    # Then, for the candidates, get a count of the rows that intersect.
+
+    resp = make_response(geojson, 200)
+    return resp
+
+
+@api.route(API_VERSION + '/api/polygons/<dataset_name>')
+@crossdomain(origin="*")
+def export_polygon_as_geojson(dataset_name):
+    postgres_connection_arg = 'PG:host={} user={} port={} dbname={} password={}'.format(
+                                  plenario.settings.DB_HOST,
+                                  plenario.settings.DB_USER,
+                                  plenario.settings.DB_PORT,
+                                  plenario.settings.DB_NAME,
+                                  plenario.settings.DB_PASSWORD)
+
+    temp_path = os.path.join(DATA_DIR, 'to_export.json')
+    if os.path.exists(temp_path):
+        os.remove(temp_path)
+
+    ogr2ogr_args = ['ogr2ogr',
+                    '-f', 'GeoJSON',
+                    temp_path,
+                    postgres_connection_arg,
+                    dataset_name]
+
+    try:
+        subprocess.check_call(ogr2ogr_args)
+    except subprocess.CalledProcessError:
+        print 'Failed to export requested polygon dataset to file.'
+        return make_response('error', 500)
+
+    # Load file into filereader
+    with open(temp_path, 'r') as geojson:
+        # Dump contents into a response
+        resp = make_response(geojson.read(), 200)
+
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
 
 @api.route(API_VERSION + '/api/weather-stations/')
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -362,7 +449,7 @@ def dataset():
             .order_by(time_agg)
         values = [o for o in base_query.all()]
 
-        # init from and to dates ad python datetimes
+        # init from and to dates with python datetimes
         from_date = truncate(parse(raw_query_params['obs_date__ge']), agg)
         if 'obs_date__le' in raw_query_params.keys():
             to_date = parse(raw_query_params['obs_date__le'])

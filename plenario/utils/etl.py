@@ -702,7 +702,7 @@ class PlenarioETL(object):
                         c.geoid10 as census_block
                     FROM
                        dat_master as d
-                    JOIN dat_census_blocks as c
+                    JOIN census_blocks as c
                        ON ST_Within(d.location_geom, c.geom)
                     WHERE d.census_block IS NULL
                         AND d.location_geom IS NOT NULL
@@ -817,7 +817,7 @@ class PlenarioETL(object):
         md.obs_from = obs_from
         md.obs_to = obs_to
 
-        # Caluculate bounding box
+        # Calculate bounding box
         if self.latitude and self.longitude:
             lat_col = getattr(self.dat_table.c, slugify(self.latitude))
             lon_col = getattr(self.dat_table.c, slugify(self.longitude))
