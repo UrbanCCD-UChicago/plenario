@@ -1,0 +1,32 @@
+{% macro contributor_form(submit_button_verb) -%}
+    {% if submit_button_verb == 'Contribute' %}
+
+        <h3>About you</h3>
+
+        <p>Finally, tell us about yourself so we can contact you about this dataset.</p>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label for="contributor_name" class="control-label"><span class="red">*</span>Name</label>
+                    <input id="contributor_name" name="contributor_name" type="text" class="form-control" placeholder="Jane Smith" value="{{ '%s' % contributor_name if contributor_name }}" />
+                </div>
+                <div class="form-group">
+                    <label for="contributor_organization" class="control-label">Organization</label>
+                    <input id="contributor_organization" name="contributor_organization" type="text" class="form-control" placeholder="Super Cool Organization" value="{{ '%s' % contributor_organization if contributor_organization }}" />
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label for="contributor_email" class="control-label"><span class="red">*</span>Email</label>
+                    <input id="contributor_email" name="contributor_email" type="text" class="form-control" placeholder="jane.smith@example.com" value="{{ '%s' % contributor_email if contributor_email }}" />
+                </div>
+            </div>
+        </div>
+
+    {% else %}
+        <input type="hidden" id="contributor_name" name="contributor_name" value="{{dataset_info.contributor_name}}">
+        <input type="hidden" id="contributor_organization" name="contributor_organization" value="{{dataset_info.contributor_organization}}">
+        <input type="hidden" id="contributor_email" name="contributor_email" value="{{dataset_info.contributor_email}}">
+    {% endif %}
+{% endmacro %}

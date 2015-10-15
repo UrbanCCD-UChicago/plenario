@@ -1,7 +1,7 @@
 import unittest
 import os
 from hashlib import md5
-from plenario.utils.shapefile_helpers import PolygonETL, polygon_source_has_changed
+from plenario.utils.polygon_etl import PolygonETL, polygon_source_has_changed
 from plenario.utils.etl import PlenarioETL, PlenarioETLError
 from plenario import create_app
 from plenario.database import task_engine
@@ -9,6 +9,7 @@ from init_db import init_master_meta_user, init_census
 from plenario.database import task_session as session
 from plenario.models import MetaTable, PolygonDataset
 import json
+import urllib
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 FIXTURE_PATH = os.path.join(pwd, '..', 'test_fixtures')
@@ -59,6 +60,21 @@ class PolygonAPITests(unittest.TestCase):
         self.assertIn(self.lines_name, all_names)
         self.assertIn(self.polygons_name, all_names)
 
+    def test_find_intersecting(self):
+        rect_path = os.path.join(FIXTURE_PATH, 'university_village_rectangle.json')
+        with open(rect_path, 'r') as rect_json:
+            query_rect = rect_json.read()
+        escaped_query_rect = urllib.quote(query_rect)
+
+        resp = self.app.get('/v1/api/polygons/intersections/' + escaped_query_rect)
+        self.assertEqual(resp.status_code, 200)
+        response_data = json.loads(resp.data)
+
+        # By design, the query rectangle should cross 3 zip codes and 2 pedestrian streets
+        datasets_to_num_geoms = {obj['dataset_name']: obj['num_geoms'] for obj in response_data['objects']}
+        self.assertEqual(datasets_to_num_geoms[self.polygons_name], 3)
+        self.assertEqual(datasets_to_num_geoms[self.lines_name], 2)
+
 
 class PolygonETLTests(unittest.TestCase):
     @classmethod
@@ -88,11 +104,6 @@ class PolygonETLTests(unittest.TestCase):
         with self.assertRaises(PlenarioETLError):
             polygon_etl.import_shapefile(self.srid, 'dummy_business_key', 'dummy/path')
 
-    def test_hash_invariant(self):
-        from plenario.utils.shapefile_helpers import sha_hash_file
-        self.assertEqual(sha_hash_file(self.shapefile_path),
-                         sha_hash_file(self.shapefile_path))
-
     def test_hash_matches_when_source_file_is_the_same(self):
         self.assertFalse(polygon_source_has_changed(self.dataset_name, self.shapefile_path))
 
@@ -113,15 +124,6 @@ class PolygonETLTests(unittest.TestCase):
 
         new_update_timestamp = get_update_timestamp()
         self.assertNotEqual(old_update_timestamp, new_update_timestamp)
-
-    # Sloppy test
-    '''def test_correct_attributes(self):
-        resp = self.app.get('/v1/api/polygons/')
-        self.assertEqual(resp.status_code, 200)
-        dataset_attributes = json.loads(resp.data)['objects'][0].keys()
-        expected_fields = ['source_srid', 'source_url', 'dataset_name', 'last_update', 'date_added']
-
-        self.assertTrue(all([field in dataset_attributes for field in expected_fields]))'''
 
     def test_export_polygon_as_geojson(self):
         # Do we at least get some json back?

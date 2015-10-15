@@ -9,7 +9,7 @@ import plenario.settings
 from sqlalchemy.exc import IntegrityError
 import datetime
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
-from plenario.utils.shapefile_helpers import PolygonETL
+from plenario.utils.polygon_etl import PolygonETL
 
 
 def init_db():

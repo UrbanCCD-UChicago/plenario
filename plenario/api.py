@@ -241,15 +241,78 @@ def find_intersecting_polygons(geojson):
     Also include how many geom rows of the dataset intersect.
     :param geojson: URL encoded geojson.
     """
+    fragment = extract_first_geometry_fragment(geojson)
 
-    # First, do a bounding box check on all polygon datasets.
-        # Take union of geoms
-        # 2dbox(union)
-    # Then, for the candidates, get a count of the rows that intersect.
+    try:
+        # First, do a bounding box check on all polygon datasets.
+        query = '''
+        SELECT m.dataset_name
+        FROM meta_polygon as m
+        WHERE m.bbox &&
+            (SELECT ST_GeomFromGeoJSON('{geojson_fragment}'));
+        '''.format(geojson_fragment=fragment)
 
-    resp = make_response(geojson, 200)
+        #import pdb; pdb.set_trace()
+        intersecting_datasets = engine.execute(query)
+        bounding_box_intersection_names = [dataset.dataset_name for dataset in intersecting_datasets]
+    except Exception as e:
+        print 'Error finding candidates'
+        raise e
+        #return make_response('Oh no', 500)
+
+    try:
+        # Then, for the candidates, get a count of the rows that intersect.
+        response_objects = []
+        for dataset_name in bounding_box_intersection_names:
+            num_intersections_query = '''
+            SELECT count(g.geom) as num_geoms
+            FROM {dataset_name} as g
+            WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
+            '''.format(dataset_name=dataset_name, geojson_fragment=fragment)
+            num_intersections = engine.execute(num_intersections_query)\
+                                      .first().num_geoms
+
+            if num_intersections > 0:
+                response_objects.append({
+                    'dataset_name': dataset_name,
+                    'num_geoms': num_intersections
+                })
+
+    except Exception as e:
+        print 'Error narrowing candidates'
+        raise e
+
+    response_skeleton = {
+                'meta': {
+                    'status': 'ok',
+                    'message': '',
+                },
+                'objects': response_objects
+            }
+
+    resp = make_response(json.dumps(response_skeleton), 200)
     return resp
 
+
+def extract_first_geometry_fragment(geojson):
+    """
+    Given a geojson document, return a geojson geometry fragment marked as 4326 encoding.
+    If there are multiple features in the document, just make a fragment of the first feature.
+    This is what PostGIS's ST_GeomFromGeoJSON expects.
+    :param geojson: A full geojson document
+    :type geojson: str
+    :return:
+    """
+    geo = json.loads(geojson)
+    if 'features' in geo.keys():
+        fragment = geo['features'][0]['geometry']
+    elif 'geometry' in geo.keys():
+        fragment = geo['geometry']
+    else:
+        fragment = geo
+
+    fragment['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
+    return json.dumps(fragment)
 
 @api.route(API_VERSION + '/api/polygons/<dataset_name>')
 @crossdomain(origin="*")

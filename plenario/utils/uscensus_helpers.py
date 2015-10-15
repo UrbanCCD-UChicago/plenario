@@ -1,4 +1,4 @@
-from plenario.utils.shapefile_helpers import PlenarioShapeETL
+from plenario.utils.polygon_etl import PlenarioShapeETL
 
 censusblocks_url = 'http://www2.census.gov/geo/tiger/TIGER2010/TABBLOCK/'
 
