@@ -45,7 +45,7 @@ cp plenario/settings.py.example plenario/settings.py
 You will want to change, at the minimum, the following `settings.py` fields:
 
 * `DATABASE_CONN`: edit this field to reflect your PostgreSQL
-  username, server hostname, port, and database name. 
+  username, server hostname, port, and database name.
 
 * `DEFAULT_USER`: change the username, email and password on the administrator account you will use on Plenario locally.
 
@@ -76,7 +76,7 @@ redis-server &
 celery -A plenario.celery_app worker --loglevel=info &
 ```
 
-Initialize the plenario database by running `python init_db.py`. 
+Initialize the plenario database by running `python init_db.py`.
 
 Finally, run the server:
 
@@ -89,28 +89,14 @@ the homepage, click 'Login' to log in with the username and password
 from `settings.py`. Once logged in, go to 'Add a dataset' under the
 'Admin' menu to add your own datasets.
 
-## Running with Docker
-Additionally, we support installing Plenario using Docker containers. Because of the variety of PostgreSQL/Docker configuration options, there are two containers needed for Plenario. One is a Plenario web server Docker container, which we provide a Dockerfile for. The other is a PostgreSQL+PostGIS database Docker container. We recommend using [helmi03/docker-postgis](https://github.com/helmi03/docker-postgis). Please read carefully about persisting data to the database. 
-
-1. Boot a PostGIS/PostgreSQL setup. See above. 
-2. Alter settings in settings.py.docker. 
-3. Run `docker build .`
-4. Run `docker run`
-5. Congrats! Plenario should now be running in the container. 
-
-# Data
-
-New datasets are actively being added to the Plenario API. We keep track of them in this [Google Doc](https://docs.google.com/spreadsheet/ccc?key=0Au-2OHnpwhGTdGJzUWJ2SERwVXZLeDU4Y3laWFJvNEE&usp=sharing#gid=0).
-
 # Dependencies
-We used the following open source tools:
+We use the following open source tools:
 
 * [PostgreSQL](http://www.postgresql.org/) - database version 9.3 or greater
 * [PostGIS](http://postgis.net/) - spatial database for PostgreSQL
 * [Flask](http://flask.pocoo.org/) - a microframework for Python web applications
 * [SQL Alchemy](http://www.sqlalchemy.org/) - Python SQL toolkit and Object Relational Mapper
-* [Green Unicorn](http://gunicorn.org/) - Python WSGI HTTP Server for UNIX
-* [psycopg2](http://initd.org/psycopg/) - PostgreSQL adapter for the Python 
+* [psycopg2](http://initd.org/psycopg/) - PostgreSQL adapter for the Python
 * [GeoAlchemy 2](http://geoalchemy-2.readthedocs.org/en/0.2.4/) - provides extensions to SQLAlchemy for working with spatial databases
 * [Celery](http://www.celeryproject.org/) - asynchronous task queue
 * [Redis](http://redis.io/) - key-value cache
@@ -125,6 +111,7 @@ We used the following open source tools:
 * Jonathan Giuffrida
 * Maggie King
 * Jiajun Shen
+* Will Engler
 
 ### DataMade
 * Derek Eder
@@ -144,7 +131,7 @@ If something is not behaving intuitively, it is a bug, and should be reported.
 Report it here: https://github.com/UrbanCCD-UChicago/plenario/issues
 
 ## Note on Patches/Pull Requests
- 
+
 * Fork the project.
 * Make your feature addition or bug fix.
 * Send us a pull request. Bonus points for topic branches.
