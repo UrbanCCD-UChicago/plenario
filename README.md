@@ -36,10 +36,11 @@ psql plenario_dev
 plenario_test=# CREATE EXTENSION postgis;
 ```
 
-Create your own `settings.py` file:
+Create your own `settings.py` files:
 
 ```
 cp plenario/settings.py.example plenario/settings.py
+cp plenario/celery_settings.py.example plenario/celery_settings.py
 ```
 
 You will want to change, at the minimum, the following `settings.py` fields:
