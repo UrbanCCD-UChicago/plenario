@@ -9,13 +9,16 @@ import plenario.settings
 from sqlalchemy.exc import IntegrityError
 import datetime
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
-from plenario.utils.polygon_etl import PolygonETL
+from plenario.utils.polygon_etl import PolygonETL, PolygonTable
+
+from plenario.tasks import hello_world
 
 
 def init_db():
     init_master_meta_user()
     init_weather()
     init_census()
+    init_celery()
 
 
 def init_master_meta_user():
@@ -49,9 +52,13 @@ def init_census():
 
     # Only try to cache to AWS if we've specified a key
     save_to_s3 = (plenario.settings.AWS_ACCESS_KEY != '')
-    polygon_etl = PolygonETL(census_settings['dataset_name'], save_to_s3=save_to_s3)
+    polygon_etl = PolygonETL(PolygonTable(census_settings['dataset_name']), save_to_s3=save_to_s3)
     polygon_etl.import_shapefile(census_settings['srid'],
                                  census_settings['source_url'])
+
+
+def init_celery():
+    hello_world.delay()
 
 if __name__ == "__main__":
     init_db()

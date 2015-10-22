@@ -73,9 +73,10 @@ class MasterTable(Base):
         return '<Master %r (%r)>' % (self.dataset_row_id, self.dataset_name)
 
 
-class PolygonDataset(Base):
+class PolygonMetadata(Base):
     __tablename__ = 'meta_polygon'
     dataset_name = Column(String(100), primary_key=True)
+    human_name = Column(String(100), primary_key=True)
     source_url = Column(String)
     source_srid = Column(Integer, nullable=False)
     source_hash = Column(String(40), nullable=False)  # SHA-1 digest, stored as 40 hex characters
@@ -83,10 +84,6 @@ class PolygonDataset(Base):
     date_added = Column(DateTime, nullable=False)
     # Wait, there's a 2DBox data type!
     bbox = Column(Geometry('POLYGON', srid=4326), nullable=False)
-    # Candidates to add, but don't need them now:
-    # bounding box
-    # approved_status
-    # update_freq
 
 def get_uuid():
     return unicode(uuid4())

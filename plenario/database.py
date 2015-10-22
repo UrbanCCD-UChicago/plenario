@@ -3,12 +3,12 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.declarative import declarative_base
 
-import plenario.settings
+from plenario.settings import DATABASE_CONN
 
 
-app_engine = create_engine(plenario.settings.DATABASE_CONN, convert_unicode=True)
+app_engine = create_engine(DATABASE_CONN, convert_unicode=True)
 task_engine = create_engine(
-    plenario.settings.DATABASE_CONN, 
+    DATABASE_CONN,
     convert_unicode=True,
     poolclass=NullPool)
 

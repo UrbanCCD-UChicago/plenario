@@ -5,6 +5,7 @@ from plenario.models import MetaTable, MasterTable
 from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.utils.etl import PlenarioETL
+from plenario.utils.polygon_etl import PolygonETL
 from plenario.utils.weather import WeatherETL
 from raven.handlers.logging import SentryHandler
 from raven.conf import setup_logging
@@ -55,6 +56,12 @@ def add_dataset(self, source_url_hash, s3_path=None, data_types=None):
     etl.add(s3_path=s3_path)
     return 'Finished adding {0} ({1})'.format(md.human_name, md.source_url_hash)
 
+@celery_app.task(bind=True)
+def add_shape(self, table_name, source_url, source_srid):
+    PolygonETL(table_name, save_to_s3=True)\
+        .import_shapefile(source_srid, source_url)
+    return 'Finished adding shape dataset {} from {}.'.format(table_name, source_url)
+
 @celery_app.task
 def frequency_update(frequency):
     # hourly, daily, weekly, monthly, yearly
@@ -89,6 +96,15 @@ def update_metar():
     w.metar_initialize_current(weather_stations_list = celery_metar_illinois_area_wbans)
     #w.metar_initialize_current(weather_stations_list = ohare_mdw)
     return 'Added current metars'
+
+
+@celery_app.task()
+def hello_world():
+    """
+    Used in init_db for its side effect.
+    Just running a task will create the celery_taskmeta tables in the database/
+    """
+    print "Hello from celery!"
 
 @celery_app.task
 def update_weather():

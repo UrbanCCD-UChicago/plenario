@@ -20,7 +20,7 @@ from sqlalchemy.types import NullType
 from shapely.wkb import loads
 from shapely.geometry import box, asShape
 
-from plenario.models import MasterTable, MetaTable, PolygonDataset
+from plenario.models import MasterTable, MetaTable, PolygonMetadata
 from plenario.database import session, app_engine as engine, Base
 from plenario.utils.helpers import slugify, increment_datetime_aggregate
 from plenario.settings import CACHE_CONFIG, DATA_DIR
@@ -211,7 +211,7 @@ def get_all_polygon_datasets():
                 'objects': []
             }
 
-        all_polygon_datasets = session.query(PolygonDataset).all()
+        all_polygon_datasets = session.query(PolygonMetadata).all()
         for dataset in all_polygon_datasets:
             attributes = {key: str(val) for key, val in dataset.__dict__.iteritems()}
             del attributes['_sa_instance_state']
@@ -324,6 +324,7 @@ def export_polygon_as_geojson(dataset_name):
                                   plenario.settings.DB_NAME,
                                   plenario.settings.DB_PASSWORD)
 
+    # TODO: use tempfile library instead
     temp_path = os.path.join(DATA_DIR, 'to_export.json')
     if os.path.exists(temp_path):
         os.remove(temp_path)
@@ -337,7 +338,7 @@ def export_polygon_as_geojson(dataset_name):
     try:
         subprocess.check_call(ogr2ogr_args)
     except subprocess.CalledProcessError:
-        print 'Failed to export requested polygon dataset to file.'
+        print 'Failed to export requested polygon dataset to file with ogr2ogr.' + str(ogr2ogr_args)
         return make_response('error', 500)
 
     # Load file into filereader

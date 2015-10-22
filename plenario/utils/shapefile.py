@@ -48,6 +48,8 @@ class Shapefile:
 
         return self
 
+    # TODO: Consider using ogr2ogr instead to remove the dependency on shp2pgsql
+    # http://www.gdal.org/drv_pgdump.html
     def generate_import_statement(self, table_name, create_mode, target_srid=4326):
         """
         Call out to shp2pgsql to generate import statement.
@@ -84,7 +86,7 @@ class Shapefile:
 
         except subprocess.CalledProcessError as e:
             # Log what happened
-            print "Command: \n {} \n failed.".format(e.cmd)
+            print "Command: \n {} \n failed.".format(str(shp2pgsql_args))
             # And make the caller deal with it
             raise e
 

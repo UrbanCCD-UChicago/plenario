@@ -3,6 +3,7 @@ from flask import make_response, request, redirect, url_for, render_template, cu
 from plenario.models import MasterTable, MetaTable, User
 from plenario.database import session, Base, app_engine as engine
 from plenario.utils.helpers import get_socrata_data_info, iter_column, send_mail, slugify
+from plenario.utils.polygon_etl import PolygonTable
 from plenario.tasks import update_dataset as update_dataset_task, \
     delete_dataset as delete_dataset_task, add_dataset as add_dataset_task
 from flask_login import login_required
@@ -211,6 +212,7 @@ http://plenar.io""" % (meta.contributor_name, meta.human_name)
     send_mail(subject="Your dataset has been added to Plenar.io", 
         recipient=meta.contributor_email, body=msg_body)
 
+
 # /contribute is similar to /admin/add-dataset, but sends an email instead of actually adding
 @views.route('/contribute', methods=['GET','POST'])
 def contrib_view():
@@ -247,7 +249,7 @@ Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (request.form.get('cont
         return redirect(url_for('views.contrib_thankyou'))
 
     context = {'dataset_info': dataset_info, 'form': request.form, 'errors': errors, 'socrata_source': socrata_source}
-    return render_template('contribute.html', **context)
+    return render_template('submit-table.html', **context)
 
 @views.route('/contribute-thankyou')
 def contrib_thankyou():
@@ -255,9 +257,9 @@ def contrib_thankyou():
     return render_template('contribute_thankyou.html', **context)
 
 
-@views.route('/admin/add-dataset', methods=['GET', 'POST'])
+@views.route('/admin/add-dataset/table', methods=['GET', 'POST'])
 @login_required
-def add_dataset():
+def add_table():
     dataset_info = {}
     errors = []
     socrata_source = False
@@ -294,8 +296,33 @@ def add_dataset():
         flash('%s added successfully!' % md.human_name, 'success')
         return redirect(url_for('views.view_datasets'))
         
-    context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source}
-    return render_template('admin/add-dataset.html', **context)
+    context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source, 'is_admin': True}
+    return render_template('submit-table.html', **context)
+
+
+@views.route('/admin/add-shape', methods=['GET', 'POST'])
+@login_required
+def add_shape():
+
+    if request.method == 'POST':
+        try:
+            human_name = request.args.get('dataset_name')
+            source_srid = request.args.get('source_srid')
+            source_url = request.args.get('source_url')
+        except KeyError:
+            # Front-end validation failed or someone is posting bogus query strings directly.
+            # re-render with error message
+            pass
+
+
+        # Does a shape dataset with this human_name already exist?
+        if PolygonTable(human_name=human_name).exists():
+            # re-render with errors
+            pass
+
+
+
+    return render_template('submit-shape.html', is_admin=True)
 
 @views.route('/admin/view-datasets')
 @login_required

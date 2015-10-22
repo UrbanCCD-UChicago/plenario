@@ -4,108 +4,57 @@
 {% from "macros/add-csv-dataset.html" import add_csv_dataset %}
 
 {% block title %}Submit a dataset - Plenar.io{% endblock %}
+
 {% block content %}
 
     <div class="row">
         <div class='col-md-10 col-md-offset-1'>
             <h2>
       	      {% block headline %}
-      	      Submit a dataset
+                  Submit a new dataset.
       	      {% endblock %}
       	    </h2>
-      	    <p>
+
+      	    <p class="lead">
       	      {% block submit_instructions %}
+                  {% if is_admin %}
+                      Plenario will try to ingest it right away.
+                  {% else %}
+                      If you know of a dataset you would like to see in Plenar.io, suggest it here.
+                      <br />Once submitted, we'll review it. If approved we'll email when your data has been added.
+                  {% endif %}
       	      {% endblock %}
       	    </p>
 
-            <div class="panel-group" id="accordion-api-datasets">
-              <div class="panel panel-default">
-                <div class="panel-heading">
-                  <a data-toggle="collapse" data-parent="#accordion-api-datasets" href="#collapse-api-datasets" id="api-datasets">
-                    <span class='label label-info'>Requirements</span>
-                    Dataset must include fields with a <strong>Unique id</strong>, <strong>Observation date</strong> and <strong>Location</strong>. Read more &raquo;
-                  </a>
-                </div>
-                <div id="collapse-api-datasets" class="panel-collapse collapse">
-                  <div class="panel-body">
+            {% if is_admin %} {# Until it's more stable, only let admins add shapefiles. #}
+                {% block tab_or_shape %}
 
-                      <p>Currently, Plenar.io is able to accept any URL to a <strong>comma separated value (CSV)</strong> or link to a dataset on a <strong>Socrata data portal</strong> (like <a href='https://data.cityofchicago.org/'>data.cityofchicago.org</a>) that has fields with the following attributes:</p>
+                <h3>Type of dataset</h3>
 
-                      <table class='table table-bordered'>
-                          <thead>
-                            <tr>
-                              <th>Column</th>
-                              <th>Description</th>
-                              <th>Example</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr>
-                              <td><strong><code>Unique&nbsp;id</code></strong></td>
-                              <td>a field that is guaranteed to contain a unique number for every row in the dataset, even if rows are updated</td>
-                              <td>'194867'</td>
-                            </tr>
-                            <tr>
-                              <td><strong><code>Observation&nbsp;date</code></strong></td>
-                              <td>a date or datetime field for each observation</td>
-                              <td>'1999-01-08'<br />'January 8, 1999'<br />'1/8/1999' <br />or <a href='http://www.postgresql.org/docs/9.3/static/datatype-datetime.html#DATATYPE-DATETIME-DATE-TABLE'>any date format supported by Postgres</a></td>
-                            </tr>
-                            <tr>
-                              <td><strong><code>Latitude/Longitude</code></strong> or <strong><code>Location</code></strong></td>
-                              <td>either two fields with latitude and longitude , or a single field with both of them formatted <code>(latitude, longitude)</code></td>
-                              <td>'41.425, -88.419'</td>
-                            </tr>
-                          </tbody>
-                      </table>
-                  </div>
-                </div>
-              </div>
-            </div>
+                    <a href={{ url_for('views.add_table') }} type="button"
+                       class="btn btn-info {% if is_shape %} active {% else %} disabled {% endif %}">
+                        Tabular data (CSV or a Socrata dataset).
+                    </a>
+                    <a href={{ url_for('views.add_shape') }} type="button"
+                       class="btn btn-info {% if not is_shape %} active {% else %} disabled {% endif %}">
+                        Shapefile (ESRI format). <em>Experimental</em>
+                    </a>
 
-            <h3>Link to a dataset</h3>
+                <br/><br/>
 
-            {% if errors %}
-              <div class="row">
-                  <div class='col-md-10'>
-                        {% for error in errors %}
-                          <div class="alert alert-danger alert-dismissible" role="alert">
-                              <button type="button" class="close" data-dismiss="alert">
-                                  <span aria-hidden="true">&times;</span>
-                                  <span class="sr-only">Close</span>
-                              </button>
-                              <p><strong>There were some errors with your submission:</strong></p>
-                              {{ error }}
-                          </div>
-                        {% endfor %}   
-                  </div>
-              </div>
+                {% endblock tab_or_shape %}
             {% endif %}
-	    
-            <form role="form" method="GET" id="fetch-details-form">
-                <div class="form-group">
-                    {% if dataset_info %}
-                    <input type="text" class="form-control" name="dataset_url" value="{{dataset_info.submitted_url}}" />
-                    {% else %}
-                    <input type="text" class="form-control" name="dataset_url" placeholder="http://data.mycity.gov/path/to/file.csv"/>
-                    {% endif %}
-                    <p class="help-block">Publicly available URL for a data source in CSV format or a Socrata dataset.</p>
-                </div>
-                <div class="form-group">
-                    <button class="btn btn-info" type="submit">Fetch details &raquo;</button>
-                </div>
-            </form>
+
+            {% block requirements %}
+                {# Tell the user what requirements we place on this kind of dataset #}
+            {% endblock requirements %}
+
+            {% block submission %}
+                {# Form to submit the dataset #}
+            {% endblock submission %}
+
         </div>
    </div>
-
-  {% if dataset_info %}
-  	{% block submit_form %}
-      {% if socrata_source %}
-           {{ add_socrata_dataset(dataset_info, 'Submit') }}
-      {% else %}
-           {{ add_csv_dataset(dataset_info, 'Submit' ) }}
-      {% endif %}
-  	{% endblock %}
-  {% endif %}
 
 {% endblock content %}
 

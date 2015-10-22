@@ -1,0 +1,57 @@
+{% extends 'submit-dataset.html' %}
+{% set is_shape=True %}
+
+{% block headline %}
+    Submit a new shapefile.
+{% endblock headline %}
+
+{% block submission %}
+
+    <form role="form" method="POST" data-toggle="validator">
+
+        {{ bootstrap_validate_field(type="url",
+                                    name="datset_url",
+                                    description="URL of shapefile",
+                                    placeholder="http://data.mycity.gov/path/to/shapefile.zip",
+                                    help_message="URL must lead to a zipped ESRI shapefile.",
+                                    error_message="Please enter a valid URL.") }}
+
+
+        {{ bootstrap_validate_field(type="text",
+                                    name="dataset_name",
+                                    description="Name that this dataset will be referenced by",
+                                    placeholder="Nifty Geographic Boundaries",
+                                    help_message="",
+                                    error_message="Please select a name."
+                                    ) }}
+
+        {{ bootstrap_validate_field(type="number",
+                                    name="source_srid",
+                                    description="Spatial reference identifier (SRID) of the shapefile",
+                                    placeholder="4326",
+                                    help_message="4-digit number. See http://prj2epsg.org for help.",
+                                    error_message="Please select a spatial reference system."
+                                    ) }}
+
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary">Add Shapefile</button>
+        </div>
+
+    </form>
+
+    <p><em><span class="red">*</span> denotes a required field</em></p>
+
+{% endblock submission %}
+
+{% block extra_javascript %}
+    <script src="{{ url_for('static', filename='js/validator.js') }}"></script>
+{% endblock extra_javascript %}
+
+{% macro bootstrap_validate_field(type, name, description, placeholder, help_message, error_message) %}
+    <div class="form-group">
+        <label for="{{ name }}" class="control-label"><span class="red">*</span>{{ description }}</label>
+        <input type="{{ type }}" class="form-control"
+               data-error="{{ error_message }}" name="{{ name }}" placeholder="{{ placeholder }}" required>
+        <p class="help-block with-errors">{{ help_message }}</p>
+    </div>
+{% endmacro %}

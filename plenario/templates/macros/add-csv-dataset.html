@@ -1,3 +1,6 @@
+{% from "macros/contributor-form.html" import contributor_form %}
+{% from "macros/metadata-form-fragment.html" import metadata_form_fragment %}
+
 {% macro add_csv_dataset(dataset_info, submit_button_verb) -%}
 <hr />
 <div class="row">
@@ -10,31 +13,8 @@
                 <p><strong>There were some errors with your submission:</strong></p>
                 <p id="error-list"></p>
             </div>
-            <p>Fill out the name, description and frequency of update for your dataset. <span class="red">*</span> denotes a required field</p>
-            
-            <div class="form-group">
-                <label for="dataset_name"><span class="red">*</span>File name</label>
-                <input id="dataset_name" name="dataset_name" class="form-control" type="text" value="{{dataset_info.name}}" />
-            </div>
 
-            <div class="form-group">
-                <label for="dataset_attribution">Attribution</label>
-                <input id="dataset_attribution" name="dataset_attribution" class="form-control" type="text" value="" placeholder="Please cite the original source of this data"/>
-            </div>
-
-            <div class="form-group">
-                <label for="dataset_description">Description</label>
-                <textarea rows="4" class="form-control" id="dataset_description" name="dataset_description">Dataset imported from {{dataset_info.name}}</textarea>
-            </div>
-            <div class="form-group">
-                <label for="update-select"><span class="red">*</span>How often should we check for updates?</label>
-                <select id="update_frequency" name="update_frequency" class="form-control">
-                    <option value="yearly">Yearly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="daily">Daily</option>
-                </select>
-            </div>
+            {{ metadata_form_fragment(dataset_info) }}
 
             <p>Below, select which columns correspond to the <code>Unique&nbsp;ID</code>, <code>Observation date</code>, <code>Latitude</code> and <code>Longitude</code> fields for your dataset. These are all <span class="red">*</span>required. We also guessed the data type of each field, feel free to change it if you think it's incorrect.</p>
 
@@ -75,35 +55,7 @@
                 </tbody>
             </table>
 
-            {% if submit_button_verb == 'Contribute' %}
-
-                <h3>About you</h3>
-
-                <p>Finally, tell us about yourself so we can contact you about this dataset.</p>
-
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="contributor_name" class="control-label"><span class="red">*</span>Name</label>
-                            <input id="contributor_name" name="contributor_name" type="text" class="form-control" placeholder="Jane Smith" value="{{ '%s' % contributor_name if contributor_name }}" />
-                        </div>
-                        <div class="form-group">
-                            <label for="contributor_organization" class="control-label">Organization</label>
-                            <input id="contributor_organization" name="contributor_organization" type="text" class="form-control" placeholder="Super Cool Organization" value="{{ '%s' % contributor_organization if contributor_organization }}" />
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="contributor_email" class="control-label"><span class="red">*</span>Email</label>
-                            <input id="contributor_email" name="contributor_email" type="text" class="form-control" placeholder="jane.smith@example.com" value="{{ '%s' % contributor_email if contributor_email }}" />
-                        </div>
-                    </div>
-                </div>
-            {% else %}
-                <input type="hidden" id="contributor_name" name="contributor_name" value="{{dataset_info.contributor_name}}">
-                <input type="hidden" id="contributor_organization" name="contributor_organization" value="{{dataset_info.contributor_organization}}">
-                <input type="hidden" id="contributor_email" name="contributor_email" value="{{dataset_info.contributor_email}}">
-            {% endif %}
+            {{ contributor_form(submit_button_verb) }}
 
             <hr />
             <p>

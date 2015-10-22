@@ -36,7 +36,28 @@ psql plenario_dev
 plenario_test=# CREATE EXTENSION postgis;
 ```
 
+Make sure your installation of postgis came with the shp2pgsql utility (we use this to ingest ESRI shapefiles).
+
+```
+shp2pgsql --help
+```
+
+And you'll need the ogr2ogr utility; it's part of the gdal package (we use it to export shape datasets)
+
+OSX
+```
+brew install gdal --with-postgresql
+```
+
+Ubuntu/Debian
+
+```
+sudo apt-get install gdal-bin
+```
+
 Create your own `settings.py` files:
+=======
+
 
 ```
 cp plenario/settings.py.example plenario/settings.py

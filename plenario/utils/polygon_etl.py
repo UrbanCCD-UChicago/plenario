@@ -12,10 +12,11 @@ from plenario.database import session, task_engine as engine
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET, DATA_DIR
 from plenario.utils.shapefile import Shapefile
 
-from plenario.models import PolygonDataset
+from plenario.models import PolygonMetadata
 import hashlib
 
 from plenario.utils.etl import PlenarioETLError
+from plenario.utils.helpers import slugify
 
 
 class ETLFile:
@@ -121,26 +122,27 @@ class ETLFile:
 
 class PolygonETL:
 
-    def __init__(self, table_name, save_to_s3=True):
-        self.table_name = table_name
+    def __init__(self, polygon_table, save_to_s3=False):
+        """
+        :param PolygonTable:
+        """
         self.save_to_s3 = save_to_s3
+        self.polygon_table = polygon_table
 
     def import_shapefile(self, source_srid, source_url, source_path=None):
-        if engine.has_table(self.table_name):
+        if self.polygon_table.exists():
             raise PlenarioETLError("Trying to create table with name that has already been claimed.")
 
         shapefile_hash = self._ingest_shapefile(source_srid, source_url, source_path, 'c')
 
-        add_polygon_table_to_meta(self.table_name, source_url, source_srid, shapefile_hash)
+        self.polygon_table.add_to_meta(source_url, source_srid, shapefile_hash)
 
+    ''' naive update. Not using.
     def update_polygon_table(self, source_path=None):
-        if not engine.has_table(self.table_name):
+        if not self.polygon.exists():
             raise PlenarioETLError("Trying to update a table that does not exist:" + self.table_name)
 
-        existing_table_meta = session.query(PolygonDataset.source_url,
-                                            PolygonDataset.source_srid,)\
-                                     .filter_by(dataset_name=self.table_name)\
-                                     .first()
+        existing_table_meta = self.polygon.get_metadata()
 
         # Problem: ingest can succeed and then metadata update can fail, leaving us with inaccurate (old) metadata
         shapefile_hash = self._ingest_shapefile(existing_table_meta.source_srid,
@@ -148,7 +150,7 @@ class PolygonETL:
                                                 source_path,
                                                 'd')
 
-        update_polygon_meta(self.table_name, shapefile_hash)
+        self.polygon.update_metadata(shapefile_hash)'''
 
     def _ingest_shapefile(self, source_srid, source_url, source_path, create_mode):
 
@@ -158,7 +160,7 @@ class PolygonETL:
                 # that has the expected composition of a shapefile...
                 with Shapefile(shapefile_zip, source_srid=source_srid) as shape:
                     # we can generate a big SQL import statement.
-                    import_statement = shape.generate_import_statement(self.table_name, create_mode)
+                    import_statement = shape.generate_import_statement(self.polygon_table.table_name, create_mode)
 
             engine.execute(import_statement)
 
@@ -166,7 +168,7 @@ class PolygonETL:
             try:
                 # Use current time to create uniquely named file in S3 bucket
                 now_timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-                s3_path = '{}/{}.zip'.format(self.table_name, now_timestamp)
+                s3_path = '{}/{}.zip'.format(self.polygon_table.table_name, now_timestamp)
                 file_helper.upload_to_s3(s3_path)
             except S3ResponseError as e:
                 # If AWS storage fails, soldier on.
@@ -185,61 +187,73 @@ class PolygonETL:
             return file_helper.get_sha1_hash()
 
 
-def polygon_source_has_changed(table_name, polygon_file_path):
-    old_hash = session.query(PolygonDataset.source_hash)\
-                      .filter_by(dataset_name=table_name)\
+class PolygonTable:
+    def __init__(self, human_name):
+        """
+        :param human_name:
+        :type human_name: unicode
+        """
+        self.human_name = human_name
+        self.table_name = PolygonTable.make_table_name(human_name)
+
+    def exists(self):
+        return engine.has_table(self.table_name)
+
+    @classmethod
+    def make_table_name(cls, human_name):
+        return slugify(human_name)
+
+    def get_metadata(self):
+        return session.query(PolygonMetadata.source_url,
+                             PolygonMetadata.source_srid,)\
+                      .filter_by(dataset_name=self.table_name)\
+                      .first()
+
+    def has_changed(self, path_to_new_file):
+        old_hash = session.query(PolygonMetadata.source_hash)\
+                      .filter_by(dataset_name=self.table_name)\
                       .first()\
                       .source_hash
 
-    with ETLFile(source_path=polygon_file_path) as file_helper:
-        new_hash = file_helper.get_sha1_hash()
+        with ETLFile(source_path=path_to_new_file) as file_helper:
+            new_hash = file_helper.get_sha1_hash()
 
-    return old_hash != new_hash
+        return old_hash != new_hash
 
+    ''' Rethinking updates
+    def update_metadata(self, new_hash):
+        session.query(PolygonMetadata).filter_by(dataset_name=self.table_name)\
+               .update({
+                    'source_hash': new_hash,
+                    'last_update': datetime.now(),
+                    'bbox': self._make_bbox()},)
+        try:
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            raise e'''
 
-def update_polygon_meta(table_name, file_hash):
-    bbox = create_polygon_dataset_bounding_box(table_name)
-    session.query(PolygonDataset).filter_by(dataset_name=table_name)\
-           .update({
-                'source_hash': file_hash,
-                'last_update': datetime.now(),
-                'bbox': bbox},)
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        raise e
-
-
-def add_polygon_table_to_meta(table_name, source_url, source_srid, source_hash):
-    """
-    Add table_name to meta_polygon
-    """
-
-    bbox = create_polygon_dataset_bounding_box(table_name)
-    new_polygon_dataset = PolygonDataset(dataset_name=table_name,
-                                         source_url=source_url,
-                                         date_added=datetime.now().date(),
-                                         last_update=datetime.now(),
-                                         source_hash=source_hash,
-                                         source_srid=source_srid,
-                                         bbox=bbox)
-    try:
-        session.add(new_polygon_dataset)
-        session.commit()
-        print "Committed polygon metadata."
-    except Exception as e:
-        print e.message
-        print 'Rolled back polygon metadata.'
-        session.rollback()
-        # The caller needs to know.
-        raise e
-
-
-def create_polygon_dataset_bounding_box(dataset_name):
-    bbox_query = 'SELECT ST_Envelope(ST_Union(geom)) FROM {};'.format(dataset_name)
-    try:
+    def _make_bbox(self):
+        bbox_query = 'SELECT ST_Envelope(ST_Union(geom)) FROM {};'.format(self.table_name)
         box = engine.execute(bbox_query).first().st_envelope
         return box
-    except Exception as e:
-        raise e
+
+    def add_to_meta(self, source_url, source_srid, source_hash):
+        """
+        Add table_name to meta_polygon
+        """
+
+        new_polygon_dataset = PolygonMetadata(dataset_name=self.table_name,
+                                              human_name=self.human_name,
+                                             source_url=source_url,
+                                             date_added=datetime.now().date(),
+                                             last_update=datetime.now(),
+                                             source_hash=source_hash,
+                                             source_srid=source_srid,
+                                             bbox=self._make_bbox())
+        try:
+            session.add(new_polygon_dataset)
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            raise e

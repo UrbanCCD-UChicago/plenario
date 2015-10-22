@@ -622,14 +622,6 @@ class PlenarioETL(object):
         with engine.begin() as conn:
             conn.execute(ins)
 
-    # Unused
-    '''
-    def _add_weather_stations(self):
-        date_type = str(getattr(self.dat_table.c, slugify(self.observed_date)).type)
-        #print "_add_weather_info(): date_type is", date_type
-        # XXX TODO: get all the rows in the dataset and calculate a bounding box
-    '''
-
     def _add_weather_info(self):
         """ 
         This is just adding the weather observation id to the master table right now.
@@ -717,83 +709,6 @@ class PlenarioETL(object):
         # self._add_weather_info()
         # self._add_weather_stations()
         self._add_census_block()
-
-    # _find_changes, _update_dat_current_flag, and _update_master_current_flag have been unused since Sept. 2014
-    # As a result, current_flag is always TRUE
-    '''
-    def _find_changes(self):
-        # Step Eight: Find changes
-        bk = slugify(self.business_key)
-        self.chg_table = Table('chg_%s' % self.dataset_name, self.metadata,
-                      Column('id', Integer), 
-                      extend_existing=True)
-        self.chg_table.drop(bind=engine, checkfirst=True)
-        self.chg_table.create(bind=engine)
-        bk = slugify(self.business_key)
-        skip_cols = ['start_date', 'end_date', 'current_flag', bk, 
-            '%s_row_id' % self.dataset_name, 'dup_ver']
-        src_cols = [c for c in self.src_table.columns if c.name != bk]
-        dat_cols = [c for c in self.dat_table.columns if c.name not in skip_cols]
-        and_args = []
-        for s,d in zip(src_cols, dat_cols):
-            ors = or_(s != None, d != None)
-            ands = and_(ors, s != d)
-            and_args.append(ands)
-        pk = getattr(self.dat_table.c, '%s_row_id' % self.dataset_name)
-        ins = self.chg_table.insert()\
-            .from_select(
-                ['id'],
-                select([pk])\
-                    .select_from(
-                        join(self.dat_table, self.src_table, 
-                            self.dat_table.c.service_request_number == \
-                                self.src_table.c.service_request_number)\
-                        .join(self.dup_table, self.src_table.c.line_num == self.dup_table.c.line_num))\
-                    .where(or_(*and_args))\
-                    .where(and_(self.dat_table.c.current_flag == True, 
-                        or_(getattr(self.src_table.c, bk) != None, 
-                            getattr(self.dat_table.c, bk) != None)))
-            )
-        conn = engine.connect()
-        try:
-            with engine.begin() as conn:
-                conn.execute(ins)
-                return True
-        except TypeError:
-            # No changes found
-            return False
-
-    def _update_dat_current_flag(self):
-        # Step Nine: Update data table with changed records
-
-        # Need to figure out how to make the end_date more granular than a day. 
-        # For datasets that update more frequently than every day, this will be
-        # crucial so that we are updating the current_flag on the correct records.
-        pk = getattr(self.dat_table.c, '%s_row_id' % self.dataset_name)
-        update = self.dat_table.update()\
-            .values(current_flag=False, end_date=datetime.now().strftime('%Y-%m-%d'))\
-            .where(pk == self.chg_table.c.id)\
-            .where(self.dat_table.c.current_flag == True)
-        with engine.begin() as conn:
-            conn.execute(update)
-        return None
-
-    def _update_master_current_flag(self):
-        # Step Ten: Update master table with changed records
-
-        # Need to figure out how to make the end_date more granular than a day. 
-        # For datasets that update more frequently than every day, this will be
-        # crucial so that we are updating the current_flag on the correct records.
-        mt = MasterTable.__table__
-        update = mt.update()\
-            .values(current_flag=False, end_date=datetime.now().strftime('%Y-%m-%d'))\
-            .where(mt.c.dataset_row_id == getattr(self.dat_table.c, '%s_row_id' % self.dataset_name))\
-            .where(self.dat_table.c.current_flag == False)\
-            .where(self.dat_table.c.end_date == datetime.now().strftime('%Y-%m-%d'))
-        with engine.begin() as conn:
-            conn.execute(update)
-        return None
-    '''
 
     def _update_meta(self, added=False):
         """ 
