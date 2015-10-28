@@ -96,37 +96,12 @@ class PolygonETLTests(unittest.TestCase):
                                                                          None,        # Don't care about source url
                                                                          source_path=cls.shapefile_path)
 
-        # Different enough to change the hash, but should have the same data.
-        cls.changed_shapefile_path = os.path.join(FIXTURE_PATH, 'chicago_city_limits_changed.zip')
-
         cls.app = create_app().test_client()
 
     def test_no_import_when_name_conflict(self):
         polygon_etl = PolygonETL(self.polygon_table)
         with self.assertRaises(PlenarioETLError):
             polygon_etl.import_shapefile(self.srid, 'dummy_business_key', 'dummy/path')
-
-    '''def test_hash_matches_when_source_file_is_the_same(self):
-        self.assertFalse(PolygonTable(self.dataset_name).has_changed(self.shapefile_path))
-
-    def test_hash_does_not_match_when_source_file_is_different(self):
-        self.assertTrue(PolygonTable(self.dataset_name).has_changed(self.changed_shapefile_path))'''
-
-    ''' Rethinking updates
-    def test_update_when_source_file_changes(self):
-        def get_update_timestamp():
-            return session.query(PolygonMetadata.last_update)\
-                          .filter_by(dataset_name=self.dataset_name)\
-                          .first()\
-                          .last_update
-
-        old_update_timestamp = get_update_timestamp()
-
-        polygon_etl = PolygonETL(self.dataset_name, save_to_s3=False)
-        polygon_etl.update_polygon_table(source_path=self.changed_shapefile_path)
-
-        new_update_timestamp = get_update_timestamp()
-        self.assertNotEqual(old_update_timestamp, new_update_timestamp)'''
 
     def test_export_polygon_as_geojson(self):
         # Do we at least get some json back?

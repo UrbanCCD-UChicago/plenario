@@ -5,7 +5,7 @@ from plenario.database import session, Base, app_engine as engine
 from plenario.utils.helpers import get_socrata_data_info, iter_column, send_mail, slugify
 from plenario.utils.polygon_etl import PolygonTable
 from plenario.tasks import update_dataset as update_dataset_task, \
-    delete_dataset as delete_dataset_task, add_dataset as add_dataset_task
+    delete_dataset as delete_dataset_task, add_dataset as add_dataset_task, add_shape as add_shape_task
 from flask_login import login_required
 from datetime import datetime, timedelta
 from urlparse import urlparse
@@ -304,25 +304,37 @@ def add_table():
 @login_required
 def add_shape():
 
+    errors = []
+
     if request.method == 'POST':
         try:
-            human_name = request.args.get('dataset_name')
-            source_srid = request.args.get('source_srid')
-            source_url = request.args.get('source_url')
+            print request.form
+            human_name = request.form['dataset_name']
+            print human_name
+            source_srid = request.form['source_srid']
+            print source_srid
+            source_url = request.form['source_url']
+            print source_url
         except KeyError:
             # Front-end validation failed or someone is posting bogus query strings directly.
             # re-render with error message
-            pass
-
+            errors.append('A required field was not submitted.')
 
         # Does a shape dataset with this human_name already exist?
-        if PolygonTable(human_name=human_name).exists():
+        new_table = PolygonTable(human_name)
+        if new_table.exists():
             # re-render with errors
-            pass
+            errors.append('A shape dataset with that name already exists.')
 
+        if not errors:
+            add_shape_task.delay(polygon_table=new_table,
+                                 source_url=source_url,
+                                 source_srid=source_srid)
 
+            flash('Plenario is now trying to ingest your shapefile.', 'success')
+            return redirect(url_for('views.view_datasets'))
 
-    return render_template('submit-shape.html', is_admin=True)
+    return render_template('submit-shape.html', is_admin=True, errors=errors)
 
 @views.route('/admin/view-datasets')
 @login_required

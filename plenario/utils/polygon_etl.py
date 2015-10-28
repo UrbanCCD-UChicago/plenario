@@ -106,19 +106,6 @@ class ETLFile:
         # Upload to S3
         s3_key.set_contents_from_file(self.handle)
 
-    @_seek_to_start
-    def get_sha1_hash(self):
-        # Thank you http://pythoncentral.io/hashing-files-with-python/
-        sha = hashlib.sha1()
-        chunk_size = 1024  # 1024 seems reasonable. No deeper reason.
-
-        buf = self.handle.read(chunk_size)
-        while len(buf) > 0:
-            sha.update(buf)
-            buf = self.handle.read(chunk_size)
-
-        return sha.hexdigest()
-
 
 class PolygonETL:
 
@@ -135,22 +122,7 @@ class PolygonETL:
 
         shapefile_hash = self._ingest_shapefile(source_srid, source_url, source_path, 'c')
 
-        self.polygon_table.add_to_meta(source_url, source_srid, shapefile_hash)
-
-    ''' naive update. Not using.
-    def update_polygon_table(self, source_path=None):
-        if not self.polygon.exists():
-            raise PlenarioETLError("Trying to update a table that does not exist:" + self.table_name)
-
-        existing_table_meta = self.polygon.get_metadata()
-
-        # Problem: ingest can succeed and then metadata update can fail, leaving us with inaccurate (old) metadata
-        shapefile_hash = self._ingest_shapefile(existing_table_meta.source_srid,
-                                                existing_table_meta.source_url,
-                                                source_path,
-                                                'd')
-
-        self.polygon.update_metadata(shapefile_hash)'''
+        self.polygon_table.add_to_meta(source_url, source_srid)
 
     def _ingest_shapefile(self, source_srid, source_url, source_path, create_mode):
 
@@ -183,8 +155,6 @@ class PolygonETL:
                 attempt_save_to_s3(file_helper)
 
             insert_in_database(file_helper.handle)
-            # Return the file's hash so that the caller can update metadata accordingly.
-            return file_helper.get_sha1_hash()
 
 
 class PolygonTable:
@@ -209,36 +179,12 @@ class PolygonTable:
                       .filter_by(dataset_name=self.table_name)\
                       .first()
 
-    def has_changed(self, path_to_new_file):
-        old_hash = session.query(PolygonMetadata.source_hash)\
-                      .filter_by(dataset_name=self.table_name)\
-                      .first()\
-                      .source_hash
-
-        with ETLFile(source_path=path_to_new_file) as file_helper:
-            new_hash = file_helper.get_sha1_hash()
-
-        return old_hash != new_hash
-
-    ''' Rethinking updates
-    def update_metadata(self, new_hash):
-        session.query(PolygonMetadata).filter_by(dataset_name=self.table_name)\
-               .update({
-                    'source_hash': new_hash,
-                    'last_update': datetime.now(),
-                    'bbox': self._make_bbox()},)
-        try:
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            raise e'''
-
     def _make_bbox(self):
         bbox_query = 'SELECT ST_Envelope(ST_Union(geom)) FROM {};'.format(self.table_name)
         box = engine.execute(bbox_query).first().st_envelope
         return box
 
-    def add_to_meta(self, source_url, source_srid, source_hash):
+    def add_to_meta(self, source_url, source_srid):
         """
         Add table_name to meta_polygon
         """
@@ -247,8 +193,6 @@ class PolygonTable:
                                               human_name=self.human_name,
                                              source_url=source_url,
                                              date_added=datetime.now().date(),
-                                             last_update=datetime.now(),
-                                             source_hash=source_hash,
                                              source_srid=source_srid,
                                              bbox=self._make_bbox())
         try:

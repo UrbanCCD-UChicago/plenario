@@ -57,10 +57,10 @@ def add_dataset(self, source_url_hash, s3_path=None, data_types=None):
     return 'Finished adding {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task(bind=True)
-def add_shape(self, table_name, source_url, source_srid):
-    PolygonETL(table_name, save_to_s3=True)\
+def add_shape(self, polygon_table, source_url, source_srid):
+    PolygonETL(polygon_table, save_to_s3=True)\
         .import_shapefile(source_srid, source_url)
-    return 'Finished adding shape dataset {} from {}.'.format(table_name, source_url)
+    return 'Finished adding shape dataset {} from {}.'.format(polygon_table.table_name, source_url)
 
 @celery_app.task
 def frequency_update(frequency):
