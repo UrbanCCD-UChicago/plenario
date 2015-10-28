@@ -1,15 +1,10 @@
-# Before I import the things I want from plenario.database,
-# I need to import the module itself in order to initialize its members.
-# Kinda janky.
-import plenario.database
-
 from plenario.database import session, app_engine, Base
 import plenario.models
 import plenario.settings
 from sqlalchemy.exc import IntegrityError
 import datetime
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
-from plenario.utils.polygon_etl import PolygonETL, PolygonTable
+from plenario.utils.polygon_etl import PolygonETL
 
 from plenario.tasks import hello_world
 
@@ -52,9 +47,12 @@ def init_census():
 
     # Only try to cache to AWS if we've specified a key
     save_to_s3 = (plenario.settings.AWS_ACCESS_KEY != '')
-    polygon_etl = PolygonETL(PolygonTable(census_settings['dataset_name']), save_to_s3=save_to_s3)
-    polygon_etl.import_shapefile(census_settings['srid'],
-                                 census_settings['source_url'])
+
+    census_meta = plenario.models.PolygonMetadata.add(source_url=census_settings['source_url'],
+                                                      human_name=census_settings['human_name'],
+                                                      caller_session=session)
+    session.commit()
+    PolygonETL(meta=census_meta, save_to_s3=save_to_s3).import_shapefile()
 
 
 def init_celery():

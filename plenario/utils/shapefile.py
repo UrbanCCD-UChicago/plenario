@@ -1,7 +1,28 @@
 import os
 import tempfile
-import subprocess
 import shutil
+from plenario.utils.ogr2ogr import import_shapefile_to_table, OgrError
+
+
+class ShapefileError(Exception):
+    def __init__(self, message):
+        Exception.__init__(self, message)
+        self.message = message
+
+
+def import_shapefile(shapefile_zip, table_name):
+    """
+    :param shapefile_zip: The zipped shapefile.
+    :type shapefile_zip: A Python zipfile.ZipFile object
+    """
+
+    try:
+        with Shapefile(shapefile_zip) as shape:
+            shape.insert_in_database(table_name)
+    except ShapefileError as e:
+        raise e
+    except Exception as e:
+        raise ShapefileError("Shapefile import failed.\n{}".format(repr(e)))
 
 
 class Shapefile:
@@ -10,15 +31,12 @@ class Shapefile:
     """
     COMPONENT_PREFIX = 'component'
 
-    def __init__(self, shapefile_zip, source_srid=None):
+    def __init__(self, shapefile_zip):
         """
         :param shapefile_zip: The zipped shapefile.
         :type shapefile_zip: A Python zipfile.ZipFile object
-        :param source_srid: SRS identifier of shape data. Can be derived from .prj.
-        :type source_srid: int
         """
         self.shapefile_zip = shapefile_zip
-        self.srid = source_srid
 
     def __enter__(self):
         """
@@ -35,60 +53,31 @@ class Shapefile:
         self.unzip_dir = tempfile.mkdtemp()
         self.shapefile_zip.extractall(self.unzip_dir)
 
+        suffixes = []
         # In the new directory,
-        # change every component's file prefix to COMPONENT_PREFIX so that we know where to point shp2pgsql.
+        # change every component's file prefix to COMPONENT_PREFIX so that we know where to point ogr2ogr.
         for shapefile_name in os.listdir(self.unzip_dir):
             # Assumption: every filename is formatted like name.suffix
             # Will raise IndexError if assumption is not met.
             # Only split on the first dot to handle oddballs like foo.shp.xml
             file_suffix = str.split(shapefile_name, '.', 1)[1]
+            suffixes.append(file_suffix)
             normalized_name = "{}.{}".format(Shapefile.COMPONENT_PREFIX, file_suffix)
             os.rename(os.path.join(self.unzip_dir, shapefile_name),
                       os.path.join(self.unzip_dir, normalized_name))
 
+        # Ideally we have a .dbf too, but we can't move on without a shape and a projection.
+        if 'shp' not in suffixes or 'prj' not in suffixes:
+            raise ShapefileError('Shapefile missing a .shp or .prj component')
+
         return self
 
-    # TODO: Consider using ogr2ogr instead to remove the dependency on shp2pgsql
-    # http://www.gdal.org/drv_pgdump.html
-    def generate_import_statement(self, table_name, create_mode, target_srid=4326):
-        """
-        Call out to shp2pgsql to generate import statement.
-        :param target_srid: Spatial reference id that spatial data will be encoded as in import statement.
-        :type target_srid: int
-        :param table_name: Table that shapefile should be imported into.
-                           Can be qualified with schema name.
-                           Without schema name, will import to 'public' by default.
-        :type table_name: str
-        :return: import_statement
-        """
-
-        # create_mode must be one of four characters:
-        # (d)rop and recreate, (a)ppend, (c)reate new, (p)repare table without data
-        assert create_mode in ['d', 'a', 'c', 'p']
-
-        # shp2pgsql handles srs transformations if specified as source:target
-        srs_transformation = str(self.srid) + ':' + str(target_srid)
-
-        # shp2pgsql expects to be directed to directory/common_prefix_of_shapefile_components
-        components_path = os.path.join(self.unzip_dir, Shapefile.COMPONENT_PREFIX)
-
-        # Use the postgres shp2pgsql command line utility.
-        shp2pgsql_args = ['shp2pgsql',
-                          '-' + create_mode,            # (-d|a|c|p)
-                          '-s', srs_transformation,     # [<from>:]<srid>
-                          '-I',                         # Create a spatial index on the geometry column
-                          components_path,              # <shapefile>
-                          table_name]                   # [[<schema.]<table>]
-
+    def insert_in_database(self, table_name):
+        component_path = os.path.join(self.unzip_dir, Shapefile.COMPONENT_PREFIX)
         try:
-            import_statement = subprocess.check_output(shp2pgsql_args)
-            return import_statement
-
-        except subprocess.CalledProcessError as e:
-            # Log what happened
-            print "Command: \n {} \n failed.".format(str(shp2pgsql_args))
-            # And make the caller deal with it
-            raise e
+            import_shapefile_to_table(component_path=component_path, table_name=table_name)
+        except OgrError as e:
+            raise ShapefileError('Failed to insert shapefile into database.\n{}'.format(repr(e)))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """

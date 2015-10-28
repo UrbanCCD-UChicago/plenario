@@ -2,8 +2,7 @@ var AppRouter = Backbone.Router.extend({
     routes: {
         "": "defaultRoute",
         "aggregate/:query": "aggregate",
-        "detail/:query": "detail",
-        "polygon/:polygonName": "polygon",
+        "detail/:query": "detail"
     },
     defaultRoute: function(){
         new AboutView({el: '#list-view'});
@@ -28,8 +27,5 @@ var AppRouter = Backbone.Router.extend({
                 new DetailView({el: '#map-view', attributes: {query: q, meta: resp['objects'][0]}})
             }
         )
-    },
-    polygon: function(polygonName){
-        new PolygonView({el: '#map-view', attributes:{'polygonName': polygonName}})
     }
 });

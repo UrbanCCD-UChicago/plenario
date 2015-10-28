@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}Dataset status - Plenar.io{% endblock %}
+{% block extra_styles %}
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
+{% endblock %}
+
+{% block content %}
+    <p><a href='{{ url_for('views.view_datasets') }}'>&laquo; view datasets</a></p>
+
+    <h2>{{ shape.human_name }}</h2>
+
+
+    <table id='datasets-pending-table' class="table table-condensed">
+        <thead>
+            <th>Status</th>
+            <th>Completed</th>
+            <th style='width: 60%'>Traceback</th>
+        </thead>
+        <td>
+            {% if shape.status %}
+                <span class="label
+                    {% if shape.status == 'SUCCESS' %}
+                        label-success
+                    {% else %}
+                        label-primary
+                    {% endif %}">
+                    {{ shape.status|title }}
+                </span>
+            {% elif not shape.date_done %}
+                <span class="label label-default">Running</span>
+            {% endif %}
+        </td>
+        <td>
+          {% if shape.date_done %}
+            {{ shape.date_done }}
+          {% else %}
+            Update pending &hellip;
+          {% endif %}
+        </td>
+        <td>
+            {% if shape.traceback %}
+                <code>{{ shape.traceback|safe }}</code>
+            {% endif %}
+        </td>
+    </table>
+
+    <button type="button" data-toggle="modal" data-target="#confirm-modal" class="btn btn-link"><i class='fa fa-times'></i> Delete dataset</button>
+
+    <div id="confirm-modal" class="modal fade">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+            <h4 class="modal-title">Are you sure you want to delete the dataset {{shape.human_name}} ?</h4>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" data-dismiss="modal" id="delete" data-name="{{shape.dataset_name}}"><i class='fa fa-times'></i> Delete</button>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+  </div><!-- /.modal -->
+
+
+{% endblock content %}
+
+{% block extra_javascript %}
+  <script type="text/javascript">
+        $(document).ready(function(){
+            $('#delete').on('click', function(e){
+                var name = $(this).data('name');
+                $.getJSON('/admin/delete-shape/' + name, {}, function(resp){
+    	            // Slight hack: reload the view-datasets page after waiting for a couple seconds.
+     	            setTimeout( function(){
+                            window.location = "/admin/view-datasets/?";
+                        }, 2500 );
+                })
+            })
+        })
+    </script>
+{% endblock %}

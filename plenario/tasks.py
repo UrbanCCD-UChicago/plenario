@@ -1,7 +1,8 @@
 import os
 from urlparse import urlparse
+import sys
 from plenario.celery_app import celery_app
-from plenario.models import MetaTable, MasterTable
+from plenario.models import MetaTable, MasterTable, PolygonMetadata
 from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.utils.etl import PlenarioETL
@@ -57,10 +58,23 @@ def add_dataset(self, source_url_hash, s3_path=None, data_types=None):
     return 'Finished adding {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task(bind=True)
-def add_shape(self, polygon_table, source_url, source_srid):
-    PolygonETL(polygon_table, save_to_s3=True)\
-        .import_shapefile(source_srid, source_url)
-    return 'Finished adding shape dataset {} from {}.'.format(polygon_table.table_name, source_url)
+def add_shape(self, table_name):
+
+    # Associate the dataset with this celery task so we can check on the task's status
+    meta = session.query(PolygonMetadata).get(table_name)
+    meta.celery_task_id = self.request.id
+    session.commit()
+
+    # Ingest the shapefile
+    PolygonETL(meta=meta).import_shapefile()
+    return 'Finished adding shape dataset {} from {}.'.format(meta.dataset_name, meta.source_url)
+
+@celery_app.task(bind=True)
+def delete_shape(self, table_name):
+    shape_meta = session.query(PolygonMetadata).get(table_name)
+    shape_meta.remove_table(caller_session=session)
+    session.commit()
+    return 'Removed {}'.format(table_name)
 
 @celery_app.task
 def frequency_update(frequency):

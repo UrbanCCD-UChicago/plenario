@@ -1,19 +1,18 @@
-import os
-from sqlalchemy import Column, Integer, String, Boolean, Table, Date, DateTime, \
-    Float, Numeric, Text, TypeDecorator, BigInteger
-from sqlalchemy.dialects.postgresql import TIMESTAMP, DOUBLE_PRECISION, TIME,\
-    DATE, ARRAY
-from geoalchemy2 import Geometry
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, backref, deferred, synonym
-from sqlalchemy.ext.hybrid import hybrid_property
 from uuid import uuid4
-from flask_bcrypt import Bcrypt
-from plenario.database import session
+from datetime import datetime
 
-from plenario.database import Base, app_engine as engine
-#from plenario.auth import bcrypt
+from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, \
+    Text, BigInteger, update
+from sqlalchemy.dialects.postgresql import TIMESTAMP, DOUBLE_PRECISION, ARRAY
+from geoalchemy2 import Geometry
+from sqlalchemy.orm import synonym
+from flask_bcrypt import Bcrypt
+
+from plenario.database import session, Base
+from plenario.utils.helpers import slugify
+
 bcrypt = Bcrypt()
+
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
@@ -49,6 +48,7 @@ class MetaTable(Base):
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
+
 class MasterTable(Base):
     __tablename__ = 'dat_master'
     master_row_id = Column(BigInteger, primary_key=True)
@@ -76,11 +76,86 @@ class MasterTable(Base):
 class PolygonMetadata(Base):
     __tablename__ = 'meta_polygon'
     dataset_name = Column(String(100), primary_key=True)
-    human_name = Column(String(100), primary_key=True)
+    human_name = Column(String(100), nullable=False)
     source_url = Column(String)
-    source_srid = Column(Integer, nullable=False)
     date_added = Column(DateTime, nullable=False)
-    bbox = Column(Geometry('POLYGON', srid=4326), nullable=False)
+    # We always ingest geometric data as 4326
+    bbox = Column(Geometry('POLYGON', srid=4326))
+    # False when admin first submits metadata.
+    # Will become true if ETL completes successfully.
+    is_ingested = Column(Boolean, nullable=False)
+    # foreign key of celery task responsible for shapefile's ingestion
+    celery_task_id = Column(String)
+
+    """
+    A note on `caller_session`.
+    tasks.py calls on a different scoped_session than the rest of the application.
+    To make these functions usable from the tasks and the regular application code,
+    we need to pass in a session rather than risk grabbing the wrong session from the registry.
+    """
+
+    @classmethod
+    def get_all_with_etl_status(cls, caller_session):
+        """
+        :return: Every row of meta_polygon joined with celery task status.
+        """
+        shape_query = '''
+            SELECT meta.*, celery.status
+            FROM meta_polygon as meta
+            LEFT JOIN celery_taskmeta as celery
+            ON celery.task_id = meta.celery_task_id;
+        '''
+
+        return list(caller_session.execute(shape_query))
+
+    @classmethod
+    def get_metadata_with_etl_result(cls, table_name, caller_session):
+        query = '''
+            SELECT meta.*, celery.status, celery.traceback, celery.date_done
+            FROM meta_polygon as meta
+            LEFT JOIN celery_taskmeta as celery
+            ON celery.task_id = meta.celery_task_id
+            WHERE meta.dataset_name='{}';
+        '''.format(table_name)
+
+        metadata = caller_session.execute(query).first()
+        return metadata
+
+    @classmethod
+    def get_by_human_name(cls, human_name, caller_session):
+        caller_session.query(cls).get(cls.make_table_name(human_name))
+
+    @classmethod
+    def make_table_name(cls, human_name):
+        return slugify(human_name)
+
+    @classmethod
+    def add(cls, caller_session, human_name, source_url):
+        table_name = PolygonMetadata.make_table_name(human_name)
+        new_polygon_dataset = PolygonMetadata(dataset_name=table_name,
+                                              human_name=human_name,
+                                              is_ingested=False,
+                                              source_url=source_url,
+                                              date_added=datetime.now().date(),
+                                              bbox=None)
+
+        caller_session.add(new_polygon_dataset)
+        return new_polygon_dataset
+
+    def remove_table(self, caller_session):
+        drop = "DROP TABLE {};".format(self.dataset_name)
+        caller_session.execute(drop)
+        caller_session.drop(self)
+
+    def update_after_ingest(self, caller_session):
+        self.is_ingested = True
+        self.bbox = self._make_bbox(caller_session)
+
+    def _make_bbox(self, caller_session):
+        bbox_query = 'SELECT ST_Envelope(ST_Union(geom)) FROM {};'.format(self.dataset_name)
+        box = caller_session.execute(bbox_query).first().st_envelope
+        return box
+
 
 def get_uuid():
     return unicode(uuid4())
@@ -128,31 +203,3 @@ class User(Base):
 
     def get_id(self):
         return self.id
-''' Not used
-def crime_table(name, metadata):
-    table = Table(name, metadata,
-            Column('id', Integer),
-            Column('case_number', String(length=10)),
-            Column('orig_date', TIMESTAMP),
-            Column('block', String(length=50)),
-            Column('iucr', String(length=10)),
-            Column('primary_type', String(length=100)),
-            Column('description', String(length=100)),
-            Column('location_description', String(length=50)),
-            Column('arrest', Boolean),
-            Column('domestic', Boolean),
-            Column('beat', String(length=10)),
-            Column('district', String(length=5)),
-            Column('ward', Integer),
-            Column('community_area', String(length=10)),
-            Column('fbi_code', String(length=10)),
-            Column('x_coordinate', Integer, nullable=True),
-            Column('y_coordinate', Integer, nullable=True),
-            Column('year', Integer),
-            Column('updated_on', TIMESTAMP, default=None),
-            Column('latitude', DOUBLE_PRECISION(precision=53)),
-            Column('longitude', DOUBLE_PRECISION(precision=53)),
-            Column('location', Point),
-    extend_existing=True)
-    return table
-'''

@@ -8,7 +8,7 @@ from itertools import groupby
 from cStringIO import StringIO
 import csv
 from collections import OrderedDict
-import subprocess
+import tempfile
 
 from flask import make_response, request, current_app, Blueprint
 from flask.ext.cache import Cache
@@ -25,6 +25,7 @@ from plenario.database import session, app_engine as engine, Base
 from plenario.utils.helpers import slugify, increment_datetime_aggregate
 from plenario.settings import CACHE_CONFIG, DATA_DIR
 import plenario.settings
+from plenario.utils.ogr2ogr import OgrExport, OgrError
 
 cache = Cache(config=CACHE_CONFIG)
 
@@ -252,13 +253,11 @@ def find_intersecting_polygons(geojson):
             (SELECT ST_GeomFromGeoJSON('{geojson_fragment}'));
         '''.format(geojson_fragment=fragment)
 
-        #import pdb; pdb.set_trace()
         intersecting_datasets = engine.execute(query)
         bounding_box_intersection_names = [dataset.dataset_name for dataset in intersecting_datasets]
     except Exception as e:
         print 'Error finding candidates'
         raise e
-        #return make_response('Oh no', 500)
 
     try:
         # Then, for the candidates, get a count of the rows that intersect.
@@ -269,6 +268,7 @@ def find_intersecting_polygons(geojson):
             FROM {dataset_name} as g
             WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
             '''.format(dataset_name=dataset_name, geojson_fragment=fragment)
+
             num_intersections = engine.execute(num_intersections_query)\
                                       .first().num_geoms
 
@@ -311,44 +311,70 @@ def extract_first_geometry_fragment(geojson):
     else:
         fragment = geo
 
-    fragment['crs'] = {"type":"name","properties":{"name":"EPSG:4326"}}
+    fragment['crs'] = {"type": "name", "properties": {"name": "EPSG:4326"}}
     return json.dumps(fragment)
+
 
 @api.route(API_VERSION + '/api/polygons/<dataset_name>')
 @crossdomain(origin="*")
-def export_polygon_as_geojson(dataset_name):
-    postgres_connection_arg = 'PG:host={} user={} port={} dbname={} password={}'.format(
-                                  plenario.settings.DB_HOST,
-                                  plenario.settings.DB_USER,
-                                  plenario.settings.DB_PORT,
-                                  plenario.settings.DB_NAME,
-                                  plenario.settings.DB_PASSWORD)
+def export_polygon(dataset_name):
+    """
+    :param dataset_name: Name of shape dataset. Expected to be found in meta_polygon table.
+    Expected query parameter: `data_type`. We expect it to be one of 'json', 'kml', or 'shapefile'.
+                                If none of these (or unspecified), return JSON.
+    """
 
-    # TODO: use tempfile library instead
-    temp_path = os.path.join(DATA_DIR, 'to_export.json')
-    if os.path.exists(temp_path):
-        os.remove(temp_path)
+    # Do we have this shape?
+    try:
+        shape_dataset = session.query(PolygonMetadata).get(dataset_name)
+        assert shape_dataset and shape_dataset.is_ingested
+    except AssertionError:
+        error_message = 'Could not find shape dataset {}'.format(dataset_name)
+        return make_response(error_message, 404)
 
-    ogr2ogr_args = ['ogr2ogr',
-                    '-f', 'GeoJSON',
-                    temp_path,
-                    postgres_connection_arg,
-                    dataset_name]
+    # What file format does the user want it in?
+    export_format = request.args.get('data_type')
+    # json is default export type
+    if not export_format:
+        export_format = u'json'
+    export_format = unicode.lower(export_format)
+
+    # Make a filename that we are reasonably sure to be unique and not occupied by anyone else.
+    sacrifice_file = tempfile.NamedTemporaryFile()
+    export_path = sacrifice_file.name
+    sacrifice_file.close()  # Removes file from system.
 
     try:
-        subprocess.check_call(ogr2ogr_args)
-    except subprocess.CalledProcessError:
-        print 'Failed to export requested polygon dataset to file with ogr2ogr.' + str(ogr2ogr_args)
-        return make_response('error', 500)
+        # Write to that filename
+        OgrExport(export_format=export_format, table_name=dataset_name, export_path=export_path).write_file()
+        # Dump it in the response
+        with open(export_path, 'r') as to_export:
+            resp = make_response(to_export.read(), 200)
+        resp.headers['Content-Type'] = _shape_format_to_content_header(export_format)
+        return resp
+    except Exception as e:
+        error_message = 'Failed to export shape dataset {}'.format(dataset_name)
+        print repr(e)
+        return make_response(error_message, 500)
+    finally:
+        # Don't leave that file hanging around.
+        if os.path.isfile(export_path):
+            os.remove(export_path)
 
-    # Load file into filereader
-    with open(temp_path, 'r') as geojson:
-        # Dump contents into a response
-        resp = make_response(geojson.read(), 200)
 
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
+def _shape_format_to_content_header(requested_format):
 
+    format_map = {
+        'json': 'application/json',
+        'kml':  'application/vnd.google-earth.kml+xml',
+        'shapefile': 'application/zip'
+    }
+    try:
+        content_header = format_map[requested_format]
+    except KeyError:
+        content_header = format_map['json']
+
+    return content_header
 
 @api.route(API_VERSION + '/api/weather-stations/')
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)

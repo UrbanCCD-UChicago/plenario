@@ -1,15 +1,17 @@
 import unittest
 import os
 from hashlib import md5
-from plenario.utils.polygon_etl import PolygonETL, PolygonTable
-from plenario.utils.etl import PlenarioETL, PlenarioETLError
+from plenario.utils.polygon_etl import PolygonETL
+from plenario.utils.etl import PlenarioETL
+from plenario.utils.shapefile import Shapefile
 from plenario import create_app
-from plenario.database import task_engine
 from init_db import init_master_meta_user, init_census
-from plenario.database import task_session as session
+from plenario.database import session, app_engine as engine
 from plenario.models import MetaTable, PolygonMetadata
 import json
 import urllib
+from StringIO import StringIO
+import zipfile
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 FIXTURE_PATH = os.path.join(pwd, '..', 'test_fixtures')
@@ -21,45 +23,58 @@ ILLINOIS_STATE_PLANE_SRID = 3435
 def drop_tables(table_names):
     drop_template = 'DROP TABLE IF EXISTS {};'
     command = ''.join([drop_template.format(table_name) for table_name in table_names])
-    task_engine.execute(command)
+    engine.execute(command)
+
+
+class Fixture(object):
+    def __init__(self, human_name, file_name):
+        self.human_name = human_name
+        self.table_name = PolygonMetadata.make_table_name(human_name)
+        self.path = os.path.join(FIXTURE_PATH, file_name)
+
+fixtures = {
+    'city': Fixture(human_name=u'Chicago City Limits',
+                    file_name='chicago_city_limits.zip'),
+    'streets': Fixture(human_name=u'Pedestrian Streets',
+                       file_name='chicago_pedestrian_streets.zip'),
+    'zips': Fixture(human_name=u'Zip Codes',
+                    file_name='chicago_zip_codes.zip')
+}
 
 
 class PolygonAPITests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Use Chicago's pedestrian streets to test how we handle polylines
-        cls.lines_table = PolygonTable(u'Pedestrian Streets')
-        cls.lines_srid = ILLINOIS_STATE_PLANE_SRID
-        cls.lines_path = os.path.join(FIXTURE_PATH, 'chicago_pedestrian_streets.zip')
 
-        # Use Chciago's zip codes to test how we handle polygons
-        cls.polygons_table = PolygonTable(u'Zip Codes')
-        cls.polygons_srid = ILLINOIS_STATE_PLANE_SRID
-        cls.polygons_path = os.path.join(FIXTURE_PATH, 'chicago_zip_codes.zip')
+        # Remove tables that we're about to recreate.
+        # This doesn't happen in teardown because I find it helpful to inspect them in the DB after running the tests.
+        meta_table_names = ['dat_master', 'meta_polygon', 'meta_master', 'plenario_user']
+        fixture_table_names = [fixture.table_name for key, fixture in fixtures.iteritems()]
+        drop_tables(meta_table_names + fixture_table_names)
 
-        # Clean up
-        tables_to_drop = [cls.lines_table.table_name, cls.polygons_table.table_name,
-                          'dat_master', 'meta_polygon', 'meta_master', 'plenario_user']
-        drop_tables(tables_to_drop)
+        # Re-add meta tables
         init_master_meta_user()
 
-        # Ingest
-        PolygonETL(cls.polygons_table).import_shapefile(cls.polygons_srid,
-                                                        None,
-                                                        source_path=cls.polygons_path)
-
-        PolygonETL(cls.lines_table).import_shapefile(cls.lines_srid,
-                                                     None,
-                                                     source_path=cls.lines_path)
+        cls.city_meta = PolygonAPITests.ingest_fixture(fixtures['city'])
+        cls.streets_meta = PolygonAPITests.ingest_fixture(fixtures['streets'])
+        cls.zips_meta = PolygonAPITests.ingest_fixture(fixtures['zips'])
+        session.commit()
 
         cls.app = create_app().test_client()
+
+    @staticmethod
+    def ingest_fixture(fixture):
+            shape_meta = PolygonMetadata.add(caller_session=session, human_name=fixture.human_name, source_url=None)
+            session.commit()
+            PolygonETL(meta=shape_meta, source_path=fixture.path).import_shapefile()
+            return shape_meta
 
     def test_names_in_polygon_list(self):
         resp = self.app.get('/v1/api/polygons/')
         response_data = json.loads(resp.data)
         all_names = [item['dataset_name'] for item in response_data['objects']]
-        self.assertIn(self.lines_table.table_name, all_names)
-        self.assertIn(self.polygons_table.table_name, all_names)
+        self.assertIn(fixtures['streets'].table_name, all_names)
+        self.assertIn(fixtures['zips'].table_name, all_names)
 
     def test_find_intersecting(self):
         rect_path = os.path.join(FIXTURE_PATH, 'university_village_rectangle.json')
@@ -73,39 +88,12 @@ class PolygonAPITests(unittest.TestCase):
 
         # By design, the query rectangle should cross 3 zip codes and 2 pedestrian streets
         datasets_to_num_geoms = {obj['dataset_name']: obj['num_geoms'] for obj in response_data['objects']}
-        self.assertEqual(datasets_to_num_geoms[self.polygons_table.table_name], 3)
-        self.assertEqual(datasets_to_num_geoms[self.lines_table.table_name], 2)
+        self.assertEqual(datasets_to_num_geoms[fixtures['zips'].table_name], 3)
+        self.assertEqual(datasets_to_num_geoms[fixtures['streets'].table_name], 2)
 
-
-class PolygonETLTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        # Chicago's city limits is a relatively small polygon dataset. Nice for testing.
-        cls.human_name = u'Chicago City Limits'
-        cls.srid = ILLINOIS_STATE_PLANE_SRID
-        cls.polygon_table = PolygonTable(cls.human_name)
-
-        # Clean our testing environment
-        tables_to_drop = [cls.polygon_table.table_name, 'dat_master', 'meta_polygon', 'meta_master', 'plenario_user']
-        drop_tables(tables_to_drop)
-        init_master_meta_user()
-
-        # Ingest locally
-        cls.shapefile_path = os.path.join(FIXTURE_PATH, 'chicago_city_limits.zip')
-        PolygonETL(cls.polygon_table, save_to_s3=False).import_shapefile(cls.srid,
-                                                                         None,        # Don't care about source url
-                                                                         source_path=cls.shapefile_path)
-
-        cls.app = create_app().test_client()
-
-    def test_no_import_when_name_conflict(self):
-        polygon_etl = PolygonETL(self.polygon_table)
-        with self.assertRaises(PlenarioETLError):
-            polygon_etl.import_shapefile(self.srid, 'dummy_business_key', 'dummy/path')
-
-    def test_export_polygon_as_geojson(self):
+    def test_export_geojson(self):
         # Do we at least get some json back?
-        resp = self.app.get('/v1/api/polygons/' + self.polygon_table.table_name)
+        resp = self.app.get('/v1/api/polygons/{}?data_type=json'.format(fixtures['city'].table_name))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.content_type, 'application/json')
 
@@ -120,6 +108,30 @@ class PolygonETLTests(unittest.TestCase):
             for inner_geom in outer_geom:
                 observed_num_points += len(inner_geom)
         self.assertEqual(expected_num_points, observed_num_points)
+
+    def test_export_with_bad_name(self):
+        resp = self.app.get('/v1/api/polygons/this_is_a_fake_name')
+        self.assertEqual(resp.status_code, 404)
+
+    def test_export_shapefile(self):
+        resp = self.app.get('/v1/api/polygons/{}?data_type=shapefile'.format(fixtures['city'].table_name))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.content_type, 'application/zip')
+        file_content = StringIO(resp.data)
+        as_zip = zipfile.ZipFile(file_content)
+
+        # The Shapefile utility class takes a ZipFile, opens it,
+        # and throws an exception if it doesn't have the expected shapefile components (.shp and ,prj namely)
+        with Shapefile(as_zip):
+            pass
+
+    def test_no_import_when_name_conflict(self):
+        with self.assertRaises(Exception):
+            PolygonAPITests.ingest_fixture(fixtures['city'])
+
+    # TODO: test case for exporting table that's in metadata but not ingested
+
+    # TODO: test cases for alternative export types
 
 
 class CensusRegressionTests(unittest.TestCase):
@@ -195,11 +207,6 @@ class CensusRegressionTests(unittest.TestCase):
 
     def test_point_dataset_visible(self):
         resp = self.app.get('/v1/api/fields/flu_shot_clinic_locations')
-        self.assertEqual(resp.status_code, 200)
-
-    # Failing on assumption that all datasets are prefixed with dat_
-    def test_census_dataset_visible_in_dataset_fields(self):
-        resp = self.app.get('/v1/api/fields/census_blocks')
         self.assertEqual(resp.status_code, 200)
 
     def test_filter_on_census_block(self):

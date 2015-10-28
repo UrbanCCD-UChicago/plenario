@@ -8,15 +8,13 @@ import requests
 from boto.s3.connection import S3Connection, S3ResponseError
 from boto.s3.key import Key
 
-from plenario.database import session, task_engine as engine
-from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET, DATA_DIR
-from plenario.utils.shapefile import Shapefile
+from plenario.database import session, app_engine as engine
+from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET
+from plenario.utils.shapefile import import_shapefile, ShapefileError
 
 from plenario.models import PolygonMetadata
-import hashlib
 
 from plenario.utils.etl import PlenarioETLError
-from plenario.utils.helpers import slugify
 
 
 class ETLFile:
@@ -109,95 +107,62 @@ class ETLFile:
 
 class PolygonETL:
 
-    def __init__(self, polygon_table, save_to_s3=False):
-        """
-        :param PolygonTable:
-        """
+    def __init__(self, meta, source_path=None, save_to_s3=False):
         self.save_to_s3 = save_to_s3
-        self.polygon_table = polygon_table
+        self.source_path = source_path
+        self.table_name = meta.dataset_name
+        self.source_url = meta.source_url
+        self.meta = meta
 
-    def import_shapefile(self, source_srid, source_url, source_path=None):
-        if self.polygon_table.exists():
-            raise PlenarioETLError("Trying to create table with name that has already been claimed.")
+    def _get_metadata(self):
+        shape_meta = session.query(PolygonMetadata).get(self.table_name)
+        if not shape_meta:
+            raise PlenarioETLError("Table {} is not registered in the metadata.".format(self.table_name))
+        return shape_meta
 
-        shapefile_hash = self._ingest_shapefile(source_srid, source_url, source_path, 'c')
+    def _refresh_metadata(self):
+        pass
 
-        self.polygon_table.add_to_meta(source_url, source_srid)
+    def import_shapefile(self):
+        if self.meta.is_ingested:
+            raise PlenarioETLError("Table {} has already been ingested.".format(self.table_name))
 
-    def _ingest_shapefile(self, source_srid, source_url, source_path, create_mode):
+        # NB: this function is not atomic.
+        # update_after_ingest could fail after _ingest_shapefile succeeds, leaving us with inaccurate metadata.
+        # If this becomes a problem, we can tweak the ogr2ogr import to return a big SQL string
+        # rather than just going ahead and importing the shapefile.
+        # Then we could put both operations in the same transaction.
 
-        def insert_in_database(shapefile_handle):
-            # Given a valid shapefile...
-            with zipfile.ZipFile(shapefile_handle) as shapefile_zip:
-                # that has the expected composition of a shapefile...
-                with Shapefile(shapefile_zip, source_srid=source_srid) as shape:
-                    # we can generate a big SQL import statement.
-                    import_statement = shape.generate_import_statement(self.polygon_table.table_name, create_mode)
+        self._ingest_shapefile()
+        self.meta.update_after_ingest(session)
 
-            engine.execute(import_statement)
+        session.commit()
+
+    def _ingest_shapefile(self):
 
         def attempt_save_to_s3(file_helper):
             try:
                 # Use current time to create uniquely named file in S3 bucket
                 now_timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-                s3_path = '{}/{}.zip'.format(self.polygon_table.table_name, now_timestamp)
+                s3_path = '{}/{}.zip'.format(self.table_name, now_timestamp)
                 file_helper.upload_to_s3(s3_path)
             except S3ResponseError as e:
                 # If AWS storage fails, soldier on.
                 print "Failed to upload file to S3.\n" + e.message
 
         # Get a handle to the shapefile.
-        with ETLFile(source_url=source_url, source_path=source_path) as file_helper:
+        with ETLFile(source_url=self.source_url, source_path=self.source_path) as file_helper:
 
             # Try to save to S3 first so that we have a record of what the dataset looked like
             # even if insertion fails.
             if self.save_to_s3:
                 attempt_save_to_s3(file_helper)
 
-            insert_in_database(file_helper.handle)
-
-
-class PolygonTable:
-    def __init__(self, human_name):
-        """
-        :param human_name:
-        :type human_name: unicode
-        """
-        self.human_name = human_name
-        self.table_name = PolygonTable.make_table_name(human_name)
-
-    def exists(self):
-        return engine.has_table(self.table_name)
-
-    @classmethod
-    def make_table_name(cls, human_name):
-        return slugify(human_name)
-
-    def get_metadata(self):
-        return session.query(PolygonMetadata.source_url,
-                             PolygonMetadata.source_srid,)\
-                      .filter_by(dataset_name=self.table_name)\
-                      .first()
-
-    def _make_bbox(self):
-        bbox_query = 'SELECT ST_Envelope(ST_Union(geom)) FROM {};'.format(self.table_name)
-        box = engine.execute(bbox_query).first().st_envelope
-        return box
-
-    def add_to_meta(self, source_url, source_srid):
-        """
-        Add table_name to meta_polygon
-        """
-
-        new_polygon_dataset = PolygonMetadata(dataset_name=self.table_name,
-                                              human_name=self.human_name,
-                                             source_url=source_url,
-                                             date_added=datetime.now().date(),
-                                             source_srid=source_srid,
-                                             bbox=self._make_bbox())
-        try:
-            session.add(new_polygon_dataset)
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            raise e
+            # Attempt insertion
+            try:
+                with zipfile.ZipFile(file_helper.handle) as shapefile_zip:
+                    import_shapefile(shapefile_zip=shapefile_zip, table_name=self.table_name)
+            except zipfile.BadZipfile:
+                raise PlenarioETLError("Source file was not a valid .zip")
+            except ShapefileError as e:
+                raise PlenarioETLError("Failed to import shapefile.\n{}".format(repr(e)))

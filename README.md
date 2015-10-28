@@ -36,13 +36,7 @@ psql plenario_dev
 plenario_test=# CREATE EXTENSION postgis;
 ```
 
-Make sure your installation of postgis came with the shp2pgsql utility (we use this to ingest ESRI shapefiles).
-
-```
-shp2pgsql --help
-```
-
-And you'll need the ogr2ogr utility; it's part of the gdal package (we use it to export shape datasets)
+You'll need the ogr2ogr utility; it's part of the gdal package (we use it toimport and export shape datasets)
 
 OSX
 ```

@@ -1,11 +1,11 @@
 from flask import make_response, request, redirect, url_for, render_template, current_app, g, \
     Blueprint, flash, session as flask_session
-from plenario.models import MasterTable, MetaTable, User
+from plenario.models import MasterTable, MetaTable, User, PolygonMetadata
 from plenario.database import session, Base, app_engine as engine
 from plenario.utils.helpers import get_socrata_data_info, iter_column, send_mail, slugify
-from plenario.utils.polygon_etl import PolygonTable
 from plenario.tasks import update_dataset as update_dataset_task, \
-    delete_dataset as delete_dataset_task, add_dataset as add_dataset_task, add_shape as add_shape_task
+    delete_dataset as delete_dataset_task, add_dataset as add_dataset_task, \
+    add_shape as add_shape_task, delete_shape as delete_shape_task
 from flask_login import login_required
 from datetime import datetime, timedelta
 from urlparse import urlparse
@@ -308,28 +308,26 @@ def add_shape():
 
     if request.method == 'POST':
         try:
-            print request.form
             human_name = request.form['dataset_name']
-            print human_name
-            source_srid = request.form['source_srid']
-            print source_srid
             source_url = request.form['source_url']
-            print source_url
         except KeyError:
             # Front-end validation failed or someone is posting bogus query strings directly.
             # re-render with error message
             errors.append('A required field was not submitted.')
 
         # Does a shape dataset with this human_name already exist?
-        new_table = PolygonTable(human_name)
-        if new_table.exists():
-            # re-render with errors
+        if PolygonMetadata.get_by_human_name(human_name=human_name, caller_session=session):
             errors.append('A shape dataset with that name already exists.')
 
         if not errors:
-            add_shape_task.delay(polygon_table=new_table,
+            # Add the metadata right away
+            meta = PolygonMetadata.add(caller_session=session, human_name=human_name, source_url=source_url)
+            session.commit()
+
+            # And tell a worker to go ingest it
+            add_shape_task.delay(table_name=meta.dataset_name,
                                  source_url=source_url,
-                                 source_srid=source_srid)
+                                 )
 
             flash('Plenario is now trying to ingest your shapefile.', 'success')
             return redirect(url_for('views.view_datasets'))
@@ -351,8 +349,6 @@ def view_datasets():
     }
 
     try:
-        celery_table = Table('celery_taskmeta', Base.metadata, 
-                             autoload=True, autoload_with=engine)
         q = text(''' 
             SELECT m.*, c.status, c.task_id
             FROM meta_master AS m 
@@ -365,14 +361,33 @@ def view_datasets():
               )
             WHERE m.approved_status = 'true'
         ''')
-        datasets = []
         with engine.begin() as c:
             datasets = list(c.execute(q))
     except NoSuchTableError, e:
         datasets = session.query(MetaTable)\
         .filter(MetaTable.approved_status == 'true')\
         .all()
-    return render_template('admin/view-datasets.html', datasets_pending=datasets_pending, datasets=datasets, counts=counts)
+
+    try:
+        shape_datasets = PolygonMetadata.get_all_with_etl_status()
+    except NoSuchTableError:
+        # If we can't find shape metadata, soldier on.
+        shape_datasets = None
+
+    return render_template('admin/view-datasets.html',
+                           datasets_pending=datasets_pending,
+                           datasets=datasets,
+                           counts=counts,
+                           shape_datasets=shape_datasets)
+
+
+@views.route('/admin/shape-status/')
+@login_required
+def shape_status():
+    table_name = request.args['table_name']
+    shape_meta = PolygonMetadata.get_metadata_with_etl_result(table_name)
+    return render_template('admin/shape-status.html', shape=shape_meta)
+
 
 @views.route('/admin/dataset-status/')
 @login_required
@@ -559,6 +574,14 @@ def edit_dataset(source_url_hash):
         'num_rows_w_censusblocks': num_rows_w_censusblocks
     }
     return render_template('admin/edit-dataset.html', **context)
+
+
+@views.route('/admin/delete-shape/<table_name>')
+@login_required
+def delete_shape(table_name):
+    result = delete_shape_task.delay(table_name)
+    return make_response(json.dumps({'status': 'success', 'task_id': result.id}))
+
 
 @views.route('/admin/delete-dataset/<source_url_hash>')
 @login_required

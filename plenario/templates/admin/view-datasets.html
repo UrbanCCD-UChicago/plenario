@@ -159,6 +159,52 @@
             {% endfor %}
         </tbody>
     </table>
+
+    {% if shape_datasets %}
+        <h3>
+        Experimental: Shape Datasets
+        </h3>
+
+        <table id='shapes-table' class="table table-condensed">
+            <thead>
+                <th>Name</th>
+                <th>Date Added</th>
+                <th>ETL Status</th>
+                <th></th>
+            </thead>
+                {% for shape_dataset in shape_datasets %}
+                    <tr>
+                        <td>{{ shape_dataset.dataset_name }}</td>
+                        <td>{{ shape_dataset.date_added }}</td>
+                        <td>
+                            {% if shape_dataset.status %}
+                                {% if shape_dataset.status == 'SUCCESS' %}
+                                    <a href="{{url_for('views.shape_status', table_name=shape_dataset.dataset_name)}}" class='btn btn-success btn-sm dataset-success'>
+                                        <i class='fa fa-check'></i>
+                                        {{ shape_dataset.status|title }}
+                                    </a>
+                                {% else %}
+                                    <a href="{{url_for('views.shape_status', table_name=shape_dataset.dataset_name) }}" class='btn btn-primary btn-sm dataset-error'>
+                                        <i class='fa fa-exclamation'></i>
+                                        {{ shape_dataset.status|title }}
+                                    </a>
+                                {% endif %}
+                            {% else %}
+                                <a href="{{url_for('views.shape_status', table_name=shape_dataset.dataset_name) }}" class='btn btn-default btn-sm dataset-running'>
+                                        Ingest pending
+                                    </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            <tbody>
+            </tbody>
+        </table>
+
+
+    {% endif %}
+
+
 {% endblock content %}
 {% block extra_javascript %}
     <script type="text/javascript" charset="utf8" src="/static/js/jquery.dataTables.js"></script>
