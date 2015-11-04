@@ -1,6 +1,6 @@
 from flask import make_response, request, redirect, url_for, render_template, current_app, g, \
     Blueprint, flash, session as flask_session
-from plenario.models import MasterTable, MetaTable, User, PolygonMetadata
+from plenario.models import MasterTable, MetaTable, User, ShapeMetadata
 from plenario.database import session, Base, app_engine as engine
 from plenario.utils.helpers import get_socrata_data_info, iter_column, send_mail, slugify
 from plenario.tasks import update_dataset as update_dataset_task, \
@@ -316,18 +316,16 @@ def add_shape():
             errors.append('A required field was not submitted.')
 
         # Does a shape dataset with this human_name already exist?
-        if PolygonMetadata.get_by_human_name(human_name=human_name, caller_session=session):
+        if ShapeMetadata.get_by_human_name(human_name=human_name, caller_session=session):
             errors.append('A shape dataset with that name already exists.')
 
         if not errors:
             # Add the metadata right away
-            meta = PolygonMetadata.add(caller_session=session, human_name=human_name, source_url=source_url)
+            meta = ShapeMetadata.add(caller_session=session, human_name=human_name, source_url=source_url)
             session.commit()
 
             # And tell a worker to go ingest it
-            add_shape_task.delay(table_name=meta.dataset_name,
-                                 source_url=source_url,
-                                 )
+            add_shape_task.delay(table_name=meta.dataset_name)
 
             flash('Plenario is now trying to ingest your shapefile.', 'success')
             return redirect(url_for('views.view_datasets'))
@@ -369,7 +367,7 @@ def view_datasets():
         .all()
 
     try:
-        shape_datasets = PolygonMetadata.get_all_with_etl_status()
+        shape_datasets = ShapeMetadata.get_all_with_etl_status(caller_session=session)
     except NoSuchTableError:
         # If we can't find shape metadata, soldier on.
         shape_datasets = None
@@ -385,7 +383,7 @@ def view_datasets():
 @login_required
 def shape_status():
     table_name = request.args['table_name']
-    shape_meta = PolygonMetadata.get_metadata_with_etl_result(table_name)
+    shape_meta = ShapeMetadata.get_metadata_with_etl_result(table_name=table_name, caller_session=session)
     return render_template('admin/shape-status.html', shape=shape_meta)
 
 

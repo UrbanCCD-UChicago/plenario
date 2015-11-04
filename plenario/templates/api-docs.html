@@ -23,7 +23,7 @@
       </ul>
 
       <h2 id='endpoints'>Endpoints</h2>
-      <p>Currently there are nine API endpoints:</p>
+      <p>Currently there are thirteen API endpoints:</p>
 
       <h3>Data about the data</h3>
       <div class="panel-group" id="accordion-api-datasets">
@@ -696,6 +696,8 @@
         </div>
       </div>
 
+
+
       <h3>Raw data</h3>
       <div class="panel-group" id="accordion-api-detail">
         <div class="panel panel-default">
@@ -822,15 +824,15 @@
                     <td><strong><code>offset</code></strong></td>
                     <td>none</td>
                     <td>
-                      <p>Used to paginate through results of more than 500.</p>
-                      <p><strong>Example:</strong> <code>offset=500</code> will fetch the second page of results.</p>
+                      <p>Used to paginate through results of more than 1000.</p>
+                      <p><strong>Example:</strong> <code>offset=1000</code> will fetch the second page of results.</p>
                     </td>
                   </tr>
                 </tbody>
               </table>
 
               <p><strong>Response</strong></p>
-              <p>The API responds with a list of raw records for the particular dataset. The fields returned will vary per dataset. Response is limited to 500 results, which can be paginated by using the <code>offset</code> parameter.</p>
+              <p>The API responds with a list of raw records for the particular dataset. The fields returned will vary per dataset. Response is limited to 1000 results, which can be paginated by using the <code>offset</code> parameter.</p>
 
               <div class='well examples'>
                 <p><strong>Example</strong></p>
@@ -1540,7 +1542,130 @@
         </div>
       </div>
 
+      {% macro shape_panel(endpoint, endpoint_id, short_description, long_description,
+                         query_desc,
+                         query_params,
+                         response_desc, response_attrs,
+                         examples) %}
 
+        <div class="panel-group" id="accordion-api-{{ endpoint_id }}">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <a data-toggle="collapse" data-parent="#accordion-api-{{ endpoint_id }}" href="#collapse-api-{{ endpoint_id }}" id="api-{{ endpoint_id }}">
+              <span class='label label-info'>GET</span>
+              <strong><code>/v1/api/{{ endpoint }}/</code></strong>
+              <p class='pull-right'>{{ short_description }}</p>
+              <div class='clearfix'></div>
+            </a>
+          </div>
+          <div id="collapse-api-{{ endpoint_id }}" class="panel-collapse collapse">
+            <div class="panel-body">
+              <p>
+                  {{ long_description }}
+              </p>
+
+              <p><strong>Query parameters</strong></p>
+              <p>{% if query_desc %}{{ query_desc }} {% endif %}</p>
+
+                {% if query_params %}
+                <table class='table table-bordered'>
+                <thead>
+                  <tr>
+                    <th>Parameter Name</th>
+                    <th>Parameter Default</th>
+                    <th>Parameter Description</th>
+                  </tr>
+                </thead>
+                {% for param_name, param_default, param_desc in query_params %}
+                  <tbody>
+                    <tr>
+                      <td><strong><code>{{ param_name }}</code></strong></td>
+                      <td>{{ param_default }}</td>
+                      <td>{{ param_desc | safe }}</td>
+                    </tr>
+                  </tbody>
+                {% endfor %}
+                </table>
+                {% endif%}
+
+              <p><strong>Response</strong></p>
+              <p>{{ response_desc }}</p>
+
+                {% if response_attrs %}
+                    <table class='table table-bordered'>
+                    <thead>
+                      <tr>
+                        <th>Attribute Name</th>
+                        <th>Attribute Description</th>
+                      </tr>
+                    </thead>
+                    {% for attr_name, attr_desc in response_attrs %}
+                      <tbody>
+                        <tr>
+                          <td><strong><code>{{ attr_name }}</code></strong></td>
+                          <td>{{ attr_desc }}</td>
+                        </tr>
+                      </tbody>
+                    {% endfor %}
+                    </table>
+                {% endif %}
+
+              <div class='well examples'>
+                <p><strong>Examples</strong></p>
+                {% for ex_link, ex_desc in examples %}
+                  <p><a href='/v1/api/{{ ex_link }}'>http://plenar.io/v1/api/{{ ex_link }}</a><br />
+                  <p>{{ ex_desc }}</p>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endmacro %}
+
+      <h3>Shape data - <em>Experimental</em></h3>
+      {{ shape_panel(endpoint='shapes',
+                     endpoint_id='shapes',
+                     short_description='list metadata about available shape datasets',
+                     long_description='This endpoint contains a record for each shape dataset in Plenario.',
+                     query_desc='This endpoint takes no query parameters.',
+                     query_params=None,
+                     response_desc='One record per shape dataset.',
+                     response_attrs=[('dataset_name', 'the name by which you can query the shape dataset'),
+                                     ('human_name', 'a nicer name to refer to the shape dataset in user interfaces'),
+                                     ('date_added', 'the date the shape dataset was added to Plenario'),
+                                     ('bounding_box','a GeoJSON document that describes an area that contains all shapes in the dataset')],
+                     examples=[('shapes/', 'Information about every shape dataset.')] )}}
+
+      {{ shape_panel(endpoint='shapes/<dataset_name>',
+                     endpoint_id='shapes_raw',
+                     short_description='get a single shape dataset',
+                     long_description='Download this shape dataset in the format of your choosing.',
+                     query_desc=None,
+                     query_params=[('data_type', 'json', '<code>json</code> for GeoJSON,
+                                                          <code>shapefile</code> for ESRI Shapefile,
+                                                          or <code>kml</code> for KML')],
+                     response_desc='A document with the entire shape dataset.',
+                     response_attrs=None,
+                     examples=[('shapes/chicago_pedestrian_streets?data_type=json',
+                                "Get a GeoJSON document with Chicago's streets that are reserved for pedestrian traffic."),
+                                ('shapes/chicago_zip_codes?data_type=shapefile',
+                                 "Get an ESRI Shapefile with the boundaries of Chicago's zip codes.")]) }}
+
+      {{ shape_panel(endpoint='shapes/intersections/<geojson>',
+                     endpoint_id='shape_intersections',
+                     short_description='find how many shapes in Plenario intersect with a geometry',
+                     long_description="Given a geometry encoded in GeoJSON,
+                                       find how many shapes in each of Plenario's shape datasets in Plenario intersect it.",
+                     query_desc='This endpoint takes no query parameters.',
+                     query_params=None,
+                     response_desc='One record per shape dataset that intersects the given geometry.',
+                     response_attrs=[('dataset_name', 'The name of a dataset that intersects the query geometry.'),
+                                     ('num_intersections', 'A count of how many shapes in that dataset intersect with the query geometry.')],
+                     examples=[('shapes/intersections/{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.67248630523682,41.86454328565965],[-87.67248630523682,41.872117384500754],[-87.6549768447876,41.872117384500754],[-87.6549768447876,41.86454328565965],[-87.67248630523682,41.86454328565965]]]}}',
+                                "For each shape dataset in Plenario,
+                                get a count of the shapes that intersect a geometry encoded in the given GeoJSON.
+                                (This GeoJSON happens to represent a chunk of Chicago's Little Italy neighborhood.)")]) }}
       
       <h2 id='responses'>Response format</h2>
       <p>All JSON API calls return their data in the <code>objects</code> block. Additional information is returned in the <code>meta</code> block:</p>

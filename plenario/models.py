@@ -2,7 +2,7 @@ from uuid import uuid4
 from datetime import datetime
 
 from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, \
-    Text, BigInteger, update
+    Text, BigInteger, func
 from sqlalchemy.dialects.postgresql import TIMESTAMP, DOUBLE_PRECISION, ARRAY
 from geoalchemy2 import Geometry
 from sqlalchemy.orm import synonym
@@ -73,12 +73,12 @@ class MasterTable(Base):
         return '<Master %r (%r)>' % (self.dataset_row_id, self.dataset_name)
 
 
-class PolygonMetadata(Base):
-    __tablename__ = 'meta_polygon'
-    dataset_name = Column(String(100), primary_key=True)
-    human_name = Column(String(100), nullable=False)
+class ShapeMetadata(Base):
+    __tablename__ = 'meta_shape'
+    dataset_name = Column(String, primary_key=True)
+    human_name = Column(String, nullable=False)
     source_url = Column(String)
-    date_added = Column(DateTime, nullable=False)
+    date_added = Column(Date, nullable=False)
     # We always ingest geometric data as 4326
     bbox = Column(Geometry('POLYGON', srid=4326))
     # False when admin first submits metadata.
@@ -97,11 +97,11 @@ class PolygonMetadata(Base):
     @classmethod
     def get_all_with_etl_status(cls, caller_session):
         """
-        :return: Every row of meta_polygon joined with celery task status.
+        :return: Every row of meta_shape joined with celery task status.
         """
         shape_query = '''
             SELECT meta.*, celery.status
-            FROM meta_polygon as meta
+            FROM meta_shape as meta
             LEFT JOIN celery_taskmeta as celery
             ON celery.task_id = meta.celery_task_id;
         '''
@@ -109,10 +109,23 @@ class PolygonMetadata(Base):
         return list(caller_session.execute(shape_query))
 
     @classmethod
+    def index(cls, caller_session):
+        result = caller_session.query(cls.dataset_name,
+                                        cls.human_name,
+                                        cls.date_added,
+                                        func.ST_AsGeoJSON(cls.bbox))\
+                                 .filter(cls.is_ingested)
+        field_names = ['dataset_name', 'human_name', 'date_added', 'bounding_box']
+        listing = [dict(zip(field_names, row)) for row in result]
+        for dataset in listing:
+            dataset['date_added'] = str(dataset['date_added'])
+        return listing
+
+    @classmethod
     def get_metadata_with_etl_result(cls, table_name, caller_session):
         query = '''
             SELECT meta.*, celery.status, celery.traceback, celery.date_done
-            FROM meta_polygon as meta
+            FROM meta_shape as meta
             LEFT JOIN celery_taskmeta as celery
             ON celery.task_id = meta.celery_task_id
             WHERE meta.dataset_name='{}';
@@ -131,21 +144,22 @@ class PolygonMetadata(Base):
 
     @classmethod
     def add(cls, caller_session, human_name, source_url):
-        table_name = PolygonMetadata.make_table_name(human_name)
-        new_polygon_dataset = PolygonMetadata(dataset_name=table_name,
+        table_name = ShapeMetadata.make_table_name(human_name)
+        new_shape_dataset = ShapeMetadata(dataset_name=table_name,
                                               human_name=human_name,
                                               is_ingested=False,
                                               source_url=source_url,
                                               date_added=datetime.now().date(),
                                               bbox=None)
 
-        caller_session.add(new_polygon_dataset)
-        return new_polygon_dataset
+        caller_session.add(new_shape_dataset)
+        return new_shape_dataset
 
     def remove_table(self, caller_session):
-        drop = "DROP TABLE {};".format(self.dataset_name)
-        caller_session.execute(drop)
-        caller_session.drop(self)
+        if self.is_ingested:
+            drop = "DROP TABLE {};".format(self.dataset_name)
+            caller_session.execute(drop)
+        caller_session.delete(self)
 
     def update_after_ingest(self, caller_session):
         self.is_ingested = True

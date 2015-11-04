@@ -2,11 +2,11 @@ import os
 from urlparse import urlparse
 import sys
 from plenario.celery_app import celery_app
-from plenario.models import MetaTable, MasterTable, PolygonMetadata
+from plenario.models import MetaTable, MasterTable, ShapeMetadata
 from plenario.database import task_session as session, task_engine as engine, \
     Base
 from plenario.utils.etl import PlenarioETL
-from plenario.utils.polygon_etl import PolygonETL
+from plenario.utils.shape_etl import ShapeETL
 from plenario.utils.weather import WeatherETL
 from raven.handlers.logging import SentryHandler
 from raven.conf import setup_logging
@@ -61,17 +61,17 @@ def add_dataset(self, source_url_hash, s3_path=None, data_types=None):
 def add_shape(self, table_name):
 
     # Associate the dataset with this celery task so we can check on the task's status
-    meta = session.query(PolygonMetadata).get(table_name)
+    meta = session.query(ShapeMetadata).get(table_name)
     meta.celery_task_id = self.request.id
     session.commit()
 
     # Ingest the shapefile
-    PolygonETL(meta=meta).import_shapefile()
+    ShapeETL(meta=meta).import_shapefile()
     return 'Finished adding shape dataset {} from {}.'.format(meta.dataset_name, meta.source_url)
 
 @celery_app.task(bind=True)
 def delete_shape(self, table_name):
-    shape_meta = session.query(PolygonMetadata).get(table_name)
+    shape_meta = session.query(ShapeMetadata).get(table_name)
     shape_meta.remove_table(caller_session=session)
     session.commit()
     return 'Removed {}'.format(table_name)

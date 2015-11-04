@@ -20,7 +20,7 @@ from sqlalchemy.types import NullType
 from shapely.wkb import loads
 from shapely.geometry import box, asShape
 
-from plenario.models import MasterTable, MetaTable, PolygonMetadata
+from plenario.models import MasterTable, MetaTable, ShapeMetadata
 from plenario.database import session, app_engine as engine, Base
 from plenario.utils.helpers import slugify, increment_datetime_aggregate
 from plenario.settings import CACHE_CONFIG, DATA_DIR
@@ -197,11 +197,11 @@ def dataset_fields(dataset_name):
     return resp
 
 
-@api.route(API_VERSION + '/api/polygons/')
+@api.route(API_VERSION + '/api/shapes/')
 @crossdomain(origin="*")
-def get_all_polygon_datasets():
+def get_all_shape_datasets():
     """
-    Fetches metadata for every polygon dataset in meta_polygon
+    Fetches metadata for every shape dataset in meta_shape
     """
     try:
         response_skeleton = {
@@ -212,11 +212,8 @@ def get_all_polygon_datasets():
                 'objects': []
             }
 
-        all_polygon_datasets = session.query(PolygonMetadata).all()
-        for dataset in all_polygon_datasets:
-            attributes = {key: str(val) for key, val in dataset.__dict__.iteritems()}
-            del attributes['_sa_instance_state']
-            response_skeleton['objects'].append(attributes)
+        public_listing = ShapeMetadata.index(caller_session=session)
+        response_skeleton['objects'] = public_listing
         status_code = 200
 
     except Exception as e:
@@ -234,21 +231,21 @@ def get_all_polygon_datasets():
     return resp
 
 
-@api.route(API_VERSION + '/api/polygons/intersections/<geojson>')
+@api.route(API_VERSION + '/api/shapes/intersections/<geojson>')
 @crossdomain(origin="*")
-def find_intersecting_polygons(geojson):
+def find_intersecting_shapes(geojson):
     """
-    Respond with all polygon datasets that intersect with the geojson provided.
+    Respond with all shape datasets that intersect with the geojson provided.
     Also include how many geom rows of the dataset intersect.
     :param geojson: URL encoded geojson.
     """
     fragment = extract_first_geometry_fragment(geojson)
 
     try:
-        # First, do a bounding box check on all polygon datasets.
+        # First, do a bounding box check on all shape datasets.
         query = '''
         SELECT m.dataset_name
-        FROM meta_polygon as m
+        FROM meta_shape as m
         WHERE m.bbox &&
             (SELECT ST_GeomFromGeoJSON('{geojson_fragment}'));
         '''.format(geojson_fragment=fragment)
@@ -315,20 +312,18 @@ def extract_first_geometry_fragment(geojson):
     return json.dumps(fragment)
 
 
-@api.route(API_VERSION + '/api/polygons/<dataset_name>')
+@api.route(API_VERSION + '/api/shapes/<dataset_name>')
 @crossdomain(origin="*")
-def export_polygon(dataset_name):
+def export_shape(dataset_name):
     """
-    :param dataset_name: Name of shape dataset. Expected to be found in meta_polygon table.
+    :param dataset_name: Name of shape dataset. Expected to be found in meta_shape table.
     Expected query parameter: `data_type`. We expect it to be one of 'json', 'kml', or 'shapefile'.
                                 If none of these (or unspecified), return JSON.
     """
 
     # Do we have this shape?
-    try:
-        shape_dataset = session.query(PolygonMetadata).get(dataset_name)
-        assert shape_dataset and shape_dataset.is_ingested
-    except AssertionError:
+    shape_dataset = session.query(ShapeMetadata).get(dataset_name)
+    if not (shape_dataset and shape_dataset.is_ingested):
         error_message = 'Could not find shape dataset {}'.format(dataset_name)
         return make_response(error_message, 404)
 
@@ -350,7 +345,12 @@ def export_polygon(dataset_name):
         # Dump it in the response
         with open(export_path, 'r') as to_export:
             resp = make_response(to_export.read(), 200)
+
+        # Make the downloaded filename look nice
         resp.headers['Content-Type'] = _shape_format_to_content_header(export_format)
+        disp_header = 'attachment; filename={name}.{ext}'.format(name=shape_dataset.human_name,
+                                                                 ext=_shape_format_to_file_extension(export_format))
+        resp.headers['Content-Disposition'] = disp_header
         return resp
     except Exception as e:
         error_message = 'Failed to export shape dataset {}'.format(dataset_name)
@@ -369,12 +369,17 @@ def _shape_format_to_content_header(requested_format):
         'kml':  'application/vnd.google-earth.kml+xml',
         'shapefile': 'application/zip'
     }
-    try:
-        content_header = format_map[requested_format]
-    except KeyError:
-        content_header = format_map['json']
+    return format_map[requested_format]
 
-    return content_header
+
+def _shape_format_to_file_extension(requested_format):
+    format_map = {
+        'json': 'json',
+        'kml': 'kml',
+        'shapefile': 'zip'
+    }
+    return format_map[requested_format]
+
 
 @api.route(API_VERSION + '/api/weather-stations/')
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)

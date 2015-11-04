@@ -12,7 +12,7 @@ from plenario.database import session, app_engine as engine
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, S3_BUCKET
 from plenario.utils.shapefile import import_shapefile, ShapefileError
 
-from plenario.models import PolygonMetadata
+from plenario.models import ShapeMetadata
 
 from plenario.utils.etl import PlenarioETLError
 
@@ -105,7 +105,7 @@ class ETLFile:
         s3_key.set_contents_from_file(self.handle)
 
 
-class PolygonETL:
+class ShapeETL:
 
     def __init__(self, meta, source_path=None, save_to_s3=False):
         self.save_to_s3 = save_to_s3
@@ -115,7 +115,7 @@ class PolygonETL:
         self.meta = meta
 
     def _get_metadata(self):
-        shape_meta = session.query(PolygonMetadata).get(self.table_name)
+        shape_meta = session.query(ShapeMetadata).get(self.table_name)
         if not shape_meta:
             raise PlenarioETLError("Table {} is not registered in the metadata.".format(self.table_name))
         return shape_meta

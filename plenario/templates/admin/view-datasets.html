@@ -174,7 +174,7 @@
             </thead>
                 {% for shape_dataset in shape_datasets %}
                     <tr>
-                        <td>{{ shape_dataset.dataset_name }}</td>
+                        <td>{{ shape_dataset.human_name }}</td>
                         <td>{{ shape_dataset.date_added }}</td>
                         <td>
                             {% if shape_dataset.status %}
