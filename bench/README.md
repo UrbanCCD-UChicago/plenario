@@ -7,5 +7,7 @@ for pgbench here.
 
 Example argument:
 ```
-pgbench -h [hostname] -p 5432 -U postgres -f plenarioBench.sql -c 10 -j 2 -T 10 -n -l plenario
+pgbench -h [hostname] -p 5432 -U postgres -f plenarioBench.sql -c 4 -j 2 -t 3 -n -r plenario
 ```
+
+Using 2 threads, create 10 clients who will perform 20 transactions specified by plenarioBench.sql.

@@ -20,9 +20,22 @@ except IndexError:
     print "Expected usage: python bench_report.py hostname db_name output_destination"
     sys.exit(1)
 
+try:
+    should_warm = sys.argv[4]
+    WARM_UP = (should_warm == '-w')
+except IndexError:
+    WARM_UP = False
+
 
 # pgbench documentation: http://www.postgresql.org/docs/9.4/static/pgbench.html
 def main():
+
+    # Do one transaction to warm up the cache
+    if WARM_UP:
+        throw_away_one_transaction()
+        # And that is all
+        sys.exit()
+
     args = ['pgbench',
             '-h', HOSTNAME,
             '-U', 'postgres',
@@ -48,6 +61,20 @@ def main():
 
     latency = OrderedDict(zip(query_labels, get_latency_in_seconds(pgbench_output)))
     make_report(latency, elapsed_time)
+
+
+def throw_away_one_transaction():
+    args = ['pgbench',
+            '-h', HOSTNAME,
+            '-U', 'postgres',
+            '-f', SQL_PATH,
+            '-c', '1',
+            '-j', '1',
+            '-t', '1',
+            '-n',  # Don't try to vacuum the default tables that we don't have.
+            '-r',  # Print to stdout the average latency per query.
+            DB_NAME]
+    subprocess.check_call(args)
 
 
 def get_latency_in_seconds(latency_output):
