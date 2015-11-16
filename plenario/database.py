@@ -19,5 +19,5 @@ session = scoped_session(sessionmaker(bind=app_engine,
 task_session = scoped_session(sessionmaker(bind=task_engine,
                                       autocommit=False,
                                       autoflush=False))
-Base = declarative_base()
+Base = declarative_base(bind=app_engine)
 Base.query = session.query_property()
