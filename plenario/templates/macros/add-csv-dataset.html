@@ -1,7 +1,7 @@
 {% from "macros/contributor-form.html" import contributor_form %}
 {% from "macros/metadata-form-fragment.html" import metadata_form_fragment %}
 
-{% macro add_csv_dataset(dataset_info, submit_button_verb) -%}
+{% macro add_csv_dataset(submit_button_verb, dataset_info) -%}
 <hr />
 <div class="row">
     <div class="col-md-10 col-md-offset-1">
@@ -55,7 +55,7 @@
                 </tbody>
             </table>
 
-            {{ contributor_form(submit_button_verb) }}
+            {{ contributor_form(submit_button_verb, dataset_info) }}
 
             <hr />
             <p>

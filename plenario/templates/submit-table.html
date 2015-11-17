@@ -1,5 +1,5 @@
 {% extends 'submit-dataset.html' %}
-{% set is_shape=False %}
+{% set submit_button_verb = "Submit" if is_admin else "Contribute" %}
 
 {% block requirements %}
     <div class="panel-group" id="accordion-api-datasets">
@@ -49,25 +49,6 @@
 
 {% block submission %}
      <h3>Link to a dataset</h3>
-
-            {#
-            {% if errors %}
-              <div class="row">
-                  <div class='col-md-10'>
-                        {% for error in errors %}
-                          <div class="alert alert-danger alert-dismissible" role="alert">
-                              <button type="button" class="close" data-dismiss="alert">
-                                  <span aria-hidden="true">&times;</span>
-                                  <span class="sr-only">Close</span>
-                              </button>
-                              <p><strong>There were some errors with your submission:</strong></p>
-                              {{ error }}
-                          </div>
-                        {% endfor %}
-                  </div>
-              </div>
-            {% endif %}  #}
-
             {% block fetch_details %}
             <form role="form" method="GET" id="fetch-details-form">
                 <div class="form-group">
@@ -87,9 +68,9 @@
               {% if dataset_info %}
                 {% block submit_form %}
                   {% if socrata_source %}
-                       {{ add_socrata_dataset(dataset_info, 'Submit') }}
+                       {{ add_socrata_dataset(submit_button_verb=submit_button_verb, dataset_info=dataset_info) }}
                   {% else %}
-                       {{ add_csv_dataset(dataset_info, 'Submit' ) }}
+                       {{ add_csv_dataset(submit_button_verb=submit_button_verb, dataset_info=dataset_info) }}
                   {% endif %}
                 {% endblock %}
               {% endif %}
