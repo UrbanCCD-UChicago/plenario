@@ -43,7 +43,8 @@ CENSUS_BLOCKS = {
     'dataset_name': u'census_blocks',
     'business_key': 'geoid',
     'srid': 4269,
-    'source_url': 'http://www2.census.gov/geo/tiger/TIGER2010/TABBLOCK/2010/tl_2010_17031_tabblock10.zip'
+    'source_url': 'http://www2.census.gov/geo/tiger/TIGER2010/TABBLOCK/2010/tl_2010_17031_tabblock10.zip',
+    'human_name': u'Plenario Census Blocks'
 }
 
 # Toggle maintenence mode

@@ -21,18 +21,20 @@ cd plenario
 pip install -r requirements.txt
 ```
 
-Create a PostgreSQL database for Plenario. (If you aren't
-  already running [PostgreSQL](http://www.postgresql.org/), we recommend
-  installing version 9.3 or later.)
+Create a PostgreSQL database for Plenario. (If you aren't already running
+[PostgreSQL](http://www.postgresql.org/), we recommend installing version 9.3 or
+later.) The following command creates the default database, `plenario_test`.
+This corresponds with the `DB_NAME` setting in your `plenario/settings.py` file
+and can be modified.
 
 ```
-createdb plenario_dev
+createdb plenario_test
 ```
 
 Make sure your local database has the [PostGIS](http://postgis.net/) extension:
 
 ```
-psql plenario_dev
+psql plenario_test
 plenario_test=# CREATE EXTENSION postgis;
 ```
 
