@@ -3,17 +3,28 @@ import plenario.models
 import plenario.settings
 from sqlalchemy.exc import IntegrityError
 import datetime
+from argparse import ArgumentParser
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
 from plenario.utils.shape_etl import ShapeETL
 
 from plenario.tasks import hello_world
 
 
-def init_db():
-    init_master_meta_user()
-    init_weather()
-    init_census()
-    init_celery()
+def init_db(args={}):
+    if args.everything:
+        init_master_meta_user()
+        init_weather()
+        init_census()
+        init_celery()
+    else:
+        if args.tables:
+            init_master_meta_user()
+        if args.weather:
+            init_weather()
+        if args.census:
+            init_census()
+        if args.celery:
+            init_celery()
 
 
 def init_master_meta_user():
@@ -58,5 +69,28 @@ def init_census():
 def init_celery():
     hello_world.delay()
 
+def build_arg_parser():
+    '''Creates an argument parser for this script. This is helpful in the event
+    that a user needs to only run a portion of the setup script.
+    '''
+    description = 'Set up your development environment with this script. It \
+    creates tables, initializes NOAA weather station data and US Census block \
+    data.'
+    parser = ArgumentParser(description=description)
+    parser.add_argument('-t', '--tables', dest='tables', help='Set up the \
+            master, meta and user tables')
+    parser.add_argument('-w', '--weather', dest='weather', help='Set up NOAA \
+            weather station data. This includes the daily and hourly weather \
+            observations.')
+    parser.add_argument('-c', '--census', dest='census', help='Set up and \
+            populate US Census blocks.')
+    parser.add_argument('-cl', '--celery', dest='celery', help='Say hello \
+            world from Celery')
+    parser.add_argument('-e', '--everything', dest='everything', help='Run \
+            everything in the script.', default=True)
+    return parser
+
 if __name__ == "__main__":
-    init_db()
+    parser = build_arg_parser()
+    arguments = parser.parse_args()
+    init_db(arguments)
