@@ -15,7 +15,7 @@ import os, sys
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 plenario_path = os.path.join(pwd, '../../..')
-print plenario_path
+# print plenario_path
 sys.path.append(str(plenario_path))
 
 from alembic import op
@@ -45,17 +45,9 @@ def upgrade():
         .where(MetaTable.dataset_name.in_(bad_names))
     session.execute(delete)
 
-    #print session.query(MetaTable).first()
-
     for dataset_name, date_col in dataset_names_with_date_col_names():
         table_name = 'dat_' + dataset_name
 
-        # Make foo_row_id -> point_id for all point datasets foo
-        op.alter_column(
-            table_name,
-            '{}_row_id'.format(dataset_name),
-            new_column_name='point_id'
-        )
         # Make foo's date col -> point_date
         op.alter_column(
             table_name,
@@ -65,14 +57,9 @@ def upgrade():
 
 
 def downgrade():
-    # Make point_id -> foo_row_id for all point datasets foo
     for dataset_name, date_col in dataset_names_with_date_col_names():
         table_name = 'dat_' + dataset_name
-        op.alter_column(
-            table_name,
-            'point_id',
-            new_column_name='{}_row_id'.format(dataset_name)
-        )
+
         op.alter_column(
             table_name,
             'point_date',

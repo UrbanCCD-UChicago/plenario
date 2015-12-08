@@ -15,7 +15,7 @@ from dateutil import relativedelta
 import operator
 
 import calendar
-from plenario.database import task_session as session, task_engine as engine, \
+from plenario.database import session as session, app_engine as engine, \
     Base
 from plenario.settings import DATA_DIR
 import sqlalchemy

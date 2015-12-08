@@ -4,7 +4,7 @@ from plenario.database import session, app_engine
 from plenario.models import MetaTable
 from sqlalchemy.exc import NoSuchTableError
 from plenario.utils.helpers import slugify
-from plenario.utils.etl import PlenarioETL
+from plenario.etl.point import PlenarioETL
 import traceback
 
 if __name__ == "__main__":

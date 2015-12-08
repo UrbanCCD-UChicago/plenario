@@ -31,7 +31,7 @@ class ParamValidator(object):
 
         if dataset_name:
             # Throws NoSuchTableError. Should be caught by caller.
-            self.dataset = Table('dat_' + dataset_name, Base.metadata,
+            self.dataset = Table(dataset_name, Base.metadata,
                             autoload_with=engine, extend_existing=True)
             self.cols = self.dataset.columns.keys()
             # SQLAlchemy boolean expressions
@@ -386,7 +386,6 @@ def detail():
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def grid():
-    print 'grid()'
     raw_query_params = request.args.copy()
 
     # First, make sure name of dataset was provided...
@@ -497,7 +496,7 @@ def meta():
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
     try:
-        table = Table('dat_%s' % dataset_name, Base.metadata,
+        table = Table(dataset_name, Base.metadata,
             autoload=True, autoload_with=engine,
             extend_existing=True)
         data = {

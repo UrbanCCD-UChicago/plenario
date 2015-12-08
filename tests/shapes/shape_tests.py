@@ -1,17 +1,18 @@
-import unittest
-import os
-from hashlib import md5
-from plenario.utils.shape_etl import ShapeETL
-from plenario.utils.etl import PlenarioETL
-from plenario.utils.shapefile import Shapefile
-from plenario import create_app
-from init_db import init_master_meta_user, init_census
-from plenario.database import session, app_engine as engine
-from plenario.models import MetaTable, ShapeMetadata
 import json
+import os
+import unittest
 import urllib
-from StringIO import StringIO
 import zipfile
+from StringIO import StringIO
+from hashlib import md5
+
+from init_db import init_master_meta_user, init_census
+from plenario import create_app
+from plenario.database import session, app_engine as engine
+from plenario.etl.shape import ShapeETL
+from plenario.models import MetaTable, ShapeMetadata
+from plenario.etl.point import PlenarioETL
+from plenario.utils.shapefile import Shapefile
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 FIXTURE_PATH = os.path.join(pwd, '..', 'test_fixtures')

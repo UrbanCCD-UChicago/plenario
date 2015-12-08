@@ -7,7 +7,7 @@ from flask import make_response, request
 from plenario.models import ShapeMetadata
 from plenario.database import session, app_engine as engine
 from plenario.utils.ogr2ogr import OgrExport
-from plenario.api.common import crossdomain, extract_first_geometry_fragment
+from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str
 
 
 @crossdomain(origin="*")
@@ -50,7 +50,7 @@ def find_intersecting_shapes(geojson):
     Also include how many geom rows of the dataset intersect.
     :param geojson: URL encoded geojson.
     """
-    fragment = json.dumps(extract_first_geometry_fragment(geojson))
+    fragment = make_fragment_str(extract_first_geometry_fragment(geojson))
 
     try:
         # First, do a bounding box check on all shape datasets.

@@ -1,9 +1,9 @@
 from uuid import uuid4
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, \
-    Text, BigInteger, func, Table, select, and_
-from sqlalchemy.dialects.postgresql import TIMESTAMP, DOUBLE_PRECISION, ARRAY
+from sqlalchemy import Column, String, Boolean, Date, DateTime, \
+    Text, func, Table, select
+from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
 from sqlalchemy.orm import synonym
 import sqlalchemy as sa
@@ -11,7 +11,7 @@ from plenario.utils.helpers import get_size_in_degrees
 from flask_bcrypt import Bcrypt
 from itertools import groupby
 import json
-
+from hashlib import md5
 
 from plenario.database import session, Base
 from plenario.utils.helpers import slugify
@@ -21,7 +21,7 @@ bcrypt = Bcrypt()
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
-    dataset_name = Column(String(100), nullable=False)
+    dataset_name = Column(String(100), nullable=False)  # limited to 50 chars elsewhere
     human_name = Column(String(255), nullable=False)
     description = Column(Text)
     source_url = Column(String(255))
@@ -40,13 +40,66 @@ class MetaTable(Base):
     longitude = Column(String)
     location = Column(String)
     # approved_status is used as a bool
-    approved_status = Column(String) # if False, then do not display without first getting administrator approval
+    approved_status = Column(String)  # if False, then do not display without first getting administrator approval
     contributor_name = Column(String)
     contributor_organization = Column(String)
     contributor_email = Column(String)
-    contributed_data_types = Column(Text) # Temporarily store user-submitted data types for later approval
+    contributed_data_types = Column(Text)  # Temporarily store user-submitted data types for later approval
     is_socrata_source = Column(Boolean, default=False)
     result_ids = Column(ARRAY(String))
+
+    def __init__(self, url, human_name,
+                 business_key, observed_date,
+                 is_socrata=False, approved_status=False,
+                 contributed_data_types=None, update_freq='yearly',
+                 latitude=None, longitude=None, location=None,
+                 attribution=None, description=None, **kwargs):
+        """
+        :param url: url where CSV or Socrata dataset with this dataset resides
+        :param human_name: Nicely formatted name to display to people
+        :param business_key: Name of column with the dataset's unique ID
+        :param observed_date: Name of column with the datset's timestamp
+        :param is_socrata: Does this dataset come from Socrata?
+        :param approved_status: Has an admin signed off on this dataset?
+        :param contributed_data_types: stringified JSON mapping
+        :param update_freq: string: one of ['daily', 'weekly', 'monthly', 'yearly']
+        :param latitude: Name of col with latitude
+        :param longitude: Name of col with longitude
+        :param location: Name of col with location formatted as (lat, lon)
+        :param attribution: Text describing who maintains the dataset
+        :param description: Text describing the dataset.
+        """
+        def curried_slug(name):
+            return slugify(unicode(name), delim=u'_')
+
+        # We need some combination of columns from which we can derive a point in space
+        assert(location or (latitude and longitude))
+        # Frontend validation should have slugified column names already, but enforcing it here is nice for testing.
+        self.latitude, self.longitude = curried_slug(latitude), curried_slug(longitude)
+        self.location = curried_slug(location)
+
+        assert human_name
+        self.human_name = human_name
+        # Known issue: slugify fails hard on Non-ASCII
+        self.dataset_name = kwargs.get('dataset_name', curried_slug(human_name)[:50])
+
+        assert(business_key and observed_date)
+        self.business_key = curried_slug(business_key)
+        self.observed_date = curried_slug(observed_date)
+
+        assert url
+        self.source_url, self.source_url_hash = url, md5(url).hexdigest()
+
+        assert update_freq
+        self.update_freq = update_freq
+
+        # Can be None. In practice, frontend validation makes sure these are always passed along.
+        self.description, self.attribution = description, attribution
+        self.is_socrata_source = is_socrata
+        self.contributed_data_types = contributed_data_types
+
+        # This boolish value is stored as a string in the DB.
+        self.approved_status = str(approved_status)
 
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
@@ -54,12 +107,20 @@ class MetaTable(Base):
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
+    def column_info(self):
+        return self.point_table.c
+
+    def id_col(self):
+        # The unique ID column of a point dataset is specified by the user. Get it by name.
+        return self.point_table.c[self.business_key]
+
     @property
     def point_table(self):
         try:
             return self._point_table
         except AttributeError:
-            self._point_table = Table('dat_' + self.dataset_name, Base.metadata, autoload=True, extend_existing=True)
+            # Removed _dat prefix. May the failing tests rain down like blood.
+            self._point_table = Table(self.dataset_name, Base.metadata, autoload=True, extend_existing=True)
             return self._point_table
 
     # Return a list of [
@@ -135,6 +196,14 @@ class MetaTable(Base):
         # returns [lon, lat]
         return json.loads(result.first()[0])['coordinates']
 
+    def update_date_added(self):
+        now = datetime.now()
+        if self.date_added is None:
+            self.date_added = now
+        self.last_update = now
+
+
+
     def make_grid(self, resolution, geom=None, conditions=[]):
         """
         :param resolution: length of side of grid square in meters
@@ -155,7 +224,7 @@ class MetaTable(Base):
 
         # Generate a count for each resolution by resolution square
         t = self.point_table
-        q = session.query(func.count(t.c.point_id),
+        q = session.query(func.count(self.id_col()),
                           func.ST_SnapToGrid(t.c.geom, size_x, size_y).label('squares'))\
             .filter(*conditions)\
             .group_by('squares')
@@ -168,6 +237,9 @@ class MetaTable(Base):
 
     # Return select statement to execute or union
     def timeseries(self, agg_unit, start, end, geom=None):
+        # Reading this blog post
+        # http://no0p.github.io/postgresql/2014/05/08/timeseries-tips-pg.html
+        # inspired this implementation.
         t = self.point_table
 
         # Create a CTE to represent every time bucket in the timeseries
@@ -181,7 +253,7 @@ class MetaTable(Base):
 
         # Create a CTE that grabs the number of records contained in each time bucket.
         # Will only have rows for buckets with records.
-        actuals = select([func.count(t.c.point_id).label('count'),  # Count unique records
+        actuals = select([func.count(self.id_col()).label('count'),  # Count unique records
                           func.date_trunc(agg_unit, t.c.point_date).label('time_bucket')])\
             .where(sa.and_(t.c.point_date >= start,            # Only include records in time window
                            t.c.point_date <= end))\
@@ -202,30 +274,6 @@ class MetaTable(Base):
             select_from(defaults.outerjoin(actuals, actuals.c.time_bucket == defaults.c.time_bucket))
 
         return ts
-
-
-class MasterTable(Base):
-    __tablename__ = 'dat_master'
-    master_row_id = Column(BigInteger, primary_key=True)
-    # Looks like start_date and end_date aren't used.
-    start_date = Column(TIMESTAMP)
-    end_date = Column(TIMESTAMP)
-    # current_flag is never updated. We can probably get rid of this
-    current_flag = Column(Boolean, default=True)
-    location = Column(String(200))
-    latitude = Column(DOUBLE_PRECISION(precision=53))
-    longitude = Column(DOUBLE_PRECISION(precision=53))
-    obs_date = Column(TIMESTAMP, index=True)
-    weather_observation_id = Column(BigInteger, index=True)
-    census_block = Column(String(15), index=True)
-    # Looks like geotag3 is unused
-    geotag3 = Column(String(50))
-    dataset_name = Column(String(100), index=True)
-    dataset_row_id = Column(Integer)
-    location_geom = Column(Geometry('POINT', srid=4326))
-
-    def __repr__(self):
-        return '<Master %r (%r)>' % (self.dataset_row_id, self.dataset_name)
 
 
 class ShapeMetadata(Base):

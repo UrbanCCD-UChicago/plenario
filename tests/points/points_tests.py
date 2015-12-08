@@ -2,7 +2,7 @@ import unittest
 from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta
 from plenario.models import MetaTable
 from plenario.database import session, app_engine
-from plenario.utils.etl import PlenarioETL
+from plenario.etl.point import PlenarioETL
 from init_db import init_master_meta_user
 from sqlalchemy import Table, MetaData
 from sqlalchemy.exc import NoSuchTableError
@@ -16,7 +16,7 @@ def ingest_online_from_fixture(fixture_meta):
         md = MetaTable(**fixture_meta)
         session.add(md)
         session.commit()
-        point_etl = PlenarioETL(fixture_meta)
+        point_etl = PlenarioETL(md)
         point_etl.add()
 
 
@@ -37,6 +37,7 @@ def create_dummy_census_table():
     """)
     session.commit()
 
+
 def get_loop_rect():
     pwd = os.path.dirname(os.path.realpath(__file__))
     rect_path = os.path.join(pwd, '../test_fixtures', 'loop_rectangle.json')
@@ -44,6 +45,7 @@ def get_loop_rect():
         query_rect = rect_json.read()
     escaped_query_rect = urllib.quote(query_rect)
     return escaped_query_rect
+
 
 class DetailTests(unittest.TestCase):
 
@@ -85,6 +87,7 @@ class GridTests(unittest.TestCase):
         query = 'v1/api/grid/?obs_date__ge=2013-1-1&obs_date_le=2014-1-1&dataset_name=flu_shot_clinics&location_geom__within=' + escaped_query_rect
         resp = self.app.get(query)
         response_data = json.loads(resp.data)
+        print response_data
         self.assertEqual(len(response_data['features']), 4)
 
         # Each feature should have an associated square geometry with 5 points
@@ -99,15 +102,13 @@ class GridTests(unittest.TestCase):
         self.assertEqual(counts.count(2), 1)
 
 
-
 class TimeseriesRegressionTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Commented out to keep test DB the same while I run tests after running migrations
-        '''tables_to_drop = [
-            'dat_flu_shot_clinics',
-            'dat_landmarks',
+        tables_to_drop = [
+            'flu_shot_clinics',
+            'landmarks',
             'dat_master',
             'meta_master',
             'plenario_user'
@@ -123,7 +124,7 @@ class TimeseriesRegressionTests(unittest.TestCase):
             create_dummy_census_table()
 
         ingest_online_from_fixture(flu_shot_meta)
-        ingest_online_from_fixture(landmarks_meta)'''
+        ingest_online_from_fixture(landmarks_meta)
 
         cls.app = create_app().test_client()
 

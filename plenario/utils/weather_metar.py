@@ -1,20 +1,9 @@
-import plenario
-import weather
-
-import metar
-from metar.metar import Metar, ParserError
-from plenario.database import task_session as session, task_engine as engine, Base
-from sqlalchemy import Table, select, func, and_, distinct
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
-import sys
-#import grequests
+from metar.metar import Metar
+from plenario.database import app_engine as engine
 import requests
 
-import pdb
 from lxml import etree
 from lxml.etree import fromstring
-from cStringIO import StringIO
 from lxml import objectify
 
 # Example METAR URL: 'https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25&stationString=KORD'

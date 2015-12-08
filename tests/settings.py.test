@@ -15,12 +15,6 @@ CACHE_CONFIG = {
     'CACHE_TYPE': 'simple',
 }
 
-# We don't want to save to S3 in our tests.
-AWS_ACCESS_KEY = ''
-AWS_SECRET_KEY = ''
-S3_BUCKET = ''
-
-
 CENSUS_BLOCKS = {
     'dataset_name': 'census_blocks',
     'business_key': 'geoid',
