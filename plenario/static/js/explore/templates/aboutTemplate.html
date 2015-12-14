@@ -16,7 +16,7 @@
           <a href="javascript://" class='about-detail' data-dataset_name="<%= set.dataset_name %>"><%= set.human_name %></a>
         </td>
         <td>
-          <% if (set.obs_from && set.obs_to) { %>
+          <% if (set.obs_from && set.obs_to && moment(set.obs_to).isBefore(moment()) && moment(set.obs_from).isAfter('1989-12-31')) { %>
           <strong><%= moment(set.obs_from).from(moment(set.obs_to), true) %></strong> (<%= moment(set.obs_from).format("M/D/YYYY") %> - <%= moment(set.obs_to).format("M/D/YYYY") %>)
           <% } %>
         </td>
