@@ -1,7 +1,7 @@
 <% var points = "/v1/api/detail/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
 <% var time_series = "/v1/api/detail-aggregate/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
 <% var fields_list = "/v1/api/fields/" + meta.dataset_name %>
-<% var grid = "/v1/api/grid/?" + $.param(points_query) %>
+<% var grid = "/v1/api/grid/?" + $.param(query) %>
 
 <div class='col-md-12'>
     <p><a href='#' id='back-to-explorer'>&lt; back to Explorer</a></p>
