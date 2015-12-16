@@ -1,6 +1,7 @@
 <% var points = "/v1/api/detail/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
 <% var time_series = "/v1/api/detail-aggregate/?" + $.param(points_query) + '&dataset_name=' + meta.dataset_name %>
 <% var fields_list = "/v1/api/fields/" + meta.dataset_name %>
+<% var grid = "/v1/api/grid/?" + $.param(points_query) %>
 
 <div class='col-md-12'>
     <p><a href='#' id='back-to-explorer'>&lt; back to Explorer</a></p>
@@ -84,7 +85,7 @@
         <h4>API queries</h4>
         <p>View the API queries that are used on this page. <a href='/api-docs/'>Read the API docs</a>.</p>
         <ul class=''>
-            <li><a class='download-geojson' target="_blank" href="#"><code>/v1/api/grid/&hellip;</code></a></li>
+            <li><a class='download-geojson' target="_blank" href="<%= grid %>"><code>/v1/api/grid/&hellip;</code></a></li>
             <li><a href="<%= time_series %>" target="_blank"><code>/v1/api/detail-aggregate/&hellip;</code></a></li>
             <li><a href="<%= points %>" target="_blank"><code>/v1/api/detail/&hellip;</code></a></li>
             <li><a href="<%= fields_list %>" target="_blank"><code>/v1/api/fields/&hellip;</code></a></li>
