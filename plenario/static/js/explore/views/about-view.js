@@ -4,8 +4,6 @@ var AboutView = Backbone.View.extend({
     },
     initialize: function(){
         this.render();
-        //this.shapeCollection = new app.Shapes();
-
     },
     render: function(){
         $('#list-view').show();

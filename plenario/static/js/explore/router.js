@@ -6,7 +6,7 @@ var AppRouter = Backbone.Router.extend({
     },
     defaultRoute: function(){
         new AboutView({el: '#list-view'});
-        shapeView = new app.ShapeView({reset:true});
+        shapeView = new app.ShapeView();
         map = new MapView({el: '#map-view', attributes: {}})
     },
     aggregate: function(query){
