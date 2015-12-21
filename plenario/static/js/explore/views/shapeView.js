@@ -8,14 +8,17 @@ var app = app || {};
         initialize: function() {
             console.log("hello shapeview");
             this.collection = new app.Shapes();
-            this.collection.fetch({reset:true, validation:true});
+            this.on("reset", this.render);
+
+            self = this;
+            this.collection.fetch({reset: true});
             console.log(this.collection);
-            // Listen for event from about-view
         },
 
         render: function(){
-            template = template_cache('shapesList', this.collection.toJSON());
-            el.html(template)
+            console.log(this.collection.toJSON());
+            template = template_cache('shapesList', {shapes: this.collection.toJSON()});
+            this.$el.html(template)
         }
 
 
