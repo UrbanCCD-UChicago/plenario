@@ -1,0 +1,19 @@
+<!-- take shapes object as input -->
+<br />
+<p class='lead'><strong><%= shapes.length %></strong> shape datasets available to query</p>
+<table id='shape-datasets' class='table table-condensed'>
+    <thead>
+    <tr>
+        <th>Dataset Name</th>
+        <th>Date Added</th>
+    </tr>
+    </thead>
+    <tbody>
+    <% $.each(shapes, function(i, shape){ %>
+        <tr>
+            <td><%= shape.human_name %></td>
+            <td><%= shape.date_added %></td>
+        </tr>
+    <% }) %>
+    </tbody>
+</table>

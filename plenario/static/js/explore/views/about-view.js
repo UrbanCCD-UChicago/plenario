@@ -4,6 +4,8 @@ var AboutView = Backbone.View.extend({
     },
     initialize: function(){
         this.render();
+        //this.shapeCollection = new app.Shapes();
+
     },
     render: function(){
         $('#list-view').show();
@@ -13,16 +15,22 @@ var AboutView = Backbone.View.extend({
         var self = this;
         $.when(this.get_datasets()).then(
             function(resp){
-                resp = resp['objects']
+                resp = resp['objects'];
                 self.$el.spin(false);
+
+                // Render template with dataset metadata
+                // (Add fields to table)
                 self.$el.html(template_cache('aboutTemplate', {datasets:resp}));
-                var dataObjs = {}
-                // console.log(resp);
+
+                // Make a map from dataset name to metadata
+                // that we'll use if the user clicks on a dataset.
+                var dataObjs = {};
                 $.each(resp, function(i, obj){
                     dataObjs[obj['dataset_name']] = obj;
-                })
+                });
                 self.datasetsObj = dataObjs;
 
+                // Apply desired settings to table
                 $('#available-datasets').DataTable( {
                     "aaSorting": [ [0,'asc'] ],
                     "aoColumns": [
