@@ -11,10 +11,10 @@ var app = app || {};
             if (resp) {
                 this.resp = resp;
                 this.query = this.resp.query;
-                this.collection = this.setIntersection();
+                this.setIntersection();
             }
             this.listenTo(this.collection, 'reset', this.render);
-            //this.listenTo(this.collection, 'update', function(){console.log("update");this.render;});
+            this.listenTo(this.collection, 'change', this.render);
         },
 
         render: function(){
@@ -22,37 +22,36 @@ var app = app || {};
             console.log(this.collection.toJSON());
             template = template_cache('shapesList', {shapes: this.collection.toJSON()});
             this.$el.html(template);
+            return this;
         },
 
         setIntersection: function(){
             var self = this;
-            if (self.resp) {
-                $.when(self.getIntersection()).then(
-                    function(resp) {
-                        var data = {
-                            "meta": {"status": "ok", "message": ""},
-                            "objects": [{
-                                "dataset_name": "chicago_pedestrian_streets",
-                                "num_geoms": 2
-                            }, {
-                                "dataset_name": "chicago_city_limits",
-                                "num_geoms": 1
-                            }, {
-                                "dataset_name": "chicago_tif_districts",
-                                "num_geoms": 2
-                            }, {
-                                "dataset_name": "chicago_wards",
-                                "num_geoms": 9
-                            }, {"dataset_name": "chicago_major_streets", "num_geoms": 28}]
-                        };
-                        data.objects.forEach(function (intersect) {
-                            self.collection.get(intersect.dataset_name).set(intersect);
-                        });
-                        console.log(self.collection);//right
-                        return self.collection;
-                });
-                return self.collection;
-            }
+            $.when(self.getIntersection()).then(
+                function(resp) {
+                    var data = {
+                        "meta": {"status": "ok", "message": ""},
+                        "objects": [{
+                            "dataset_name": "chicago_pedestrian_streets",
+                            "num_geoms": 2
+                        }, {
+                            "dataset_name": "chicago_city_limits",
+                            "num_geoms": 1
+                        }, {
+                            "dataset_name": "chicago_tif_districts",
+                            "num_geoms": 2
+                        }, {
+                            "dataset_name": "chicago_wards",
+                            "num_geoms": 9
+                        }, {"dataset_name": "chicago_major_streets", "num_geoms": 28}]
+                    };
+                    data.objects.forEach(function (intersect) {
+                        self.collection.get(intersect.dataset_name).set("num_geoms",intersect.num_geoms);
+                    });
+                    console.log(self.collection);//right
+                    //return self.collection;
+            });
+                //return self.collection;
             //return self.collection;
         },
 
@@ -81,3 +80,4 @@ var app = app || {};
         //}
 
     });
+

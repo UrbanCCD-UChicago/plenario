@@ -6,5 +6,4 @@ app.Shapes = Backbone.Collection.extend({
     parse: function(data){
         return data.objects;
     }
-
 });
