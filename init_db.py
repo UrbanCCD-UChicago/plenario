@@ -1,7 +1,6 @@
 from plenario.database import session, app_engine, Base
 import plenario.models
 import plenario.settings
-from sqlalchemy.exc import IntegrityError
 import datetime
 from argparse import ArgumentParser
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
@@ -10,8 +9,9 @@ from plenario.utils.shape_etl import ShapeETL
 from plenario.tasks import hello_world
 
 
-def init_db(args={}):
-    if args.everything:
+def init_db(args):
+    if not any(vars(args).values()):
+        # No specific arguments specified. Run it all!
         init_master_meta_user()
         init_weather()
         init_census()
@@ -36,8 +36,9 @@ def init_master_meta_user():
         session.add(user)
         try:
             session.commit()
-        except IntegrityError:
-            pass
+        except Exception as e:
+            session.rollback()
+            raise e
 
 
 def init_weather():
@@ -48,8 +49,11 @@ def init_weather():
     print 'initializing NOAA daily and hourly weather observations for %s/%s' % (datetime.datetime.now().month, datetime.datetime.now().year)
     print 'this will take a few minutes ...'
     e = WeatherETL()
-    e.initialize_month(datetime.datetime.now().year, datetime.datetime.now().month)
-
+    try:
+        e.initialize_month(datetime.datetime.now().year, datetime.datetime.now().month)
+    except Exception as e:
+        session.rollback()
+        raise e
 
 def init_census():
     print 'initializing and populating US Census blocks'
@@ -62,32 +66,36 @@ def init_census():
     census_meta = plenario.models.ShapeMetadata.add(source_url=census_settings['source_url'],
                                                       human_name=census_settings['human_name'],
                                                       caller_session=session)
-    session.commit()
+    try:
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise e
+
     ShapeETL(meta=census_meta, save_to_s3=save_to_s3).import_shapefile()
 
 
 def init_celery():
     hello_world.delay()
 
+
 def build_arg_parser():
-    '''Creates an argument parser for this script. This is helpful in the event
+    """Creates an argument parser for this script. This is helpful in the event
     that a user needs to only run a portion of the setup script.
-    '''
+    """
     description = 'Set up your development environment with this script. It \
     creates tables, initializes NOAA weather station data and US Census block \
-    data.'
+    data. If you specify no options, it will populate everything.'
     parser = ArgumentParser(description=description)
-    parser.add_argument('-t', '--tables', dest='tables', help='Set up the \
+    parser.add_argument('-t', '--tables', action="store_true", help='Set up the \
             master, meta and user tables')
-    parser.add_argument('-w', '--weather', dest='weather', help='Set up NOAA \
+    parser.add_argument('-w', '--weather', action="store_true", help='Set up NOAA \
             weather station data. This includes the daily and hourly weather \
             observations.')
-    parser.add_argument('-c', '--census', dest='census', help='Set up and \
+    parser.add_argument('-c', '--census', action="store_true", help='Set up and \
             populate US Census blocks.')
-    parser.add_argument('-cl', '--celery', dest='celery', help='Say hello \
+    parser.add_argument('-cl', '--celery', action="store_true", help='Say hello \
             world from Celery')
-    parser.add_argument('-e', '--everything', dest='everything', help='Run \
-            everything in the script.', default=True)
     return parser
 
 if __name__ == "__main__":
