@@ -2,6 +2,12 @@ import tempfile
 import requests
 
 
+class PlenarioETLError(Exception):
+    def __init__(self, message):
+        Exception.__init__(self, message)
+        self.message = message
+
+
 class ETLFile(object):
     """
     Encapsulates whether a file has been downloaded temporarily

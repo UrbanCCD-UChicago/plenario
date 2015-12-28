@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import zipfile
-from datetime import datetime
-
-from boto.s3.connection import S3ResponseError
 
 from plenario.database import session
 from plenario.etl.common import ETLFile
 from plenario.models import ShapeMetadata
-from plenario.etl.point import PlenarioETLError
+from plenario.etl.common import PlenarioETLError
 from plenario.utils.shapefile import import_shapefile, ShapefileError
 
 

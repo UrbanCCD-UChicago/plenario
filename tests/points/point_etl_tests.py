@@ -84,13 +84,13 @@ class StagingTableTests(TestCase):
         return [c.name for c in columns]
 
     def test_col_info_infer(self):
-        s_table = StagingTable(self.unloaded_meta, source_path=self.radio_path)
-        observed_names = self.extract_names(s_table.cols)
+        with StagingTable(self.unloaded_meta, source_path=self.radio_path)as s_table:
+            observed_names = self.extract_names(s_table.cols)
         self.assertEqual(set(observed_names), set(self.expected_radio_col_names))
 
     def test_col_info_existing(self):
-        s_table = StagingTable(self.existing_meta, source_path=self.dog_path)
-        observed_col_names = self.extract_names(s_table.cols)
+        with StagingTable(self.existing_meta, source_path=self.dog_path) as s_table:
+            observed_col_names = self.extract_names(s_table.cols)
         self.assertEqual(set(observed_col_names), set(self.expected_dog_col_names))
 
     def test_col_info_provided(self):
@@ -102,10 +102,9 @@ class StagingTableTests(TestCase):
         stored_col_info = [{'field_name': name, 'data_type': d_type}
                            for name, d_type in col_info_raw]
         self.unloaded_meta.contributed_data_types = json.dumps(stored_col_info)
-        s_table = StagingTable(self.unloaded_meta, source_path=self.radio_path)
-
-        observed_names = self.extract_names(s_table.cols)
-        self.assertEqual(set(observed_names), set(self.expected_radio_col_names))
+        with StagingTable(self.unloaded_meta, source_path=self.radio_path) as s_table:
+            observed_names = self.extract_names(s_table.cols)
+            self.assertEqual(set(observed_names), set(self.expected_radio_col_names))
 
     '''
     Are the files ingested as we expect?
@@ -114,21 +113,22 @@ class StagingTableTests(TestCase):
     def test_staging_new_table(self):
         # For the entry in MetaTable without a table, create a staging table.
         # We'll need to read from a fixture csv.
-        s_table = StagingTable(self.unloaded_meta, source_path=self.radio_path)
-        all_rows = session.execute(s_table.table.select()).fetchall()
+        with StagingTable(self.unloaded_meta, source_path=self.radio_path) as s_table:
+            all_rows = session.execute(s_table.table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
 
     def test_staging_existing_table(self):
         # With a fixture CSV whose columns match the existing dataset,
         # create a staging table.
-        s_table = StagingTable(self.existing_meta, source_path=self.dog_path)
-        all_rows = session.execute(s_table.table.select()).fetchall()
+        with StagingTable(self.existing_meta, source_path=self.dog_path) as s_table:
+            all_rows = session.execute(s_table.table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
 
     def test_insert_data(self):
-        staging = StagingTable(self.existing_meta, source_path=self.dog_path)
+
         existing = self.existing_table
-        staging.insert_into(existing)
+        with StagingTable(self.existing_meta, source_path=self.dog_path) as staging:
+            staging.insert_into(existing)
         pre_existing_row = session.execute(existing.select()
                                            .where(existing.c[self.existing_meta.business_key] == 1)).fetchone()
         self.assertEqual(date(2015, 1, 2), pre_existing_row.point_date.date())
@@ -137,29 +137,10 @@ class StagingTableTests(TestCase):
         self.assertEqual(len(all_rows), 5)
 
     def test_new_table(self):
-        staging = StagingTable(self.unloaded_meta, source_path=self.radio_path)
         drop_if_exists(self.unloaded_meta.dataset_name)
-        new_table = staging.create_new()
+        with StagingTable(self.unloaded_meta, source_path=self.radio_path) as staging:
+            new_table = staging.create_new()
         all_rows = session.execute(new_table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
         session.close()
         new_table.drop(app_engine, checkfirst=True)
-
-
-    '''
-    Does the table disappear once it goes out of context?
-    '''
-
-    ''' Eh. Later
-    def test_self_cleaning(self):
-        pass'''
-
-
-    '''def test_extra_column_failure(self):
-        # With a fixture CSV that has one more column than the one that we inserted in the databse,
-        # try to create the staging table and expect an Exception
-        self.assert_(False)'''
-
-
-class UpdateMetaTests(TestCase):
-    pass

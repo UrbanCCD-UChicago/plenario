@@ -1,7 +1,5 @@
-from plenario.database import session
-from plenario.models import MetaTable
+def dataset_names(op):
+    conn = op.get_bind()
+    sel = "SELECT dataset_name FROM meta_master WHERE approved_status = 'true';"
 
-
-def dataset_names():
-    return [row.dataset_name for row in session.query(MetaTable.dataset_name)
-            .filter_by(approved_status='true').all()]
+    return [row['dataset_name']for row in conn.execute(sel)]

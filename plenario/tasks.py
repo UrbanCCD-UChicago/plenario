@@ -78,7 +78,7 @@ def frequency_update(frequency):
     return '%s update complete' % frequency
 
 @celery_app.task(bind=True)
-def update_dataset(self, source_url_hash, s3_path=None):
+def update_dataset(self, source_url_hash):
     md = session.query(MetaTable).get(source_url_hash)
     if md.result_ids:
         ids = md.result_ids
@@ -89,8 +89,8 @@ def update_dataset(self, source_url_hash, s3_path=None):
         c.execute(MetaTable.__table__.update()\
             .where(MetaTable.source_url_hash == source_url_hash)\
             .values(result_ids=ids))
-    etl = PlenarioETL(md.as_dict())
-    etl.update(s3_path=s3_path)
+    etl = PlenarioETL(md)
+    etl.update()
     return 'Finished updating {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task

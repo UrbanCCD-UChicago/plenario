@@ -9,41 +9,49 @@ from sqlalchemy import Boolean, Integer, BigInteger, Float, String, Date, TIME, 
 from sqlalchemy import select, func, text
 from geoalchemy2 import Geometry
 from plenario.models import MetaTable
-
-
-# Can move to common?
-class PlenarioETLError(Exception):
-    def __init__(self, message):
-        Exception.__init__(self, message)
-        self.message = message
+from plenario.etl.common import PlenarioETLError
 
 
 class PlenarioETL(object):
     def __init__(self, metadata, source_path=None):
+        """
+        :param metadata: MetaTable instance of dataset being ETL'd.
+        :param source_path: If provided, get source CSV ftom local filesystem instead of URL in metadata.
+        """
         self.metadata = metadata
         self.staging_table = StagingTable(self.metadata, source_path=source_path)
 
     def add(self):
-        new_table = self.staging_table.create_new()
+        """
+        Create point table for the first time.
+        """
+        with self.staging_table as s_table:
+            new_table = s_table.create_new()
         update_meta(new_table)
 
     def update(self):
+        """
+        Insert new records into existing point table.
+        """
         existing_table = self.metadata.point_table
-        self.staging_table.insert_into(existing_table)
+        with self.staging_table as s_table:
+            s_table.insert_into(existing_table)
         update_meta(existing_table)
 
 
-# Should StagingTable itself be a context manager? Probably.
 class StagingTable(object):
     def __init__(self, meta, source_path=None):
         """
+        A temporary table that will contain all records from the source CSV.
+        From it, either create a new point table
+        or insert records from it into an existing point table.
+
         :param meta: record from MetaTable
         :param source_path: path of source file on local filesystem
-        :return:
         """
-        # TODO: Must change these var names
         self.meta = meta
-        self.md = MetaData()
+        # The sqlalchemy metadata registry in which we must register our staging table.
+        self.sa_meta = MetaData()
 
         # Get the Columns to construct our table
         try:
@@ -59,38 +67,54 @@ class StagingTable(object):
         # Retrieve the source file
         try:
             if source_path:  # Local ingest
-                file_helper = ETLFile(source_path=source_path)
+                self.file_helper = ETLFile(source_path=source_path)
             else:  # Remote ingest
-                file_helper = ETLFile(source_url=meta.source_url)
+                self.file_helper = ETLFile(source_url=meta.source_url)
         # TODO: Handle more specific exception
         except Exception as e:
             raise PlenarioETLError(e)
 
-        with file_helper:
+    def __enter__(self):
+        """
+        Create the staging table. Will be named s_[dataset_name]
+        """
+        with self.file_helper as helper:
             if not self.cols:
                 # We couldn't get the column metadata from an existing table or from the user.
-                self.cols = self._from_inference(file_helper.handle)
+                self.cols = self._from_inference(helper.handle)
 
             # Grab the handle to build a table from the CSV
             try:
-                self.table = self._make_table(file_helper.handle)
-                self._kill_dups(self.table)
+                self.table = self._make_table(helper.handle)
+                self._kill_dups()
+                return self
             except Exception as e:
                 # Some stuff that could happen:
                     # There could be more columns in the source file than we expected.
                     # Some input could be malformed.
                 raise PlenarioETLError(e)
 
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Drop the staging table is it's been created.
+        """
+        if hasattr(self, 'table'):
+            session.close()
+            self.table.drop(bind=engine, checkfirst=True)
+        if exc_val:
+            print exc_val
+
     def _make_table(self, f):
         # Persist an empty table eagerly
         # so that we can access it when we drop down to a raw connection.
-        s_table_name = 'staging_' + self.meta.dataset_name
+        s_table_name = 's_' + self.meta.dataset_name
 
         # Make a sequential primary key to track line numbers
         self.cols.append(Column('line_num', Integer, primary_key=True))
 
-        table = Table(s_table_name, self.md, *self.cols, extend_existing=True)
-        # Dropping first because I haven't implmented a context manager for the staging table
+        table = Table(s_table_name, self.sa_meta, *self.cols, extend_existing=True)
+
+        # Be paranoid and remove the table if one by this name already exists.
         table.drop(bind=engine, checkfirst=True)
         table.create(bind=engine)
 
@@ -118,9 +142,9 @@ class StagingTable(object):
             where(existing.c.geom == select([func.ST_SetSRID(func.ST_MakePoint(0, 0), 4326)]))
         engine.execute(upd)
 
-    def _kill_dups(self, t):
+    def _kill_dups(self):
         # When a unique ID is duplicated, only retain the record with that ID found highest in the source file.
-
+        t = self.table
         del_stmt = '''
         DELETE FROM {table}
         WHERE line_num NOT IN (
@@ -134,6 +158,7 @@ class StagingTable(object):
             session.commit()
         except:
             session.rollback()
+            raise
 
     @staticmethod
     def _make_col(name, type, nullable):
@@ -161,6 +186,7 @@ class StagingTable(object):
         Generate columns by scanning source CSV and inferring column types.
         """
         reader = UnicodeCSVReader(f)
+        # Always create columns with slugified names
         header = map(slugify, reader.next())
 
         cols = []
@@ -226,7 +252,7 @@ class StagingTable(object):
                           FROM (SELECT a[1] AS lon, a[2] AS lat
                                   FROM (SELECT regexp_matches({}, '\((.*), (.*)\)') FROM {} AS FLOAT8(a))
                                 AS subq)
-                       AS geom;'''.format(t.c[m.location], 'staging_' + m.dataset_name))
+                       AS geom;'''.format(t.c[m.location], 's_' + m.dataset_name))
         else:
             raise PlenarioETLError('Staging table does not have geometry information.')
 
@@ -283,7 +309,7 @@ class StagingTable(object):
             Column('geom', Geometry('POINT', srid=4326), nullable=True)
         ]
 
-        new_table = Table(self.meta.dataset_name, self.md, *(verbatim_cols + derived_cols))
+        new_table = Table(self.meta.dataset_name, self.sa_meta, *(verbatim_cols + derived_cols))
         new_table.create(engine)
 
         # Ask the staging table to insert its new columns into the newly created table.
@@ -317,7 +343,6 @@ def update_meta(table):
     """
     After ingest/update, update the metadata registry to reflect
     :param table:
-    :return:
     """
     record = MetaTable.get_by_dataset_name(table.name)
     record.update_date_added()
@@ -332,5 +357,6 @@ def update_meta(table):
     try:
         session.commit()
     # TODO: Catch more specific
-    except Exception:
+    except:
         session.rollback()
+        raise

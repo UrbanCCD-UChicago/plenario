@@ -2,8 +2,8 @@ from uuid import uuid4
 from datetime import datetime
 
 from sqlalchemy import Column, String, Boolean, Date, DateTime, \
-    Text, func, Table, select
-from sqlalchemy.dialects.postgresql import ARRAY
+    Text, func, Table, select, BigInteger, TIMESTAMP, Integer
+from sqlalchemy.dialects.postgresql import ARRAY, DOUBLE_PRECISION
 from geoalchemy2 import Geometry
 from sqlalchemy.orm import synonym
 import sqlalchemy as sa
@@ -274,6 +274,30 @@ class MetaTable(Base):
             select_from(defaults.outerjoin(actuals, actuals.c.time_bucket == defaults.c.time_bucket))
 
         return ts
+
+
+class MasterTable(Base):
+    __tablename__ = 'dat_master'
+    master_row_id = Column(BigInteger, primary_key=True)
+    # Looks like start_date and end_date aren't used.
+    start_date = Column(TIMESTAMP)
+    end_date = Column(TIMESTAMP)
+    # current_flag is never updated. We can probably get rid of this
+    current_flag = Column(Boolean, default=True)
+    location = Column(String(200))
+    latitude = Column(DOUBLE_PRECISION(precision=53))
+    longitude = Column(DOUBLE_PRECISION(precision=53))
+    obs_date = Column(TIMESTAMP, index=True)
+    weather_observation_id = Column(BigInteger, index=True)
+    census_block = Column(String(15), index=True)
+    # Looks like geotag3 is unused
+    geotag3 = Column(String(50))
+    dataset_name = Column(String(100), index=True)
+    dataset_row_id = Column(Integer)
+    location_geom = Column(Geometry('POINT', srid=4326))
+
+    def __repr__(self):
+        return '<Master %r (%r)>' % (self.dataset_row_id, self.dataset_name)
 
 
 class ShapeMetadata(Base):

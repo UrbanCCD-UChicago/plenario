@@ -69,12 +69,6 @@ class DetailTests(unittest.TestCase):
         response_data = json.loads(resp.data)
         self.assertEqual(response_data['meta']['total'], 5)
 
-    # TODO: Verify CSV output
-    '''def test_csv(self):
-        query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&data_type=csv'
-        resp = self.app.get(query)
-        print resp.data'''
-
 
 class GridTests(unittest.TestCase):
     # Assume same setup as Timeseries
