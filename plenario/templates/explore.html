@@ -13,6 +13,7 @@
         </div>
         <div class="col-md-12">
             <div id="list-view"></div>
+            <div id="shapes-view"></div>
             <div id="detail-view"></div>
         </div>
     </div>
@@ -31,7 +32,6 @@
     <script type="text/javascript" src="{{ url_for('static', filename='js/moment.min.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.dataTables.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/highcharts.js') }}"></script>
-
     <script type="text/javascript" src="{{ url_for('static', filename='js/chart_helper.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/explore/helpers.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/explore/router.js') }}"></script>
@@ -41,7 +41,9 @@
     <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/detail-view.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/filter-view.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/response-view.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/polygon-view.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/shapeView.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/models/shape.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/collections/shapes.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/error-view.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/explore/app.js') }}"></script>
 {% endblock %}

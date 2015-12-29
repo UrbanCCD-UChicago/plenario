@@ -6,6 +6,7 @@ var AppRouter = Backbone.Router.extend({
     },
     defaultRoute: function(){
         new AboutView({el: '#list-view'});
+        shapeView = new app.ShapeView();
         map = new MapView({el: '#map-view', attributes: {}})
     },
     aggregate: function(query){
@@ -18,6 +19,7 @@ var AppRouter = Backbone.Router.extend({
             attrs['dataLayer'] = $.parseJSON(q['location_geom__within']);
         }
         map = new MapView({el: '#map-view', attributes: attrs});
+        shapeView = new app.ShapeView({el: '#shapes-view'});
     },
     detail: function(query){
         var q = parseParams(query);

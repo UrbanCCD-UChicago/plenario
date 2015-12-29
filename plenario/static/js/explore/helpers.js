@@ -16,15 +16,16 @@ function get_template(tmpl_name){
 }
 
 function template_cache(tmpl_name, tmpl_data){
+    // Have we created the cache?
     if ( !template_cache.tmpl_cache ) {
         template_cache.tmpl_cache = {};
     }
-
+    // Have we created this template before?
     if ( ! template_cache.tmpl_cache[tmpl_name] ) {
         var tmpl_string = get_template(tmpl_name);
         template_cache.tmpl_cache[tmpl_name] = _.template(tmpl_string);
     }
-
+    // Render this template with the given data.
     return template_cache.tmpl_cache[tmpl_name](tmpl_data);
 }
 

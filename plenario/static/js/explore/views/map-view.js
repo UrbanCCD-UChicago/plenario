@@ -137,7 +137,7 @@ var MapView = Backbone.View.extend({
             resp = new ResponseView({el: '#list-view', attributes: {query: query}})
             var route = "aggregate/" + $.param(query);
             _gaq.push(['_trackPageview', route]);
-            router.navigate(route);
+            router.navigate(route, {trigger: true});
         } else {
             $('#list-view').spin(false);
             var error = {
