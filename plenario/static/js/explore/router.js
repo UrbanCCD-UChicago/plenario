@@ -19,7 +19,8 @@ var AppRouter = Backbone.Router.extend({
             attrs['dataLayer'] = $.parseJSON(q['location_geom__within']);
         }
         map = new MapView({el: '#map-view', attributes: attrs});
-        shapeView = new app.ShapeView(resp);
+        //shapeView = new app.ShapeView(resp);
+        shapeView = new app.ShapeView({el: '#shapes-view', resp:resp});
     },
     detail: function(query){
         var q = parseParams(query);

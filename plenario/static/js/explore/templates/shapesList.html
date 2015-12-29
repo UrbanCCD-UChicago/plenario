@@ -5,7 +5,9 @@
     <thead>
     <tr>
         <th>Dataset Name</th>
-        <th>Number of Intersection</th>
+          <% if (hasIntersect) { %>
+            <th>Count</th>
+            <% } %>
         <th>Date Added</th>
         <th>Download</th>
     </tr>
@@ -13,9 +15,10 @@
     <tbody>
     <% $.each(shapes, function(i, shape){ %>
         <tr>
-            <%= console.log(shape.num_geoms) %>
             <td><%= shape.human_name %></td>
+            <% if (hasIntersect) { %>
             <td><%= shape.num_geoms %></td>
+            <% } %>
             <td><%= shape.date_added %></td>
             <td>
                 <div class="btn-group">

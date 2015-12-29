@@ -5,5 +5,5 @@ app.Shapes = Backbone.Collection.extend({
     url: "http://plenar.io/v1/api/shapes/",
     parse: function(data){
         return data.objects;
-    }
+    },
 });
