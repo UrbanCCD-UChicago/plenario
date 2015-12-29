@@ -49,13 +49,7 @@ var app = app || {};
                             self.collection.get(intersect.dataset_name).set("num_geoms", intersect.num_geoms);
                         });
                     }
-                }).fail(function(resp){
-                    var error = {
-                        header: 'Woops!',
-                        body: "Error fetching data.",
-                    }
-                    new ErrorView({el: '#errorModal', model: error});
-                });
+                })
         },
 
         getIntersection: function(){
