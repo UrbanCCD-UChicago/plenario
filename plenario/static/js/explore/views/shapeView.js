@@ -3,7 +3,9 @@ var app = app || {};
     app.ShapeView = Backbone.View.extend({
 
         el: '#shapes-view',
+        // will go back to use template after fully integrate backbone with the original application
         //template:
+
         initialize: function() {
             var self = this;
             this.collection = new app.Shapes();
@@ -19,13 +21,16 @@ var app = app || {};
         },
 
         render: function(){
-            var shapes = this.collection.toJSON();
+            var shapes;
             var intersect;
             var available;
             if (resp === undefined) {
+                shapes = this.collection.toJSON();
                 intersect = false;
                 available = _.size(this.collection);
             } else {
+                //filter out the shape datasets that intersect with the bounding box to display
+                shapes = _.filter(this.collection.toJSON(), function(v){if(v.num_geoms) {return v};});
                 intersect = true;
                 available = _.size(_.filter(this.collection.pluck("num_geoms"), function(v) {return v !== undefined;}));
             }
@@ -57,12 +62,11 @@ var app = app || {};
             var self = this;
             var q = self.getGeoJson();
             return $.ajax({
-                //url: 'http://plenar.io/v1/api/shapes/intersections/'+ q,
                 url: '/v1/api/shapes/intersections/'+ q,
-                //url: 'http://plenar.io/v1/api/shapes/intersections/{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.67248630523682,41.86454328565965],[-87.67248630523682,41.872117384500754],[-87.6549768447876,41.872117384500754],[-87.6549768447876,41.86454328565965],[-87.67248630523682,41.86454328565965]]]}}',
-                dataType: 'json',
+                dataType: 'json'
             });
         },
+
         getGeoJson: function() {
             var self = this;
             return self.query.location_geom__within;
