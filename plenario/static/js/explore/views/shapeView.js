@@ -16,7 +16,6 @@ var app = app || {};
                 }
             }
             });
-
             // if listen to reset, it will initialize a new collection and render the one without additional features
            this.listenTo(this.collection, 'all', this.render, this);
         },
@@ -40,25 +39,24 @@ var app = app || {};
             $.when(self.getIntersection()).then(
                 function(resp) {
                     //var data = {
-                    //    "meta": {"status": "ok", "message": ""},
-                    //    "objects": [{
-                    //        "dataset_name": "chicago_pedestrian_streets",
-                    //        "num_geoms": 2
-                    //    }, {
-                    //        "dataset_name": "chicago_city_limits",
-                    //        "num_geoms": 1
-                    //    }, {
-                    //        "dataset_name": "chicago_tif_districts",
-                    //        "num_geoms": 2
-                    //    }, {
-                    //        "dataset_name": "chicago_wards",
-                    //        "num_geoms": 9
-                    //    }, {"dataset_name": "chicago_major_streets", "num_geoms": 28}]};
+                        //"meta": {"status": "ok", "message": ""},
+                        //"objects": [{
+                        //    "dataset_name": "chicago_pedestrian_streets",
+                        //    "num_geoms": 9
+                        //}, {
+                        //    "dataset_name": "chicago_city_limits",
+                        //    "num_geoms": ""
+                        //}, {
+                        //    "dataset_name": "chicago_tif_districts",
+                        //    "num_geoms": 90
+                        //}, {
+                        //    "dataset_name": "chicago_wards",
+                        //    "num_geoms": 0
+                        //}, {"dataset_name": "chicago_major_streets"}]};
                     var data = resp.objects;
-                    data.objects.forEach(function (intersect) {
+                    data.forEach(function (intersect) {
                         self.collection.get(intersect.dataset_name).set("num_geoms",intersect.num_geoms);
                     });
-                    //console.log(self.collection);//right
                 });
         },
 
