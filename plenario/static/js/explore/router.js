@@ -20,7 +20,7 @@ var AppRouter = Backbone.Router.extend({
         }
         map = new MapView({el: '#map-view', attributes: attrs});
         //shapeView = new app.ShapeView(resp);
-        shapeView = new app.ShapeView({el: '#shapes-view', resp:resp});
+        shapeView = new app.ShapeView({el: '#shapes-view'});
     },
     detail: function(query){
         var q = parseParams(query);

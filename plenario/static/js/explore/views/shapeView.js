@@ -5,14 +5,12 @@ var app = app || {};
         el: '#shapes-view',
         //template:
         initialize: function() {
-            console.log(this);
             var self = this;
             this.collection = new app.Shapes();
             this.collection.fetch({reset:true,success:function(){
                 if (resp) {
-                self.resp = resp;
-                self.query = self.resp.query;
-                self.setIntersection();
+                    self.query = resp.query;
+                    self.setIntersection();
                 }
             }
             });
@@ -21,15 +19,17 @@ var app = app || {};
         },
 
         render: function(){
-            console.log("Rendering");
             var shapes = this.collection.toJSON();
             var intersect;
+            var available;
             if (resp === undefined) {
                 intersect = false;
+                available = _.size(this.collection);
             } else {
                 intersect = true;
+                available = _.size(_.filter(this.collection.pluck("num_geoms"), function(v) {return v !== undefined;}));
             }
-            var template = template_cache('shapesList', {shapes:shapes,hasIntersect:intersect});
+            var template = template_cache('shapesList', {shapes:shapes, hasIntersect:intersect, available:available});
             this.$el.html(template);
             return this;
         },
@@ -38,25 +38,18 @@ var app = app || {};
             var self = this;
             $.when(self.getIntersection()).then(
                 function(resp) {
-                    //var data = {
-                        //"meta": {"status": "ok", "message": ""},
-                        //"objects": [{
-                        //    "dataset_name": "chicago_pedestrian_streets",
-                        //    "num_geoms": 9
-                        //}, {
-                        //    "dataset_name": "chicago_city_limits",
-                        //    "num_geoms": ""
-                        //}, {
-                        //    "dataset_name": "chicago_tif_districts",
-                        //    "num_geoms": 90
-                        //}, {
-                        //    "dataset_name": "chicago_wards",
-                        //    "num_geoms": 0
-                        //}, {"dataset_name": "chicago_major_streets"}]};
                     var data = resp.objects;
-                    data.forEach(function (intersect) {
-                        self.collection.get(intersect.dataset_name).set("num_geoms",intersect.num_geoms);
-                    });
+                    if (data.length > 0) {
+                        data.forEach(function (intersect) {
+                            self.collection.get(intersect.dataset_name).set("num_geoms", intersect.num_geoms);
+                        });
+                    }
+                }).fail(function(resp){
+                    var error = {
+                        header: 'Woops!',
+                        body: "Error fetching data.",
+                    }
+                    new ErrorView({el: '#errorModal', model: error});
                 });
         },
 
@@ -64,10 +57,9 @@ var app = app || {};
             var self = this;
             var q = self.getGeoJson();
             return $.ajax({
+                //url: 'http://plenar.io/v1/api/shapes/intersections/'+ q,
                 url: '/v1/api/shapes/intersections/'+ q,
-               // url: "http://plenar.io/v1/api/shapes/intersections/{'type':'Feature','properties':{},'geometry':{'type':'Polygon','coordinates':[[[-87.67248630523682,41.86454328565965],[-87.67248630523682,41.872117384500754],[-87.6549768447876,41.872117384500754],[-87.6549768447876,41.86454328565965],[-87.67248630523682,41.86454328565965]]]}}",
-                //crossOrigin: true,
-                //xhrFields: {withCredentials:true},
+                //url: 'http://plenar.io/v1/api/shapes/intersections/{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.67248630523682,41.86454328565965],[-87.67248630523682,41.872117384500754],[-87.6549768447876,41.872117384500754],[-87.6549768447876,41.86454328565965],[-87.67248630523682,41.86454328565965]]]}}',
                 dataType: 'json',
             });
         },
