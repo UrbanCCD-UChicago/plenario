@@ -35,15 +35,22 @@ def upgrade():
     for name in dataset_names():
         print 'updating ' + name
         pt = MetaTable.get_by_dataset_name(name).point_table
+        original_cols = [c for c in pt.c if c.name not in {'geom', 'point_date'}]
 
-        # Select geoms and dates from matching records in master table
-        sel = select([mt.c.location_geom.label('geom'),
-                      mt.c.observed_date.label('date')])\
-              .where(mt.c.master_row_id == pt.c[name + '_row_id'])\
-              .limit(1)
-        upd = pt.update().values(geom=sel.geom, point_date=sel.date)
+        # Create new table with populated geom and date columns
+        sel = select(original_cols + [
+                      mt.c.location_geom.label('geom'),
+                      mt.c.obs_date.label('point_date')])\
+              .where(mt.c.master_row_id == pt.c[name + '_row_id'])
 
-        session.execute(upd)
+        sel_str = str(sel)
+        ins_str = "CREATE TABLE tmp AS " + sel_str
+
+        session.execute(ins_str)
+
+        # Drop old table and give new one its name
+        rename = 'DROP TABLE "{name}"; ALTER TABLE tmp RENAME TO "{name}";'.format(name=name)
+        session.execute(rename)
         session.commit()
 
     session.close()
