@@ -305,8 +305,8 @@ class StagingTable(object):
 
         # Create geometry and timestamp columns
         derived_cols = [
-            Column('point_date', TIMESTAMP, nullable=False),
-            Column('geom', Geometry('POINT', srid=4326), nullable=True)
+            Column('point_date', TIMESTAMP, nullable=False, index=True),
+            Column('geom', Geometry('POINT', srid=4326), nullable=True, index=True)
         ]
 
         new_table = Table(self.meta.dataset_name, self.sa_meta, *(verbatim_cols + derived_cols))
