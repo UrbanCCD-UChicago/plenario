@@ -26,5 +26,6 @@ from plenario.alembic.version_helpers import dataset_names
 def upgrade():
     cols_to_drop = ['dup_ver', 'start_date', 'end_date', 'current_flag']
     for name in dataset_names(op):
-        for col in cols_to_drop:
+        cols = list(cols_to_drop) + [name + '_row_id']
+        for col in cols:
             op.drop_column(name, col)

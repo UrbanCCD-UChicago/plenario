@@ -40,23 +40,12 @@ def upgrade():
         denull = pt.delete().where(meta.id_col() == None)
         session.execute(denull)
 
-        session.commit()
-        session.close()
-        print 'Cleaned ' + dset_name
+        # Make business key the primary key
+        make_pkey = """
+           ALTER TABLE "{table_name}" ADD PRIMARY KEY ({col_name})""".\
+            format(table_name=dset_name, col_name=bkey_col_name)
 
-        # Change the primary key
-
-        # Create an index on the business key
-        new_pkey_name = dset_name[:54] + '_pkey'
-        op.create_unique_constraint(new_pkey_name, dset_name, [bkey_col_name])
-
-        # Replace the old pkey with the new index
-        old_pkey_name = 'dat_{}_pkey'.format(dset_name)
-        replace_key = """ALTER TABLE "{table_name}" DROP CONSTRAINT {old_pkey_name};
-           ALTER TABLE "{table_name}" ADD PRIMARY KEY {new_pkey_name}""".\
-            format(table_name=dset_name, old_pkey_name=old_pkey_name, new_pkey_name=new_pkey_name)
-
-        session.execute(replace_key)
+        session.execute(make_pkey)
         session.commit()
         session.close()
         print 'Added pkey to ' + dset_name
