@@ -56,10 +56,11 @@ class ParamValidator(object):
                 self.vals[k] = val
                 continue
 
-            elif self.cols:
+            elif hasattr(self, 'cols'):
                 # Maybe k specifies a condition on the dataset
                 cond, err = self._make_condition(k, v)
-                if cond:
+                # 'if cond' fails because sqlalchemy overrides __bool__
+                if cond is not None:
                     self.conditions.append(cond)
                     continue
                 elif err:
@@ -352,11 +353,13 @@ def detail():
     rows = []
     for record in q.all():
         row = list(record)
-        row[geom_idx] = shapely.wkb.loads(row[geom_idx].desc, hex=True).__geo_interface__
+        try:
+            row[geom_idx] = shapely.wkb.loads(row[geom_idx].desc, hex=True).__geo_interface__
+        except AttributeError:
+            pass  # geoms can be null :(
         rows.append(row)
 
     # Part 4: Format response
-    # TODO update docs to reflect that geojson is unsupported.
     datatype = validator.vals['data_type']
     if datatype == 'json':
         resp = {
