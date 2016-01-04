@@ -163,6 +163,7 @@ class MetaTable(Base):
 
         return panel
 
+
     # Information about all point datasets
     @classmethod
     def index(cls):
@@ -276,6 +277,14 @@ class MetaTable(Base):
             select_from(defaults.outerjoin(actuals, actuals.c.time_bucket == defaults.c.time_bucket))
 
         return ts
+
+    def timeseries_one(self, agg_unit, start, end, geom=None):
+        ts_select = self.timeseries(agg_unit, start, end, geom)
+        rows = session.execute(ts_select.order_by('time_bucket'))
+
+        ts = [['count', 'datetime']] + [[count, time_bucket.date()] for _, count, time_bucket in rows]
+        return ts
+
 
 
 class MasterTable(Base):

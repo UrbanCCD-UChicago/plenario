@@ -210,7 +210,7 @@ def make_error(msg):
 @crossdomain(origin="*")
 def timeseries():
     validator = ParamValidator()\
-        .set_optional('agg', agg_validator, 'day')\
+        .set_optional('agg', agg_validator, 'week')\
         .set_optional('data_type', make_format_validator(['json', 'csv']), 'json')\
         .set_optional('dataset_name__in', list_of_datasets_validator, MetaTable.index)\
         .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
@@ -289,6 +289,71 @@ def timeseries():
         filedate = datetime.now().strftime('%Y-%m-%d')
         resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
     return resp
+
+
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def detail_aggregate():
+    # Can I abstract out the common param requirements?
+
+    raw_query_params = request.args.copy()
+    # First, make sure name of dataset was provided...
+    try:
+        dataset_name = raw_query_params['dataset_name']
+    except KeyError:
+        return make_error("'dataset_name' is required")
+
+    # and that we have that dataset.
+    try:
+        validator = ParamValidator(dataset_name)
+    except NoSuchTableError:
+        return make_error("Cannot find dataset named {}".format(dataset_name))
+
+    validator\
+        .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
+        .set_optional('obs_date__le', date_validator, datetime.now())\
+        .set_optional('location_geom__within', geom_validator, None)\
+        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json')\
+        .set_optional('agg', agg_validator, 'week')
+
+    # If any optional parameters are malformed, we're better off bailing and telling the user
+    # than using a default and confusing them.
+    err = validator.validate(raw_query_params)
+    if err:
+        return make_error(err)
+
+    start_date = validator.vals['obs_date__ge']
+    end_date = validator.vals['obs_date__le']
+    agg = validator.vals['agg']
+    dataset = MetaTable.get_by_dataset_name(dataset_name)
+
+    # Geometry is an optional parameter.
+    # If it was provided, convert the polygon or linestring to a postgres-ready form.
+    geom = validator.vals.get('location_geom__within', None)
+    if geom:
+        # Should probably catch a shape exception here
+        geom = make_fragment_str(geom, buffer)
+
+    ts = dataset.timeseries_one(agg_unit=agg, start=start_date, end=end_date, geom=geom)
+
+    datatype = validator.vals['data_type']
+    if datatype == 'json':
+        resp = {
+            'meta': {
+                'status': 'ok',
+                'message': validator.warnings,
+                'query': validator.vals
+            },
+            'objects': [{'count': c, 'datetime': d} for c, d in ts[1:]],
+        }
+
+        resp = make_response(json.dumps(resp, default=dthandler), 200)
+        resp.headers['Content-Type'] = 'application/json'
+    elif datatype == 'csv':
+        resp = make_csv(ts)
+        resp.headers['Content-Type'] = 'text/csv'
+        filedate = datetime.now().strftime('%Y-%m-%d')
+        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
