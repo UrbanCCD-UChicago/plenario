@@ -1,4 +1,5 @@
 flu_url = 'https://data.cityofchicago.org/api/views/rfdj-hdmf/rows.csv?accessType=DOWNLOAD'
+flu_path = 'Flu_Shot_Clinic_Locations_-_2013.csv'
 
 flu_shot_meta = {
     'dataset_name': u'flu_shot_clinics',
@@ -7,7 +8,7 @@ flu_shot_meta = {
     'description': u'bar',
     'url': flu_url,
     'update_freq': 'yearly',
-    'business_key': u'facility name',
+    'business_key': u'event',
     'observed_date': u'date',
     'latitude': u'latitude',
     'longitude': u'longitude',
@@ -21,6 +22,7 @@ flu_shot_meta = {
 }
 
 landmarks_url = 'https://data.cityofchicago.org/api/views/tdab-kixi/rows.csv?accessType=DOWNLOAD'
+landmarks_path = 'Individual_Landmarks.csv'
 
 landmarks_meta = {
     'dataset_name': u'landmarks',

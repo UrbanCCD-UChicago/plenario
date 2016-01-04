@@ -1,40 +1,32 @@
 import unittest
-from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta
+from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta, flu_path, landmarks_path
 from plenario.models import MetaTable
-from plenario.database import session, app_engine
+from plenario.database import session
 from plenario.etl.point import PlenarioETL
 from init_db import init_master_meta_user
-from sqlalchemy import Table, MetaData
-from sqlalchemy.exc import NoSuchTableError
 from plenario import create_app
 import json
 import os
 import urllib
 
 
-def ingest_online_from_fixture(fixture_meta):
-        md = MetaTable(**fixture_meta)
-        session.add(md)
-        session.commit()
-        point_etl = PlenarioETL(md)
-        point_etl.add()
+pwd = os.path.dirname(os.path.realpath(__file__))
+fixtures_path = os.path.join(pwd, '../test_fixtures')
+
+
+def ingest_from_fixture(fixture_meta, fname):
+    md = MetaTable(**fixture_meta)
+    session.add(md)
+    session.commit()
+    path = os.path.join(fixtures_path, fname)
+    point_etl = PlenarioETL(md, source_path=path)
+    point_etl.add()
 
 
 def drop_tables(table_names):
     drop_template = 'DROP TABLE IF EXISTS {};'
     command = ''.join([drop_template.format(table_name) for table_name in table_names])
     session.execute(command)
-    session.commit()
-
-
-def create_dummy_census_table():
-    session.execute("""
-    CREATE TABLE census_blocks
-    (
-        geoid10 INT,
-        geom geometry(MultiPolygon,4326)
-    );
-    """)
     session.commit()
 
 
@@ -47,12 +39,27 @@ def get_loop_rect():
     return escaped_query_rect
 
 
-class DetailTests(unittest.TestCase):
+class PointAPITests(unittest.TestCase):
 
-    # Assume same setup as Timeseries
     @classmethod
     def setUpClass(cls):
+        tables_to_drop = [
+            'flu_shot_clinics',
+            'landmarks',
+            'dat_master',
+            'meta_master',
+            'plenario_user'
+        ]
+        drop_tables(tables_to_drop)
+
+        init_master_meta_user()
+
+        ingest_from_fixture(flu_shot_meta, flu_path)
+        ingest_from_fixture(landmarks_meta, landmarks_path)
+
         cls.app = create_app().test_client()
+
+    '''/detail'''
 
     def test_time_filter(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'
@@ -69,19 +76,13 @@ class DetailTests(unittest.TestCase):
         response_data = json.loads(resp.data)
         self.assertEqual(response_data['meta']['total'], 5)
 
-
-class GridTests(unittest.TestCase):
-    # Assume same setup as Timeseries
-    @classmethod
-    def setUpClass(cls):
-        cls.app = create_app().test_client()
+    '''/grid'''
 
     def test_space_and_time(self):
         escaped_query_rect = get_loop_rect()
         query = 'v1/api/grid/?obs_date__ge=2013-1-1&obs_date_le=2014-1-1&dataset_name=flu_shot_clinics&location_geom__within=' + escaped_query_rect
         resp = self.app.get(query)
         response_data = json.loads(resp.data)
-        print response_data
         self.assertEqual(len(response_data['features']), 4)
 
         # Each feature should have an associated square geometry with 5 points
@@ -95,32 +96,7 @@ class GridTests(unittest.TestCase):
         self.assertEqual(counts.count(1), 3)
         self.assertEqual(counts.count(2), 1)
 
-
-class TimeseriesRegressionTests(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        tables_to_drop = [
-            'flu_shot_clinics',
-            'landmarks',
-            'dat_master',
-            'meta_master',
-            'plenario_user'
-        ]
-        drop_tables(tables_to_drop)
-
-        init_master_meta_user()
-
-        # Make sure that it at least _looks_ like we have census blocks
-        try:
-            Table('census_blocks', MetaData(app_engine))
-        except NoSuchTableError:
-            create_dummy_census_table()
-
-        ingest_online_from_fixture(flu_shot_meta)
-        ingest_online_from_fixture(landmarks_meta)
-
-        cls.app = create_app().test_client()
+    '''/timeseries'''
 
     def flu_agg(self, agg_type, expected_counts):
         # Always query from 9-22 to 10-1
@@ -190,5 +166,6 @@ class TimeseriesRegressionTests(unittest.TestCase):
         # Extract the number of flu clinics per time unit
         counts = [time_unit['count'] for time_unit in timeseries['items']]
         self.assertEqual([5], counts)
+
 
 
