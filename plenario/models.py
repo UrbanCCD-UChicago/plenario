@@ -282,7 +282,7 @@ class MetaTable(Base):
         ts_select = self.timeseries(agg_unit, start, end, geom)
         rows = session.execute(ts_select.order_by('time_bucket'))
 
-        ts = [['count', 'datetime']] + [[count, time_bucket.date()] for _, count, time_bucket in rows]
+        ts = [['count', 'datetime']] + [[count, time_bucket.date()] for _, time_bucket, count in rows]
         return ts
 
 

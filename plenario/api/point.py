@@ -355,6 +355,7 @@ def detail_aggregate():
         filedate = datetime.now().strftime('%Y-%m-%d')
         resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
 
+    return resp
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")

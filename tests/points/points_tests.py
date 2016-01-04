@@ -167,5 +167,14 @@ class PointAPITests(unittest.TestCase):
         counts = [time_unit['count'] for time_unit in timeseries['items']]
         self.assertEqual([5], counts)
 
+    '''/detail-aggregate'''
 
+    def test_aggregate(self):
+        # Use same params as for timeseries
+        query = '/v1/api/detail-aggregate/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&agg=week'
+        resp = self.app.get(query)
+        response_data = json.loads(resp.data)
 
+        expected_counts = [1, 1, 3]
+        observed_counts = [obj['count'] for obj in response_data['objects']]
+        self.assertEqual(expected_counts, observed_counts)
