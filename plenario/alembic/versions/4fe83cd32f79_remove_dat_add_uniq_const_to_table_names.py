@@ -1,20 +1,19 @@
-"""Remove dat_ from point table names
+"""Remove dat, add uniq const to table names
 
-Revision ID: 36a266e175ac
+Revision ID: 4fe83cd32f79
 Revises: 
-Create Date: 2015-12-30 10:35:34.438501
+Create Date: 2016-01-03 17:11:35.048990
 
 """
 
 # revision identifiers, used by Alembic.
-revision = '36a266e175ac'
+revision = '4fe83cd32f79'
 down_revision = None
 branch_labels = None
 depends_on = None
 
 import os, sys
 from alembic import op
-import sqlalchemy as sa
 
 
 # Add plenario's root directory to the working path.
@@ -30,4 +29,4 @@ def upgrade():
         old_name = 'dat_' + dset_name
         op.rename_table(old_name, dset_name)
 
-
+    op.create_unique_constraint('unique_dataset_name', 'meta_master', ['dataset_name'])

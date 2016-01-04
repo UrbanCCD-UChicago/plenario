@@ -1,19 +1,20 @@
-"""Make business_key primary key
+"""Dedupe
 
-Revision ID: 3434be31f468
-Revises: 4b1e44c83b12
-Create Date: 2015-12-30 10:49:03.980468
+Revision ID: 2b7aa5b368df
+Revises: 4fe83cd32f79
+Create Date: 2016-01-03 17:22:13.779043
 
 """
 
 # revision identifiers, used by Alembic.
-revision = '3434be31f468'
-down_revision = '4b1e44c83b12'
+revision = '2b7aa5b368df'
+down_revision = '4fe83cd32f79'
 branch_labels = None
 depends_on = None
 
 import os, sys
 from alembic import op
+import sqlalchemy as sa
 
 
 # Add plenario's root directory to the working path.
@@ -30,7 +31,6 @@ def upgrade():
     for dset_name in dataset_names(op):
         meta = MetaTable.get_by_dataset_name(dset_name)
         pt = meta.point_table
-        bkey_col_name = meta.business_key
 
         # Deduplicate business key by only taking dup_ver > 1
         dedupe = pt.delete().where(pt.c.dup_ver > 1)
@@ -40,12 +40,4 @@ def upgrade():
         denull = pt.delete().where(meta.id_col() == None)
         session.execute(denull)
 
-        # Make business key the primary key
-        make_pkey = """
-           ALTER TABLE "{table_name}" ADD PRIMARY KEY ({col_name})""".\
-            format(table_name=dset_name, col_name=bkey_col_name)
-
-        session.execute(make_pkey)
-        session.commit()
-        session.close()
-        print 'Added pkey to ' + dset_name
+    session.close()

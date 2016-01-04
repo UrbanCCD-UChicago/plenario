@@ -204,7 +204,7 @@ class MetaTable(Base):
 
 
 
-    def make_grid(self, resolution, geom=None, conditions=[]):
+    def make_grid(self, resolution, geom=None, conditions=None):
         """
         :param resolution: length of side of grid square in meters
         :type resolution: int
@@ -215,6 +215,8 @@ class MetaTable(Base):
         :return: result proxy with all result rows
                  size_x and size_y: the horizontal and vertical size of the grid squares in degrees
         """
+        if conditions is None:
+            conditions = []
 
         # We need to convert resolution (given in meters) to degrees - which is the unit of measure for EPSG 4326
         # - in order to generate our grid.
@@ -261,7 +263,7 @@ class MetaTable(Base):
 
         # Also filter by geometry if requested
         if geom:
-            actuals = actuals.where(t.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geom)))
+            actuals = actuals.where(func.ST_Within(t.c.geom, func.ST_GeomFromGeoJSON(geom)))
 
         # Need to alias to make it usable in a subexpression
         actuals = actuals.alias('actuals')
