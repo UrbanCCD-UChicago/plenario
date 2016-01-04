@@ -14,7 +14,6 @@ depends_on = None
 
 import os, sys
 from alembic import op
-import sqlalchemy as sa
 
 
 # Add plenario's root directory to the working path.
