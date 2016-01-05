@@ -14,7 +14,7 @@ api.add_url_rule(prefix + '/timeseries', 'timeseries', timeseries)
 api.add_url_rule(prefix + '/detail', 'detail', detail)
 api.add_url_rule(prefix + '/detail-aggregate', 'detail-aggregate', detail_aggregate)
 api.add_url_rule(prefix + '/datasets', 'meta', meta)
-api.add_url_rule(prefix + '/fields', 'point_fields', dataset_fields)
+api.add_url_rule(prefix + '/fields/<dataset_name>', 'point_fields', dataset_fields)
 api.add_url_rule(prefix + '/grid', 'grid', grid)
 
 api.add_url_rule(prefix + '/weather/<table>/', 'weather', weather)
