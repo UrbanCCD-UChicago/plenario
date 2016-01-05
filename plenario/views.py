@@ -340,6 +340,7 @@ def view_datasets():
         .all()
 
     counts = {
+        'master_row_count': 42,
         'weather_daily_row_count': table_row_estimate('dat_weather_observations_daily'),
         'weather_hourly_row_count': table_row_estimate('dat_weather_observations_hourly'),
         'census_block_row_count': table_row_estimate('census_blocks'),
