@@ -13,7 +13,7 @@ branch_labels = None
 depends_on = None
 
 import os, sys
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func
 
 # Add plenario's root directory to the working path.
 pwd = os.path.dirname(os.path.realpath(__file__))
@@ -34,6 +34,7 @@ def upgrade():
     mt = MasterTable.__table__
     for name in dataset_names():
         print 'updating ' + name
+
         pt = MetaTable.get_by_dataset_name(name).point_table
         original_cols = [c for c in pt.c if c.name not in {name + '_row_id',
                                                            'start_date',
@@ -46,9 +47,10 @@ def upgrade():
                                 mt.c.obs_date.label('point_date')]
 
         sel = select(cols)\
-              .where(and_(mt.c.dataset_row_id == pt.c[name + '_row_id'], mt.c.dataset_name == name))
+              .where(mt.c.dataset_row_id == pt.c[name + '_row_id'])
 
-        sel_str = str(sel)
+
+        sel_str = str(sel) + " AND dat_master.dataset_name='{}'".format(name)
         ins_str = "CREATE TABLE tmp AS " + sel_str
 
         session.execute(ins_str)
