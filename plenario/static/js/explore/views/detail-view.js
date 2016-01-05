@@ -93,7 +93,7 @@ var DetailView = Backbone.View.extend({
         window.scrollTo(0, 0);
         $('#detail-view').hide();
         $('#list-view').hide();
-
+        $('#shapes-view').hide();
         $('.download-map-grid').attr('href','/v1/api/grid/?' + $.param(self.getQuery()))
         $('.date-filter').datepicker({
             dayNamesMin: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
