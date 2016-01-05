@@ -68,7 +68,11 @@ class ETLFile(object):
         """
 
         # The file might be big, so stream it in chunks.
-        file_stream_request = requests.get(url, stream=True, timeout=5)
+        # I'd like to enforce a timeout, but some big datasets (like Chicago crimes)
+        # take more than a minute to start streaming.
+        # Maybe add timeout as a parameter.
+        #file_stream_request = requests.get(url, stream=True, timeout=5)
+        file_stream_request = requests.get(url, stream=True)
         # Raise an exception if we didn't get a 200
         file_stream_request.raise_for_status()
 
