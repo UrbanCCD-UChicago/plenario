@@ -1,6 +1,5 @@
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, make_cache_key, \
-    dthandler, make_csv, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT, \
-    get_size_in_degrees
+    dthandler, make_csv, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT
 from flask import request, make_response
 import dateutil.parser
 from datetime import timedelta, datetime
@@ -31,7 +30,7 @@ class ParamValidator(object):
 
         if dataset_name:
             # Throws NoSuchTableError. Should be caught by caller.
-            self.dataset = Table(dataset_name, Base.metadata,
+            self.dataset = Table(dataset_name, Base.metadata, autoload=True,
                             autoload_with=engine, extend_existing=True)
             self.cols = self.dataset.columns.keys()
             # SQLAlchemy boolean expressions
