@@ -241,7 +241,7 @@ class StagingTable(object):
 
         if m.latitude and m.longitude:
             geom_col = func.ST_SetSRID(func.ST_Point(t.c[m.longitude], t.c[m.latitude]),
-                                       4326)
+                                       4326).label('geom')
 
         elif m.location:
             # I had trouble handling postgres arrays in SQLAlchemy, so I used raw SQL here.
@@ -278,7 +278,7 @@ class StagingTable(object):
         #
         # Finally, include the id itself in the common table expression to join to the staging table.
         cte = select([t.c[m.business_key].label('id'),
-                      geom_sel.label('geom'),
+                      geom_sel,
                       date_sel.label('point_date')]).\
             select_from(t.outerjoin(existing, t.c[m.business_key] == existing.c[m.business_key])).\
             where(existing.c[m.business_key] == None).\
