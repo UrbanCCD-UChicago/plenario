@@ -334,8 +334,15 @@ class StagingTable(object):
             where(derived.c.point_date != None)  # Also, filter out rows with a null date.
 
         ins = existing.insert().from_select(ins_cols, sel)
-        # TODO: Catch SQL error
-        engine.execute(ins)
+        try:
+            engine.execute(ins)
+        except TypeError:
+            # We get a TypeError if there are no record found in the select statement.
+            # In which case, great! Our job is done.
+            return
+        except Exception as e:
+            raise PlenarioETLError(e)
+
         self._null_malformed_geoms(existing)
 
 

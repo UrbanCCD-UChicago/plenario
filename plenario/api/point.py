@@ -578,6 +578,10 @@ def dataset_fields(dataset_name):
         status_code = 200
         for col in table.columns:
             if not isinstance(col.type, NullType):
+                # Don't report our bookkeeping columns
+                if col.name in {'geom', 'point_date'}:
+                    continue
+                    
                 d = {}
                 d['field_name'] = col.name
                 d['field_type'] = str(col.type)
