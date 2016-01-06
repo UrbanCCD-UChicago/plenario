@@ -1,13 +1,7 @@
-import plenario
 from plenario.utils import weather
-from plenario.utils.weather import WeatherETL, WeatherStationsETL
 import metar
 from metar.metar import Metar, ParserError
-from plenario.database import task_session as session, task_engine as engine, Base
-from sqlalchemy import Table, select, func, and_, distinct
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
-import sys
+from plenario.database import app_engine as engine
 import grequests
 from plenario.utils.weather import degToCardinal
 

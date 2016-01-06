@@ -1,13 +1,3 @@
-import plenario
-from plenario.utils import weather
-from plenario.database import task_session as session, task_engine as engine, Base
-from sqlalchemy import Table, select, func, and_, distinct
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
-import time
-import sys
-import operator
-
 from datetime import datetime
 from dateutil import relativedelta
 
