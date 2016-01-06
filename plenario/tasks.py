@@ -33,7 +33,7 @@ def delete_dataset(self, source_url_hash):
     return 'Deleted {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task(bind=True)
-def add_dataset(self, source_url_hash, s3_path=None, data_types=None):
+def add_dataset(self, source_url_hash, data_types=None):
     md = session.query(MetaTable).get(source_url_hash)
     if md.result_ids:
         ids = md.result_ids
@@ -46,7 +46,7 @@ def add_dataset(self, source_url_hash, s3_path=None, data_types=None):
             .values(result_ids=ids))
     md.contributed_data_types = data_types
     etl = PlenarioETL(md)
-    etl.add(s3_path=s3_path)
+    etl.add()
     return 'Finished adding {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task(bind=True)

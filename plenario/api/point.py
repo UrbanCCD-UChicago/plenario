@@ -432,7 +432,7 @@ def detail():
             'objects': [],
         }
         for row in rows:
-            fields = {col: val for col, val in zip(col_names, row)}
+            fields = {col: val for col, val in zip(col_names, row) if col not in {'point_date', 'geom'}}
             resp['objects'].append(fields)
 
         resp['meta']['total'] = len(resp['objects'])
