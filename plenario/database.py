@@ -10,6 +10,6 @@ app_engine = create_engine(DATABASE_CONN, convert_unicode=True)
 
 session = scoped_session(sessionmaker(bind=app_engine,
                                       autocommit=False,
-                                      autoflush=False))
+                                      autoflush=False, expire_on_commit=False))
 Base = declarative_base(bind=app_engine)
 Base.query = session.query_property()

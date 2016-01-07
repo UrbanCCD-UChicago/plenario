@@ -16,8 +16,11 @@ from hashlib import md5
 from plenario.database import session, Base
 from plenario.utils.helpers import slugify
 
+from collections import namedtuple
+
 bcrypt = Bcrypt()
 
+PointDataset = namedtuple('PointDataset', 'name bkey date lat lon loc')
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
@@ -106,6 +109,15 @@ class MetaTable(Base):
 
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
+
+    def meta_tuple(self):
+        basic_info = PointDataset(name=self.dataset_name,
+                                  bkey=self.business_key,
+                                  date=self.observed_date,
+                                  lat=self.latitude,
+                                  lon=self.longitude,
+                                  loc=self.location)
+        return basic_info
 
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
