@@ -119,7 +119,6 @@ class MetaTable(Base):
         try:
             return self._point_table
         except AttributeError:
-            # Removed _dat prefix. May the failing tests rain down like blood.
             self._point_table = Table(self.dataset_name, Base.metadata, autoload=True, extend_existing=True)
             return self._point_table
 

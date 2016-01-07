@@ -96,13 +96,18 @@ class StagingTable(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
-        Drop the staging table is it's been created.
+        Drop the staging table if it's been created.
         """
+        session.close()
         if hasattr(self, 'table'):
-            session.close()
             self.table.drop(bind=engine, checkfirst=True)
-        if exc_val:
-            print exc_val
+        else:
+            # If the copy operation fails during _make_table,
+            # then the `table` variable won't have been assigned to yet.
+            brute_force = "DROP TABLE IF EXISTS {};".format('s_' + self.meta.dataset_name)
+            engine.execute(brute_force)
+
+        # Let the exception information (exc_type et al.) propagate up and get reported in the ETL log.
 
     def _make_table(self, f):
         # Persist an empty table eagerly
