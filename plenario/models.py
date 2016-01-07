@@ -70,7 +70,10 @@ class MetaTable(Base):
         :param description: Text describing the dataset.
         """
         def curried_slug(name):
-            return slugify(unicode(name), delim=u'_')
+            if name is None:
+                return None
+            else:
+                return slugify(unicode(name), delim=u'_')
 
         # We need some combination of columns from which we can derive a point in space
         assert(location or (latitude and longitude))

@@ -32,8 +32,9 @@ class StagingTableTests(TestCase):
     def setUpClass(cls):
         cls.dog_path = os.path.join(fixtures_path, 'dog_park_permits.csv')
         cls.radio_path = os.path.join(fixtures_path, 'community_radio_events.csv')
+        cls.opera_path = os.path.join(fixtures_path, 'public_opera_performances.csv')
 
-        # Make two new MetaTable objects
+        # Makenew MetaTable objects
         cls.unloaded_meta = MetaTable(url='nightvale.gov/events.csv',
                                       human_name='Community Radio Events',
                                       business_key='Event Name',
@@ -67,6 +68,14 @@ class StagingTableTests(TestCase):
                                                  lat=41.7915865543,
                                                  geom=None)
         app_engine.execute(ins)
+
+        cls.opera_meta = MetaTable(url='nightvale.gov/opera.csv',
+                                   human_name='Public Opera Performances',
+                                   business_key='Event Name',
+                                   observed_date='Date',
+                                   location='Location',
+                                   approved_status=False)
+
 
     @classmethod
     def tearDownClass(cls):
@@ -139,6 +148,14 @@ class StagingTableTests(TestCase):
     def test_new_table(self):
         drop_if_exists(self.unloaded_meta.dataset_name)
         with StagingTable(self.unloaded_meta, source_path=self.radio_path) as staging:
+            new_table = staging.create_new()
+        all_rows = session.execute(new_table.select()).fetchall()
+        self.assertEqual(len(all_rows), 5)
+        session.close()
+        new_table.drop(app_engine, checkfirst=True)
+
+    def test_location_col(self):
+        with StagingTable(self.opera_meta, source_path=self.opera_path) as staging:
             new_table = staging.create_new()
         all_rows = session.execute(new_table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
