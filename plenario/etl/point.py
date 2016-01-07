@@ -263,34 +263,24 @@ class StagingTable(object):
 
         return geom_col
 
-    def _derived_cte(self, existing):
+    def _new_records(self, existing):
         """
-        Construct a subquery that generates date and geometry columns
-        derived from the staging table.
-        But only for entirely new columns.
+        Find all records with unique ids not present in the existing table/
         """
         t = self.table
         m = self.meta
 
-        geom_sel = self._geom_selectable()
-        date_sel = self._date_selectable()
-
         # The select_from and where clauses ensure we're only looking at records
         # that don't have a unique ID that's present in the existing dataset.
         #
-        # From the records with an ID not in the existing dataset,
-        # generate new columns with a geom and timestamp.
-        #
         # Finally, include the id itself in the common table expression to join to the staging table.
-        cte = select([t.c[m.business_key].label('id'),
-                      geom_sel,
-                      date_sel.label('point_date')]).\
+        sel = select([t.c[m.business_key].label('id')]).\
             select_from(t.outerjoin(existing, t.c[m.business_key] == existing.c[m.business_key])).\
             where(existing.c[m.business_key] == None).\
             distinct().\
-            alias('id_cte')
+            alias('new')
 
-        return cte
+        return sel
 
     def create_new(self):
         """
@@ -327,16 +317,17 @@ class StagingTable(object):
 
         :param existing: Point table that has been persisted to the DB.
         """
-        derived = self._derived_cte(existing)
+        new = self._new_records(existing)
         # Insert into the canonical table the original cols
         ins_cols = [c for c in self.cols if c.name != 'line_num']
-        # ... and the derived cols
-        ins_cols += [derived.c.geom, derived.c.point_date]
+        # ... and columns that we'll derive from the original columns.
+        geom_sel, date_sel = self._geom_selectable(), self._date_selectable()
+        ins_cols += [geom_sel, date_sel]
 
-        # The cte only includes rows with business keys that weren't present in the existing table.
+        # The `new` subquery only includes rows with business keys that weren't present in the existing table.
         sel = select(ins_cols).\
-            select_from(derived.join(self.table, derived.c.id == self.table.c[self.meta.business_key])).\
-            where(derived.c.point_date != None)  # Also, filter out rows with a null date.
+            select_from(new.join(self.table, new.c.id == self.table.c[self.meta.business_key])).\
+            where(date_sel != None)  # Also, filter out rows with a null date.
 
         ins = existing.insert().from_select(ins_cols, sel)
         try:
