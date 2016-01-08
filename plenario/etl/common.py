@@ -80,7 +80,7 @@ class ETLFile(object):
         self.handle = tempfile.TemporaryFile()
 
         # Download and write to disk in 1MB chunks.
-        for chunk in file_stream_request.iter_content(chunk_size=1024):
+        for chunk in file_stream_request.iter_content(chunk_size=1024*1024):
             if chunk:
                 self._handle.write(chunk)
                 self._handle.flush()
