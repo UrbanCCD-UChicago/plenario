@@ -514,6 +514,7 @@ def grid():
     return resp
 
 
+@cache.cached(timeout=CACHE_TIMEOUT)
 @crossdomain(origin="*")
 def meta():
     status_code = 200
