@@ -43,3 +43,26 @@ landmarks_meta = {
     'approved_status': 'true',
     'is_socrata_source': False
 }
+
+crime_url = 'http://data.cityofchicago.org/api/views/ijzp-q8t2/rows.csv?accessType=DOWNLOAD'
+crime_path = 'crime_sample.csv'
+
+crime_meta = {
+    'dataset_name': u'crimes',
+    'human_name': u'Crimes',
+    'attribution': u'foo',
+    'description': u'bar',
+    'url': crime_url,
+    'update_freq': 'yearly',
+    'business_key': u'id',
+    'observed_date': u'date',
+    'latitude': u'latitude',
+    'longitude': u'longitude',
+    'location': u'location',
+    'contributor_name': u'Dana Cardinal',
+    'contributor_organization': u'City of Nightvale',
+    'contributor_email': u'foo@bar.edu',
+    'contributed_data_types': None,
+    'approved_status': 'true',
+    'is_socrata_source': False
+}

@@ -232,7 +232,7 @@ class StagingTable(object):
         Make a selectable where we take the dataset's temporal column
         And cast every record to a Postgres TIMESTAMP
         """
-
+        print self.table.c
         return func.cast(self.table.c[self.meta.observed_date], TIMESTAMP).\
                 label('point_date')
 

@@ -1,5 +1,6 @@
 import unittest
-from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta, flu_path, landmarks_path
+from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta, flu_path, landmarks_path, \
+    crime_meta, crime_path
 from plenario.models import MetaTable
 from plenario.database import session
 from plenario.etl.point import PlenarioETL
@@ -46,6 +47,7 @@ class PointAPITests(unittest.TestCase):
         tables_to_drop = [
             'flu_shot_clinics',
             'landmarks',
+            'crimes',
             'dat_master',
             'meta_master',
             'plenario_user'
@@ -56,6 +58,7 @@ class PointAPITests(unittest.TestCase):
 
         ingest_from_fixture(flu_shot_meta, flu_path)
         ingest_from_fixture(landmarks_meta, landmarks_path)
+        ingest_from_fixture(crime_meta, crime_path)
 
         cls.app = create_app().test_client()
 
@@ -75,6 +78,13 @@ class PointAPITests(unittest.TestCase):
         resp = self.app.get(url)
         response_data = json.loads(resp.data)
         self.assertEqual(response_data['meta']['total'], 5)
+
+    def test_time_of_day(self):
+        url = '/v1/api/detail/?dataset_name=crimes&obs_date__ge=2015-01-01&date__time_of_day_ge=6'
+        resp = self.app.get(url)
+        response_data = json.loads(resp.data)
+        # Time of day filter should remove all but two
+        self.assertEqual(response_data['meta']['total'], 2)
 
     '''/grid'''
 
