@@ -185,12 +185,22 @@ def geom_validator(geojson_str):
 def int_validator(int_str):
     try:
         num = int(int_str)
-        assert(num > 0)
+        assert(num >= 0)
         return num, None
     except (ValueError, AssertionError):
-        error_message = "Could not parse as positive integer: {}".format(int_str)
+        error_message = "Could not parse as non-negative integer: {}".format(int_str)
         return None, error_message
 
+
+def time_of_day_validator(hour_str):
+    num, err = int_validator(hour_str)
+    if err:
+        return None, err
+    if num > 23:
+        error_message = "{} is not a valid hour of the day (Must be between 0 and 23)".format(hour_str)
+        return None, error_message
+    else:
+        return num, None
 
 def make_error(msg):
     resp = {
@@ -378,7 +388,9 @@ def detail():
         .set_optional('obs_date__le', date_validator, datetime.now())\
         .set_optional('location_geom__within', geom_validator, None)\
         .set_optional('offset', int_validator, 0)\
-        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json')
+        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json')\
+        .set_optional('date__time_of_day_ge', time_of_day_validator, 0)\
+        .set_optional('date__time_of_day_le', time_of_day_validator, 23)
 
     # If any optional parameters are malformed, we're better off bailing and telling the user
     # than using a default and confusing them.
@@ -398,6 +410,13 @@ def detail():
     q = q.filter(dset.c.point_date >= start_date)\
          .filter(dset.c.point_date <= end_date)
 
+    start_hour = validator.vals['date__time_of_day_ge']
+    end_hour = validator.vals['date__time_of_day_le']
+    if start_hour != 0:
+        q = q.filter(sa.func.date_part('hour', dset.c.point_date).__ge__(start_hour))
+    if end_hour != 23:
+        q = q.filter(sa.func.date_part('hour', dset.c.point_date).__ge__(end_hour))
+
     # If user provided a geom,
     geom = validator.vals.get('location_geom__within', None)
     if geom:
@@ -413,7 +432,7 @@ def detail():
         q = q.offset(offset)
 
     # Part 3: Make SQL query and dump output into list of rows
-    col_names = validator.cols
+    col_names = [name for name in validator.cols if name != 'point_date']
     geom_idx = col_names.index('geom')
     rows = []
     for record in q.all():
@@ -429,10 +448,11 @@ def detail():
     if datatype == 'json':
         resp = {
             'meta': {},
+            'message': validator.warnings,
             'objects': [],
         }
         for row in rows:
-            fields = {col: val for col, val in zip(col_names, row) if col not in {'point_date', 'geom'}}
+            fields = {col: val for col, val in zip(col_names, row)}
             resp['objects'].append(fields)
 
         resp['meta']['total'] = len(resp['objects'])
