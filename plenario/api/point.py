@@ -308,7 +308,7 @@ def detail_aggregate():
     raw_query_params = request.args.copy()
     # First, make sure name of dataset was provided...
     try:
-        dataset_name = raw_query_params['dataset_name']
+        dataset_name = raw_query_params.pop('dataset_name')
     except KeyError:
         return make_error("'dataset_name' is required")
 
@@ -373,7 +373,7 @@ def detail():
     raw_query_params = request.args.copy()
     # First, make sure name of dataset was provided...
     try:
-        dataset_name = raw_query_params['dataset_name']
+        dataset_name = raw_query_params.pop('dataset_name')
     except KeyError:
         return make_error("'dataset_name' is required")
 
@@ -478,7 +478,7 @@ def grid():
 
     # First, make sure name of dataset was provided...
     try:
-        dataset_name = raw_query_params['dataset_name']
+        dataset_name = raw_query_params.pop('dataset_name')
     except KeyError:
         return make_error("'dataset_name' is required")
 
