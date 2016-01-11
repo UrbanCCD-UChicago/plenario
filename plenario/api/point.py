@@ -444,6 +444,7 @@ def detail():
         rows.append(row)
 
     # Part 4: Format response
+    print 'Getting to data_type'
     datatype = validator.vals['data_type']
     if datatype == 'json':
         resp = {
@@ -455,6 +456,7 @@ def detail():
             fields = {col: val for col, val in zip(col_names, row)}
             resp['objects'].append(fields)
 
+
         resp['meta']['total'] = len(resp['objects'])
         resp['meta']['query'] = validator.vals
         resp = make_response(json.dumps(resp, default=dthandler), 200)
@@ -463,7 +465,8 @@ def detail():
     elif datatype == 'csv':
         csv_resp = [col_names] + rows
         resp = make_response(make_csv(csv_resp), 200)
-        dname = raw_query_params['dataset_name']
+        print 'Made response'
+        dname = dataset_name
         filedate = datetime.now().strftime('%Y-%m-%d')
         resp.headers['Content-Type'] = 'text/csv'
         resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
