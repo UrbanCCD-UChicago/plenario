@@ -2,7 +2,7 @@ language: python
 python:
   - "2.7"
 install: "pip install -r requirements.txt"
-script: nosetests tests/points
+script: nosetests tests
 
 addons:
   postgresql: "9.4"
@@ -11,8 +11,6 @@ services:
   - postgresql
 
 before_script:
-  - sudo apt-get update -qq
-  - sudo apt-get install -y gdal-bin
   - cp tests/settings.py.test plenario/settings.py
   - psql -c 'create database plenario_test;' -U postgres
   - psql -c 'create extension postgis;' -U postgres -d plenario_test
