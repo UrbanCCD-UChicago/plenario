@@ -9,6 +9,7 @@ from plenario.etl.point import StagingTable, PlenarioETL
 import os
 import json
 from datetime import date
+from init_db import init_meta
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 fixtures_path = os.path.join(pwd, '../test_fixtures')
@@ -18,10 +19,9 @@ def drop_if_exists(table_name):
     try:
         t = Table(table_name, MetaData(), extend_existing=True)
         t.drop(app_engine, checkfirst=True)
-        #del_ = "DELETE FROM meta_master WHERE dataset_name = '{}';".format(table_name)
-        #app_engine.execute(del_)
     except NoSuchTableError:
         pass
+
 
 def drop_meta(table_name):
     del_ = "DELETE FROM meta_master WHERE dataset_name = '{}';".format(table_name)
@@ -36,6 +36,8 @@ class StagingTableTests(TestCase):
     """
     @classmethod
     def setUpClass(cls):
+        init_meta()
+
         cls.dog_path = os.path.join(fixtures_path, 'dog_park_permits.csv')
         cls.radio_path = os.path.join(fixtures_path, 'community_radio_events.csv')
         cls.opera_path = os.path.join(fixtures_path, 'public_opera_performances.csv')
