@@ -1,6 +1,6 @@
 var AboutView = Backbone.View.extend({
     events: {
-        'click .about-detail': 'detailView'
+        'click .about-detail': 'detailView',
     },
     initialize: function(){
         this.render();
@@ -50,25 +50,21 @@ var AboutView = Backbone.View.extend({
         })
     },
     detailView: function(e){
-        // console.log('about-view detailView')
+        console.log('about-view detailView');
         var query = {};
         var start = $('#start-date-filter').val();
         var end = $('#end-date-filter').val();
         start = moment(start);
         if (!start){ start = moment().subtract('days', 90); }
-        end = moment(end)
+        end = moment(end);
         if(!end){ end = moment(); }
         start = start.startOf('day').format('YYYY/MM/DD');
         end = end.endOf('day').format('YYYY/MM/DD');
-
         query['obs_date__le'] = end;
         query['obs_date__ge'] = start;
         query['agg'] = $('#time-agg-filter').val();
-
-        var dataset_name = $(e.target).data('dataset_name')
-        // console.log(dataset_name);
-        query['dataset_name'] = dataset_name
-
+        var dataset_name = $(e.target).data('dataset_name');
+        query['dataset_name'] = dataset_name;
         this.undelegateEvents();
         $('#map-view').empty();
         new DetailView({el: '#map-view', attributes: {query: query, meta: this.datasetsObj[dataset_name]}})

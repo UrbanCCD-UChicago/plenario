@@ -1,0 +1,52 @@
+<% var intersection = "http://plenar.io/v1/api/shapes/intersections/" + shape_query.location_geom__within %>
+
+<div class='col-md-12'>
+    <p><a href='#' id='back-to-explorer-shape'>&lt; back to Explorer</a></p>
+</div>
+<div class='col-md-5'>
+    <div id="filters">
+        <h3 class='detail-header'>
+            <%= shape.human_name %>
+        </h3>
+        <form class='form' role="form">
+
+            <div class="btn-group">
+                <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                    <i class='fa fa-download'></i>
+                    Download
+                    <span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu" role="menu">
+                    <li><a href="<%='http://plenar.io/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=json'%>"><i class='fa fa-download'></i> GeoJson</a></li>
+                    <li><a href="<%='http://plenar.io/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=shapefile'%>"><i class='fa fa-download'></i> ESRI Shapefile</a></li>
+                    <li><a href="<%='http://plenar.io/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=kml'%>"><i class='fa fa-download'></i> KML</a></li>
+                </ul>
+            </div>
+        </form>
+
+        <hr />
+
+        <h4>API queries</h4>
+        <p>View the API queries that are used on this page. <a href='/api-docs/'>Read the API docs</a>.</p>
+        <ul class=''>
+            <li><a href="<%= intersection %>" target="_blank"><code>/v1/api/shapes/intersections/&hellip;</code></a></li>
+        </ul>
+
+    </div>
+</div>
+<div class='col-md-7'>
+    <h3 class='detail-header' id="record-count"></h3>
+    <div id="map"></div>
+    <hr />
+    <h4>Dataset details</h4>
+    <table class="table">
+        <tbody>
+            <tr>
+                <td>Name:</td>
+                <td><%= shape.human_name %></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<div class='clearfix'></div>
+<hr />

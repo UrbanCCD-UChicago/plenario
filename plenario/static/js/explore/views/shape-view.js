@@ -5,13 +5,19 @@ var app = app || {};
         el: '#shapes-view',
         // will go back to use template after fully integrate backbone with the original application
         //template:
+        events: {
+            'click .shape-detail': 'shapeDetailView'
+        },
 
         initialize: function() {
             var self = this;
+            this.query = {};
+            this.shape_query = {};
             this.collection = new app.Shapes();
             this.collection.fetch({reset:true,success:function(){
-                if (resp) {
+                if (resp && resp.query.location_geom__within) {
                     self.query = resp.query;
+                    self.shape_query['location_geom__within'] = self.getGeoJson();
                     self.setIntersection();
                 }
             }
@@ -19,12 +25,11 @@ var app = app || {};
             // if listen to reset, it will initialize a new collection and render the one without additional features
            this.listenTo(this.collection, 'all', this.render, this);
         },
-
         render: function(){
             var shapes;
             var intersect;
             var available;
-            if (resp === undefined) {
+            if (resp === undefined || this.getGeoJson() === undefined) {
                 shapes = this.collection.toJSON();
                 intersect = false;
                 available = _.size(this.collection);
@@ -56,14 +61,44 @@ var app = app || {};
             var self = this;
             var q = self.getGeoJson();
             return $.ajax({
-                url: '/v1/api/shapes/intersections/'+ q,
+                url: 'http://plenar.io/v1/api/shapes/intersections/'+ q,
                 dataType: 'json'
             });
         },
 
         getGeoJson: function() {
             var self = this;
-            return self.query.location_geom__within;
+            if (self.query){
+                 return self.query.location_geom__within;
+            }
+        },
+        shapeDetailView: function(e){
+            this.undelegateEvents();
+            var dataset_name = $(e.target).data('shape_dataset_name');
+            this.shape_query['shape_dataset_name'] = dataset_name;
+
+            if (_.isEmpty(this.query)) {
+                var start = $('#start-date-filter').val();
+                var end = $('#end-date-filter').val();
+                start = moment(start);
+                if (!start){ start = moment().subtract('days', 90); }
+                end = moment(end);
+                if(!end){ end = moment(); }
+                start = start.startOf('day').format('YYYY/MM/DD');
+                end = end.endOf('day').format('YYYY/MM/DD');
+                this.query['obs_date__le'] = end;
+                this.query['obs_date__ge'] = start;
+                this.query['agg'] = $('#time-agg-filter').val();
+                if (typeof this.query['resolution'] == 'undefined')
+                    this.query['resolution'] = "500";
+            }
+
+            $('#map-view').empty();
+            // currently not rendering meta data and have no filter options
+            shapeDetailView = new app.ShapeDetailView({model:this.collection.get(dataset_name), shape_query:this.shape_query, query:this.query});
+            var route = 'shapeDetail/' + $.param(this.shape_query);
+            _gaq.push(['_trackPageview', route]);
+            router.navigate(route);
         }
     });
 
