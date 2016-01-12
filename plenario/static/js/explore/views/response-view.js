@@ -10,7 +10,6 @@ var ResponseView = Backbone.View.extend({
         $('#shapes-view').show();
         $('#detail-view').hide();
         this.query = this.attributes.query;
-        console.log(this.query);
         // I don't know what this is.
         if (typeof this.explore !== 'undefined'){
             this.explore.remove();

@@ -24,17 +24,23 @@ var app = app || {};
         }).addTo(this.map);
         this.legend = L.control({position: 'bottomright'});
         this.polygonResponse();
+        this.respLayer = new L.featureGroup();
         this.render();
     },
 
     render: function(){
-        var self = this;
         window.scrollTo(0, 0);
         $('#detail-view').hide();
         $('#list-view').hide();
         $('#shapes-view').hide();
         $("#map").spin('large');
         $("#detail-chart").spin('large');
+        if (this.shape_query['location_geom__within']) {
+            this.respLayer.addLayer(L.geoJson(jQuery.parseJSON(this.shape_query['location_geom__within']),
+                {color: "#f06eaa", fillColor: "#f06eaa", weight:4 }));
+            this.respLayer.addTo(this.map);
+            this.map.fitBounds(this.respLayer.getBounds());
+        }
     },
 
     polygonResponse: function () {
