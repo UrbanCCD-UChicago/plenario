@@ -26,7 +26,15 @@ def init_db(args):
 
 def init_master_meta_user():
     print 'creating master, meta and user tables'
+    init_meta()
+    init_user()
+
+
+def init_meta():
     Base.metadata.create_all(bind=app_engine)
+
+
+def init_user():
     if plenario.settings.DEFAULT_USER:
         print 'creating default user %s' % plenario.settings.DEFAULT_USER['name']
         user = plenario.models.User(**plenario.settings.DEFAULT_USER)

@@ -4,7 +4,7 @@ from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta, flu_pa
 from plenario.models import MetaTable
 from plenario.database import session
 from plenario.etl.point import PlenarioETL
-from init_db import init_master_meta_user
+from init_db import init_meta
 from plenario import create_app
 import json
 import os
@@ -54,7 +54,7 @@ class PointAPITests(unittest.TestCase):
         ]
         drop_tables(tables_to_drop)
 
-        init_master_meta_user()
+        init_meta()
 
         ingest_from_fixture(flu_shot_meta, flu_path)
         ingest_from_fixture(landmarks_meta, landmarks_path)

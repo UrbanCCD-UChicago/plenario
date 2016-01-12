@@ -1,0 +1,24 @@
+engines:
+  pep8:
+    enabled: true
+  radon:
+    enabled: true
+  fixme:
+    enabled: true
+  eslint:
+    enabled: true
+  duplication:
+    enabled: true
+    config:
+      languages:
+      - javascript
+      - python
+
+ratings:
+  paths:
+  - plenario/**
+  - "**.js"
+  - "**.py"
+exclude_paths:
+- plenario/alembic/**
+- plenario/static/js/*
