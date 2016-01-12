@@ -7,17 +7,9 @@ from plenario.settings import DATABASE_CONN
 
 
 app_engine = create_engine(DATABASE_CONN, convert_unicode=True)
-task_engine = create_engine(
-    DATABASE_CONN,
-    convert_unicode=True,
-    poolclass=NullPool)
 
 session = scoped_session(sessionmaker(bind=app_engine,
                                       autocommit=False,
                                       autoflush=False))
-
-task_session = scoped_session(sessionmaker(bind=task_engine,
-                                      autocommit=False,
-                                      autoflush=False))
-Base = declarative_base()
+Base = declarative_base(bind=app_engine)
 Base.query = session.query_property()

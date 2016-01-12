@@ -1,12 +1,9 @@
-from plenario.database import session, app_engine, Base
 import plenario.models
 import plenario.settings
-import datetime
-from argparse import ArgumentParser
-from plenario.utils.weather import WeatherETL, WeatherStationsETL
-from plenario.utils.shape_etl import ShapeETL
-
+from plenario.database import session, app_engine, Base
+from plenario.etl.shape import ShapeETL
 from plenario.tasks import hello_world
+from plenario.utils.weather import WeatherETL, WeatherStationsETL
 
 
 def init_db(args):
@@ -55,13 +52,11 @@ def init_weather():
         session.rollback()
         raise e
 
+
 def init_census():
     print 'initializing and populating US Census blocks'
     print 'this will *also* take a few minutes ...'
     census_settings = plenario.settings.CENSUS_BLOCKS
-
-    # Only try to cache to AWS if we've specified a key
-    save_to_s3 = (plenario.settings.AWS_ACCESS_KEY != '')
 
     census_meta = plenario.models.ShapeMetadata.add(source_url=census_settings['source_url'],
                                                       human_name=census_settings['human_name'],

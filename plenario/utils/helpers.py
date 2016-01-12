@@ -9,8 +9,23 @@ from plenario.utils.typeinference import normalize_column_type
 from flask_mail import Mail, Message
 from plenario.settings import MAIL_DISPLAY_NAME, MAIL_USERNAME, ADMIN_EMAIL
 from smtplib import SMTPAuthenticationError
+import math
 
 mail = Mail()
+
+
+def get_size_in_degrees(meters, latitude):
+    earth_circumference = 40041000.0 # meters, average circumference
+    degrees_per_meter = 360.0 / earth_circumference
+
+    degrees_at_equator = meters * degrees_per_meter
+
+    latitude_correction = 1.0 / math.cos(latitude * (math.pi / 180.0))
+
+    degrees_x = degrees_at_equator * latitude_correction
+    degrees_y = degrees_at_equator
+
+    return degrees_x, degrees_y
 
 
 def iter_column(idx, f):
@@ -135,8 +150,6 @@ def slugify(text, delim=u'_'):
 
 def increment_datetime_aggregate(sourcedate, time_agg):
     delta = None
-    # if time_agg == 'hour':
-    #     delta = timedelta(hours=1)
     if time_agg == 'day':
         delta = timedelta(days=1)
     elif time_agg == 'week':
