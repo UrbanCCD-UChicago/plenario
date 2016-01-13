@@ -70,15 +70,15 @@ def init_census():
     census_settings = plenario.settings.CENSUS_BLOCKS
 
     census_meta = plenario.models.ShapeMetadata.add(source_url=census_settings['source_url'],
-                                                      human_name=census_settings['human_name'],
-                                                      caller_session=session)
+                                                    human_name=census_settings['human_name'],
+                                                    caller_session=session)
     try:
         session.commit()
     except Exception as e:
         session.rollback()
         raise e
 
-    ShapeETL(meta=census_meta).import_shapefile()
+    ShapeETL(meta=census_meta).ingest()
 
 
 def init_celery():

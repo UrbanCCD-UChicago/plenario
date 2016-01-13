@@ -70,7 +70,7 @@ class ShapeTests(unittest.TestCase):
         shape_meta = ShapeMetadata.add(caller_session=session, human_name=fixture.human_name, source_url=None)
         session.commit()
         # Bypass the celery task and call on a ShapeETL directly
-        ShapeETL(meta=shape_meta, source_path=fixture.path).import_shapefile()
+        ShapeETL(meta=shape_meta, source_path=fixture.path).ingest()
         return shape_meta
 
     def test_names_in_shape_list(self):
