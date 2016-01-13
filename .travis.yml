@@ -6,6 +6,9 @@ script: nosetests tests/points
 
 addons:
   postgresql: "9.4"
+  apt:
+    packages:
+      - sshpass
 
 services:
   - postgresql
@@ -14,3 +17,12 @@ before_script:
   - cp tests/settings.py.test plenario/settings.py
   - psql -c 'create database plenario_test;' -U postgres
   - psql -c 'create extension postgis;' -U postgres -d plenario_test
+
+after_script:
+  - chmod +x deploy.sh
+
+deploy:
+  provider: script
+  script: deploy.sh
+  on:
+  	branch: master
