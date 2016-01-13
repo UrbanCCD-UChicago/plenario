@@ -300,31 +300,6 @@ class MetaTable(Base):
         return ts
 
 
-
-class MasterTable(Base):
-    __tablename__ = 'dat_master'
-    master_row_id = Column(BigInteger, primary_key=True)
-    # Looks like start_date and end_date aren't used.
-    start_date = Column(TIMESTAMP)
-    end_date = Column(TIMESTAMP)
-    # current_flag is never updated. We can probably get rid of this
-    current_flag = Column(Boolean, default=True)
-    location = Column(String(200))
-    latitude = Column(DOUBLE_PRECISION(precision=53))
-    longitude = Column(DOUBLE_PRECISION(precision=53))
-    obs_date = Column(TIMESTAMP, index=True)
-    weather_observation_id = Column(BigInteger, index=True)
-    census_block = Column(String(15), index=True)
-    # Looks like geotag3 is unused
-    geotag3 = Column(String(50))
-    dataset_name = Column(String(100), index=True)
-    dataset_row_id = Column(Integer)
-    location_geom = Column(Geometry('POINT', srid=4326))
-
-    def __repr__(self):
-        return '<Master %r (%r)>' % (self.dataset_row_id, self.dataset_name)
-
-
 class ShapeMetadata(Base):
     __tablename__ = 'meta_shape'
     dataset_name = Column(String, primary_key=True)
