@@ -48,7 +48,6 @@ class PointAPITests(unittest.TestCase):
             'flu_shot_clinics',
             'landmarks',
             'crimes',
-            'dat_master',
             'meta_master',
             'plenario_user'
         ]
