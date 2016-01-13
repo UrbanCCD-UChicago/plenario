@@ -117,6 +117,7 @@ def get_context_for_new_dataset(url):
     return (dataset_info, errors, socrata_source)
 
 def table_row_estimate(table_name):
+    print table_name, "estimating"
     try:
         q = text(''' 
             SELECT reltuples::bigint AS estimate FROM pg_class where relname=:table_name;
@@ -278,6 +279,8 @@ def add_table():
         dataset_info['contributor_organization'] = 'Plenario Admin'
         dataset_info['contributor_email'] = user.email
 
+        print dataset_info
+
         # check if dataset with the same URL has already been loaded
         dataset_id = md5(url).hexdigest()
         md = session.query(MetaTable).get(dataset_id)
@@ -310,6 +313,7 @@ def add_shape():
         try:
             human_name = request.form['dataset_name']
             source_url = request.form['source_url']
+            publisher  = request.form['publisher']
         except KeyError:
             # Front-end validation failed or someone is posting bogus query strings directly.
             # re-render with error message
@@ -321,7 +325,9 @@ def add_shape():
 
         if not errors:
             # Add the metadata right away
-            meta = ShapeMetadata.add(caller_session=session, human_name=human_name, source_url=source_url)
+            # Add some kind of ingestion method to examine shape url and grab metadata
+            # shape_info = get_context_for_new_shape(url)
+            meta = ShapeMetadata.add(caller_session=session, human_name=human_name, source_url=source_url, publisher = publisher)
             session.commit()
 
             # And tell a worker to go ingest it
@@ -343,7 +349,7 @@ def view_datasets():
         'master_row_count': 42,
         'weather_daily_row_count': table_row_estimate('dat_weather_observations_daily'),
         'weather_hourly_row_count': table_row_estimate('dat_weather_observations_hourly'),
-        'census_block_row_count': table_row_estimate('census_blocks'),
+        'census_block_row_count': 0, #table_row_estimate('census_blocks'),
     }
 
     try:

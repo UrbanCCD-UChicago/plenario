@@ -319,6 +319,10 @@ class ShapeMetadata(Base):
     human_name = Column(String, nullable=False)
     source_url = Column(String)
     date_added = Column(Date, nullable=False)
+
+    # Organization that published this dataset
+    publisher = Column(String)
+
     # We always ingest geometric data as 4326
     bbox = Column(Geometry('POLYGON', srid=4326))
     # False when admin first submits metadata.
@@ -383,10 +387,11 @@ class ShapeMetadata(Base):
         return slugify(human_name)
 
     @classmethod
-    def add(cls, caller_session, human_name, source_url):
+    def add(cls, caller_session, human_name, source_url, publisher):
         table_name = ShapeMetadata.make_table_name(human_name)
         new_shape_dataset = ShapeMetadata(dataset_name=table_name,
                                               human_name=human_name,
+                                              publisher = publisher,
                                               is_ingested=False,
                                               source_url=source_url,
                                               date_added=datetime.now().date(),

@@ -25,6 +25,16 @@
                                     error_message="Please select a name."
                                     ) }}
 
+        {{ bootstrap_validate_field(type="text",
+                                    name="publisher",
+                                    description="Publisher of this dataset",
+                                    placeholder="Public or Private Organization",
+                                    help_message="",
+                                    error_message="Please enter a source."
+                                    ) }}
+        
+        {# add fields to form, change model, add backend code for storage #}
+
         <div class="form-group">
             <button type="submit" class="btn btn-primary">Add Shapefile</button>
         </div>
