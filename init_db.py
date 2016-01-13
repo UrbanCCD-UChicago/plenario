@@ -4,6 +4,7 @@ from plenario.database import session, app_engine, Base
 from plenario.etl.shape import ShapeETL
 from plenario.tasks import hello_world
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
+from argparse import ArgumentParser
 
 
 def init_db(args):
@@ -14,8 +15,10 @@ def init_db(args):
         init_census()
         init_celery()
     else:
-        if args.tables:
-            init_master_meta_user()
+        if args.meta:
+            init_meta()
+        if args.users:
+            init_user()
         if args.weather:
             init_weather()
         if args.census:
@@ -75,7 +78,7 @@ def init_census():
         session.rollback()
         raise e
 
-    ShapeETL(meta=census_meta, save_to_s3=save_to_s3).import_shapefile()
+    ShapeETL(meta=census_meta).import_shapefile()
 
 
 def init_celery():
@@ -90,8 +93,10 @@ def build_arg_parser():
     creates tables, initializes NOAA weather station data and US Census block \
     data. If you specify no options, it will populate everything.'
     parser = ArgumentParser(description=description)
-    parser.add_argument('-t', '--tables', action="store_true", help='Set up the \
-            master, meta and user tables')
+    parser.add_argument('-m', '--meta', action="store_true", help="Set up the metadata \
+            registries needed to ingest point and shape datasets.")
+    parser.add_argument('-u', '--users', action="store_true", help='Set up the a default\
+            user to access the admin panel.')
     parser.add_argument('-w', '--weather', action="store_true", help='Set up NOAA \
             weather station data. This includes the daily and hourly weather \
             observations.')
