@@ -16,8 +16,11 @@ from hashlib import md5
 from plenario.database import session, Base
 from plenario.utils.helpers import slugify
 
+from collections import namedtuple
+
 bcrypt = Bcrypt()
 
+PointDataset = namedtuple('PointDataset', 'name bkey date lat lon loc')
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
@@ -106,6 +109,15 @@ class MetaTable(Base):
 
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
+
+    def meta_tuple(self):
+        basic_info = PointDataset(name=self.dataset_name,
+                                  bkey=self.business_key,
+                                  date=self.observed_date,
+                                  lat=self.latitude,
+                                  lon=self.longitude,
+                                  loc=self.location)
+        return basic_info
 
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -286,31 +298,6 @@ class MetaTable(Base):
 
         ts = [['count', 'datetime']] + [[count, time_bucket.date()] for _, time_bucket, count in rows]
         return ts
-
-
-
-class MasterTable(Base):
-    __tablename__ = 'dat_master'
-    master_row_id = Column(BigInteger, primary_key=True)
-    # Looks like start_date and end_date aren't used.
-    start_date = Column(TIMESTAMP)
-    end_date = Column(TIMESTAMP)
-    # current_flag is never updated. We can probably get rid of this
-    current_flag = Column(Boolean, default=True)
-    location = Column(String(200))
-    latitude = Column(DOUBLE_PRECISION(precision=53))
-    longitude = Column(DOUBLE_PRECISION(precision=53))
-    obs_date = Column(TIMESTAMP, index=True)
-    weather_observation_id = Column(BigInteger, index=True)
-    census_block = Column(String(15), index=True)
-    # Looks like geotag3 is unused
-    geotag3 = Column(String(50))
-    dataset_name = Column(String(100), index=True)
-    dataset_row_id = Column(Integer)
-    location_geom = Column(Geometry('POINT', srid=4326))
-
-    def __repr__(self):
-        return '<Master %r (%r)>' % (self.dataset_row_id, self.dataset_name)
 
 
 class ShapeMetadata(Base):

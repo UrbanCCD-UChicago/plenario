@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/UrbanCCD-UChicago/plenario.png)](https://travis-ci.org/UrbanCCD-UChicago/plenario) [![Code Climate](https://codeclimate.com/github/UrbanCCD-UChicago/plenario/badges/gpa.svg)](https://codeclimate.com/github/UrbanCCD-UChicago/plenario)
+
 # Plenar.io
 
 RESTful API for geospatial and time aggregation across multiple open datasets.

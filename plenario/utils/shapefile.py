@@ -12,6 +12,8 @@ class ShapefileError(Exception):
 
 def import_shapefile(shapefile_zip, table_name):
     """
+    Given a zipped shapefile, try to insert it into the database.
+
     :param shapefile_zip: The zipped shapefile.
     :type shapefile_zip: A Python zipfile.ZipFile object
     """

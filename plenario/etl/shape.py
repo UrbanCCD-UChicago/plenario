@@ -26,7 +26,7 @@ class ShapeETL:
     def _refresh_metadata(self):
         pass
 
-    def import_shapefile(self):
+    def ingest(self):
         if self.meta.is_ingested:
             raise PlenarioETLError("Table {} has already been ingested.".format(self.table_name))
 

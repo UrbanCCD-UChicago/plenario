@@ -14,8 +14,10 @@ def init_db(args):
         init_census()
         init_celery()
     else:
-        if args.tables:
-            init_master_meta_user()
+        if args.meta:
+            init_meta()
+        if args.users:
+            init_user()
         if args.weather:
             init_weather()
         if args.census:
@@ -26,7 +28,15 @@ def init_db(args):
 
 def init_master_meta_user():
     print 'creating master, meta and user tables'
+    init_meta()
+    init_user()
+
+
+def init_meta():
     Base.metadata.create_all(bind=app_engine)
+
+
+def init_user():
     if plenario.settings.DEFAULT_USER:
         print 'creating default user %s' % plenario.settings.DEFAULT_USER['name']
         user = plenario.models.User(**plenario.settings.DEFAULT_USER)
@@ -59,15 +69,15 @@ def init_census():
     census_settings = plenario.settings.CENSUS_BLOCKS
 
     census_meta = plenario.models.ShapeMetadata.add(source_url=census_settings['source_url'],
-                                                      human_name=census_settings['human_name'],
-                                                      caller_session=session)
+                                                    human_name=census_settings['human_name'],
+                                                    caller_session=session)
     try:
         session.commit()
     except Exception as e:
         session.rollback()
         raise e
 
-    ShapeETL(meta=census_meta, save_to_s3=save_to_s3).import_shapefile()
+    ShapeETL(meta=census_meta).ingest()
 
 
 def init_celery():
@@ -82,8 +92,10 @@ def build_arg_parser():
     creates tables, initializes NOAA weather station data and US Census block \
     data. If you specify no options, it will populate everything.'
     parser = ArgumentParser(description=description)
-    parser.add_argument('-t', '--tables', action="store_true", help='Set up the \
-            master, meta and user tables')
+    parser.add_argument('-m', '--meta', action="store_true", help="Set up the metadata \
+            registries needed to ingest point and shape datasets.")
+    parser.add_argument('-u', '--users', action="store_true", help='Set up the a default\
+            user to access the admin panel.')
     parser.add_argument('-w', '--weather', action="store_true", help='Set up NOAA \
             weather station data. This includes the daily and hourly weather \
             observations.')

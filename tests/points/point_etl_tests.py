@@ -5,10 +5,11 @@ import sqlalchemy as sa
 from sqlalchemy import Table, Column, Integer, Date, Float, String, TIMESTAMP, MetaData
 from sqlalchemy.exc import NoSuchTableError
 from geoalchemy2 import Geometry
-from plenario.etl.point import StagingTable
+from plenario.etl.point import StagingTable, PlenarioETL
 import os
 import json
 from datetime import date
+from init_db import init_meta
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 fixtures_path = os.path.join(pwd, '../test_fixtures')
@@ -22,6 +23,11 @@ def drop_if_exists(table_name):
         pass
 
 
+def drop_meta(table_name):
+    del_ = "DELETE FROM meta_master WHERE dataset_name = '{}';".format(table_name)
+    app_engine.execute(del_)
+
+
 class StagingTableTests(TestCase):
     """
     Given a dataset is present in MetaTable,
@@ -30,56 +36,65 @@ class StagingTableTests(TestCase):
     """
     @classmethod
     def setUpClass(cls):
+        init_meta()
+
         cls.dog_path = os.path.join(fixtures_path, 'dog_park_permits.csv')
         cls.radio_path = os.path.join(fixtures_path, 'community_radio_events.csv')
         cls.opera_path = os.path.join(fixtures_path, 'public_opera_performances.csv')
 
-        # Makenew MetaTable objects
-        cls.unloaded_meta = MetaTable(url='nightvale.gov/events.csv',
+        cls.expected_radio_col_names = ['lat', 'lon', 'event_name', 'date', 'line_num']
+        cls.expected_dog_col_names = ['lat', 'lon', 'hooded_figure_id', 'date', 'line_num']
+
+    def setUp(self):
+        # Ensure we have metadata loaded into the database
+        # to mimic the behavior of metadata ingestion preceding file ingestion.
+        drop_meta('dog_park_permits')
+        drop_meta('community_radio_events')
+        drop_meta('public_opera_performances')
+
+        # Make new MetaTable objects
+        self.unloaded_meta = MetaTable(url='nightvale.gov/events.csv',
                                       human_name='Community Radio Events',
                                       business_key='Event Name',
                                       observed_date='Date',
                                       latitude='lat', longitude='lon',
                                       approved_status=True)
-        cls.expected_radio_col_names = ['lat', 'lon', 'event_name', 'date', 'line_num']
 
-        cls.existing_meta = MetaTable(url='nightvale.gov/dogpark.csv',
+        self.existing_meta = MetaTable(url='nightvale.gov/dogpark.csv',
                                       human_name='Dog Park Permits',
                                       business_key='Hooded Figure ID',
                                       observed_date='Date',
                                       latitude='lat', longitude='lon',
                                       approved_status=False)
-        cls.expected_dog_col_names = ['lat', 'lon', 'hooded_figure_id', 'date', 'line_num']
 
-        # For one of those entries, create a point table in the database (we'll eschew the dat_ convention)
-        drop_if_exists('dog_park_permits')
-        cls.existing_table = sa.Table('dog_park_permits', Base.metadata,
+        self.opera_meta = MetaTable(url='nightvale.gov/opera.csv',
+                                   human_name='Public Opera Performances',
+                                   business_key='Event Name',
+                                   observed_date='Date',
+                                   location='Location',
+                                   approved_status=False)
+        session.add_all([self.existing_meta, self.opera_meta, self.unloaded_meta])
+        session.commit()
+
+        # Also, let's have one table pre-loaded...
+        self.existing_table = sa.Table('dog_park_permits', MetaData(),
                                       Column('hooded_figure_id', Integer, primary_key=True),
                                       Column('point_date', TIMESTAMP, nullable=False),
                                       Column('date', Date, nullable=True),
                                       Column('lat', Float, nullable=False),
                                       Column('lon', Float, nullable=False),
                                       Column('geom', Geometry('POINT', srid=4326), nullable=True))
-        cls.existing_table.create()
+        drop_if_exists(self.existing_table.name)
+        self.existing_table.create(bind=app_engine)
 
-        ins = cls.existing_table.insert().values(hooded_figure_id=1,
+        # ... with some pre-existing data
+        ins = self.existing_table.insert().values(hooded_figure_id=1,
                                                  point_date=date(2015, 1, 2),
                                                  lon=-87.6495076896,
                                                  lat=41.7915865543,
                                                  geom=None)
         app_engine.execute(ins)
 
-        cls.opera_meta = MetaTable(url='nightvale.gov/opera.csv',
-                                   human_name='Public Opera Performances',
-                                   business_key='Event Name',
-                                   observed_date='Date',
-                                   location='Location',
-                                   approved_status=False)
-
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.existing_table.drop(checkfirst=True)
 
     def tearDown(self):
         session.close()
@@ -134,10 +149,10 @@ class StagingTableTests(TestCase):
         self.assertEqual(len(all_rows), 5)
 
     def test_insert_data(self):
+        etl = PlenarioETL(self.existing_meta, source_path=self.dog_path)
+        etl.update()
 
         existing = self.existing_table
-        with StagingTable(self.existing_meta, source_path=self.dog_path) as staging:
-            staging.insert_into(existing)
         pre_existing_row = session.execute(existing.select()
                                            .where(existing.c[self.existing_meta.business_key] == 1)).fetchone()
         self.assertEqual(date(2015, 1, 2), pre_existing_row.point_date.date())
@@ -145,19 +160,50 @@ class StagingTableTests(TestCase):
         all_rows = session.execute(existing.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
 
+    def test_update_no_change(self):
+        etl = PlenarioETL(self.existing_meta, source_path=self.dog_path)
+        etl.update()
+
+        etl = PlenarioETL(self.existing_meta, source_path=self.dog_path)
+        etl.update()
+
     def test_new_table(self):
         drop_if_exists(self.unloaded_meta.dataset_name)
-        with StagingTable(self.unloaded_meta, source_path=self.radio_path) as staging:
-            new_table = staging.create_new()
+
+        etl = PlenarioETL(self.unloaded_meta, source_path=self.radio_path)
+        new_table = etl.add()
+
         all_rows = session.execute(new_table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
         session.close()
         new_table.drop(app_engine, checkfirst=True)
 
-    def test_location_col(self):
-        with StagingTable(self.opera_meta, source_path=self.opera_path) as staging:
-            new_table = staging.create_new()
+    def test_location_col_add(self):
+        drop_if_exists(self.opera_meta.dataset_name)
+
+        etl = PlenarioETL(self.opera_meta, source_path=self.opera_path)
+        new_table = etl.add()
+
         all_rows = session.execute(new_table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
         session.close()
         new_table.drop(app_engine, checkfirst=True)
+
+    def test_location_col_update(self):
+        drop_if_exists(self.opera_meta.dataset_name)
+
+        self.opera_table = sa.Table(self.opera_meta.dataset_name, MetaData(),
+                                    Column('event_name', String, primary_key=True),
+                                    Column('date', Date, nullable=True),
+                                    Column('location', String, nullable=False),
+                                    Column('geom', Geometry('POINT', srid=4326), nullable=True),
+                                    Column('point_date', TIMESTAMP, nullable=False))
+        drop_if_exists(self.existing_table.name)
+        self.opera_table.create(bind=app_engine)
+
+        ins = self.opera_table.insert().values(event_name='quux',
+                                               date=None,
+                                               point_date=date(2015, 1, 2),
+                                               location='(-87.6495076896,41.7915865543)',
+                                               geom=None)
+        app_engine.execute(ins)
