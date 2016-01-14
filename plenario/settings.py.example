@@ -16,10 +16,6 @@ CACHE_CONFIG = {
     'CACHE_TYPE': 'simple',
 }
 
-AWS_ACCESS_KEY = ''
-AWS_SECRET_KEY = ''
-S3_BUCKET = ''
-
 # Optional dict with attributes for a default web admin
 DEFAULT_USER = {
     'name': 'plenario_user',

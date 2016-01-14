@@ -1,17 +1,18 @@
-import unittest
-import os
-from hashlib import md5
-from plenario.utils.shape_etl import ShapeETL
-from plenario.utils.etl import PlenarioETL
-from plenario.utils.shapefile import Shapefile
-from plenario import create_app
-from init_db import init_master_meta_user, init_census
-from plenario.database import session, app_engine as engine
-from plenario.models import MetaTable, ShapeMetadata
 import json
+import os
+import unittest
 import urllib
-from StringIO import StringIO
 import zipfile
+from StringIO import StringIO
+from hashlib import md5
+
+from init_db import init_master_meta_user, init_census
+from plenario import create_app
+from plenario.database import session, app_engine as engine
+from plenario.etl.shape import ShapeETL
+from plenario.models import MetaTable, ShapeMetadata
+from plenario.etl.point import PlenarioETL
+from plenario.utils.shapefile import Shapefile
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 FIXTURE_PATH = os.path.join(pwd, '..', 'test_fixtures')
@@ -69,7 +70,7 @@ class ShapeTests(unittest.TestCase):
         shape_meta = ShapeMetadata.add(caller_session=session, human_name=fixture.human_name, source_url=None)
         session.commit()
         # Bypass the celery task and call on a ShapeETL directly
-        ShapeETL(meta=shape_meta, source_path=fixture.path).import_shapefile()
+        ShapeETL(meta=shape_meta, source_path=fixture.path).ingest()
         return shape_meta
 
     def test_names_in_shape_list(self):
@@ -173,103 +174,3 @@ class ShapeTests(unittest.TestCase):
         ShapeTests.ingest_fixture(fixtures['city'])
         ShapeMetadata.add(caller_session=session, human_name=u'Dummy Name', source_url=None)
         session.commit()
-
-class CensusRegressionTests(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        # Assume there exists a test database with postgis at the connection string specified in test_settings.py
-        tables_to_drop = ['census_blocks',
-                          'dat_flu_shot_clinic_locations',
-                          'dat_master',
-                          'meta_master',
-                          'meta_shape',
-                          'plenario_user']
-        drop_tables(tables_to_drop)
-
-        # Create meta, master, user tables
-        init_master_meta_user()
-
-        # Ingest the census blocks
-        init_census()
-
-        # TODO: support local ingest of csv
-        # For now, ingest Chicago's csv of 2013 flu shot locations from the data portal.
-        # It's a nice little Chicago dataset that won't change.
-
-        # So, adding the dataset to meta_table happens in view.py.
-        # I don't want to mock out a whole response object with form data and such,
-        # so here's a janky way.
-        url = 'https://data.cityofchicago.org/api/views/g5vx-5vqf/rows.csv?accessType=DOWNLOAD'
-        url_hash = md5(url).hexdigest()
-
-        d = {
-            'dataset_name': u'flu_shot_clinic_locations',
-            'human_name': u'flu_shot_clinic_locations',
-            'attribution': u'foo',
-            'description': u'bar',
-            'source_url': url,
-            'source_url_hash': url_hash,
-            'update_freq': 'yearly',
-            'business_key': u'Event',
-            'observed_date': u'Date',
-            'latitude': u'Latitude',
-            'longitude': u'Longitude',
-            'location': u'Location',
-            'contributor_name': u'Frederick Mcgillicutty',
-            'contributor_organization': u'StrexCorp',
-            'contributor_email': u'foo@bar.edu',
-            'contributed_data_types': None,
-            'approved_status': True,
-            'is_socrata_source': False
-        }
-
-        # add this to meta_master
-        md = MetaTable(**d)
-        session.add(md)
-        session.commit()
-
-        meta = {
-            'dataset_name': u'flu_shot_clinic_locations',
-            'source_url': url,
-            'business_key': u'Event',
-            'observed_date': u'Date',
-            'latitude': u'Latitude',
-            'longitude': u'Longitude',
-            'location': u'Location',
-            'source_url_hash': url_hash
-
-        }
-        point_etl = PlenarioETL(meta)
-        point_etl.add()
-
-        cls.app = create_app().test_client()
-
-    def test_point_dataset_visible(self):
-        resp = self.app.get('/v1/api/fields/flu_shot_clinic_locations')
-        self.assertEqual(resp.status_code, 200)
-
-    def test_filter_on_census_block(self):
-
-        # Query the flu_shot_clinic_locations dataset and return the number of records retrieved.
-        # Filter by census_block__like=census_block_string.
-        def num_rows_returned_from_detail_query(census_block_string):
-            request = '/v1/api/detail/' +\
-                      '?dataset_name=flu_shot_clinic_locations' +\
-                      '&obs_date__ge=2013-1-1' +\
-                      '&census_block__like=' + census_block_string
-            resp = self.app.get(request)
-            self.assertEqual(resp.status_code, 200)
-            data = json.loads(resp.data)
-            return len(data['objects'])
-
-        # I'm going to pick on this row
-        # 11/16/2013,10am,2pm,Saturday,7th Ward Burnham Math and Science Academy,Alderman,9928 S. Crandon,Chicago,IL,60649,(773) 731-7777,51,SOUTH DEERING,7,41.7144017635,-87.5671672122,"(41.7144017635, -87.5671672122)"
-        # of the flu dataset.
-        # Burnham Math and Science Academy (9928 S. Crandon Ave) is in census block 170315103004012
-        self.assertEqual(1, num_rows_returned_from_detail_query('170315103004012'))
-        # There was not a flu clinic in the census block nextdoor, 170315103004021
-        self.assertEqual(0, num_rows_returned_from_detail_query('170315103004021'))
-        # And we should be able to see the record if we zoom out to the tract level.
-        # The clinic at the Burnham school was the only one in South Deering, so we expect just one record.
-        self.assertEqual(1, num_rows_returned_from_detail_query('17031510300%'))

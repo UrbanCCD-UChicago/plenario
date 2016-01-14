@@ -1,6 +1,6 @@
 from flask import make_response, request, redirect, url_for, render_template, current_app, g, \
     Blueprint, flash, session as flask_session
-from plenario.models import MasterTable, MetaTable, User, ShapeMetadata
+from plenario.models import MetaTable, User, ShapeMetadata
 from plenario.database import session, Base, app_engine as engine
 from plenario.utils.helpers import get_socrata_data_info, iter_column, send_mail, slugify
 from plenario.tasks import update_dataset as update_dataset_task, \
@@ -155,7 +155,7 @@ def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_sou
         'human_name': request.form.get('dataset_name'),
         'attribution': request.form.get('dataset_attribution'),
         'description': request.form.get('dataset_description'),
-        'source_url': url,
+        'url': url,
         'source_url_hash': dataset_id,
         'update_freq': request.form.get('update_frequency'),
         'business_key': business_key,
@@ -171,7 +171,6 @@ def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_sou
         'is_socrata_source': socrata_source
     }
 
-    # add this to meta_master
     md = MetaTable(**d)
     session.add(md)
     session.commit()
@@ -339,11 +338,12 @@ def view_datasets():
         .filter(MetaTable.approved_status != 'true')\
         .all()
 
+    # TODO: remove row estimate count box
     counts = {
-        'master_row_count': table_row_estimate('dat_master'),
-        'weather_daily_row_count': table_row_estimate('dat_weather_observations_daily'),
-        'weather_hourly_row_count': table_row_estimate('dat_weather_observations_hourly'),
-        'census_block_row_count': table_row_estimate('census_blocks'),
+        'master_row_count': 42,
+        'weather_daily_row_count': 1,
+        'weather_hourly_row_count': 2,
+        'census_block_row_count': 3
     }
 
     try:
@@ -498,34 +498,20 @@ def edit_dataset(source_url_hash):
 
     fieldnames = None
     num_rows = 0
+    # Taking out support for these in move to master-less schema
     num_weather_observations = 0
     num_rows_w_censusblocks = 0
     
     if (meta.approved_status == 'true'):
         try:
-            table_name = 'dat_%s' % meta.dataset_name
+            table_name = meta.dataset_name
             
             table = Table(table_name, Base.metadata,
                           autoload=True, autoload_with=engine)
             fieldnames = table.columns.keys()
-            pk_name  =[p.name for p in table.primary_key][0]
+            pk_name = [p.name for p in table.primary_key][0]
             pk = table.c[pk_name]
             num_rows = session.query(pk).count()
-
-            dat_master = Table('dat_master', Base.metadata, autoload=True, autoload_with=engine)
-
-            sel = session.query(func.count(dat_master.c.master_row_id)).filter(and_(dat_master.c.dataset_name==meta.dataset_name,
-                                                                                    dat_master.c.dataset_row_id==pk,
-                                                                                    dat_master.c.weather_observation_id.isnot(None)))
-
-            num_weather_observations = sel.first()[0]
-
-            sel = session.query(func.count(dat_master.c.master_row_id)).filter(and_(dat_master.c.dataset_name==meta.dataset_name,
-                                                                                    dat_master.c.dataset_row_id==pk,
-                                                                                    dat_master.c.census_block.isnot(None)))
-
-            num_rows_w_censusblocks = sel.first()[0]
-
             
         except sqlalchemy.exc.NoSuchTableError, e:
             # dataset has been approved, but perhaps still processing.

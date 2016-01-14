@@ -1,19 +1,16 @@
-import os
-from urlparse import urlparse
-import sys
-from plenario.celery_app import celery_app
-from plenario.models import MetaTable, MasterTable, ShapeMetadata
-from plenario.database import task_session as session, task_engine as engine, \
-    Base
-from plenario.utils.etl import PlenarioETL
-from plenario.utils.shape_etl import ShapeETL
-from plenario.utils.weather import WeatherETL
-from raven.handlers.logging import SentryHandler
-from raven.conf import setup_logging
-from plenario.settings import CELERY_SENTRY_URL
-from sqlalchemy import Table
-from sqlalchemy.exc import NoSuchTableError, InternalError
 from datetime import datetime, timedelta
+
+from raven.conf import setup_logging
+from raven.handlers.logging import SentryHandler
+from sqlalchemy.exc import NoSuchTableError, InternalError
+
+from plenario.celery_app import celery_app
+from plenario.database import session as session, app_engine as engine
+from plenario.etl.shape import ShapeETL
+from plenario.models import MetaTable, ShapeMetadata
+from plenario.settings import CELERY_SENTRY_URL
+from plenario.etl.point import PlenarioETL
+from plenario.utils.weather import WeatherETL
 
 if CELERY_SENTRY_URL:
     handler = SentryHandler(CELERY_SENTRY_URL)
@@ -23,26 +20,20 @@ if CELERY_SENTRY_URL:
 def delete_dataset(self, source_url_hash):
     md = session.query(MetaTable).get(source_url_hash)
     try:
-        dat_table = Table('dat_%s' % md.dataset_name, Base.metadata, 
-            autoload=True, autoload_with=engine, keep_existing=True)
+        dat_table = md.point_table
         dat_table.drop(engine, checkfirst=True)
     except NoSuchTableError:
+        # Move on so we can get rid of the metadata
         pass
-    master_table = MasterTable.__table__
-    delete = master_table.delete()\
-        .where(master_table.c.dataset_name == md.dataset_name)
-    conn = engine.contextual_connect()
+    session.delete(md)
     try:
-        conn.execute(delete)
-        session.delete(md)
         session.commit()
     except InternalError, e:
         raise delete_dataset.retry(exc=e)
-    conn.close()
     return 'Deleted {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task(bind=True)
-def add_dataset(self, source_url_hash, s3_path=None, data_types=None):
+def add_dataset(self, source_url_hash, data_types=None):
     md = session.query(MetaTable).get(source_url_hash)
     if md.result_ids:
         ids = md.result_ids
@@ -53,8 +44,9 @@ def add_dataset(self, source_url_hash, s3_path=None, data_types=None):
         c.execute(MetaTable.__table__.update()\
             .where(MetaTable.source_url_hash == source_url_hash)\
             .values(result_ids=ids))
-    etl = PlenarioETL(md.as_dict(), data_types=data_types)
-    etl.add(s3_path=s3_path)
+    md.contributed_data_types = data_types
+    etl = PlenarioETL(md)
+    etl.add()
     return 'Finished adding {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task(bind=True)
@@ -66,7 +58,7 @@ def add_shape(self, table_name):
     session.commit()
 
     # Ingest the shapefile
-    ShapeETL(meta=meta).import_shapefile()
+    ShapeETL(meta=meta).ingest()
     return 'Finished adding shape dataset {} from {}.'.format(meta.dataset_name, meta.source_url)
 
 @celery_app.task(bind=True)
@@ -86,7 +78,7 @@ def frequency_update(frequency):
     return '%s update complete' % frequency
 
 @celery_app.task(bind=True)
-def update_dataset(self, source_url_hash, s3_path=None):
+def update_dataset(self, source_url_hash):
     md = session.query(MetaTable).get(source_url_hash)
     if md.result_ids:
         ids = md.result_ids
@@ -97,8 +89,8 @@ def update_dataset(self, source_url_hash, s3_path=None):
         c.execute(MetaTable.__table__.update()\
             .where(MetaTable.source_url_hash == source_url_hash)\
             .values(result_ids=ids))
-    etl = PlenarioETL(md.as_dict())
-    etl.update(s3_path=s3_path)
+    etl = PlenarioETL(md)
+    etl.update()
     return 'Finished updating {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 @celery_app.task

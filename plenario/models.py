@@ -1,22 +1,30 @@
 from uuid import uuid4
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, \
-    Text, BigInteger, func
-from sqlalchemy.dialects.postgresql import TIMESTAMP, DOUBLE_PRECISION, ARRAY
+from sqlalchemy import Column, String, Boolean, Date, DateTime, \
+    Text, func, Table, select, BigInteger, TIMESTAMP, Integer
+from sqlalchemy.dialects.postgresql import ARRAY, DOUBLE_PRECISION
 from geoalchemy2 import Geometry
 from sqlalchemy.orm import synonym
+import sqlalchemy as sa
+from plenario.utils.helpers import get_size_in_degrees
 from flask_bcrypt import Bcrypt
+from itertools import groupby
+import json
+from hashlib import md5
 
 from plenario.database import session, Base
 from plenario.utils.helpers import slugify
 
+from collections import namedtuple
+
 bcrypt = Bcrypt()
 
+PointDataset = namedtuple('PointDataset', 'name bkey date lat lon loc')
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
-    dataset_name = Column(String(100), nullable=False)
+    dataset_name = Column(String(100), nullable=False)  # limited to 50 chars elsewhere
     human_name = Column(String(255), nullable=False)
     description = Column(Text)
     source_url = Column(String(255))
@@ -34,43 +42,262 @@ class MetaTable(Base):
     latitude = Column(String)
     longitude = Column(String)
     location = Column(String)
-    approved_status = Column(String) # if False, then do not display without first getting administrator approval
+    # approved_status is used as a bool
+    approved_status = Column(String)  # if False, then do not display without first getting administrator approval
     contributor_name = Column(String)
     contributor_organization = Column(String)
     contributor_email = Column(String)
-    contributed_data_types = Column(Text) # Temporarily store user-submitted data types for later approval
+    contributed_data_types = Column(Text)  # Temporarily store user-submitted data types for later approval
     is_socrata_source = Column(Boolean, default=False)
     result_ids = Column(ARRAY(String))
+
+    def __init__(self, url, human_name,
+                 business_key, observed_date,
+                 is_socrata=False, approved_status=False,
+                 contributed_data_types=None, update_freq='yearly',
+                 latitude=None, longitude=None, location=None,
+                 attribution=None, description=None, **kwargs):
+        """
+        :param url: url where CSV or Socrata dataset with this dataset resides
+        :param human_name: Nicely formatted name to display to people
+        :param business_key: Name of column with the dataset's unique ID
+        :param observed_date: Name of column with the datset's timestamp
+        :param is_socrata: Does this dataset come from Socrata?
+        :param approved_status: Has an admin signed off on this dataset?
+        :param contributed_data_types: stringified JSON mapping
+        :param update_freq: string: one of ['daily', 'weekly', 'monthly', 'yearly']
+        :param latitude: Name of col with latitude
+        :param longitude: Name of col with longitude
+        :param location: Name of col with location formatted as (lat, lon)
+        :param attribution: Text describing who maintains the dataset
+        :param description: Text describing the dataset.
+        """
+        def curried_slug(name):
+            if name is None:
+                return None
+            else:
+                return slugify(unicode(name), delim=u'_')
+
+        # We need some combination of columns from which we can derive a point in space
+        assert(location or (latitude and longitude))
+        # Frontend validation should have slugified column names already, but enforcing it here is nice for testing.
+        self.latitude, self.longitude = curried_slug(latitude), curried_slug(longitude)
+        self.location = curried_slug(location)
+
+        assert human_name
+        self.human_name = human_name
+        # Known issue: slugify fails hard on Non-ASCII
+        self.dataset_name = kwargs.get('dataset_name', curried_slug(human_name)[:50])
+
+        assert(business_key and observed_date)
+        self.business_key = curried_slug(business_key)
+        self.observed_date = curried_slug(observed_date)
+
+        assert url
+        self.source_url, self.source_url_hash = url, md5(url).hexdigest()
+
+        assert update_freq
+        self.update_freq = update_freq
+
+        # Can be None. In practice, frontend validation makes sure these are always passed along.
+        self.description, self.attribution = description, attribution
+        self.is_socrata_source = is_socrata
+        self.contributed_data_types = contributed_data_types
+
+        # This boolish value is stored as a string in the DB.
+        self.approved_status = str(approved_status)
 
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
 
+    def meta_tuple(self):
+        basic_info = PointDataset(name=self.dataset_name,
+                                  bkey=self.business_key,
+                                  date=self.observed_date,
+                                  lat=self.latitude,
+                                  lon=self.longitude,
+                                  loc=self.location)
+        return basic_info
+
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
+    def column_info(self):
+        return self.point_table.c
 
-class MasterTable(Base):
-    __tablename__ = 'dat_master'
-    master_row_id = Column(BigInteger, primary_key=True)
-    # Looks like start_date and end_date aren't used.
-    start_date = Column(TIMESTAMP)
-    end_date = Column(TIMESTAMP)
-    # current_flag is never updated. We can probably get rid of this
-    current_flag = Column(Boolean, default=True)
-    location = Column(String(200))
-    latitude = Column(DOUBLE_PRECISION(precision=53))
-    longitude = Column(DOUBLE_PRECISION(precision=53))
-    obs_date = Column(TIMESTAMP, index=True)
-    weather_observation_id = Column(BigInteger, index=True)
-    census_block = Column(String(15), index=True)
-    # Looks like geotag3 is unused
-    geotag3 = Column(String(50))
-    dataset_name = Column(String(100), index=True)
-    dataset_row_id = Column(Integer)
-    location_geom = Column(Geometry('POINT', srid=4326))
+    def id_col(self):
+        # The unique ID column of a point dataset is specified by the user. Get it by name.
+        return self.point_table.c[self.business_key]
 
-    def __repr__(self):
-        return '<Master %r (%r)>' % (self.dataset_row_id, self.dataset_name)
+    @property
+    def point_table(self):
+        try:
+            return self._point_table
+        except AttributeError:
+            self._point_table = Table(self.dataset_name, Base.metadata, autoload=True, extend_existing=True)
+            return self._point_table
+
+    # Return a list of [
+    # {'dataset_name': 'Foo',
+    # 'items': [{'datetime': dt, 'count': int}, ...] } ]
+    @classmethod
+    def timeseries_all(cls, table_names, agg_unit, start, end, geom=None):
+        # For each table in table_names, generate a query to be unioned
+        selects = []
+        for name in table_names:
+            table = cls.get_by_dataset_name(name)
+            ts_select = table.timeseries(agg_unit, start, end, geom)
+            selects.append(ts_select)
+
+        # Union the time series selects to get a panel
+        panel_query = sa.union(*selects)\
+                        .order_by('dataset_name')\
+                        .order_by('time_bucket')
+        panel_vals = session.execute(panel_query)
+
+        panel = []
+        for dataset_name, ts in groupby(panel_vals, lambda row: row.dataset_name):
+
+            # Looks silly, but ts gets closed after it's been iterated over once,
+            # so we need to store all the rows somewhere if we want to iterate over them twice.
+            rows = [row for row in ts]
+            # If no records were found, don't include this dataset
+            if all([row.count == 0 for row in rows]):
+                continue
+
+            ts_dict = {'dataset_name': dataset_name,
+                       'items': []}
+
+            for row in rows:
+                ts_dict['items'].append({
+                    'datetime': row.time_bucket.date(),  # Return without tz info. Should be UTC.
+                    'count':    row.count
+                })
+            panel.append(ts_dict)
+
+        return panel
+
+
+    # Information about all point datasets
+    @classmethod
+    def index(cls):
+        results = session.query(cls.dataset_name)\
+                        .filter(cls.approved_status == 'true')
+        names = [result.dataset_name for result in results]
+        return names
+
+    @classmethod
+    def narrow_candidates(cls, dataset_names, start, end, geom=None):
+        """
+        :param dataset_names: Names of point datasets to be considered
+        :return names: Names of point datasets whose bounding box and date range interesects with the given bounds.
+        """
+        # Filter out datsets that don't intersect the time boundary
+        q = session.query(MetaTable.dataset_name)\
+            .filter(MetaTable.dataset_name.in_(dataset_names), MetaTable.obs_from < end, MetaTable.obs_to > start)
+
+        # or the geometry boundary
+        if geom:
+            q = q.filter(MetaTable.bbox.ST_Intersects(func.ST_GeomFromGeoJSON(geom)))
+
+        return [row.dataset_name for row in q.all()]
+
+    @classmethod
+    def get_by_dataset_name(cls, name):
+        return session.query(cls).filter(cls.dataset_name == name).first()
+
+    def get_bbox_center(self):
+        result = session.execute(select([func.ST_AsGeoJSON(func.ST_centroid(self.bbox))]))
+        # returns [lon, lat]
+        return json.loads(result.first()[0])['coordinates']
+
+    def update_date_added(self):
+        now = datetime.now()
+        if self.date_added is None:
+            self.date_added = now
+        self.last_update = now
+
+
+
+    def make_grid(self, resolution, geom=None, conditions=None):
+        """
+        :param resolution: length of side of grid square in meters
+        :type resolution: int
+        :param geom: string representation of geojson fragment
+        :type geom: str
+        :param conditions: conditions on columns to filter on
+        :type conditions: list of SQLAlchemy binary operations (e.g. col > value)
+        :return: result proxy with all result rows
+                 size_x and size_y: the horizontal and vertical size of the grid squares in degrees
+        """
+        if conditions is None:
+            conditions = []
+
+        # We need to convert resolution (given in meters) to degrees - which is the unit of measure for EPSG 4326
+        # - in order to generate our grid.
+        center = self.get_bbox_center()
+        # center[1] is longitude
+        size_x, size_y = get_size_in_degrees(resolution, center[1])
+
+        # Generate a count for each resolution by resolution square
+        t = self.point_table
+        q = session.query(func.count(self.id_col()),
+                          func.ST_SnapToGrid(t.c.geom, size_x, size_y).label('squares'))\
+            .filter(*conditions)\
+            .group_by('squares')
+
+        if geom:
+            q = q.filter(t.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geom)))
+
+        return session.execute(q), size_x, size_y
+
+
+    # Return select statement to execute or union
+    def timeseries(self, agg_unit, start, end, geom=None):
+        # Reading this blog post
+        # http://no0p.github.io/postgresql/2014/05/08/timeseries-tips-pg.html
+        # inspired this implementation.
+        t = self.point_table
+
+        # Create a CTE to represent every time bucket in the timeseries
+        # with a default count of 0
+        day_generator = func.generate_series(func.date_trunc(agg_unit, start),
+                                             func.date_trunc(agg_unit, end),
+                                             '1 ' + agg_unit)
+        defaults = select([sa.literal_column("0").label('count'),
+                           day_generator.label('time_bucket')])\
+            .alias('defaults')
+
+        # Create a CTE that grabs the number of records contained in each time bucket.
+        # Will only have rows for buckets with records.
+        actuals = select([func.count(self.id_col()).label('count'),  # Count unique records
+                          func.date_trunc(agg_unit, t.c.point_date).label('time_bucket')])\
+            .where(sa.and_(t.c.point_date >= start,            # Only include records in time window
+                           t.c.point_date <= end))\
+            .group_by('time_bucket')
+
+        # Also filter by geometry if requested
+        if geom:
+            actuals = actuals.where(func.ST_Within(t.c.geom, func.ST_GeomFromGeoJSON(geom)))
+
+        # Need to alias to make it usable in a subexpression
+        actuals = actuals.alias('actuals')
+
+        # Outer join the default and observed values to create the timeseries select statement.
+        # If no observed value in a bucket, use the default.
+        ts = select([sa.literal_column("'{}'".format(self.dataset_name)).label('dataset_name'),
+                     defaults.c.time_bucket.label('time_bucket'),
+                     func.coalesce(actuals.c.count, defaults.c.count).label('count')]).\
+            select_from(defaults.outerjoin(actuals, actuals.c.time_bucket == defaults.c.time_bucket))
+
+        return ts
+
+    def timeseries_one(self, agg_unit, start, end, geom=None):
+        ts_select = self.timeseries(agg_unit, start, end, geom)
+        rows = session.execute(ts_select.order_by('time_bucket'))
+
+        ts = [['count', 'datetime']] + [[count, time_bucket.date()] for _, time_bucket, count in rows]
+        return ts
 
 
 class ShapeMetadata(Base):
