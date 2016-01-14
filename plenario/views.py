@@ -155,7 +155,7 @@ def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_sou
         'human_name': request.form.get('dataset_name'),
         'attribution': request.form.get('dataset_attribution'),
         'description': request.form.get('dataset_description'),
-        'source_url': url,
+        'url': url,
         'source_url_hash': dataset_id,
         'update_freq': request.form.get('update_frequency'),
         'business_key': business_key,
