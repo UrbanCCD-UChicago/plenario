@@ -6,7 +6,7 @@ import zipfile
 from StringIO import StringIO
 from hashlib import md5
 
-from init_db import init_master_meta_user, init_census
+from init_db import init_meta
 from plenario import create_app
 from plenario.database import session, app_engine as engine
 from plenario.etl.shape import ShapeETL
@@ -46,12 +46,12 @@ class ShapeTests(unittest.TestCase):
 
         # Remove tables that we're about to recreate.
         # This doesn't happen in teardown because I find it helpful to inspect them in the DB after running the tests.
-        meta_table_names = ['dat_master', 'meta_shape', 'meta_master', 'plenario_user']
+        meta_table_names = ['dat_master', 'meta_shape', 'meta_master']
         fixture_table_names = [fixture.table_name for key, fixture in fixtures.iteritems()]
         drop_tables(meta_table_names + fixture_table_names)
 
         # Re-add meta tables
-        init_master_meta_user()
+        init_meta()
 
         # Fully ingest the fixtures
         ShapeTests.ingest_fixture(fixtures['city'])

@@ -42,22 +42,25 @@ class PlenarioETL(object):
         """
         existing_table = self.metadata.point_table
         with self.staging_table as s_table:
-            with AdditionTable(s_table.table, self.dataset, existing_table) as new_records:
-                #if new_records.has_new():
+            staging = s_table.table
+            Delete(staging, existing_table, self.dataset).execute()
+            with AdditionTable(staging, self.dataset, existing_table) as new_records:
                 new_records.insert()
-                # If we didn't find anything new, just do nothing.
         update_meta(self.metadata, existing_table)
 
 
 class StagingTable(object):
+    """
+    A temporary table that will contain all records from the source CSV.
+    From it, either create a new point table
+    or insert records from it into an existing point table.
+    """
+
     def __init__(self, meta, source_path=None):
         """
-        A temporary table that will contain all records from the source CSV.
-        From it, either create a new point table
-        or insert records from it into an existing point table.
-
         :param meta: record from MetaTable
         :param source_path: path of source file on local filesystem
+                            if None, look for data at a remote URL instead
         """
         # Just the info about column names we usually need
         self.dataset = meta.meta_tuple()
@@ -68,9 +71,15 @@ class StagingTable(object):
             self.cols = self._from_ingested(meta.column_info())
         except NoSuchTableError:
             # This must be the first time we're ingesting the table
+
             if meta.contributed_data_types:
-                types = json.loads(meta.contributed_data_types)
-                self.cols = self._from_contributed(types)
+                try:
+                    types = json.loads(meta.contributed_data_types)
+                    self.cols = self._from_contributed(types)
+                # Quick fix until we dig deeper into contributed data types problem.
+                # If it fails, give up and attempt to infer from the source file instead.
+                except:
+                    pass
             else:
                 self.cols = None
 
@@ -80,7 +89,6 @@ class StagingTable(object):
                 self.file_helper = ETLFile(source_path=source_path)
             else:  # Remote ingest
                 self.file_helper = ETLFile(source_url=meta.source_url)
-        # TODO: Handle more specific exception
         except Exception as e:
             raise PlenarioETLError(e)
 
@@ -173,6 +181,7 @@ class StagingTable(object):
             raise
 
     '''Utility methods to generate columns into which we can dump the CSV data.'''
+
     @staticmethod
     def _from_ingested(column_info):
         """
@@ -187,7 +196,8 @@ class StagingTable(object):
 
         return cols
 
-    def _from_inference(self, f):
+    @staticmethod
+    def _from_inference(f):
         """
         Generate columns by scanning source CSV and inferring column types.
         """
@@ -201,7 +211,8 @@ class StagingTable(object):
             cols.append(_make_col(col_name, col_type, nullable))
         return cols
 
-    def _from_contributed(self, data_types):
+    @staticmethod
+    def _from_contributed(data_types):
         """
         :param data_types: List of dictionaries, each of which has 'field_name' and 'data_type' fields.
 
@@ -243,6 +254,9 @@ def _copy_col(col):
 
 
 class BrandNewTable(object):
+    """
+    When we're adding a dataset for the first time, create a BrandNewTable
+    """
 
     def __init__(self, staging, dataset):
         """
@@ -305,8 +319,6 @@ class AdditionTable(object):
         self.staging = staging
         self.dataset = dataset
         self.existing = existing
-        # We might attempt an update only to find the staging table has no new records.
-        #self._has_new = False
 
         # This table will only have the business key and the two derived columns for space and time.
         cols = [_copy_col(staging.c[dataset.bkey]),
@@ -391,20 +403,19 @@ class AdditionTable(object):
         d = self.dataset
 
         if d.lat and d.lon:
+            # Assume latitude and longitude columns are both numeric types.
             geom_col = func.ST_SetSRID(func.ST_Point(t.c[d.lon], t.c[d.lat]),
                                        4326).label('geom')
 
         elif d.loc:
-            # I had trouble handling postgres arrays in SQLAlchemy, so I used raw SQL here.
-            # (The two capture groups from the regex get returned as an array)
-            # (Also - NB - postgres arrays are 1-indexed!)
+            # Warning: this is really fragile.
             geom_col = text(
                     '''SELECT ST_PointFromText('POINT(' || subq.longitude || ' ' || subq.latitude || ')', 4326) \
                         FROM (
                               SELECT FLOAT8((regexp_matches({loc_col}, '\((.*),.*\)'))[1]) AS latitude, \
                                      FLOAT8((regexp_matches({loc_col}, '\(.*,(.*)\)'))[1]) AS longitude \
                               FROM s_{table} as t WHERE t."{bkey}" = {table}."{bkey}") AS subq'''\
-                        .format(table=(d.name), bkey=d.bkey, loc_col=d.loc))
+                        .format(table=d.name, bkey=d.bkey, loc_col=d.loc))
             geom_col = geom_col.columns(column('geom')).label('geom')
 
         else:
@@ -413,9 +424,40 @@ class AdditionTable(object):
         return geom_col
 
 
+class Delete(object):
+    """
+    Identify all records in existing not present in staging
+    and get rid of them!
+    """
+    def __init__(self, staging, existing, dataset):
+        """
+
+        :param staging: table with CSV data
+        :param existing: table
+        :param dataset:
+        """
+        self.staging = staging
+        self.existing = existing
+        self.dataset = dataset
+
+    def execute(self):
+        del_ = """DELETE FROM {existing}
+                  WHERE {id} IN
+                     (SELECT {id} FROM {existing}
+                        EXCEPT
+                      SELECT {id} FROM  {staging});""".\
+            format(existing=self.existing.name, staging=self.staging.name, id=self.dataset.bkey)
+
+        try:
+            engine.execute(del_)
+        except Exception as e:
+            raise PlenarioETLError(repr(e) + '\n Failed to execute' + del_)
+
+
 def update_meta(metadata, table):
     """
     After ingest/update, update the metadata registry to reflect
+    :param metadata:
     :param table:
     """
     metadata.update_date_added()
@@ -429,7 +471,6 @@ def update_meta(metadata, table):
     session.add(metadata)
     try:
         session.commit()
-    # TODO: Catch more specific
     except:
         session.rollback()
         raise
