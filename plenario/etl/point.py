@@ -42,7 +42,9 @@ class PlenarioETL(object):
         """
         existing_table = self.metadata.point_table
         with self.staging_table as s_table:
-            with AdditionTable(s_table.table, self.dataset, existing_table) as new_records:
+            staging = s_table.table
+            Delete(staging, existing_table, self.dataset).execute()
+            with AdditionTable(staging, self.dataset, existing_table) as new_records:
                 new_records.insert()
         update_meta(self.metadata, existing_table)
 
@@ -415,6 +417,7 @@ class AdditionTable(object):
 
         return geom_col
 
+
 class Delete(object):
     """
     Identify all records in existing not present in staging
@@ -432,13 +435,18 @@ class Delete(object):
         self.dataset = dataset
 
     def execute(self):
-        # Delete all records in existing that aren't in staging.
-        pass
+        del_ = """DELETE FROM {existing}
+                  WHERE {id} IN
+                     (SELECT {id} FROM {existing}
+                        EXCEPT
+                      SELECT {id} FROM  {staging});""".\
+            format(existing=self.existing.name, staging=self.staging.name, id=self.dataset.bkey)
 
+        try:
+            engine.execute(del_)
+        except Exception as e:
+            raise PlenarioETLError(repr(e) + '\n Failed to execute' + del_)
 
-
-#class UpdateTable(object):
-#    pass
 
 def update_meta(metadata, table):
     """
