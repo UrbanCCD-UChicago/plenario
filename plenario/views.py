@@ -339,11 +339,12 @@ def view_datasets():
         .filter(MetaTable.approved_status != 'true')\
         .all()
 
+    # TODO: remove row estimate count box
     counts = {
         'master_row_count': 42,
-        'weather_daily_row_count': table_row_estimate('dat_weather_observations_daily'),
-        'weather_hourly_row_count': table_row_estimate('dat_weather_observations_hourly'),
-        'census_block_row_count': table_row_estimate('census_blocks'),
+        'weather_daily_row_count': 1,
+        'weather_hourly_row_count': 2,
+        'census_block_row_count': 3
     }
 
     try:
