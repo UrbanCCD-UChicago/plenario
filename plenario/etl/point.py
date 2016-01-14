@@ -71,9 +71,15 @@ class StagingTable(object):
             self.cols = self._from_ingested(meta.column_info())
         except NoSuchTableError:
             # This must be the first time we're ingesting the table
+
             if meta.contributed_data_types:
-                types = json.loads(meta.contributed_data_types)
-                self.cols = self._from_contributed(types)
+                try:
+                    types = json.loads(meta.contributed_data_types)
+                    self.cols = self._from_contributed(types)
+                # Quick fix until we dig deeper into contributed data types problem.
+                # If it fails, give up and attempt to infer from the source file instead.
+                except:
+                    pass
             else:
                 self.cols = None
 
