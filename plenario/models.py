@@ -20,7 +20,8 @@ from collections import namedtuple
 
 bcrypt = Bcrypt()
 
-PointDataset = namedtuple('PointDataset', 'name bkey date lat lon loc')
+PointDataset = namedtuple('PointDataset', 'name date lat lon loc')
+
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
@@ -112,7 +113,6 @@ class MetaTable(Base):
 
     def meta_tuple(self):
         basic_info = PointDataset(name=self.dataset_name,
-                                  bkey=self.business_key,
                                   date=self.observed_date,
                                   lat=self.latitude,
                                   lon=self.longitude,

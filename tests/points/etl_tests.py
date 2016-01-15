@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy import Table, Column, Integer, Date, Float, String, TIMESTAMP, MetaData, Text
 from sqlalchemy.exc import NoSuchTableError
 from geoalchemy2 import Geometry
-from plenario.etl.point import StagingTable, PlenarioETL
+from plenario.etl.point import Staging, PlenarioETL
 import os
 import json
 from datetime import date
@@ -110,12 +110,12 @@ class StagingTableTests(TestCase):
         return [c.name for c in columns]
 
     def test_col_info_infer(self):
-        with StagingTable(self.unloaded_meta, source_path=self.radio_path)as s_table:
+        with Staging(self.unloaded_meta, source_path=self.radio_path)as s_table:
             observed_names = self.extract_names(s_table.cols)
         self.assertEqual(set(observed_names), set(self.expected_radio_col_names))
 
     def test_col_info_existing(self):
-        with StagingTable(self.existing_meta, source_path=self.dog_path) as s_table:
+        with Staging(self.existing_meta, source_path=self.dog_path) as s_table:
             observed_col_names = self.extract_names(s_table.cols)
         self.assertEqual(set(observed_col_names), set(self.expected_dog_col_names))
 
@@ -128,7 +128,7 @@ class StagingTableTests(TestCase):
         stored_col_info = [{'field_name': name, 'data_type': d_type}
                            for name, d_type in col_info_raw]
         self.unloaded_meta.contributed_data_types = json.dumps(stored_col_info)
-        with StagingTable(self.unloaded_meta, source_path=self.radio_path) as s_table:
+        with Staging(self.unloaded_meta, source_path=self.radio_path) as s_table:
             observed_names = self.extract_names(s_table.cols)
             self.assertEqual(set(observed_names), set(self.expected_radio_col_names))
 
@@ -139,14 +139,14 @@ class StagingTableTests(TestCase):
     def test_staging_new_table(self):
         # For the entry in MetaTable without a table, create a staging table.
         # We'll need to read from a fixture csv.
-        with StagingTable(self.unloaded_meta, source_path=self.radio_path) as s_table:
+        with Staging(self.unloaded_meta, source_path=self.radio_path) as s_table:
             all_rows = session.execute(s_table.table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
 
     def test_staging_existing_table(self):
         # With a fixture CSV whose columns match the existing dataset,
         # create a staging table.
-        with StagingTable(self.existing_meta, source_path=self.dog_path) as s_table:
+        with Staging(self.existing_meta, source_path=self.dog_path) as s_table:
             all_rows = session.execute(s_table.table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
 
