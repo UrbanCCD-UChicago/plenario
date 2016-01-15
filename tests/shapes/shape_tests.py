@@ -4,14 +4,12 @@ import unittest
 import urllib
 import zipfile
 from StringIO import StringIO
-from hashlib import md5
 
 from init_db import init_meta
 from plenario import create_app
 from plenario.database import session, app_engine as engine
 from plenario.etl.shape import ShapeETL
-from plenario.models import MetaTable, ShapeMetadata
-from plenario.etl.point import PlenarioETL
+from plenario.models import ShapeMetadata
 from plenario.utils.shapefile import Shapefile
 
 pwd = os.path.dirname(os.path.realpath(__file__))
@@ -46,7 +44,7 @@ class ShapeTests(unittest.TestCase):
 
         # Remove tables that we're about to recreate.
         # This doesn't happen in teardown because I find it helpful to inspect them in the DB after running the tests.
-        meta_table_names = ['dat_master', 'meta_shape', 'meta_master']
+        meta_table_names = ['meta_shape']
         fixture_table_names = [fixture.table_name for key, fixture in fixtures.iteritems()]
         drop_tables(meta_table_names + fixture_table_names)
 
@@ -84,6 +82,19 @@ class ShapeTests(unittest.TestCase):
 
         # And make sure the name of an uningested shape didn't sneak in.
         self.assertNotIn(self.dummy_name, all_names)
+
+    def test_num_shapes_in_meta(self):
+        resp = self.app.get('/v1/api/shapes/')
+        response_data = json.loads(resp.data)
+
+        # Expect field called num_shapes for each metadata object
+        # Will throw KeyError if 'num_shapes' not found in each
+        shape_nums = {obj['dataset_name']: obj['num_shapes'] for obj in response_data['objects']}
+
+        self.assertEqual(shape_nums['chicago_city_limits'], 1)
+        self.assertEqual(shape_nums['zip_codes'], 61)
+        self.assertEqual(shape_nums['pedestrian_streets'], 41)
+
 
     def test_find_intersecting(self):
         # See test_fixtures/README for a picture of the rectangle
