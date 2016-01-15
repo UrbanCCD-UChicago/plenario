@@ -103,7 +103,7 @@ class StagingTable(object):
             # Grab the handle to build a table from the CSV
             try:
                 self.table = self._make_table(helper.handle)
-                self._kill_dups(self.table.name, self.dataset.bkey)
+                self._kill_dups(self.table.name)
                 return self
             except Exception as e:
                 raise PlenarioETLError(e)
@@ -128,17 +128,13 @@ class StagingTable(object):
         # so that we can access it when we drop down to a raw connection.
         s_table_name = 's_' + self.dataset.name
 
-        # Make a sequential primary key to track line numbers
-        self.cols.append(Column('line_num', Integer, primary_key=True))
-
-        table = Table(s_table_name, MetaData(), *self.cols, extend_existing=True)
-
         # Be paranoid and remove the table if one by this name already exists.
-        table.drop(bind=engine, checkfirst=True)
+        table = Table(s_table_name, MetaData(), *self.cols, extend_existing=True)
+        self._drop()
         table.create(bind=engine)
 
         # Fill in the columns we expect from the CSV.
-        names = [c.name for c in self.cols if c.name != 'line_num']
+        names = [c.name for c in self.cols]
         copy_st = "COPY {t_name} ({cols}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')".\
             format(t_name=s_table_name, cols=', '.join(names))
 
@@ -155,29 +151,38 @@ class StagingTable(object):
             conn.close()
 
     @staticmethod
-    def _kill_dups(table_name, key_name):
+    def _add_hash_column(table_name):
         """
-        Removes rows from a table
-        such that the column named :key_name is unique.
-        Ties are broken on a column named line_num
+        Add and populate a column to the staging table
+        that is am MD5 hash of the other values in the row cast to a string.
+        """
+        # MD5 syntax courtesy of http://stackoverflow.com/a/3879275/3834754
+        add_col = """ALTER TABLE "{table}" ADD hash numeric(32);
+                     SELECT md5(CAST(("{table}".*)AS text)) FROM {table};""".\
+                  format(table=table_name)
+        try:
+            engine.execute(add_col)
+        except Exception as e:
+            raise PlenarioETLError(repr(e) + '\n Failed on ' + str(add_col))
 
+    @staticmethod
+    def _kill_dups(table_name):
+        """
+        Removes duplicate rows from a table.
         :param table_name: Name of table to deduplicate
-        :param key_name: Name of column to dedupe on
         """
         del_stmt = '''
-        DELETE FROM {table}
-        WHERE line_num NOT IN (
-          SELECT MIN(line_num) FROM {table}
-          GROUP BY {bk}
-        )
-        '''.format(table=table_name, bk=key_name)
+        DROP TABLE IF EXISTS temp;
+        CREATE TABLE temp AS
+          SELECT DISTINCT * FROM "{table_name}";
+        DROP TABLE "{table_name}";
+        ALTER TABLE temp RENAME TO "{table_name}";
+        '''.format(table_name=table_name)
 
-        session.execute(del_stmt)
         try:
-            session.commit()
-        except:
-            session.rollback()
-            raise
+            engine.execute(del_stmt)
+        except Exception as e:
+            raise PlenarioETLError(repr(e) + '\n Failed to deduplicate with ' + del_stmt)
 
     '''Utility methods to generate columns into which we can dump the CSV data.'''
 
