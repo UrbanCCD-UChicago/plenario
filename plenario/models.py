@@ -312,6 +312,8 @@ class ShapeMetadata(Base):
 
     # We always ingest geometric data as 4326
     bbox = Column(Geometry('POLYGON', srid=4326))
+    # How many shape records are present?
+    num_shapes = Column(Integer)
     # False when admin first submits metadata.
     # Will become true if ETL completes successfully.
     is_ingested = Column(Boolean, nullable=False)
@@ -342,11 +344,12 @@ class ShapeMetadata(Base):
     @classmethod
     def index(cls, caller_session):
         result = caller_session.query(cls.dataset_name,
-                                        cls.human_name,
-                                        cls.date_added,
-                                        func.ST_AsGeoJSON(cls.bbox))\
+                                      cls.human_name,
+                                      cls.date_added,
+                                      func.ST_AsGeoJSON(cls.bbox),
+                                      cls.num_shapes)\
                                  .filter(cls.is_ingested)
-        field_names = ['dataset_name', 'human_name', 'date_added', 'bounding_box']
+        field_names = ['dataset_name', 'human_name', 'date_added', 'bounding_box', 'num_shapes']
         listing = [dict(zip(field_names, row)) for row in result]
         for dataset in listing:
             dataset['date_added'] = str(dataset['date_added'])
@@ -382,10 +385,19 @@ class ShapeMetadata(Base):
                                               is_ingested=False,
                                               source_url=source_url,
                                               date_added=datetime.now().date(),
-                                              bbox=None)
+                                              bbox=None,
+                                              num_shapes=None)
 
         caller_session.add(new_shape_dataset)
         return new_shape_dataset
+
+    @property
+    def shape_table(self):
+        try:
+            return self._shape_table
+        except AttributeError:
+            self._shape_table = Table(self.dataset_name, Base.metadata, autoload=True, extend_existing=True)
+            return self._shape_table
 
     def remove_table(self, caller_session):
         if self.is_ingested:
@@ -396,11 +408,19 @@ class ShapeMetadata(Base):
     def update_after_ingest(self, caller_session):
         self.is_ingested = True
         self.bbox = self._make_bbox(caller_session)
+        self.num_shapes = self._get_num_shapes()
 
     def _make_bbox(self, caller_session):
         bbox_query = 'SELECT ST_Envelope(ST_Union(geom)) FROM {};'.format(self.dataset_name)
         box = caller_session.execute(bbox_query).first().st_envelope
         return box
+
+    def _get_num_shapes(self):
+        table = self.shape_table
+        # Arbitrarily select the first column of the table to count against
+        count_query = select([func.count(table.c.geom)])
+        # Should return only one row. And we want the 0th and only attribute of that row (the count).
+        return session.execute(count_query).fetchone()[0]
 
 
 def get_uuid():

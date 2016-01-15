@@ -164,8 +164,22 @@ class StagingTableTests(TestCase):
         etl = PlenarioETL(self.existing_meta, source_path=self.dog_path)
         etl.update()
 
+        # We're just checking that an exception doesn't get thrown.
         etl = PlenarioETL(self.existing_meta, source_path=self.dog_path)
         etl.update()
+
+    # Disabling new feature ahead of product launch. Will revisit soon. WHE - 1/15/16
+    def test_update_with_delete(self):
+        etl = PlenarioETL(self.existing_meta, source_path=self.dog_path)
+        etl.update()
+
+        # The same source CSV, but with one less record
+        deleted_path = os.path.join(fixtures_path, 'dog_park_permits_deleted.csv')
+        etl = PlenarioETL(self.existing_meta, source_path=deleted_path)
+        etl.update()
+
+        all_rows = session.execute(self.existing_table.select()).fetchall()
+        self.assertEqual(len(all_rows), 4)
 
     def test_new_table(self):
         drop_if_exists(self.unloaded_meta.dataset_name)

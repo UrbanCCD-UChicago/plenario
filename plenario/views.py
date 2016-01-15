@@ -151,12 +151,16 @@ def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_sou
         data_types = dataset_info['columns']
         url = dataset_info['source_url']
 
+    # Horrible awful no good hack that reflects that we chck for literal string 'true'
+    if approved_status is True:
+        approved_status = 'true'
+
     d = {
         'dataset_name': slugify(request.form.get('dataset_name'), delim=u'_')[:50],
         'human_name': request.form.get('dataset_name'),
         'attribution': request.form.get('dataset_attribution'),
         'description': request.form.get('dataset_description'),
-        'source_url': url,
+        'url': url,
         'source_url_hash': dataset_id,
         'update_freq': request.form.get('update_frequency'),
         'business_key': business_key,
@@ -345,11 +349,12 @@ def view_datasets():
         .filter(MetaTable.approved_status != 'true')\
         .all()
 
+    # TODO: remove row estimate count box
     counts = {
         'master_row_count': 42,
-        'weather_daily_row_count': table_row_estimate('dat_weather_observations_daily'),
-        'weather_hourly_row_count': table_row_estimate('dat_weather_observations_hourly'),
-        'census_block_row_count': 0, #table_row_estimate('census_blocks'),
+        'weather_daily_row_count': 1,
+        'weather_hourly_row_count': 2,
+        'census_block_row_count': 3
     }
 
     try:
