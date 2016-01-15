@@ -150,6 +150,10 @@ def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_sou
         data_types = dataset_info['columns']
         url = dataset_info['source_url']
 
+    # Horrible awful no good hack that reflects that we chck for literal string 'true'
+    if approved_status is True:
+        approved_status = 'true'
+
     d = {
         'dataset_name': slugify(request.form.get('dataset_name'), delim=u'_')[:50],
         'human_name': request.form.get('dataset_name'),
