@@ -9,7 +9,6 @@ from sqlalchemy import Boolean, Integer, BigInteger, Float, String, Date, TIME, 
 from sqlalchemy import select, func, text
 from sqlalchemy.sql import column
 from geoalchemy2 import Geometry
-from plenario.models import MetaTable
 from plenario.etl.common import PlenarioETLError
 from collections import namedtuple
 
@@ -43,6 +42,7 @@ class PlenarioETL(object):
         existing_table = self.metadata.point_table
         with self.staging_table as s_table:
             staging = s_table.table
+            Delete(staging, existing_table, self.dataset).execute()
             with AdditionTable(staging, self.dataset, existing_table) as new_records:
                 new_records.insert()
         update_meta(self.metadata, existing_table)
@@ -422,6 +422,34 @@ class AdditionTable(object):
 
         return geom_col
 
+
+class Delete(object):
+    """
+    Identify all records in existing not present in staging
+    and get rid of them!
+    """
+    def __init__(self, staging, existing, dataset):
+        """
+        :param staging: table with CSV data
+        :param existing: table
+        :param dataset:
+        """
+        self.staging = staging
+        self.existing = existing
+        self.dataset = dataset
+
+    def execute(self):
+        del_ = """DELETE FROM "{existing}"
+                  WHERE "{id}" IN
+                     (SELECT "{id}" FROM "{existing}"
+                        EXCEPT
+                      SELECT "{id}" FROM  "{staging}");""".\
+            format(existing=self.existing.name, staging=self.staging.name, id=self.dataset.bkey)
+
+        try:
+            engine.execute(del_)
+        except Exception as e:
+            raise PlenarioETLError(repr(e) + '\n Failed to execute' + del_)
 
 def update_meta(metadata, table):
     """

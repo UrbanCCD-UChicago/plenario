@@ -169,7 +169,7 @@ class StagingTableTests(TestCase):
         etl.update()
 
     # Disabling new feature ahead of product launch. Will revisit soon. WHE - 1/15/16
-    '''def test_update_with_delete(self):
+    def test_update_with_delete(self):
         etl = PlenarioETL(self.existing_meta, source_path=self.dog_path)
         etl.update()
 
@@ -179,7 +179,7 @@ class StagingTableTests(TestCase):
         etl.update()
 
         all_rows = session.execute(self.existing_table.select()).fetchall()
-        self.assertEqual(len(all_rows), 4)'''
+        self.assertEqual(len(all_rows), 4)
 
     def test_new_table(self):
         drop_if_exists(self.unloaded_meta.dataset_name)
