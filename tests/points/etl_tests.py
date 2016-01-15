@@ -1,6 +1,6 @@
 from unittest import TestCase
 from plenario.models import MetaTable
-from plenario.database import session, Base, app_engine
+from plenario.database import session, app_engine
 import sqlalchemy as sa
 from sqlalchemy import Table, Column, Integer, Date, Float, String, TIMESTAMP, MetaData
 from sqlalchemy.exc import NoSuchTableError
@@ -95,7 +95,6 @@ class StagingTableTests(TestCase):
                                                  geom=None)
         app_engine.execute(ins)
 
-
     def tearDown(self):
         session.close()
 
@@ -168,7 +167,6 @@ class StagingTableTests(TestCase):
         etl = PlenarioETL(self.existing_meta, source_path=self.dog_path)
         etl.update()
 
-    # Disabling new feature ahead of product launch. Will revisit soon. WHE - 1/15/16
     def test_update_with_delete(self):
         etl = PlenarioETL(self.existing_meta, source_path=self.dog_path)
         etl.update()
@@ -180,6 +178,20 @@ class StagingTableTests(TestCase):
 
         all_rows = session.execute(self.existing_table.select()).fetchall()
         self.assertEqual(len(all_rows), 4)
+
+    def test_update_with_change(self):
+        drop_if_exists(self.unloaded_meta.dataset_name)
+
+        etl = PlenarioETL(self.unloaded_meta, source_path=self.radio_path)
+        table = etl.add()
+
+        changed_path = os.path.join(fixtures_path, 'community_radio_events_changed.csv')
+        etl = PlenarioETL(self.unloaded_meta, source_path=changed_path)
+        etl.update()
+
+        sel = sa.select([table.c.date]).where(table.c.event_name == 'baz')
+        changed_date = app_engine.execute(sel).fetchone()[0]
+        self.assertEqual(changed_date, date(1993, 11, 10))
 
     def test_new_table(self):
         drop_if_exists(self.unloaded_meta.dataset_name)
