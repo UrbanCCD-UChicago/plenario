@@ -3,8 +3,7 @@ from csvkit.unicsv import UnicodeCSVReader
 from sqlalchemy.exc import NoSuchTableError
 from plenario.database import app_engine as engine, session
 from plenario.utils.helpers import iter_column, slugify
-import json
-from sqlalchemy import Boolean, Integer, BigInteger, Float, String, Date, TIME, TIMESTAMP,\
+from sqlalchemy import Boolean, Integer, BigInteger, Float, String, Date, TIME, TIMESTAMP, Text,\
     Table, Column, MetaData
 from sqlalchemy import select, func, text
 from sqlalchemy.sql import column
@@ -63,24 +62,17 @@ class StagingTable(object):
         """
         # Just the info about column names we usually need
         self.dataset = meta.meta_tuple()
+        self.name = 's_' + self.dataset.name
 
         # Get the Columns to construct our table
         try:
             # Can we just grab columns from an existing table?
             self.cols = self._from_ingested(meta.column_info())
         except NoSuchTableError:
-            # This must be the first time we're ingesting the table
-
-            if meta.contributed_data_types:
-                try:
-                    types = json.loads(meta.contributed_data_types)
-                    self.cols = self._from_contributed(types)
-                # Quick fix until we dig deeper into contributed data types problem.
-                # If it fails, give up and attempt to infer from the source file instead.
-                except:
-                    pass
-            else:
-                self.cols = None
+            # We want to try contributed_column_types here eventually,
+            # but it's crazy broken right now.
+            # So either we already have the column info, or we try to infer it.
+            self.cols = None
 
         # Retrieve the source file
         try:
@@ -104,12 +96,18 @@ class StagingTable(object):
             try:
                 self.table = self._make_table(helper.handle)
                 self._kill_dups(self.table.name)
+                #self._add_hash_column(self.table.name)
+                self.table = Table(self.name, MetaData(), autoload_with=engine, extend_existing=True)
+                #self.table = self._refresh_table
                 return self
             except Exception as e:
                 raise PlenarioETLError(e)
 
     def _drop(self):
         engine.execute("DROP TABLE IF EXISTS {};".format('s_' + self.dataset.name))
+
+    #def _refresh_table(self):
+     #   Tab
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
@@ -158,7 +156,9 @@ class StagingTable(object):
         """
         # MD5 syntax courtesy of http://stackoverflow.com/a/3879275/3834754
         add_col = """ALTER TABLE "{table}" ADD hash numeric(32);
-                     SELECT md5(CAST(("{table}".*)AS text)) FROM {table};""".\
+                     UPDATE "{table}"
+                     SET hash=subq.md5
+                     FROM (SELECT md5(CAST(("{table}".*)AS text)) FROM {table}) AS subq;""".\
                   format(table=table_name)
         try:
             engine.execute(add_col)
@@ -174,7 +174,7 @@ class StagingTable(object):
         del_stmt = '''
         DROP TABLE IF EXISTS temp;
         CREATE TABLE temp AS
-          SELECT DISTINCT * FROM "{table_name}";
+          SELECT DISTINCT *, md5(CAST(("{table_name}".*)AS text)) AS hash FROM "{table_name}";
         DROP TABLE "{table_name}";
         ALTER TABLE temp RENAME TO "{table_name}";
         '''.format(table_name=table_name)
@@ -194,7 +194,7 @@ class StagingTable(object):
         ingested_cols = column_info
         # Don't include the geom and point_date columns.
         # They're derived from the source data and won't be present in the source CSV
-        original_cols = [c for c in ingested_cols if c.name not in ['geom', 'point_date']]
+        original_cols = [c for c in ingested_cols if c.name not in ['geom', 'point_date', 'hash']]
         # Make copies that don't refer to the existing table.
         cols = [_copy_col(c) for c in original_cols]
 
@@ -325,7 +325,7 @@ class AdditionTable(object):
         self.existing = existing
 
         # This table will only have the business key and the two derived columns for space and time.
-        cols = [_copy_col(staging.c[dataset.bkey]),
+        cols = [Column('hash', String(32), primary_key=True),
                 _make_col('point_date', TIMESTAMP, True),
                 _make_col('geom', Geometry('POINT', srid=4326), True)]
 
@@ -346,12 +346,12 @@ class AdditionTable(object):
 
         derived_dates = func.cast(s.c[d.date], TIMESTAMP).label('point_date')
         derived_geoms = self._geom_col()
-        cols_to_insert = [s.c[d.bkey], derived_dates, derived_geoms]
+        cols_to_insert = [s.c['hash'], derived_dates, derived_geoms]
 
         # Select the bkey and the columns we're deriving from the staging table.
         sel = select(cols_to_insert)
         # And limit our results to records whose bkeys aren't already present in the existing table.
-        sel = sel.select_from(s.outerjoin(e, s.c[d.bkey] == e.c[d.bkey])).where(e.c[d.bkey] == None)
+        sel = sel.select_from(s.outerjoin(e, s.c['hash'] == e.c['hash'])).where(e.c['hash'] == None)
 
         # Drop the table first out of healthy paranoia
         self._drop()
@@ -375,12 +375,11 @@ class AdditionTable(object):
         Join with the staging table to insert complete records into existing table.
         """
         derived_cols = [c for c in self.table.c if c.name in {'geom', 'point_date'}]
-        staging_cols = [c for c in self.staging.c if c.name != 'line_num']
+        staging_cols = [c for c in self.staging.c]
         sel_cols = staging_cols + derived_cols
 
-        bkey = self.dataset.bkey
 
-        sel = select(sel_cols).where(self.staging.c[bkey] == self.table.c[bkey])
+        sel = select(sel_cols).where(self.staging.c.hash == self.table.c.hash)
         ins = self.existing.insert().from_select(sel_cols, sel)
 
         try:
@@ -445,10 +444,10 @@ class Delete(object):
 
     def execute(self):
         del_ = """DELETE FROM "{existing}"
-                  WHERE "{id}" IN
-                     (SELECT "{id}" FROM "{existing}"
+                  WHERE hash IN
+                     (SELECT hash FROM "{existing}"
                         EXCEPT
-                      SELECT "{id}" FROM  "{staging}");""".\
+                      SELECT hash FROM  "{staging}");""".\
             format(existing=self.existing.name, staging=self.staging.name, id=self.dataset.bkey)
 
         try:

@@ -2,7 +2,7 @@ from unittest import TestCase
 from plenario.models import MetaTable
 from plenario.database import session, app_engine
 import sqlalchemy as sa
-from sqlalchemy import Table, Column, Integer, Date, Float, String, TIMESTAMP, MetaData
+from sqlalchemy import Table, Column, Integer, Date, Float, String, TIMESTAMP, MetaData, Text
 from sqlalchemy.exc import NoSuchTableError
 from geoalchemy2 import Geometry
 from plenario.etl.point import StagingTable, PlenarioETL
@@ -42,10 +42,11 @@ class StagingTableTests(TestCase):
         cls.radio_path = os.path.join(fixtures_path, 'community_radio_events.csv')
         cls.opera_path = os.path.join(fixtures_path, 'public_opera_performances.csv')
 
-        cls.expected_radio_col_names = ['lat', 'lon', 'event_name', 'date', 'line_num']
-        cls.expected_dog_col_names = ['lat', 'lon', 'hooded_figure_id', 'date', 'line_num']
+        cls.expected_radio_col_names = ['lat', 'lon', 'event_name', 'date']
+        cls.expected_dog_col_names = ['lat', 'lon', 'hooded_figure_id', 'date']
 
     def setUp(self):
+        session.rollback()
         # Ensure we have metadata loaded into the database
         # to mimic the behavior of metadata ingestion preceding file ingestion.
         drop_meta('dog_park_permits')
@@ -78,21 +79,23 @@ class StagingTableTests(TestCase):
 
         # Also, let's have one table pre-loaded...
         self.existing_table = sa.Table('dog_park_permits', MetaData(),
-                                      Column('hooded_figure_id', Integer, primary_key=True),
+                                      Column('hooded_figure_id', Integer),
                                       Column('point_date', TIMESTAMP, nullable=False),
                                       Column('date', Date, nullable=True),
                                       Column('lat', Float, nullable=False),
                                       Column('lon', Float, nullable=False),
+                                       Column('hash', String(32), primary_key=True),
                                       Column('geom', Geometry('POINT', srid=4326), nullable=True))
         drop_if_exists(self.existing_table.name)
         self.existing_table.create(bind=app_engine)
 
         # ... with some pre-existing data
         ins = self.existing_table.insert().values(hooded_figure_id=1,
-                                                 point_date=date(2015, 1, 2),
-                                                 lon=-87.6495076896,
-                                                 lat=41.7915865543,
-                                                 geom=None)
+                                                  point_date=date(2015, 1, 2),
+                                                  lon=-87.6495076896,
+                                                  lat=41.7915865543,
+                                                  geom=None,
+                                                  hash='addde9be7f59e95fc08e54e29b2a947f')
         app_engine.execute(ins)
 
     def tearDown(self):
@@ -152,10 +155,6 @@ class StagingTableTests(TestCase):
         etl.update()
 
         existing = self.existing_table
-        pre_existing_row = session.execute(existing.select()
-                                           .where(existing.c[self.existing_meta.business_key] == 1)).fetchone()
-        self.assertEqual(date(2015, 1, 2), pre_existing_row.point_date.date())
-
         all_rows = session.execute(existing.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
 
