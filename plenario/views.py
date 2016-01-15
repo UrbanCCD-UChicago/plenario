@@ -317,7 +317,7 @@ def add_shape():
         try:
             human_name = request.form['dataset_name']
             source_url = request.form['source_url']
-            publisher  = request.form['publisher']
+            attribution  = request.form['attribution']
         except KeyError:
             # Front-end validation failed or someone is posting bogus query strings directly.
             # re-render with error message
@@ -331,7 +331,7 @@ def add_shape():
             # Add the metadata right away
             # Add some kind of ingestion method to examine shape url and grab metadata
             # shape_info = get_context_for_new_shape(url)
-            meta = ShapeMetadata.add(caller_session=session, human_name=human_name, source_url=source_url, publisher = publisher)
+            meta = ShapeMetadata.add(caller_session=session, human_name=human_name, source_url=source_url, attribution = attribution)
             session.commit()
 
             # And tell a worker to go ingest it

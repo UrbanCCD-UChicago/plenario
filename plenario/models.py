@@ -308,7 +308,7 @@ class ShapeMetadata(Base):
     date_added = Column(Date, nullable=False)
 
     # Organization that published this dataset
-    publisher = Column(String)
+    attribution = Column(String)
 
     # We always ingest geometric data as 4326
     bbox = Column(Geometry('POLYGON', srid=4326))
@@ -347,9 +347,11 @@ class ShapeMetadata(Base):
                                       cls.human_name,
                                       cls.date_added,
                                       func.ST_AsGeoJSON(cls.bbox),
-                                      cls.num_shapes)\
+                                      cls.num_shapes,
+                                      cls.attribution
+                                      )\
                                  .filter(cls.is_ingested)
-        field_names = ['dataset_name', 'human_name', 'date_added', 'bounding_box', 'num_shapes']
+        field_names = ['dataset_name', 'human_name', 'date_added', 'bounding_box', 'num_shapes', 'attribution']
         listing = [dict(zip(field_names, row)) for row in result]
         for dataset in listing:
             dataset['date_added'] = str(dataset['date_added'])
@@ -377,11 +379,11 @@ class ShapeMetadata(Base):
         return slugify(human_name)
 
     @classmethod
-    def add(cls, caller_session, human_name, source_url, publisher):
+    def add(cls, caller_session, human_name, source_url, attribution):
         table_name = ShapeMetadata.make_table_name(human_name)
         new_shape_dataset = ShapeMetadata(dataset_name=table_name,
                                               human_name=human_name,
-                                              publisher = publisher,
+                                              attribution = attribution,
                                               is_ingested=False,
                                               source_url=source_url,
                                               date_added=datetime.now().date(),
