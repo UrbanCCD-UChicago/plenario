@@ -2,8 +2,8 @@ from uuid import uuid4
 from datetime import datetime
 
 from sqlalchemy import Column, String, Boolean, Date, DateTime, \
-    Text, func, Table, select, BigInteger, TIMESTAMP, Integer
-from sqlalchemy.dialects.postgresql import ARRAY, DOUBLE_PRECISION
+    Text, func, Table, select, Integer
+from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
 from sqlalchemy.orm import synonym
 import sqlalchemy as sa
@@ -90,7 +90,7 @@ class MetaTable(Base):
         # Known issue: slugify fails hard on Non-ASCII
         self.dataset_name = kwargs.get('dataset_name', curried_slug(human_name)[:50])
 
-        assert(business_key and observed_date)
+        assert observed_date
         self.business_key = curried_slug(business_key)
         self.observed_date = curried_slug(observed_date)
 
@@ -124,10 +124,6 @@ class MetaTable(Base):
 
     def column_info(self):
         return self.point_table.c
-
-    def id_col(self):
-        # The unique ID column of a point dataset is specified by the user. Get it by name.
-        return self.point_table.c[self.business_key]
 
     @property
     def point_table(self):
@@ -204,7 +200,8 @@ class MetaTable(Base):
 
     @classmethod
     def get_by_dataset_name(cls, name):
-        return session.query(cls).filter(cls.dataset_name == name).first()
+        foo = session.query(cls).filter(cls.dataset_name == name).first()
+        return foo
 
     def get_bbox_center(self):
         result = session.execute(select([func.ST_AsGeoJSON(func.ST_centroid(self.bbox))]))
@@ -241,7 +238,7 @@ class MetaTable(Base):
 
         # Generate a count for each resolution by resolution square
         t = self.point_table
-        q = session.query(func.count(self.id_col()),
+        q = session.query(func.count(t.c.hash),
                           func.ST_SnapToGrid(t.c.geom, size_x, size_y).label('squares'))\
             .filter(*conditions)\
             .group_by('squares')
@@ -270,7 +267,7 @@ class MetaTable(Base):
 
         # Create a CTE that grabs the number of records contained in each time bucket.
         # Will only have rows for buckets with records.
-        actuals = select([func.count(self.id_col()).label('count'),  # Count unique records
+        actuals = select([func.count(t.c.hash).label('count'),  # Count unique records
                           func.date_trunc(agg_unit, t.c.point_date).label('time_bucket')])\
             .where(sa.and_(t.c.point_date >= start,            # Only include records in time window
                            t.c.point_date <= end))\

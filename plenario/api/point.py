@@ -366,6 +366,7 @@ def detail_aggregate():
 
     return resp
 
+
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail():
@@ -552,7 +553,7 @@ def meta():
     q = '''
         SELECT  m.obs_from, m.location, m.latitude, m.last_update,
                 m.source_url_hash, m.attribution, m.description, m.source_url,
-                m.obs_to, m.date_added, m.business_key,
+                m.obs_to, m.date_added,
                 m.longitude, m.observed_date, m.human_name, m.dataset_name,
                 m.update_freq, ST_AsGeoJSON(m.bbox) as bbox
         FROM meta_master AS m
