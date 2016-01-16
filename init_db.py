@@ -5,6 +5,8 @@ from plenario.etl.shape import ShapeETL
 from plenario.tasks import hello_world
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
 from argparse import ArgumentParser
+import datetime
+
 
 def init_db(args):
     if not any(vars(args).values()):
