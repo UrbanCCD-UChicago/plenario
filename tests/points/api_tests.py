@@ -68,6 +68,7 @@ class PointAPITests(unittest.TestCase):
     def test_time_filter(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'
         resp = self.app.get(query)
+        print resp.data
         response_data = json.loads(resp.data)
 
         self.assertEqual(response_data['meta']['total'], 5)
@@ -75,6 +76,7 @@ class PointAPITests(unittest.TestCase):
     def test_csv_response(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&data_type=csv'
         resp = self.app.get(query)
+
         mock_csv_file = StringIO(resp.data)
         reader = csv.reader(mock_csv_file)
         lines = [line for line in reader]
@@ -86,6 +88,7 @@ class PointAPITests(unittest.TestCase):
 
         url = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-01-01&obs_date__le=2013-12-31&location_geom__within=' + escaped_query_rect
         resp = self.app.get(url)
+        print resp.data
         response_data = json.loads(resp.data)
         self.assertEqual(response_data['meta']['total'], 5)
 
@@ -102,6 +105,8 @@ class PointAPITests(unittest.TestCase):
         escaped_query_rect = get_loop_rect()
         query = 'v1/api/grid/?obs_date__ge=2013-1-1&obs_date_le=2014-1-1&dataset_name=flu_shot_clinics&location_geom__within=' + escaped_query_rect
         resp = self.app.get(query)
+        print resp
+        print resp.data
         response_data = json.loads(resp.data)
         self.assertEqual(len(response_data['features']), 4)
 
@@ -122,6 +127,7 @@ class PointAPITests(unittest.TestCase):
         # Always query from 9-22 to 10-1
         query = '/v1/api/timeseries/?obs_date__ge=2013-09-22&obs_date__le=2013-10-1&agg=' + agg_type
         resp = self.app.get(query)
+        print resp
         response_data = json.loads(resp.data)
 
         # Only the flu dataset should have records in this range

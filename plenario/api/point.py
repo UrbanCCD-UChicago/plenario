@@ -14,8 +14,6 @@ from plenario.database import session, Base, app_engine as engine
 import shapely.wkb, shapely.geometry
 from sqlalchemy.types import NullType
 
-VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
-
 
 class ParamValidator(object):
 
@@ -37,6 +35,16 @@ class ParamValidator(object):
             self.conditions = []
 
     def set_optional(self, name, transform, default):
+        """
+        :param name: Name of expected HTTP parameter
+        :param transform: Function of type
+                          f(param_val: str) -> (validated_argument: Option<object, None>, err_msg: Option<str, None>
+                          Return value should be of form (output, None) if transformation was applied successully,
+                          or (None, error_message_string) if transformation could not be applied.
+        :param default: Value to apply to associate with parameter given by :name
+                        if not specified by user. Can be a callable.
+        :return: Returns the Validator to allow generative construction.
+        """
         self.vals[name] = default
         self.transforms[name] = transform
 
@@ -47,6 +55,7 @@ class ParamValidator(object):
         for k, v in params.items():
             if k in self.transforms.keys():
                 # k is a param name with a defined transformation
+                # Get the transformation and apply it to v
                 val, err = self.transforms[k](v)
                 if err:
                     # v wasn't a valid string for this param name
@@ -74,6 +83,12 @@ class ParamValidator(object):
 
         self._eval_defaults()
 
+    def get_geom(self):
+        validated_geom = self.vals['location_geom__within']
+        if validated_geom is not None:
+            buff = self.vals.get('buffer', 100)
+            return make_fragment_str(validated_geom, buff)
+
     def _eval_defaults(self):
         """
         Replace every value in vals that is callable with the returned value of that callable.
@@ -98,37 +113,61 @@ class ParamValidator(object):
         # Generally, we expect the form k = [field]__[op]
         # Can also be just [field] in the case of simple equality
         tokens = k.split('__')
+        # An attribute of the dataset
         field = tokens[0]
         if field not in self.cols:
-            # Don't make a condition.
-            # But nothing went wrong, so error is None too.
+            # No column matches this key.
+            # Rather than return an error here,
+            # we'll return None to indicate that this field wasn't present
+            # and let the calling function send a warning to the client.
             return None, None
 
         col = self.dataset.columns.get(field)
 
         if len(tokens) == 1:
             # One token? Then it's an equality operation of the form k=v
-            cond = col == v
-            return cond, None
+            # col == v creates a SQLAlchemy boolean expression
+            return (col == v), None
         elif len(tokens) == 2:
             # Two tokens? Then it's of the form [field]__[op_code]=v
             op_code = tokens[1]
-            if op_code == 'in':
-                cond = col.in_(v.split(','))
+            valid_op_codes = self.field_ops.keys() + ['in']
+            if op_code not in valid_op_codes:
+                error_msg = "Invalid dataset field operator:" \
+                                " {} called in {}={}".format(op_code, k, v)
+                return None, error_msg
             else:
-                try:
-                    op_func = ParamValidator.field_ops[op_code]
-                    cond = getattr(col, op_func)(v)
-                except AttributeError:
-                    error_msg = "Invalid dataset field operator: {} called in {}={}".format(op_code, k, v)
-                    return None, error_msg
-            return cond, None
+                cond = self._make_condition_with_operator(col, op_code, v)
+                return cond, None
+
         else:
-            error_msg = "Too many arguments on dataset field {}={}\n Expected [field]__[operator]=value".format(k, v)
+            error_msg = "Too many arguments on dataset field {}={}" \
+                        "\n Expected [field]__[operator]=value".format(k, v)
             return None, error_msg
+
+    def _make_condition_with_operator(self, col, op_code, target_value):
+        if op_code == 'in':
+            cond = col.in_(target_value.split(','))
+            return cond, None
+        else:   # Any other op code
+            op_func = self.field_ops[op_code]
+            # op_func is the name of a method bound to the SQLAlchemy column object.
+            # Get the method and call it to create a binary condition (like name != 'Roy')
+            # on the value the user specified.
+            cond = getattr(col, op_func)(target_value)
+            return cond, None
+
+'''
+    Validator transformations.
+    To be added to a validator object with Validator.set_optional()
+    They take a string and return a tuple of (expected_return_type, error_message)
+    where error_message is non-None only when the transformation could not produce an object of the expected type.
+'''
 
 
 def agg_validator(agg_str):
+    VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
+
     if agg_str in VALID_AGG:
         return agg_str, None
     else:
@@ -149,7 +188,8 @@ def date_validator(date_str):
 def list_of_datasets_validator(list_str):
     table_names = list_str.split(',')
     if not len(table_names) > 1:
-        error_msg = "Expected comma-separated list of computer-formatted dataset names. Couldn't parse {}".format(list_str)
+        error_msg = "Expected comma-separated list of computer-formatted dataset names." \
+                    " Couldn't parse {}".format(list_str)
         return None, error_msg
     return table_names, None
 
@@ -203,6 +243,12 @@ def time_of_day_validator(hour_str):
 
 
 class FilterMaker(object):
+    """
+    Given dictionary of validated arguments and a sqlalchemy table,
+    generate binary consitions on that table restricting time and geography.
+    Can also create a postgres-formatted geography for further filtering
+    with just a dict of arguments.
+    """
 
     def __init__(self, args, dataset=None):
         """
@@ -248,30 +294,25 @@ class FilterMaker(object):
 
         return filters
 
-    def sql_ready_geom(self):
-        query_geom = self.args.get('location_geom__within', None)
-        if query_geom is None:
-            sql_ready_geom = None
-        else:
-            # 100 is the default buffer value. Would be nice to DRY that knowledge
-            buffer = self.args.get('buffer', 100)
-            sql_ready_geom = make_fragment_str(query_geom, buffer)
-
-        return sql_ready_geom
-
-    def geom_filter(self):
+    def geom_filter(self, geom_str):
         """
+        :param geom_str: geoJSON string from Validator ready to throw into postgres
         :return: geographic filter based on location_geom__within and buffer parameters
         """
-        sql_ready_geom = self.sql_ready_geom()
-        if sql_ready_geom is None:
-            filter = None
-        else:
-            filter = self.dataset.c.geom.ST_Within(sa.func.ST_GeomFromGeoJSON(sql_ready_geom))
-        return filter
+        # Demeter weeps
+        return self.dataset.c.geom.ST_Within(sa.func.ST_GeomFromGeoJSON(geom_str))
 
 
-def make_error(msg):
+def sql_ready_geom(validated_geom, buff):
+    """
+    :param validated_geom: geoJSON fragment as extracted from geom_validator
+    :param buff: int representing lenth of buffer around geometry if geometry is a linestring
+    :return: Geometry string suitable for postgres query
+    """
+    return make_fragment_str(validated_geom, buff)
+
+
+def make_error(msg, status_code):
     resp = {
         'meta': {
             'status': 'error',
@@ -281,7 +322,15 @@ def make_error(msg):
     }
 
     resp['meta']['query'] = request.args
-    return make_response(json.dumps(resp), 400)
+    return make_response(json.dumps(resp), status_code)
+
+
+def bad_request(msg):
+    return make_error(msg, 400)
+
+
+def internal_error(msg):
+    return make_error(msg, 500)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -299,13 +348,11 @@ def timeseries():
     try:
         err = validator.validate(request.args)
     except Exception as e:
-        raise
-
+        return internal_error(repr(e))
     if err:
-        return make_error(err)
+        return bad_request(err)
 
-    fmaker = FilterMaker(validator.vals)
-    geom = fmaker.sql_ready_geom()
+    geom = validator.get_geom()
     table_names = validator.vals['dataset_name__in']
     start_date = validator.vals['obs_date__ge']
     end_date = validator.vals['obs_date__le']
@@ -316,7 +363,7 @@ def timeseries():
         table_names = MetaTable.narrow_candidates(table_names, start_date, end_date, geom)
     except Exception as e:
         msg = 'Failed to gather candidate tables.\n Debug ' + repr(e)
-        return make_error(msg)
+        return internal_error(msg)
 
     try:
         panel = MetaTable.timeseries_all(table_names=table_names,
@@ -326,7 +373,7 @@ def timeseries():
                                          geom=geom)
     except Exception as e:
         msg = 'Failed to construct timeseries. \nAdvanced debug info: ' + repr(e)
-        return make_error(msg)
+        return internal_error(msg)
 
     resp = {
         'meta': {
@@ -383,13 +430,13 @@ def detail_aggregate():
     try:
         dataset_name = raw_query_params.pop('dataset_name')
     except KeyError:
-        return make_error("'dataset_name' is required")
+        return bad_request("'dataset_name' is required")
 
     # and that we have that dataset.
     try:
         validator = ParamValidator(dataset_name)
     except NoSuchTableError:
-        return make_error("Cannot find dataset named {}".format(dataset_name))
+        return bad_request("Cannot find dataset named {}".format(dataset_name))
 
     validator\
         .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
@@ -402,14 +449,14 @@ def detail_aggregate():
     # than using a default and confusing them.
     err = validator.validate(raw_query_params)
     if err:
-        return make_error(err)
+        return bad_request(err)
 
     start_date = validator.vals['obs_date__ge']
     end_date = validator.vals['obs_date__le']
     agg = validator.vals['agg']
+    geom = validator.get_geom()
     dataset = MetaTable.get_by_dataset_name(dataset_name)
 
-    geom = FilterMaker(validator.vals).sql_ready_geom()
     ts = dataset.timeseries_one(agg_unit=agg, start=start_date, end=end_date, geom=geom)
 
     datatype = validator.vals['data_type']
@@ -443,13 +490,13 @@ def detail():
     try:
         dataset_name = raw_query_params.pop('dataset_name')
     except KeyError:
-        return make_error("'dataset_name' is required")
+        return bad_request("'dataset_name' is required")
 
     # and that we have that dataset.
     try:
         validator = ParamValidator(dataset_name)
     except NoSuchTableError:
-        return make_error("Cannot find dataset named {}".format(dataset_name))
+        return bad_request("Cannot find dataset named {}".format(dataset_name))
 
     validator\
         .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
@@ -464,7 +511,7 @@ def detail():
     # than using a default and confusing them.
     err = validator.validate(raw_query_params)
     if err:
-        return make_error(err)
+        return bad_request(err)
 
     # Part 2: Construct SQL query
     dset = validator.dataset
@@ -474,7 +521,7 @@ def detail():
             q = q.filter(*validator.conditions)
     except Exception as e:
         msg = 'Internal error. \n Advanced debugging details: ' + repr(e)
-        return make_error(msg)
+        return bad_request(msg)
 
     try:
         # Add time filters
@@ -482,13 +529,14 @@ def detail():
         q = q.filter(*maker.time_filters())
 
         # Add geom filter, if provided
-        geom_filter = maker.geom_filter()
-        if geom_filter is not None:
+        geom = validator.get_geom()
+        if geom is not None:
+            geom_filter = maker.geom_filter(geom)
             q = q.filter(geom_filter)
     except Exception as e:
         import sys, traceback
         exc_type, exc_obj, exc_tb = sys.exc_info()
-        raise
+        return internal_error(repr(e))
 
     # Page in RESPONSE_LIMIT chunks
     offset = validator.vals['offset']
@@ -539,12 +587,12 @@ def grid():
     try:
         dataset_name = raw_query_params.pop('dataset_name')
     except KeyError:
-        return make_error("'dataset_name' is required")
+        return bad_request("'dataset_name' is required")
 
     try:
         validator = ParamValidator(dataset_name)
     except NoSuchTableError:
-        return make_error("Could not find dataset named {}.".format(dataset_name))
+        return bad_request("Could not find dataset named {}.".format(dataset_name))
 
     validator.set_optional('buffer', int_validator, 100)\
              .set_optional('resolution', int_validator, 500)\
@@ -554,7 +602,7 @@ def grid():
 
     err = validator.validate(raw_query_params)
     if err:
-        return make_error(err)
+        return bad_request(err)
 
     # Part 2: Construct SQL query
     try:
@@ -563,7 +611,7 @@ def grid():
         # Get time filters
         time_filters = maker.time_filters()
         # From user params, wither get None or requested geometry
-        geom = maker.sql_ready_geom()
+        geom = validator.get_geom()
     except Exception as e:
         raise
 
@@ -574,7 +622,7 @@ def grid():
     except Exception as e:
         msg = 'Internal error. Could not make grid aggregation. ' \
               '\nAdvanced debugging information ' + repr(e)
-        return make_error(msg)
+        return bad_request(msg)
 
     resp = {'type': 'FeatureCollection', 'features': []}
     for value in grid_rows:
