@@ -114,7 +114,6 @@ class ParamValidator(object):
             # Two tokens? Then it's of the form [field]__[op_code]=v
             op_code = tokens[1]
             if op_code == 'in':
-                # TODO: change documentation to reflect expected input format
                 cond = col.in_(v.split(','))
             else:
                 try:
@@ -366,6 +365,7 @@ def detail_aggregate():
 
     return resp
 
+
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail():
@@ -432,17 +432,10 @@ def detail():
         q = q.offset(offset)
 
     # Part 3: Make SQL query and dump output into list of rows
-    col_names = [name for name in validator.cols if name != 'point_date']
-    geom_idx = col_names.index('geom')
-    rows = []
-    for record in q.all():
-        row = list(record)
-        try:
-            row[geom_idx] = shapely.wkb.loads(row[geom_idx].desc, hex=True).__geo_interface__
-        except AttributeError:
-            pass  # geoms can be null :(
-        rows.append(row)
+    # I don't really want geom. Only regurgitate!
+    rows = [list(record) for record in q.all()]
 
+    col_names = [name for name in validator.cols if name not in {'point_date', 'geom'}]
     # Part 4: Format response
     datatype = validator.vals['data_type']
     if datatype == 'json':
