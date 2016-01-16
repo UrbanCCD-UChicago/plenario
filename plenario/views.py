@@ -117,7 +117,6 @@ def get_context_for_new_dataset(url):
     return (dataset_info, errors, socrata_source)
 
 def table_row_estimate(table_name):
-    print table_name, "estimating"
     try:
         q = text(''' 
             SELECT reltuples::bigint AS estimate FROM pg_class where relname=:table_name;
@@ -282,8 +281,6 @@ def add_table():
         dataset_info['contributor_name'] = user.name
         dataset_info['contributor_organization'] = 'Plenario Admin'
         dataset_info['contributor_email'] = user.email
-
-        print dataset_info
 
         # check if dataset with the same URL has already been loaded
         dataset_id = md5(url).hexdigest()
