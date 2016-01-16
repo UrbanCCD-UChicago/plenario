@@ -31,7 +31,7 @@ class ParamValidator(object):
         if dataset_name:
             # Throws NoSuchTableError. Should be caught by caller.
             self.dataset = Table(dataset_name, Base.metadata, autoload=True,
-                            autoload_with=engine, extend_existing=True)
+                                 autoload_with=engine, extend_existing=True)
             self.cols = self.dataset.columns.keys()
             # SQLAlchemy boolean expressions
             self.conditions = []
@@ -201,6 +201,76 @@ def time_of_day_validator(hour_str):
     else:
         return num, None
 
+
+class FilterMaker(object):
+
+    def __init__(self, args, dataset=None):
+        """
+        :param args: dict mapping arguments to values as taken from a Validator
+        :param dataset: table object of particular dataset being queried, if available
+        """
+        self.args = args
+        self.dataset = dataset
+
+    def time_filters(self):
+        """
+        :return: SQLAlchemy conditions derived from time arguments on :dataset:
+        """
+        filters = []
+        d = self.dataset
+        try:
+            lower_bound = d.c.point_date >= self.args['obs_date__ge']
+            filters.append(lower_bound)
+        except KeyError:
+            pass
+
+        try:
+            upper_bound = d.c.point_date <= self.args['obs_date__le']
+            filters.append(upper_bound)
+        except KeyError:
+            pass
+
+        try:
+            start_hour = self.args['date__time_of_day_ge']
+            if start_hour != 0:
+                lower_bound = sa.func.date_part('hour', d.c.point_date).__ge__(start_hour)
+                filters.append(lower_bound)
+        except KeyError:
+            pass
+
+        try:
+            end_hour = self.args['date__time_of_day_le']
+            if end_hour != 23:
+                upper_bound = sa.func.date_part('hour', d.c.point_date).__ge__(end_hour)
+                filters.append(upper_bound)
+        except KeyError:
+            pass
+
+        return filters
+
+    def sql_ready_geom(self):
+        query_geom = self.args.get('location_geom__within', None)
+        if query_geom is None:
+            sql_ready_geom = None
+        else:
+            # 100 is the default buffer value. Would be nice to DRY that knowledge
+            buffer = self.args.get('buffer', 100)
+            sql_ready_geom = make_fragment_str(query_geom, buffer)
+
+        return sql_ready_geom
+
+    def geom_filter(self):
+        """
+        :return: geographic filter based on location_geom__within and buffer parameters
+        """
+        sql_ready_geom = self.sql_ready_geom()
+        if sql_ready_geom is None:
+            filter = None
+        else:
+            filter = self.dataset.c.geom.ST_Within(sa.func.ST_GeomFromGeoJSON(sql_ready_geom))
+        return filter
+
+
 def make_error(msg):
     resp = {
         'meta': {
@@ -226,31 +296,37 @@ def timeseries():
         .set_optional('location_geom__within', geom_validator, None)\
         .set_optional('buffer', int_validator, 100)
 
-    err = validator.validate(request.args)
+    try:
+        err = validator.validate(request.args)
+    except Exception as e:
+        raise
+
     if err:
         return make_error(err)
 
-    # Geometry is an optional parameter.
-    # If it was provided, convert the polygon or linestring to a postgres-ready form.
-    geom = validator.vals.get('location_geom__within', None)
-    if geom:
-        buffer = validator.vals['buffer']
-        # Should probably catch a shape exception here
-        geom = make_fragment_str(geom, buffer)
-
+    fmaker = FilterMaker(validator.vals)
+    geom = fmaker.sql_ready_geom()
     table_names = validator.vals['dataset_name__in']
     start_date = validator.vals['obs_date__ge']
     end_date = validator.vals['obs_date__le']
     agg = validator.vals['agg']
 
     # Only examine tables that have a chance of containing records within the date and space boundaries.
-    table_names = MetaTable.narrow_candidates(table_names, start_date, end_date, geom)
+    try:
+        table_names = MetaTable.narrow_candidates(table_names, start_date, end_date, geom)
+    except Exception as e:
+        msg = 'Failed to gather candidate tables.\n Debug ' + repr(e)
+        return make_error(msg)
 
-    panel = MetaTable.timeseries_all(table_names=table_names,
-                                     agg_unit=agg,
-                                     start=start_date,
-                                     end=end_date,
-                                     geom=geom)
+    try:
+        panel = MetaTable.timeseries_all(table_names=table_names,
+                                         agg_unit=agg,
+                                         start=start_date,
+                                         end=end_date,
+                                         geom=geom)
+    except Exception as e:
+        msg = 'Failed to construct timeseries. \nAdvanced debug info: ' + repr(e)
+        return make_error(msg)
 
     resp = {
         'meta': {
@@ -302,8 +378,6 @@ def timeseries():
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail_aggregate():
-    # Can I abstract out the common param requirements?
-
     raw_query_params = request.args.copy()
     # First, make sure name of dataset was provided...
     try:
@@ -335,13 +409,7 @@ def detail_aggregate():
     agg = validator.vals['agg']
     dataset = MetaTable.get_by_dataset_name(dataset_name)
 
-    # Geometry is an optional parameter.
-    # If it was provided, convert the polygon or linestring to a postgres-ready form.
-    geom = validator.vals.get('location_geom__within', None)
-    if geom:
-        # Should probably catch a shape exception here
-        geom = make_fragment_str(geom, buffer)
-
+    geom = FilterMaker(validator.vals).sql_ready_geom()
     ts = dataset.timeseries_one(agg_unit=agg, start=start_date, end=end_date, geom=geom)
 
     datatype = validator.vals['data_type']
@@ -399,31 +467,28 @@ def detail():
         return make_error(err)
 
     # Part 2: Construct SQL query
-    # TODO: handle SQL Exceptions
     dset = validator.dataset
-    q = session.query(dset)
-    if validator.conditions:
-        q = q.filter(*validator.conditions)
+    try:
+        q = session.query(dset)
+        if validator.conditions:
+            q = q.filter(*validator.conditions)
+    except Exception as e:
+        msg = 'Internal error. \n Advanced debugging details: ' + repr(e)
+        return make_error(msg)
 
-    start_date = validator.vals['obs_date__ge']
-    end_date = validator.vals['obs_date__le']
-    q = q.filter(dset.c.point_date >= start_date)\
-         .filter(dset.c.point_date <= end_date)
+    try:
+        # Add time filters
+        maker = FilterMaker(validator.vals, dataset=dset)
+        q = q.filter(*maker.time_filters())
 
-    start_hour = validator.vals['date__time_of_day_ge']
-    end_hour = validator.vals['date__time_of_day_le']
-    if start_hour != 0:
-        q = q.filter(sa.func.date_part('hour', dset.c.point_date).__ge__(start_hour))
-    if end_hour != 23:
-        q = q.filter(sa.func.date_part('hour', dset.c.point_date).__ge__(end_hour))
-
-    # If user provided a geom,
-    geom = validator.vals.get('location_geom__within', None)
-    if geom:
-        # make it a str ready for postgres.
-        geom = make_fragment_str(geom)
-        # Assumption: geom column holds PostGIS points
-        q = q.filter(dset.c.geom.ST_Within(sa.func.ST_GeomFromGeoJSON(geom)))
+        # Add geom filter, if provided
+        geom_filter = maker.geom_filter()
+        if geom_filter is not None:
+            q = q.filter(geom_filter)
+    except Exception as e:
+        import sys, traceback
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        raise
 
     # Page in RESPONSE_LIMIT chunks
     offset = validator.vals['offset']
@@ -432,11 +497,11 @@ def detail():
         q = q.offset(offset)
 
     # Part 3: Make SQL query and dump output into list of rows
-    # I don't really want geom. Only regurgitate!
+    # (Could explicitly not request point_date and geom here to transfer less data)
     rows = [list(record) for record in q.all()]
 
-    col_names = [name for name in validator.cols if name not in {'point_date', 'geom'}]
     # Part 4: Format response
+    col_names = [name for name in validator.cols if name not in {'point_date', 'geom'}]
     datatype = validator.vals['data_type']
     if datatype == 'json':
         resp = {
@@ -481,7 +546,6 @@ def grid():
     except NoSuchTableError:
         return make_error("Could not find dataset named {}.".format(dataset_name))
 
-    # TODO: Update docs to reflect that center[] is not supported
     validator.set_optional('buffer', int_validator, 100)\
              .set_optional('resolution', int_validator, 500)\
              .set_optional('location_geom__within', geom_validator, None)\
@@ -492,21 +556,26 @@ def grid():
     if err:
         return make_error(err)
 
-    # TODO: better error handling
+    # Part 2: Construct SQL query
+    try:
+        dset = validator.dataset
+        maker = FilterMaker(validator.vals, dataset=dset)
+        # Get time filters
+        time_filters = maker.time_filters()
+        # From user params, wither get None or requested geometry
+        geom = maker.sql_ready_geom()
+    except Exception as e:
+        raise
 
-    geom = validator.vals['location_geom__within']
-    if geom:
-        buffer = validator.vals['buffer']
-        geom = make_fragment_str(geom, buffer)
     resolution = validator.vals['resolution']
+    try:
+        registry_row = MetaTable.get_by_dataset_name(dataset_name)
+        grid_rows, size_x, size_y = registry_row.make_grid(resolution, geom, validator.conditions + time_filters)
+    except Exception as e:
+        msg = 'Internal error. Could not make grid aggregation. ' \
+              '\nAdvanced debugging information ' + repr(e)
+        return make_error(msg)
 
-    dataset = MetaTable.get_by_dataset_name(dataset_name)
-    start_date = validator.vals['obs_date__ge']
-    end_date = validator.vals['obs_date__le']
-    time_conds = [dataset.point_table.c.point_date >= start_date,
-                  dataset.point_table.c.point_date <= end_date]
-
-    grid_rows, size_x, size_y = dataset.make_grid(resolution, geom, validator.conditions + time_conds)
     resp = {'type': 'FeatureCollection', 'features': []}
     for value in grid_rows:
         d = {
