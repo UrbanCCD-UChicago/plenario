@@ -68,9 +68,8 @@ def init_census():
     print 'this will *also* take a few minutes ...'
     census_settings = plenario.settings.CENSUS_BLOCKS
 
-    census_meta = plenario.models.ShapeMetadata.add(source_url=census_settings['source_url'],
-                                                    human_name=census_settings['human_name'],
-                                                    caller_session=session)
+    census_meta = plenario.models.ShapeMetadata.add(human_name=census_settings['human_name'],
+                                                    source_url=census_settings['source_url'])
     try:
         session.commit()
     except Exception as e:

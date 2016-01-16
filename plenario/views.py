@@ -314,21 +314,22 @@ def add_shape():
         try:
             human_name = request.form['dataset_name']
             source_url = request.form['source_url']
-            attribution  = request.form['attribution']
+            attribution = request.form['attribution']
         except KeyError:
             # Front-end validation failed or someone is posting bogus query strings directly.
             # re-render with error message
             errors.append('A required field was not submitted.')
-
-        # Does a shape dataset with this human_name already exist?
-        if ShapeMetadata.get_by_human_name(human_name=human_name, caller_session=session):
-            errors.append('A shape dataset with that name already exists.')
+        else:
+            # Does a shape dataset with this human_name already exist?
+            if ShapeMetadata.get_by_human_name(human_name=human_name):
+                errors.append('A shape dataset with that name already exists.')
 
         if not errors:
             # Add the metadata right away
             # Add some kind of ingestion method to examine shape url and grab metadata
             # shape_info = get_context_for_new_shape(url)
-            meta = ShapeMetadata.add(caller_session=session, human_name=human_name, source_url=source_url, attribution = attribution)
+            meta = ShapeMetadata.add(human_name=human_name, source_url=source_url,
+                                     attribution=attribution)
             session.commit()
 
             # And tell a worker to go ingest it
@@ -375,7 +376,7 @@ def view_datasets():
         .all()
 
     try:
-        shape_datasets = ShapeMetadata.get_all_with_etl_status(caller_session=session)
+        shape_datasets = ShapeMetadata.get_all_with_etl_status()
     except NoSuchTableError:
         # If we can't find shape metadata, soldier on.
         shape_datasets = None
@@ -391,7 +392,7 @@ def view_datasets():
 @login_required
 def shape_status():
     table_name = request.args['table_name']
-    shape_meta = ShapeMetadata.get_metadata_with_etl_result(table_name=table_name, caller_session=session)
+    shape_meta = ShapeMetadata.get_metadata_with_etl_result(table_name=table_name)
     return render_template('admin/shape-status.html', shape=shape_meta)
 
 

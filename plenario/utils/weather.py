@@ -568,7 +568,8 @@ class WeatherETL(object):
         station_pressure=self.floatOrNA(row[header.index('StnPressure')])
         sealevel_pressure=self.floatOrNA(row[header.index('SeaLevel')])
         resultant_windspeed = self.floatOrNA(row[header.index('ResultSpeed')])
-        resultant_winddirection, resultant_winddirection_cardinal=self.getWind(resultant_windspeed, row[header.index('ResultDir')])
+        resultant_winddirection, resultant_winddirection_cardinal=self.getWind(resultant_windspeed, row[
+            header.index('ResultDir')])
         avg_windspeed=self.floatOrNA(row[header.index('AvgSpeed')])            
         max5_windspeed=self.floatOrNA(row[header.index('Max5Speed')])
         max5_winddirection, max5_winddirection_cardinal=self.getWind(max5_windspeed, row[header.index('Max5Dir')])
@@ -607,7 +608,8 @@ class WeatherETL(object):
         station_pressure=self.floatOrNA(row[header.index('Pressue Avg Station')]) # XXX Not me -- typo in header!
         sealevel_pressure=self.floatOrNA(row[header.index('Pressure Avg Sea Level')])
         resultant_windspeed = self.floatOrNA(row[header.index('Wind Speed')])
-        resultant_winddirection, resultant_winddirection_cardinal=self.getWind(resultant_windspeed, row[header.index('Wind Direction')])
+        resultant_winddirection, resultant_winddirection_cardinal=self.getWind(resultant_windspeed, row[
+            header.index('Wind Direction')])
         avg_windspeed=self.floatOrNA(row[header.index('Wind Avg Speed')])            
         max5_windspeed=self.floatOrNA(row[header.index('Max 5 sec speed')])
         max5_winddirection, max5_winddirection_cardinal=self.getWind(max5_windspeed, row[header.index('Max 5 sec Dir')])
