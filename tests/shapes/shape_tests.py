@@ -57,7 +57,7 @@ class ShapeTests(unittest.TestCase):
         ShapeTests.ingest_fixture(fixtures['zips'])
 
         # Add a dummy dataset to the metadata without ingesting a shapefile for it
-        cls.dummy_name = ShapeMetadata.add(caller_session=session, human_name=u'Dummy Name', source_url=None).dataset_name
+        cls.dummy_name = ShapeMetadata.add(human_name=u'Dummy Name', source_url=None).dataset_name
         session.commit()
 
         cls.app = create_app().test_client()
@@ -65,7 +65,7 @@ class ShapeTests(unittest.TestCase):
     @staticmethod
     def ingest_fixture(fixture):
         # Add the fixture to the metadata first
-        shape_meta = ShapeMetadata.add(caller_session=session, human_name=fixture.human_name, source_url=None)
+        shape_meta = ShapeMetadata.add(human_name=fixture.human_name, source_url=None)
         session.commit()
         # Bypass the celery task and call on a ShapeETL directly
         ShapeETL(meta=shape_meta, source_path=fixture.path).ingest()
@@ -94,7 +94,6 @@ class ShapeTests(unittest.TestCase):
         self.assertEqual(shape_nums['chicago_city_limits'], 1)
         self.assertEqual(shape_nums['zip_codes'], 61)
         self.assertEqual(shape_nums['pedestrian_streets'], 41)
-
 
     def test_find_intersecting(self):
         # See test_fixtures/README for a picture of the rectangle
@@ -168,7 +167,7 @@ class ShapeTests(unittest.TestCase):
         # Can we remove a shape that's fully ingested?
         city_meta = session.query(ShapeMetadata).get(fixtures['city'].table_name)
         self.assertIsNotNone(city_meta)
-        city_meta.remove_table(caller_session=session)
+        city_meta.remove_table()
         session.commit()
         city_meta = session.query(ShapeMetadata).get(fixtures['city'].table_name)
         self.assertIsNone(city_meta)
@@ -176,12 +175,12 @@ class ShapeTests(unittest.TestCase):
         # Can we remove a shape that's only in the metadata?
         dummy_meta = session.query(ShapeMetadata).get(self.dummy_name)
         self.assertIsNotNone(dummy_meta)
-        dummy_meta.remove_table(caller_session=session)
+        dummy_meta.remove_table()
         session.commit()
         dummy_meta = session.query(ShapeMetadata).get(self.dummy_name)
         self.assertIsNone(dummy_meta)
 
         # Add them back to return to original test state
         ShapeTests.ingest_fixture(fixtures['city'])
-        ShapeMetadata.add(caller_session=session, human_name=u'Dummy Name', source_url=None)
+        ShapeMetadata.add(human_name=u'Dummy Name', source_url=None)
         session.commit()

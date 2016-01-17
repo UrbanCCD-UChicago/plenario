@@ -24,7 +24,7 @@ def get_all_shape_datasets():
                 'objects': []
             }
 
-        public_listing = ShapeMetadata.index(caller_session=session)
+        public_listing = ShapeMetadata.index()
         response_skeleton['objects'] = public_listing
         status_code = 200
 
