@@ -329,7 +329,8 @@ def bad_request(msg):
     return make_error(msg, 400)
 
 
-def internal_error(msg):
+def internal_error(context_msg, exception):
+    msg = context_msg + '\nDebug:\n' + repr(exception)
     return make_error(msg, 500)
 
 
@@ -345,10 +346,7 @@ def timeseries():
         .set_optional('location_geom__within', geom_validator, None)\
         .set_optional('buffer', int_validator, 100)
 
-    try:
-        err = validator.validate(request.args)
-    except Exception as e:
-        return internal_error(repr(e))
+    err = validator.validate(request.args)
     if err:
         return bad_request(err)
 
@@ -362,8 +360,8 @@ def timeseries():
     try:
         table_names = MetaTable.narrow_candidates(table_names, start_date, end_date, geom)
     except Exception as e:
-        msg = 'Failed to gather candidate tables.\n Debug ' + repr(e)
-        return internal_error(msg)
+        msg = 'Failed to gather candidate tables.'
+        return internal_error(msg, e)
 
     try:
         panel = MetaTable.timeseries_all(table_names=table_names,
@@ -372,8 +370,8 @@ def timeseries():
                                          end=end_date,
                                          geom=geom)
     except Exception as e:
-        msg = 'Failed to construct timeseries. \nAdvanced debug info: ' + repr(e)
-        return internal_error(msg)
+        msg = 'Failed to construct timeseries.'
+        return internal_error(msg, e)
 
     resp = {
         'meta': {
@@ -457,7 +455,10 @@ def detail_aggregate():
     geom = validator.get_geom()
     dataset = MetaTable.get_by_dataset_name(dataset_name)
 
-    ts = dataset.timeseries_one(agg_unit=agg, start=start_date, end=end_date, geom=geom)
+    try:
+        ts = dataset.timeseries_one(agg_unit=agg, start=start_date, end=end_date, geom=geom)
+    except Exception as e:
+        return internal_error('Failed to construct timeseries', e)
 
     datatype = validator.vals['data_type']
     if datatype == 'json':
@@ -520,8 +521,7 @@ def detail():
         if validator.conditions:
             q = q.filter(*validator.conditions)
     except Exception as e:
-        msg = 'Internal error. \n Advanced debugging details: ' + repr(e)
-        return bad_request(msg)
+        return internal_error('Failed to construct column filters.', e)
 
     try:
         # Add time filters
@@ -534,9 +534,7 @@ def detail():
             geom_filter = maker.geom_filter(geom)
             q = q.filter(geom_filter)
     except Exception as e:
-        import sys, traceback
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        return internal_error(repr(e))
+        return internal_error('Failed to construct time and geometry filters.', e)
 
     # Page in RESPONSE_LIMIT chunks
     offset = validator.vals['offset']
@@ -546,7 +544,10 @@ def detail():
 
     # Part 3: Make SQL query and dump output into list of rows
     # (Could explicitly not request point_date and geom here to transfer less data)
-    rows = [list(record) for record in q.all()]
+    try:
+        rows = [list(record) for record in q.all()]
+    except Exception as e:
+        return internal_error('Failed to fetch records.', e)
 
     # Part 4: Format response
     col_names = [name for name in validator.cols if name not in {'point_date', 'geom'}]
@@ -560,7 +561,6 @@ def detail():
         for row in rows:
             fields = {col: val for col, val in zip(col_names, row)}
             resp['objects'].append(fields)
-
 
         resp['meta']['total'] = len(resp['objects'])
         resp['meta']['query'] = validator.vals
@@ -613,16 +613,14 @@ def grid():
         # From user params, wither get None or requested geometry
         geom = validator.get_geom()
     except Exception as e:
-        raise
+        return internal_error('Could not make time and geometry filters.', e)
 
     resolution = validator.vals['resolution']
     try:
         registry_row = MetaTable.get_by_dataset_name(dataset_name)
         grid_rows, size_x, size_y = registry_row.make_grid(resolution, geom, validator.conditions + time_filters)
     except Exception as e:
-        msg = 'Internal error. Could not make grid aggregation. ' \
-              '\nAdvanced debugging information ' + repr(e)
-        return bad_request(msg)
+        return internal_error('Could not make grid aggregation.', e)
 
     resp = {'type': 'FeatureCollection', 'features': []}
     for value in grid_rows:
@@ -697,13 +695,13 @@ def meta():
 def dataset_fields(dataset_name):
     try:
         table = Table(dataset_name, Base.metadata,
-            autoload=True, autoload_with=engine,
-            extend_existing=True)
+                      autoload=True, autoload_with=engine,
+                      extend_existing=True)
         data = {
             'meta': {
                 'status': 'ok',
                 'message': '',
-                'query': { 'dataset_name': dataset_name }
+                'query': {'dataset_name': dataset_name}
             },
             'objects': []
         }
