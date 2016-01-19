@@ -6,6 +6,7 @@ from plenario.utils.helpers import iter_column, slugify
 from sqlalchemy import Boolean, Integer, BigInteger, Float, String, Date, TIME, TIMESTAMP, Text,\
     Table, Column, MetaData
 from sqlalchemy import select, func, text
+from sqlalchemy import event, DDL
 from sqlalchemy.sql import column
 from geoalchemy2 import Geometry
 from plenario.etl.common import PlenarioETLError
@@ -266,10 +267,13 @@ class Creation(object):
         # We also expect geometry and date columns to be created.
         derived_cols = [Column('point_date', TIMESTAMP, nullable=True, index=True),
                         Column('geom', Geometry('POINT', srid=4326), nullable=True, index=True)]
+        update_table_state = DDL('''\CREATE TRIGGER audit_after AFTER DELETE OR UPDATE ON %s FOR EACH ROW EXECUTE PROCEDURE audit.if_modified()''')
         new_table = Table(self.dataset.name, MetaData(), *(original_cols + derived_cols))
+        event.listen(new_table, 'after_create', update_table_state)
 
         try:
             new_table.create(engine)
+
         except:
             new_table.drop(bind=engine, checkfirst=True)
             raise
