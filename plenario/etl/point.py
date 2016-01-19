@@ -267,18 +267,23 @@ class Creation(object):
         # We also expect geometry and date columns to be created.
         derived_cols = [Column('point_date', TIMESTAMP, nullable=True, index=True),
                         Column('geom', Geometry('POINT', srid=4326), nullable=True, index=True)]
-        update_table_state = DDL('''\CREATE TRIGGER audit_after AFTER DELETE OR UPDATE ON %s FOR EACH ROW EXECUTE PROCEDURE audit.if_modified()''')
         new_table = Table(self.dataset.name, MetaData(), *(original_cols + derived_cols))
-        event.listen(new_table, 'after_create', update_table_state)
 
         try:
             new_table.create(engine)
-
+            self._add_trigger()
         except:
             new_table.drop(bind=engine, checkfirst=True)
             raise
         else:
             return new_table
+
+    def _add_trigger(self):
+        add_trigger = """CREATE TRIGGER audit_after AFTER DELETE OR UPDATE
+                         ON {table}
+                         FOR EACH ROW EXECUTE PROCEDURE audit.if_modified()""".\
+                      format(table=self.dataset.name)
+        engine.execute(add_trigger)
 
 
 class Update(object):
@@ -351,7 +356,6 @@ class Update(object):
         derived_cols = [c for c in self.table.c if c.name in {'geom', 'point_date'}]
         staging_cols = [c for c in self.staging.c]
         sel_cols = staging_cols + derived_cols
-
 
         sel = select(sel_cols).where(self.staging.c.hash == self.table.c.hash)
         ins = self.existing.insert().from_select(sel_cols, sel)
