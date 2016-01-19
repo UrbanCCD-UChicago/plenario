@@ -97,6 +97,12 @@ class PointAPITests(unittest.TestCase):
         # Time of day filter should remove all but two
         self.assertEqual(response_data['meta']['total'], 2)
 
+    def test_in_operator(self):
+        url = '/v1/api/detail/?obs_date__le=2016%2F01%2F19&event_type__in=Alderman,CPD&obs_date__ge=2012%2F10%2F21&dataset_name=flu_shot_clinics'
+        resp = self.app.get(url)
+        response_data = json.loads(resp.data)
+        self.assertEqual(response_data['meta']['total'], 53)
+
     '''/grid'''
 
     def test_space_and_time(self):

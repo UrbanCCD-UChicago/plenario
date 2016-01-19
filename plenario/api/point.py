@@ -148,14 +148,14 @@ class ParamValidator(object):
     def _make_condition_with_operator(self, col, op_code, target_value):
         if op_code == 'in':
             cond = col.in_(target_value.split(','))
-            return cond, None
+            return cond
         else:   # Any other op code
             op_func = self.field_ops[op_code]
             # op_func is the name of a method bound to the SQLAlchemy column object.
             # Get the method and call it to create a binary condition (like name != 'Roy')
             # on the value the user specified.
             cond = getattr(col, op_func)(target_value)
-            return cond, None
+            return cond
 
 '''
     Validator transformations.
