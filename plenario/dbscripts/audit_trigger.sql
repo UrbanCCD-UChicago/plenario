@@ -18,7 +18,7 @@ BEGIN
     v_sql = 'SELECT ' || '  count(1) ' || 'FROM ' || '  information_schema.tables ' || 'WHERE ' || E'  table_name=\'' || v_table || E'\'';
     
     EXECUTE v_sql INTO v_count;
-    IF (v_count == 0) THEN
+    IF (v_count = 0) THEN
         v_sql = '
 	CREATE TABLE ' || TG_TABLE_NAME::regclass || '_history' || '(
 	    action_tstamp_tx TIMESTAMP WITH TIME ZONE NOT NULL,
