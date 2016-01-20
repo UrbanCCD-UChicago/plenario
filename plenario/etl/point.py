@@ -3,10 +3,9 @@ from csvkit.unicsv import UnicodeCSVReader
 from sqlalchemy.exc import NoSuchTableError
 from plenario.database import app_engine as engine, session
 from plenario.utils.helpers import iter_column, slugify
-from sqlalchemy import Boolean, Integer, BigInteger, Float, String, Date, TIME, TIMESTAMP, Text,\
-    Table, Column, MetaData
+from sqlalchemy import Boolean, Integer, BigInteger, Float, String, Date, TIME,\
+    TIMESTAMP, Text, Table, Column, MetaData
 from sqlalchemy import select, func, text
-from sqlalchemy import event, DDL
 from sqlalchemy.sql import column
 from geoalchemy2 import Geometry
 from plenario.etl.common import PlenarioETLError
@@ -16,7 +15,8 @@ class PlenarioETL(object):
     def __init__(self, metadata, source_path=None):
         """
         :param metadata: MetaTable instance of dataset being ETL'd.
-        :param source_path: If provided, get source CSV ftom local filesystem instead of URL in metadata.
+        :param source_path: If provided, get source CSV ftom local filesystem
+                            instead of URL in metadata.
         """
         self.metadata = metadata
         # Grab a record of the names we'll need to work with this dataset
@@ -152,9 +152,12 @@ class Staging(object):
         add_hash = '''
         DROP TABLE IF EXISTS temp;
         CREATE TABLE temp AS
-          SELECT DISTINCT *, md5(CAST(("{table_name}".*)AS text)) AS hash FROM "{table_name}";
+          SELECT DISTINCT *,
+                 md5(CAST(("{table_name}".*)AS text))
+                    AS hash FROM "{table_name}";
         DROP TABLE "{table_name}";
         ALTER TABLE temp RENAME TO "{table_name}";
+        ALTER TABLE "{table_name}" ADD PRIMARY KEY (hash);
         '''.format(table_name=table_name)
 
         try:
@@ -262,16 +265,24 @@ class Creation(object):
         Make a new table with the original columns from the staging table
         """
         # Take most columns straight from the source.
-        original_cols = [_copy_col(c) for c in self.staging.columns]
+        original_cols = [_copy_col(c) for c in self.staging.columns
+                         if c.name != 'hash']
+        # Take care that the hash column is designated the primary key.
+        original_cols.append(Column('hash', String(32), primary_key=True))
+
 
         # We also expect geometry and date columns to be created.
-        derived_cols = [Column('point_date', TIMESTAMP, nullable=True, index=True),
-                        Column('geom', Geometry('POINT', srid=4326), nullable=True, index=True)]
-        new_table = Table(self.dataset.name, MetaData(), *(original_cols + derived_cols))
+        derived_cols = [
+            Column('point_date', TIMESTAMP, nullable=True, index=True),
+            Column('geom', Geometry('POINT', srid=4326),
+                   nullable=True, index=True)]
+        new_table = Table(self.dataset.name, MetaData(),
+                          *(original_cols + derived_cols))
 
         try:
             new_table.create(engine)
-            self._add_trigger()
+            # Disabled until trigger is debugged
+            #self._add_trigger()
         except:
             new_table.drop(bind=engine, checkfirst=True)
             raise
