@@ -22,15 +22,19 @@ sys.path.append(str(plenario_path))
 
 
 from plenario.alembic.version_helpers import dataset_names
-from plenario.database import app_engine as engine
+from plenario.database import session, app_engine as engine
 from plenario.models import MetaTable
 from plenario.tasks import add_dataset
 
 
 def upgrade():
     for name in dataset_names(op):
+        print 'Trying to re-ingest ' + name
         meta = MetaTable.get_by_dataset_name(name)
+        session.close()
+
         drop = 'DROP TABLE IF EXISTS "{}";'.format(name)
         engine.execute(drop)
         hash = meta.source_url_hash
+        session.close()
         add_dataset(hash)
