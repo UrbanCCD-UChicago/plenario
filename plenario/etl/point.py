@@ -282,7 +282,7 @@ class Creation(object):
         try:
             new_table.create(engine)
             # Disabled until trigger is debugged
-            #self._add_trigger()
+            # self._add_trigger()
         except:
             new_table.drop(bind=engine, checkfirst=True)
             raise
@@ -406,7 +406,7 @@ class Update(object):
                         FROM (
                               SELECT FLOAT8((regexp_matches({loc_col}, '\((.*),.*\)'))[1]) AS latitude, \
                                      FLOAT8((regexp_matches({loc_col}, '\(.*,(.*)\)'))[1]) AS longitude \
-                              FROM s_{table} as t WHERE t.hash = {table}.hash) AS subq'''\
+                              FROM s_{table} as t WHERE t.hash = "{table}".hash) AS subq'''\
                         .format(table=d.name, loc_col=d.loc))
             geom_col = geom_col.columns(column('geom')).label('geom')
 
