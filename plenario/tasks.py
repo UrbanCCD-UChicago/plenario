@@ -66,7 +66,7 @@ def add_shape(self, table_name):
 @celery_app.task(bind=True)
 def delete_shape(self, table_name):
     shape_meta = session.query(ShapeMetadata).get(table_name)
-    shape_meta.remove_table(caller_session=session)
+    shape_meta.remove_table()
     session.commit()
     return 'Removed {}'.format(table_name)
 

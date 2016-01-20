@@ -14,8 +14,6 @@ from plenario.database import session, Base, app_engine as engine
 import shapely.wkb, shapely.geometry
 from sqlalchemy.types import NullType
 
-VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
-
 
 class ParamValidator(object):
 
@@ -31,12 +29,22 @@ class ParamValidator(object):
         if dataset_name:
             # Throws NoSuchTableError. Should be caught by caller.
             self.dataset = Table(dataset_name, Base.metadata, autoload=True,
-                            autoload_with=engine, extend_existing=True)
+                                 autoload_with=engine, extend_existing=True)
             self.cols = self.dataset.columns.keys()
             # SQLAlchemy boolean expressions
             self.conditions = []
 
     def set_optional(self, name, transform, default):
+        """
+        :param name: Name of expected HTTP parameter
+        :param transform: Function of type
+                          f(param_val: str) -> (validated_argument: Option<object, None>, err_msg: Option<str, None>
+                          Return value should be of form (output, None) if transformation was applied successully,
+                          or (None, error_message_string) if transformation could not be applied.
+        :param default: Value to apply to associate with parameter given by :name
+                        if not specified by user. Can be a callable.
+        :return: Returns the Validator to allow generative construction.
+        """
         self.vals[name] = default
         self.transforms[name] = transform
 
@@ -47,6 +55,7 @@ class ParamValidator(object):
         for k, v in params.items():
             if k in self.transforms.keys():
                 # k is a param name with a defined transformation
+                # Get the transformation and apply it to v
                 val, err = self.transforms[k](v)
                 if err:
                     # v wasn't a valid string for this param name
@@ -74,6 +83,12 @@ class ParamValidator(object):
 
         self._eval_defaults()
 
+    def get_geom(self):
+        validated_geom = self.vals['location_geom__within']
+        if validated_geom is not None:
+            buff = self.vals.get('buffer', 100)
+            return make_fragment_str(validated_geom, buff)
+
     def _eval_defaults(self):
         """
         Replace every value in vals that is callable with the returned value of that callable.
@@ -98,38 +113,61 @@ class ParamValidator(object):
         # Generally, we expect the form k = [field]__[op]
         # Can also be just [field] in the case of simple equality
         tokens = k.split('__')
+        # An attribute of the dataset
         field = tokens[0]
         if field not in self.cols:
-            # Don't make a condition.
-            # But nothing went wrong, so error is None too.
+            # No column matches this key.
+            # Rather than return an error here,
+            # we'll return None to indicate that this field wasn't present
+            # and let the calling function send a warning to the client.
             return None, None
 
         col = self.dataset.columns.get(field)
 
         if len(tokens) == 1:
             # One token? Then it's an equality operation of the form k=v
-            cond = col == v
-            return cond, None
+            # col == v creates a SQLAlchemy boolean expression
+            return (col == v), None
         elif len(tokens) == 2:
             # Two tokens? Then it's of the form [field]__[op_code]=v
             op_code = tokens[1]
-            if op_code == 'in':
-                # TODO: change documentation to reflect expected input format
-                cond = col.in_(v.split(','))
+            valid_op_codes = self.field_ops.keys() + ['in']
+            if op_code not in valid_op_codes:
+                error_msg = "Invalid dataset field operator:" \
+                                " {} called in {}={}".format(op_code, k, v)
+                return None, error_msg
             else:
-                try:
-                    op_func = ParamValidator.field_ops[op_code]
-                    cond = getattr(col, op_func)(v)
-                except AttributeError:
-                    error_msg = "Invalid dataset field operator: {} called in {}={}".format(op_code, k, v)
-                    return None, error_msg
-            return cond, None
+                cond = self._make_condition_with_operator(col, op_code, v)
+                return cond, None
+
         else:
-            error_msg = "Too many arguments on dataset field {}={}\n Expected [field]__[operator]=value".format(k, v)
+            error_msg = "Too many arguments on dataset field {}={}" \
+                        "\n Expected [field]__[operator]=value".format(k, v)
             return None, error_msg
+
+    def _make_condition_with_operator(self, col, op_code, target_value):
+        if op_code == 'in':
+            cond = col.in_(target_value.split(','))
+            return cond
+        else:   # Any other op code
+            op_func = self.field_ops[op_code]
+            # op_func is the name of a method bound to the SQLAlchemy column object.
+            # Get the method and call it to create a binary condition (like name != 'Roy')
+            # on the value the user specified.
+            cond = getattr(col, op_func)(target_value)
+            return cond
+
+'''
+    Validator transformations.
+    To be added to a validator object with Validator.set_optional()
+    They take a string and return a tuple of (expected_return_type, error_message)
+    where error_message is non-None only when the transformation could not produce an object of the expected type.
+'''
 
 
 def agg_validator(agg_str):
+    VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
+
     if agg_str in VALID_AGG:
         return agg_str, None
     else:
@@ -150,7 +188,8 @@ def date_validator(date_str):
 def list_of_datasets_validator(list_str):
     table_names = list_str.split(',')
     if not len(table_names) > 1:
-        error_msg = "Expected comma-separated list of computer-formatted dataset names. Couldn't parse {}".format(list_str)
+        error_msg = "Expected comma-separated list of computer-formatted dataset names." \
+                    " Couldn't parse {}".format(list_str)
         return None, error_msg
     return table_names, None
 
@@ -202,7 +241,78 @@ def time_of_day_validator(hour_str):
     else:
         return num, None
 
-def make_error(msg):
+
+class FilterMaker(object):
+    """
+    Given dictionary of validated arguments and a sqlalchemy table,
+    generate binary consitions on that table restricting time and geography.
+    Can also create a postgres-formatted geography for further filtering
+    with just a dict of arguments.
+    """
+
+    def __init__(self, args, dataset=None):
+        """
+        :param args: dict mapping arguments to values as taken from a Validator
+        :param dataset: table object of particular dataset being queried, if available
+        """
+        self.args = args
+        self.dataset = dataset
+
+    def time_filters(self):
+        """
+        :return: SQLAlchemy conditions derived from time arguments on :dataset:
+        """
+        filters = []
+        d = self.dataset
+        try:
+            lower_bound = d.c.point_date >= self.args['obs_date__ge']
+            filters.append(lower_bound)
+        except KeyError:
+            pass
+
+        try:
+            upper_bound = d.c.point_date <= self.args['obs_date__le']
+            filters.append(upper_bound)
+        except KeyError:
+            pass
+
+        try:
+            start_hour = self.args['date__time_of_day_ge']
+            if start_hour != 0:
+                lower_bound = sa.func.date_part('hour', d.c.point_date).__ge__(start_hour)
+                filters.append(lower_bound)
+        except KeyError:
+            pass
+
+        try:
+            end_hour = self.args['date__time_of_day_le']
+            if end_hour != 23:
+                upper_bound = sa.func.date_part('hour', d.c.point_date).__ge__(end_hour)
+                filters.append(upper_bound)
+        except KeyError:
+            pass
+
+        return filters
+
+    def geom_filter(self, geom_str):
+        """
+        :param geom_str: geoJSON string from Validator ready to throw into postgres
+        :return: geographic filter based on location_geom__within and buffer parameters
+        """
+        # Demeter weeps
+        return self.dataset.c.geom.ST_Within(sa.func.ST_GeomFromGeoJSON(geom_str))
+
+
+def sql_ready_geom(validated_geom, buff):
+    """
+    :param validated_geom: geoJSON fragment as extracted from geom_validator
+    :param buff: int representing lenth of buffer around geometry if geometry is a linestring
+    :return: Geometry string suitable for postgres query
+    """
+    return make_fragment_str(validated_geom, buff)
+
+
+def make_error(msg, status_code):
     resp = {
         'meta': {
             'status': 'error',
@@ -212,7 +322,16 @@ def make_error(msg):
     }
 
     resp['meta']['query'] = request.args
-    return make_response(json.dumps(resp), 400)
+    return make_response(json.dumps(resp), status_code)
+
+
+def bad_request(msg):
+    return make_error(msg, 400)
+
+
+def internal_error(context_msg, exception):
+    msg = context_msg + '\nDebug:\n' + repr(exception)
+    return make_error(msg, 500)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -229,29 +348,30 @@ def timeseries():
 
     err = validator.validate(request.args)
     if err:
-        return make_error(err)
+        return bad_request(err)
 
-    # Geometry is an optional parameter.
-    # If it was provided, convert the polygon or linestring to a postgres-ready form.
-    geom = validator.vals.get('location_geom__within', None)
-    if geom:
-        buffer = validator.vals['buffer']
-        # Should probably catch a shape exception here
-        geom = make_fragment_str(geom, buffer)
-
+    geom = validator.get_geom()
     table_names = validator.vals['dataset_name__in']
     start_date = validator.vals['obs_date__ge']
     end_date = validator.vals['obs_date__le']
     agg = validator.vals['agg']
 
     # Only examine tables that have a chance of containing records within the date and space boundaries.
-    table_names = MetaTable.narrow_candidates(table_names, start_date, end_date, geom)
+    try:
+        table_names = MetaTable.narrow_candidates(table_names, start_date, end_date, geom)
+    except Exception as e:
+        msg = 'Failed to gather candidate tables.'
+        return internal_error(msg, e)
 
-    panel = MetaTable.timeseries_all(table_names=table_names,
-                                     agg_unit=agg,
-                                     start=start_date,
-                                     end=end_date,
-                                     geom=geom)
+    try:
+        panel = MetaTable.timeseries_all(table_names=table_names,
+                                         agg_unit=agg,
+                                         start=start_date,
+                                         end=end_date,
+                                         geom=geom)
+    except Exception as e:
+        msg = 'Failed to construct timeseries.'
+        return internal_error(msg, e)
 
     resp = {
         'meta': {
@@ -303,20 +423,18 @@ def timeseries():
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail_aggregate():
-    # Can I abstract out the common param requirements?
-
     raw_query_params = request.args.copy()
     # First, make sure name of dataset was provided...
     try:
         dataset_name = raw_query_params.pop('dataset_name')
     except KeyError:
-        return make_error("'dataset_name' is required")
+        return bad_request("'dataset_name' is required")
 
     # and that we have that dataset.
     try:
         validator = ParamValidator(dataset_name)
     except NoSuchTableError:
-        return make_error("Cannot find dataset named {}".format(dataset_name))
+        return bad_request("Cannot find dataset named {}".format(dataset_name))
 
     validator\
         .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
@@ -329,21 +447,18 @@ def detail_aggregate():
     # than using a default and confusing them.
     err = validator.validate(raw_query_params)
     if err:
-        return make_error(err)
+        return bad_request(err)
 
     start_date = validator.vals['obs_date__ge']
     end_date = validator.vals['obs_date__le']
     agg = validator.vals['agg']
+    geom = validator.get_geom()
     dataset = MetaTable.get_by_dataset_name(dataset_name)
 
-    # Geometry is an optional parameter.
-    # If it was provided, convert the polygon or linestring to a postgres-ready form.
-    geom = validator.vals.get('location_geom__within', None)
-    if geom:
-        # Should probably catch a shape exception here
-        geom = make_fragment_str(geom, buffer)
-
-    ts = dataset.timeseries_one(agg_unit=agg, start=start_date, end=end_date, geom=geom)
+    try:
+        ts = dataset.timeseries_one(agg_unit=agg, start=start_date, end=end_date, geom=geom)
+    except Exception as e:
+        return internal_error('Failed to construct timeseries', e)
 
     datatype = validator.vals['data_type']
     if datatype == 'json':
@@ -366,6 +481,7 @@ def detail_aggregate():
 
     return resp
 
+
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail():
@@ -375,13 +491,13 @@ def detail():
     try:
         dataset_name = raw_query_params.pop('dataset_name')
     except KeyError:
-        return make_error("'dataset_name' is required")
+        return bad_request("'dataset_name' is required")
 
     # and that we have that dataset.
     try:
         validator = ParamValidator(dataset_name)
     except NoSuchTableError:
-        return make_error("Cannot find dataset named {}".format(dataset_name))
+        return bad_request("Cannot find dataset named {}".format(dataset_name))
 
     validator\
         .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
@@ -396,34 +512,29 @@ def detail():
     # than using a default and confusing them.
     err = validator.validate(raw_query_params)
     if err:
-        return make_error(err)
+        return bad_request(err)
 
     # Part 2: Construct SQL query
-    # TODO: handle SQL Exceptions
     dset = validator.dataset
-    q = session.query(dset)
-    if validator.conditions:
-        q = q.filter(*validator.conditions)
+    try:
+        q = session.query(dset)
+        if validator.conditions:
+            q = q.filter(*validator.conditions)
+    except Exception as e:
+        return internal_error('Failed to construct column filters.', e)
 
-    start_date = validator.vals['obs_date__ge']
-    end_date = validator.vals['obs_date__le']
-    q = q.filter(dset.c.point_date >= start_date)\
-         .filter(dset.c.point_date <= end_date)
+    try:
+        # Add time filters
+        maker = FilterMaker(validator.vals, dataset=dset)
+        q = q.filter(*maker.time_filters())
 
-    start_hour = validator.vals['date__time_of_day_ge']
-    end_hour = validator.vals['date__time_of_day_le']
-    if start_hour != 0:
-        q = q.filter(sa.func.date_part('hour', dset.c.point_date).__ge__(start_hour))
-    if end_hour != 23:
-        q = q.filter(sa.func.date_part('hour', dset.c.point_date).__ge__(end_hour))
-
-    # If user provided a geom,
-    geom = validator.vals.get('location_geom__within', None)
-    if geom:
-        # make it a str ready for postgres.
-        geom = make_fragment_str(geom)
-        # Assumption: geom column holds PostGIS points
-        q = q.filter(dset.c.geom.ST_Within(sa.func.ST_GeomFromGeoJSON(geom)))
+        # Add geom filter, if provided
+        geom = validator.get_geom()
+        if geom is not None:
+            geom_filter = maker.geom_filter(geom)
+            q = q.filter(geom_filter)
+    except Exception as e:
+        return internal_error('Failed to construct time and geometry filters.', e)
 
     # Page in RESPONSE_LIMIT chunks
     offset = validator.vals['offset']
@@ -432,18 +543,14 @@ def detail():
         q = q.offset(offset)
 
     # Part 3: Make SQL query and dump output into list of rows
-    col_names = [name for name in validator.cols if name != 'point_date']
-    geom_idx = col_names.index('geom')
-    rows = []
-    for record in q.all():
-        row = list(record)
-        try:
-            row[geom_idx] = shapely.wkb.loads(row[geom_idx].desc, hex=True).__geo_interface__
-        except AttributeError:
-            pass  # geoms can be null :(
-        rows.append(row)
+    # (Could explicitly not request point_date and geom here to transfer less data)
+    try:
+        rows = [list(record) for record in q.all()]
+    except Exception as e:
+        return internal_error('Failed to fetch records.', e)
 
     # Part 4: Format response
+    col_names = [name for name in validator.cols if name not in {'point_date', 'geom'}]
     datatype = validator.vals['data_type']
     if datatype == 'json':
         resp = {
@@ -454,7 +561,6 @@ def detail():
         for row in rows:
             fields = {col: val for col, val in zip(col_names, row)}
             resp['objects'].append(fields)
-
 
         resp['meta']['total'] = len(resp['objects'])
         resp['meta']['query'] = validator.vals
@@ -481,14 +587,13 @@ def grid():
     try:
         dataset_name = raw_query_params.pop('dataset_name')
     except KeyError:
-        return make_error("'dataset_name' is required")
+        return bad_request("'dataset_name' is required")
 
     try:
         validator = ParamValidator(dataset_name)
     except NoSuchTableError:
-        return make_error("Could not find dataset named {}.".format(dataset_name))
+        return bad_request("Could not find dataset named {}.".format(dataset_name))
 
-    # TODO: Update docs to reflect that center[] is not supported
     validator.set_optional('buffer', int_validator, 100)\
              .set_optional('resolution', int_validator, 500)\
              .set_optional('location_geom__within', geom_validator, None)\
@@ -497,23 +602,26 @@ def grid():
 
     err = validator.validate(raw_query_params)
     if err:
-        return make_error(err)
+        return bad_request(err)
 
-    # TODO: better error handling
+    # Part 2: Construct SQL query
+    try:
+        dset = validator.dataset
+        maker = FilterMaker(validator.vals, dataset=dset)
+        # Get time filters
+        time_filters = maker.time_filters()
+        # From user params, wither get None or requested geometry
+        geom = validator.get_geom()
+    except Exception as e:
+        return internal_error('Could not make time and geometry filters.', e)
 
-    geom = validator.vals['location_geom__within']
-    if geom:
-        buffer = validator.vals['buffer']
-        geom = make_fragment_str(geom, buffer)
     resolution = validator.vals['resolution']
+    try:
+        registry_row = MetaTable.get_by_dataset_name(dataset_name)
+        grid_rows, size_x, size_y = registry_row.make_grid(resolution, geom, validator.conditions + time_filters)
+    except Exception as e:
+        return internal_error('Could not make grid aggregation.', e)
 
-    dataset = MetaTable.get_by_dataset_name(dataset_name)
-    start_date = validator.vals['obs_date__ge']
-    end_date = validator.vals['obs_date__le']
-    time_conds = [dataset.point_table.c.point_date >= start_date,
-                  dataset.point_table.c.point_date <= end_date]
-
-    grid_rows, size_x, size_y = dataset.make_grid(resolution, geom, validator.conditions + time_conds)
     resp = {'type': 'FeatureCollection', 'features': []}
     for value in grid_rows:
         d = {
@@ -587,13 +695,13 @@ def meta():
 def dataset_fields(dataset_name):
     try:
         table = Table(dataset_name, Base.metadata,
-            autoload=True, autoload_with=engine,
-            extend_existing=True)
+                      autoload=True, autoload_with=engine,
+                      extend_existing=True)
         data = {
             'meta': {
                 'status': 'ok',
                 'message': '',
-                'query': { 'dataset_name': dataset_name }
+                'query': {'dataset_name': dataset_name}
             },
             'objects': []
         }
