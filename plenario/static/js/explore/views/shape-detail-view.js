@@ -26,7 +26,6 @@ var app = app || {};
             }).addTo(this.map);
             this.legend = L.control({position: 'bottomright'});
         }
-        //this.respLayer = new L.featureGroup();
         this.listenTo(this.model, 'all', this.render);
         this.render();
     },
@@ -37,12 +36,6 @@ var app = app || {};
         $('#list-view').hide();
         $('#shapes-view').hide();
         $("#map").spin('large');
-        //if (this.query['location_geom__within']) {
-        //    this.respLayer.addLayer(L.geoJson(jQuery.parseJSON(this.query['location_geom__within']),
-        //        {color: "#f06eaa", fillColor: "#f06eaa", weight:4 }));
-        //    this.respLayer.addTo(this.map);
-        //    this.map.fitBounds(this.respLayer.getBounds());
-        //}
         if (this.model.get('num_shapes')<= 500){
             this.polygonResponse();
         } else {
@@ -52,7 +45,7 @@ var app = app || {};
 
     polygonResponse: function() {
        var self = this;
-       $.when($.getJSON('http://plenar.io/v1/api/shapes/'+ this.query.shape_dataset_name + '?data_type=json')).then(
+       $.when($.getJSON('/v1/api/shapes/'+ this.query.shape_dataset_name + '?data_type=json')).then(
             function(resp){
                 $('#map').spin(false);
                 var data = resp;

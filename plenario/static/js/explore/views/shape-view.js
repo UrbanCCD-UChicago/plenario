@@ -59,7 +59,7 @@ var app = app || {};
             var self = this;
             var q = self.getGeoJson();
             return $.ajax({
-                url: 'http://plenar.io/v1/api/shapes/intersections/'+ q,
+                url: '/v1/api/shapes/intersections/'+ q,
                 dataType: 'json'
             });
         },
