@@ -270,7 +270,6 @@ class Creation(object):
         # Take care that the hash column is designated the primary key.
         original_cols.append(Column('hash', String(32), primary_key=True))
 
-
         # We also expect geometry and date columns to be created.
         derived_cols = [
             Column('point_date', TIMESTAMP, nullable=True, index=True),
@@ -281,8 +280,7 @@ class Creation(object):
 
         try:
             new_table.create(engine)
-            # Disabled until trigger is debugged
-            # self._add_trigger()
+            self._add_trigger()
         except:
             new_table.drop(bind=engine, checkfirst=True)
             raise
