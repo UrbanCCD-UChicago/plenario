@@ -3,12 +3,9 @@ import plenario.settings
 from plenario.database import session, app_engine, Base
 from plenario.etl.shape import ShapeETL
 from plenario.tasks import hello_world
-from plenario.settings import DB_NAME, DB_USER
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
 from argparse import ArgumentParser
-import os
 import datetime
-import subprocess
 
 def init_db(args):
     if not any(vars(args).values()):
@@ -17,7 +14,6 @@ def init_db(args):
         init_weather()
         init_census()
         init_celery()
-        add_trigger()
     else:
         if args.meta:
             init_meta()
@@ -29,8 +25,6 @@ def init_db(args):
             init_census()
         if args.celery:
             init_celery()
-        if args.trigger:
-            add_trigger()
 
 
 def init_master_meta_user():
@@ -86,16 +80,6 @@ def init_census():
     ShapeETL(meta=census_meta).ingest()
 
 
-def add_trigger():
-    # Makes bold assumption that you're executing on a local, passwprd-unprotected server
-    # for development purposes.
-    # If you can't connect this way, you'll need to execute the sql script yourself.
-    pwd = os.path.dirname(os.path.realpath(__file__))
-    db_script_path = os.path.join(pwd, 'plenario', 'dbscripts', 'audit_trigger.sql')
-    args = ['psql', '-U', DB_USER, '-d', DB_NAME, '-f', db_script_path]
-    subprocess.check_call(args)
-
-
 def init_celery():
     hello_world.delay()
 
@@ -119,8 +103,6 @@ def build_arg_parser():
             populate US Census blocks.')
     parser.add_argument('-cl', '--celery', action="store_true", help='Say hello \
             world from Celery')
-    parser.add_argument('-t', '--trigger', action='store_true',
-                        help='Add history tracking trigger function to database.')
     return parser
 
 if __name__ == "__main__":

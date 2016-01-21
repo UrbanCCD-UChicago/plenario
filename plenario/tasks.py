@@ -35,7 +35,6 @@ def delete_dataset(self, source_url_hash):
 @celery_app.task(bind=True)
 def add_dataset(self, source_url_hash, data_types=None):
     md = session.query(MetaTable).get(source_url_hash)
-    session.close()
     if md.result_ids:
         ids = md.result_ids
         ids.append(self.request.id)

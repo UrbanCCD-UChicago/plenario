@@ -16,7 +16,7 @@
 
             {{ metadata_form_fragment(dataset_info) }}
 
-            <p>Below, select which columns correspond to the <code>Observation date</code>, <code>Latitude</code> and <code>Longitude</code> fields for your dataset. These are all <span class="red">*</span>required. We also guessed the data type of each field, feel free to change it if you think it's incorrect.</p>
+            <p>Below, select which columns correspond to the <code>Unique&nbsp;ID</code>, <code>Observation date</code>, <code>Latitude</code> and <code>Longitude</code> fields for your dataset. These are all <span class="red">*</span>required. We also guessed the data type of each field, feel free to change it if you think it's incorrect.</p>
 
             <table class="table">
                 <thead>
@@ -30,6 +30,7 @@
                             <td>
                                 <select id="key_type_{{info.human_name|slugify}}" name="key_type_{{info.human_name|slugify}}" class="plenario-field form-control">
                                     <option value="">---------</option>
+                                    <option value="business_key">Unique ID</option>
                                     <option value="observed_date">Observation date</option>
                                     <option value="latitude">Latitude</option>
                                     <option value="longitude">Longitude</option>

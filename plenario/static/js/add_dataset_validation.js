@@ -51,6 +51,10 @@ $('#datatype-submit').on('click', function(e){
     $.each(definitions['field_definitions'], function(i, definition){
         defined.push(i);
     })
+    if(!(defined.indexOf('unique_id') >= 0)){
+        valid = false
+        appendError('You need to define a unique ID field');
+    }
     if(!(defined.indexOf('observation_date') >= 0)){
         valid = false
         appendError('You need to define a date/datetime field');

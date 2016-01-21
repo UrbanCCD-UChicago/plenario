@@ -1,4 +1,4 @@
-from flask import make_response, request, redirect, url_for, render_template, \
+from flask import make_response, request, redirect, url_for, render_template, current_app, g, \
     Blueprint, flash, session as flask_session
 from plenario.models import MetaTable, User, ShapeMetadata
 from plenario.database import session, Base, app_engine as engine
@@ -11,15 +11,19 @@ from datetime import datetime, timedelta
 from urlparse import urlparse
 import requests
 from flask_wtf import Form
-from wtforms import TextField, SelectField
-from wtforms.validators import DataRequired
+from wtforms import TextField, PasswordField, DateField, SelectField
+from wtforms.validators import DataRequired, Email
+from dateutil import parser
 import json
 import re
 from cStringIO import StringIO
 from csvkit.unicsv import UnicodeCSVReader
-from sqlalchemy import Table, text
+from sqlalchemy import Table, select, func, text, and_
+from plenario.settings import CACHE_CONFIG
+import string
 import sqlalchemy
 from hashlib import md5
+import traceback
 from sqlalchemy.exc import NoSuchTableError
 
 views = Blueprint('views', __name__)
