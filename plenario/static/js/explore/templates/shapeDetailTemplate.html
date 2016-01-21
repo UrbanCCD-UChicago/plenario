@@ -16,9 +16,9 @@
                     <span class="caret"></span>
                 </button>
                 <ul class="dropdown-menu" role="menu">
-                    <li><a href="<%='http://plenar.io/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=json'%>"><i class='fa fa-download'></i> GeoJson</a></li>
-                    <li><a href="<%='http://plenar.io/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=shapefile'%>"><i class='fa fa-download'></i> ESRI Shapefile</a></li>
-                    <li><a href="<%='http://plenar.io/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=kml'%>"><i class='fa fa-download'></i> KML</a></li>
+                    <li><a href="<%='/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=json'%>"><i class='fa fa-download'></i> GeoJson</a></li>
+                    <li><a href="<%='/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=shapefile'%>"><i class='fa fa-download'></i> ESRI Shapefile</a></li>
+                    <li><a href="<%='/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=kml'%>"><i class='fa fa-download'></i> KML</a></li>
                 </ul>
             </div>
         </form>
@@ -32,7 +32,8 @@
     <% if (shape.num_shapes <= 500 ) { %>
         <div id="map"></div>
     <% } else { %>
-        <br><br>
+        <p>This shape dataset is too big to display in a web browser. If you would like to view the shapes,
+            please download the file and open it in a GIS package such as <a href = "http://www.qgis.org/en/site/">QGIS</a>.</p>
     <% } %>
     <hr />
     <h4>Dataset details</h4>
@@ -42,9 +43,27 @@
                 <td>Name:</td>
                 <td><%= shape.human_name %></td>
             </tr>
-            <tr><td>Total Number of Shapes:</td>
+            <tr>
+                <td>Attribution:</td>
+                <td><%= shape.attribution %></td>
+            </tr>
+            <tr>
+                <td>Total number of shapes:</td>
                 <td><%= shape.num_shapes %></td>
             </tr>
+            <tr>
+                <td>Date added:</td>
+                <td><%= shape.date_added %></td>
+            </tr>
+            <tr>
+                <td>Update frequency:</td>
+                <td><%= shape.update_freq %></td>
+            </tr>
+            <tr>
+                <td>Description:</td>
+                <td><%= shape.description %></td>
+            </tr>
+
         </tbody>
     </table>
 </div>
