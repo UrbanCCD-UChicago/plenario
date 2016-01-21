@@ -291,7 +291,7 @@ class Creation(object):
 
     def _add_trigger(self):
         add_trigger = """CREATE TRIGGER audit_after AFTER DELETE OR UPDATE
-                         ON {table}
+                         ON "{table}"
                          FOR EACH ROW EXECUTE PROCEDURE audit.if_modified()""".\
                       format(table=self.dataset.name)
         engine.execute(add_trigger)
