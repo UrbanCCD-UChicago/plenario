@@ -51,10 +51,11 @@ def maintenance():
     return render_template('maintenance.html'), 503
 
 # Given a URL, this function returns a tuple (dataset_info, errors, socrata_source)
-def get_context_for_new_dataset(url):
+def get_context_for_new_dataset(url, is_shapefile=False):
     dataset_info = {}
     errors = []
     socrata_source = False
+    print url
     if url:
         url = url.strip(' \t\n\r') # strip whitespace, tabs, etc
         four_by_four = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
@@ -64,11 +65,12 @@ def get_context_for_new_dataset(url):
             host = 'https://%s' % parsed.netloc
             path = 'api/views'
 
-            dataset_info, errors, status_code = get_socrata_data_info(host, path, four_by_four[-1])
+            dataset_info, errors, status_code = get_socrata_data_info(host, path, four_by_four[-1], is_shapefile)
             if not errors:
                 socrata_source = True
                 dataset_info['submitted_url'] = url
         if errors:
+            print errors, "ERRORS"
             errors = []
             try:
                 r = requests.get(url, stream=True)
@@ -113,6 +115,7 @@ def get_context_for_new_dataset(url):
     return (dataset_info, errors, socrata_source)
 
 def table_row_estimate(table_name):
+    print table_name, "estimating"
     try:
         q = text(''' 
             SELECT reltuples::bigint AS estimate FROM pg_class where relname=:table_name;
@@ -171,7 +174,6 @@ def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_sou
         'is_socrata_source': socrata_source
     }
 
-    # add this to meta_master
     md = MetaTable(**d)
     session.add(md)
     session.commit()
@@ -257,20 +259,15 @@ def contrib_thankyou():
     return render_template('contribute_thankyou.html', **context)
 
 
-@views.route('/admin/add-dataset/table', methods=['GET', 'POST'])
-@login_required
-def add_table():
+def grab_dataset_details(is_shapefile=False):
     dataset_info = {}
     errors = []
     socrata_source = False
-
     url = ""
-    dataset_id = None
-    md = None
-
+ 
     if request.args.get('dataset_url'):
         url = request.args.get('dataset_url')
-        (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url)
+        (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url, True)
 
         # populate contributor info from session
         user = session.query(User).get(flask_session['user_id'])
@@ -278,11 +275,26 @@ def add_table():
         dataset_info['contributor_organization'] = 'Plenario Admin'
         dataset_info['contributor_email'] = user.email
 
-        # check if dataset with the same URL has already been loaded
-        dataset_id = md5(url).hexdigest()
-        md = session.query(MetaTable).get(dataset_id)
-        if md:
-            errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
+        dataset_info['is_shapefile'] = is_shapefile
+        #print dataset_info
+
+    return (dataset_info, errors, socrata_source, url)
+
+@views.route('/admin/add-dataset/table', methods=['GET', 'POST'])
+@login_required
+def add_table():
+    dataset_info = {}
+    errors = []
+    socrata_source = False
+    md = None
+
+    (dataset_info, error, socrata_source, url) = grab_dataset_details()
+
+    # check if dataset with the same URL has already been loaded
+    dataset_id = md5(url).hexdigest()
+    md = session.query(MetaTable).get(dataset_id)
+    if md:
+        errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
 
     if request.method == 'POST' and not md:
         md = add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_source, approved_status=True)
@@ -303,14 +315,20 @@ def add_table():
 @views.route('/admin/add-shape', methods=['GET', 'POST'])
 @login_required
 def add_shape():
-
+    dataset_info = {}
     errors = []
+    socrata_source = False
+    md = None
+
+    (dataset_info, error, socrata_source, url) = grab_dataset_details(True)
 
     if request.method == 'POST':
         try:
             human_name = request.form['dataset_name']
-            source_url = request.form['source_url']
-            attribution = request.form['attribution']
+            source_url = dataset_info['source_url']
+            attribution = request.form.get('dataset_attribution')
+            description = request.form.get('dataset_description')
+            update_freq = request.form['update_frequency']
         except KeyError:
             # Front-end validation failed or someone is posting bogus query strings directly.
             # re-render with error message
@@ -324,8 +342,10 @@ def add_shape():
             # Add the metadata right away
             # Add some kind of ingestion method to examine shape url and grab metadata
             # shape_info = get_context_for_new_shape(url)
+
             meta = ShapeMetadata.add(human_name=human_name, source_url=source_url,
-                                     attribution=attribution)
+                                     attribution=attribution, description=description,
+                                     update_freq=update_freq)
             session.commit()
 
             # And tell a worker to go ingest it
@@ -334,7 +354,8 @@ def add_shape():
             flash('Plenario is now trying to ingest your shapefile.', 'success')
             return redirect(url_for('views.view_datasets'))
 
-    return render_template('submit-shape.html', is_admin=True, errors=errors)
+    context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source, 'is_admin': True}
+    return render_template('submit-shape.html', **context)
 
 @views.route('/admin/view-datasets')
 @login_required

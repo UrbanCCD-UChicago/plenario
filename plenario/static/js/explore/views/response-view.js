@@ -7,9 +7,10 @@ var ResponseView = Backbone.View.extend({
     },
     render: function(){
         $('#list-view').show();
+        $('#shapes-view').show();
         $('#detail-view').hide();
-        var self = this;
         this.query = this.attributes.query;
+        // I don't know what this is.
         if (typeof this.explore !== 'undefined'){
             this.explore.remove();
         }
@@ -20,11 +21,11 @@ var ResponseView = Backbone.View.extend({
     },
     detailView: function(e){
         // console.log('response-view detailView')
-        var dataset_name = $(e.target).data('dataset_name')
-        this.query['dataset_name'] = dataset_name
+        var dataset_name = $(e.target).data('dataset_name');
+        this.query['dataset_name'] = dataset_name;
         this.undelegateEvents();
         $('#map-view').empty();
-        new DetailView({el: '#map-view', attributes: {query: this.query, meta: this.meta[dataset_name]}})
+        new DetailView({el: '#map-view', attributes: {query: this.query, meta: this.meta[dataset_name]}});
         var route = 'detail/' + $.param(this.query)
         _gaq.push(['_trackPageview', route]);
         router.navigate(route)
