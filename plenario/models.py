@@ -306,6 +306,12 @@ class ShapeMetadata(Base):
     human_name = Column(String, nullable=False)
     source_url = Column(String)
     date_added = Column(Date, nullable=False)
+
+    # Organization that published this dataset
+    attribution = Column(String)
+    description = Column(Text)
+    update_freq = Column(String(100), nullable=False)
+
     # We always ingest geometric data as 4326
     bbox = Column(Geometry('POLYGON', srid=4326))
     # How many shape records are present?
@@ -316,15 +322,8 @@ class ShapeMetadata(Base):
     # foreign key of celery task responsible for shapefile's ingestion
     celery_task_id = Column(String)
 
-    """
-    A note on `caller_session`.
-    tasks.py calls on a different scoped_session than the rest of the application.
-    To make these functions usable from the tasks and the regular application code,
-    we need to pass in a session rather than risk grabbing the wrong session from the registry.
-    """
-
     @classmethod
-    def get_all_with_etl_status(cls, caller_session):
+    def get_all_with_etl_status(cls):
         """
         :return: Every row of meta_shape joined with celery task status.
         """
@@ -335,24 +334,28 @@ class ShapeMetadata(Base):
             ON celery.task_id = meta.celery_task_id;
         '''
 
-        return list(caller_session.execute(shape_query))
+        return list(session.execute(shape_query))
 
     @classmethod
-    def index(cls, caller_session):
-        result = caller_session.query(cls.dataset_name,
+    def index(cls):
+        result = session.query(cls.dataset_name,
                                       cls.human_name,
                                       cls.date_added,
                                       func.ST_AsGeoJSON(cls.bbox),
-                                      cls.num_shapes)\
+                                      cls.num_shapes,
+                                      cls.attribution,
+                                      cls.description,
+                                      cls.update_freq
+                                      )\
                                  .filter(cls.is_ingested)
-        field_names = ['dataset_name', 'human_name', 'date_added', 'bounding_box', 'num_shapes']
+        field_names = ['dataset_name', 'human_name', 'date_added', 'bounding_box', 'num_shapes', 'attribution','description','update_freq']
         listing = [dict(zip(field_names, row)) for row in result]
         for dataset in listing:
             dataset['date_added'] = str(dataset['date_added'])
         return listing
 
     @classmethod
-    def get_metadata_with_etl_result(cls, table_name, caller_session):
+    def get_metadata_with_etl_result(cls, table_name):
         query = '''
             SELECT meta.*, celery.status, celery.traceback, celery.date_done
             FROM meta_shape as meta
@@ -361,29 +364,33 @@ class ShapeMetadata(Base):
             WHERE meta.dataset_name='{}';
         '''.format(table_name)
 
-        metadata = caller_session.execute(query).first()
+        metadata = session.execute(query).first()
         return metadata
 
     @classmethod
-    def get_by_human_name(cls, human_name, caller_session):
-        caller_session.query(cls).get(cls.make_table_name(human_name))
+    def get_by_human_name(cls, human_name):
+        session.query(cls).get(cls.make_table_name(human_name))
 
     @classmethod
     def make_table_name(cls, human_name):
         return slugify(human_name)
 
     @classmethod
-    def add(cls, caller_session, human_name, source_url):
+
+    def add(cls, human_name, source_url, attribution=None, description=None, update_freq=None):
         table_name = ShapeMetadata.make_table_name(human_name)
         new_shape_dataset = ShapeMetadata(dataset_name=table_name,
                                           human_name=human_name,
+                                          attribution=attribution,
+                                          description=description,
+                                          update_freq=update_freq,
                                           is_ingested=False,
                                           source_url=source_url,
                                           date_added=datetime.now().date(),
                                           bbox=None,
                                           num_shapes=None)
 
-        caller_session.add(new_shape_dataset)
+        session.add(new_shape_dataset)
         return new_shape_dataset
 
     @property
@@ -394,20 +401,20 @@ class ShapeMetadata(Base):
             self._shape_table = Table(self.dataset_name, Base.metadata, autoload=True, extend_existing=True)
             return self._shape_table
 
-    def remove_table(self, caller_session):
+    def remove_table(self):
         if self.is_ingested:
             drop = "DROP TABLE {};".format(self.dataset_name)
-            caller_session.execute(drop)
-        caller_session.delete(self)
+            session.execute(drop)
+        session.delete(self)
 
-    def update_after_ingest(self, caller_session):
+    def update_after_ingest(self):
         self.is_ingested = True
-        self.bbox = self._make_bbox(caller_session)
+        self.bbox = self._make_bbox()
         self.num_shapes = self._get_num_shapes()
 
-    def _make_bbox(self, caller_session):
+    def _make_bbox(self):
         bbox_query = 'SELECT ST_Envelope(ST_Union(geom)) FROM {};'.format(self.dataset_name)
-        box = caller_session.execute(bbox_query).first().st_envelope
+        box = session.execute(bbox_query).first().st_envelope
         return box
 
     def _get_num_shapes(self):

@@ -1,4 +1,6 @@
 {% extends 'submit-dataset.html' %}
+{% from "macros/add-shapefile-dataset.html" import add_shapefile_dataset %}
+
 {% set is_shape=True %}
 
 {% block headline %}
@@ -7,32 +9,30 @@
 
 {% block submission %}
 
-    <form role="form" method="POST" data-toggle="validator">
-
-        {{ bootstrap_validate_field(type="url",
-                                    name="source_url",
-                                    description="URL of shapefile",
-                                    placeholder="http://data.mycity.gov/path/to/shapefile.zip",
-                                    help_message="URL must lead to a zipped ESRI shapefile.",
-                                    error_message="Please enter a valid URL.") }}
-
-
-        {{ bootstrap_validate_field(type="text",
-                                    name="dataset_name",
-                                    description="Name that this dataset will be referenced by",
-                                    placeholder="Nifty Geographic Boundaries",
-                                    help_message="",
-                                    error_message="Please select a name."
-                                    ) }}
-
-        <div class="form-group">
-            <button type="submit" class="btn btn-primary">Add Shapefile</button>
-        </div>
-
-    </form>
-
     <p><em><span class="red">*</span> denotes a required field</em></p>
 
+     <h3>Link to a shapefile</h3>
+            {% block fetch_details %}
+            <form role="form" method="GET" id="fetch-details-form">
+                <div class="form-group">
+                    {% if dataset_info %}
+                    <input type="text" class="form-control" name="dataset_url" value="{{dataset_info.submitted_url}}" />
+                    {% else %}
+                    <input type="text" class="form-control" name="dataset_url" placeholder="http://data.mycity.gov/path/to/file.csv"/>
+                    {% endif %}
+                    <p class="help-block">Publicly available URL for a data source in CSV format or a Socrata dataset.</p>
+                </div>
+                <div class="form-group">
+                    <button class="btn btn-info" type="submit">Fetch details &raquo;</button>
+                </div>
+            </form>
+            {% endblock fetch_details %}
+
+              {% if dataset_info %}
+                {% block submit_form %}
+                    {{ add_shapefile_dataset(submit_button_verb=submit_button_verb, dataset_info=dataset_info) }}
+                {% endblock %}
+              {% endif %}
 {% endblock submission %}
 
 {% block extra_javascript %}

@@ -9,6 +9,8 @@ from plenario import create_app
 import json
 import os
 import urllib
+from StringIO import StringIO
+import csv
 
 
 pwd = os.path.dirname(os.path.realpath(__file__))
@@ -70,6 +72,16 @@ class PointAPITests(unittest.TestCase):
 
         self.assertEqual(response_data['meta']['total'], 5)
 
+    def test_csv_response(self):
+        query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&data_type=csv'
+        resp = self.app.get(query)
+
+        mock_csv_file = StringIO(resp.data)
+        reader = csv.reader(mock_csv_file)
+        lines = [line for line in reader]
+        # One header line, 5 data lines
+        self.assertEqual(len(lines), 6)
+
     def test_space_filter(self):
         escaped_query_rect = get_loop_rect()
 
@@ -84,6 +96,12 @@ class PointAPITests(unittest.TestCase):
         response_data = json.loads(resp.data)
         # Time of day filter should remove all but two
         self.assertEqual(response_data['meta']['total'], 2)
+
+    def test_in_operator(self):
+        url = '/v1/api/detail/?obs_date__le=2016%2F01%2F19&event_type__in=Alderman,CPD&obs_date__ge=2012%2F10%2F21&dataset_name=flu_shot_clinics'
+        resp = self.app.get(url)
+        response_data = json.loads(resp.data)
+        self.assertEqual(response_data['meta']['total'], 53)
 
     '''/grid'''
 

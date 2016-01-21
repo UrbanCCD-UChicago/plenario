@@ -37,7 +37,7 @@ class ShapeETL:
         # Then we could put both operations in the same transaction.
 
         self._ingest_shapefile()
-        self.meta.update_after_ingest(session)
+        self.meta.update_after_ingest()
 
         session.commit()
 

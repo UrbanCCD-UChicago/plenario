@@ -4,6 +4,7 @@
 <table id='shape-datasets' class='table table-condensed'>
     <thead>
     <tr>
+        <th>Source</th>
         <th>Dataset Name</th>
           <% if (hasIntersect) { %>
             <th>Count</th>
@@ -15,6 +16,7 @@
     <tbody>
     <% $.each(shapes, function(i, shape){ %>
         <tr>
+            <td><%= shape.attribution %></td>
             <td><a href="javascript://" class="shape-detail" data-shape_dataset_name="<%= shape.dataset_name %>"><%= shape.human_name %></a></td>
             <% if (hasIntersect) { %>
             <td><%= shape.num_geoms %></td>
