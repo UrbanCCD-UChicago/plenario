@@ -3,35 +3,34 @@ from csvkit.unicsv import UnicodeCSVReader
 from sqlalchemy.exc import NoSuchTableError
 from plenario.database import app_engine as engine, session
 from plenario.utils.helpers import iter_column, slugify
-import json
-from sqlalchemy import Boolean, Integer, BigInteger, Float, String, Date, TIME, TIMESTAMP,\
-    Table, Column, MetaData
+from sqlalchemy import Boolean, Integer, BigInteger, Float, String, Date, TIME,\
+    TIMESTAMP, Text, Table, Column, MetaData
 from sqlalchemy import select, func, text
 from sqlalchemy.sql import column
 from geoalchemy2 import Geometry
 from plenario.etl.common import PlenarioETLError
-from collections import namedtuple
 
-Dataset = namedtuple('Dataset', 'name bkey date lat lon loc')
 
 class PlenarioETL(object):
     def __init__(self, metadata, source_path=None):
         """
         :param metadata: MetaTable instance of dataset being ETL'd.
-        :param source_path: If provided, get source CSV ftom local filesystem instead of URL in metadata.
+        :param source_path: If provided, get source CSV ftom local filesystem
+                            instead of URL in metadata.
         """
         self.metadata = metadata
         # Grab a record of the names we'll need to work with this dataset
         # instead of passing around the unwieldy metadata object to ETL objects.
+        # Type of namedtuple('Dataset', 'name date lat lon loc')
         self.dataset = self.metadata.meta_tuple()
-        self.staging_table = StagingTable(self.metadata, source_path=source_path)
+        self.staging_table = Staging(self.metadata, source_path=source_path)
 
     def add(self):
         """
         Create point table for the first time.
         """
         with self.staging_table as s_table:
-            new_table = BrandNewTable(s_table.table, self.dataset).table
+            new_table = Creation(s_table.table, self.dataset).table
         update_meta(self.metadata, new_table)
         return new_table
 
@@ -42,13 +41,13 @@ class PlenarioETL(object):
         existing_table = self.metadata.point_table
         with self.staging_table as s_table:
             staging = s_table.table
-            Delete(staging, existing_table, self.dataset).execute()
-            with AdditionTable(staging, self.dataset, existing_table) as new_records:
+            delete(staging.name, existing_table.name)
+            with Update(staging, self.dataset, existing_table) as new_records:
                 new_records.insert()
         update_meta(self.metadata, existing_table)
 
 
-class StagingTable(object):
+class Staging(object):
     """
     A temporary table that will contain all records from the source CSV.
     From it, either create a new point table
@@ -63,24 +62,17 @@ class StagingTable(object):
         """
         # Just the info about column names we usually need
         self.dataset = meta.meta_tuple()
+        self.name = 's_' + self.dataset.name
 
         # Get the Columns to construct our table
         try:
             # Can we just grab columns from an existing table?
             self.cols = self._from_ingested(meta.column_info())
         except NoSuchTableError:
-            # This must be the first time we're ingesting the table
-
-            if meta.contributed_data_types:
-                try:
-                    types = json.loads(meta.contributed_data_types)
-                    self.cols = self._from_contributed(types)
-                # Quick fix until we dig deeper into contributed data types problem.
-                # If it fails, give up and attempt to infer from the source file instead.
-                except:
-                    pass
-            else:
-                self.cols = None
+            # We want to try contributed_column_types here eventually,
+            # but it's crazy broken right now.
+            # So either we already have the column info, or we try to infer it.
+            self.cols = None
 
         # Retrieve the source file
         try:
@@ -103,7 +95,8 @@ class StagingTable(object):
             # Grab the handle to build a table from the CSV
             try:
                 self.table = self._make_table(helper.handle)
-                self._kill_dups(self.table.name, self.dataset.bkey)
+                self._add_unique_hash(self.table.name)
+                self.table = Table(self.name, MetaData(), autoload_with=engine, extend_existing=True)
                 return self
             except Exception as e:
                 raise PlenarioETLError(e)
@@ -126,21 +119,16 @@ class StagingTable(object):
         """
         # Persist an empty table eagerly
         # so that we can access it when we drop down to a raw connection.
-        s_table_name = 's_' + self.dataset.name
-
-        # Make a sequential primary key to track line numbers
-        self.cols.append(Column('line_num', Integer, primary_key=True))
-
-        table = Table(s_table_name, MetaData(), *self.cols, extend_existing=True)
 
         # Be paranoid and remove the table if one by this name already exists.
-        table.drop(bind=engine, checkfirst=True)
+        table = Table(self.name, MetaData(), *self.cols, extend_existing=True)
+        self._drop()
         table.create(bind=engine)
 
         # Fill in the columns we expect from the CSV.
-        names = [c.name for c in self.cols if c.name != 'line_num']
+        names = [c.name for c in self.cols]
         copy_st = "COPY {t_name} ({cols}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')".\
-            format(t_name=s_table_name, cols=', '.join(names))
+            format(t_name=self.name, cols=', '.join(names))
 
         # In order to issue a COPY, we need to drop down to the psycopg2 DBAPI.
         conn = engine.raw_connection()
@@ -155,29 +143,27 @@ class StagingTable(object):
             conn.close()
 
     @staticmethod
-    def _kill_dups(table_name, key_name):
+    def _add_unique_hash(table_name):
         """
-        Removes rows from a table
-        such that the column named :key_name is unique.
-        Ties are broken on a column named line_num
-
-        :param table_name: Name of table to deduplicate
-        :param key_name: Name of column to dedupe on
+        Adds an md5 hash column of the preexisting columns
+        and removes duplicate rows from a table.
+        :param table_name: Name of table to add hash to.
         """
-        del_stmt = '''
-        DELETE FROM {table}
-        WHERE line_num NOT IN (
-          SELECT MIN(line_num) FROM {table}
-          GROUP BY {bk}
-        )
-        '''.format(table=table_name, bk=key_name)
+        add_hash = '''
+        DROP TABLE IF EXISTS temp;
+        CREATE TABLE temp AS
+          SELECT DISTINCT *,
+                 md5(CAST(("{table_name}".*)AS text))
+                    AS hash FROM "{table_name}";
+        DROP TABLE "{table_name}";
+        ALTER TABLE temp RENAME TO "{table_name}";
+        ALTER TABLE "{table_name}" ADD PRIMARY KEY (hash);
+        '''.format(table_name=table_name)
 
-        session.execute(del_stmt)
         try:
-            session.commit()
-        except:
-            session.rollback()
-            raise
+            engine.execute(add_hash)
+        except Exception as e:
+            raise PlenarioETLError(repr(e) + '\n Failed to deduplicate with ' + add_hash)
 
     '''Utility methods to generate columns into which we can dump the CSV data.'''
 
@@ -189,7 +175,7 @@ class StagingTable(object):
         ingested_cols = column_info
         # Don't include the geom and point_date columns.
         # They're derived from the source data and won't be present in the source CSV
-        original_cols = [c for c in ingested_cols if c.name not in ['geom', 'point_date']]
+        original_cols = [c for c in ingested_cols if c.name not in ['geom', 'point_date', 'hash']]
         # Make copies that don't refer to the existing table.
         cols = [_copy_col(c) for c in original_cols]
 
@@ -252,9 +238,9 @@ def _copy_col(col):
     return _make_col(col.name, col.type, col.nullable)
 
 
-class BrandNewTable(object):
+class Creation(object):
     """
-    When we're adding a dataset for the first time, create a BrandNewTable
+    When we're adding a dataset for the first time, create a brand new table
     """
 
     def __init__(self, staging, dataset):
@@ -266,8 +252,8 @@ class BrandNewTable(object):
         self.dataset = dataset
         # Make a brand spanking new table
         self.table = self._init_table()
-        # And insert data from an AdditionTable into it
-        with AdditionTable(self.staging, self.dataset, self.table) as new:
+        # And insert data from an Update into it
+        with Update(self.staging, self.dataset, self.table) as new:
             try:
                 new.insert()
             except Exception as e:
@@ -279,32 +265,39 @@ class BrandNewTable(object):
         Make a new table with the original columns from the staging table
         """
         # Take most columns straight from the source.
-        original_cols = []
-        for c in self.staging.columns:
-            if c.name == 'line_num':
-                # We only created line_num to deduplicate. Don't include it in our canonical table.
-                continue
-            elif c.name == self.dataset.bkey:
-                # The business_key will be our unique ID
-                original_cols.append(Column(c.name, c.type, primary_key=True))
-            else:
-                original_cols.append(_copy_col(c))
+        original_cols = [_copy_col(c) for c in self.staging.columns
+                         if c.name != 'hash']
+        # Take care that the hash column is designated the primary key.
+        original_cols.append(Column('hash', String(32), primary_key=True))
+
 
         # We also expect geometry and date columns to be created.
-        derived_cols = [Column('point_date', TIMESTAMP, nullable=True, index=True),
-                        Column('geom', Geometry('POINT', srid=4326), nullable=True, index=True)]
-        new_table = Table(self.dataset.name, MetaData(), *(original_cols + derived_cols))
+        derived_cols = [
+            Column('point_date', TIMESTAMP, nullable=True, index=True),
+            Column('geom', Geometry('POINT', srid=4326),
+                   nullable=True, index=True)]
+        new_table = Table(self.dataset.name, MetaData(),
+                          *(original_cols + derived_cols))
 
         try:
             new_table.create(engine)
+            # Disabled until trigger is debugged
+            # self._add_trigger()
         except:
             new_table.drop(bind=engine, checkfirst=True)
             raise
         else:
             return new_table
 
+    def _add_trigger(self):
+        add_trigger = """CREATE TRIGGER audit_after AFTER DELETE OR UPDATE
+                         ON {table}
+                         FOR EACH ROW EXECUTE PROCEDURE audit.if_modified()""".\
+                      format(table=self.dataset.name)
+        engine.execute(add_trigger)
 
-class AdditionTable(object):
+
+class Update(object):
     """
     Create a table that contains the business key, geom, and date
     of all records found in the staging table and not in the existing table.
@@ -319,13 +312,15 @@ class AdditionTable(object):
         self.dataset = dataset
         self.existing = existing
 
+        # We'll name it n_table
+        self.name = 'n_' + dataset.name
+
         # This table will only have the business key and the two derived columns for space and time.
-        cols = [_copy_col(staging.c[dataset.bkey]),
+        cols = [Column('hash', String(32), primary_key=True),
                 _make_col('point_date', TIMESTAMP, True),
                 _make_col('geom', Geometry('POINT', srid=4326), True)]
 
-        # We'll name it n_table
-        self.table = Table('n_' + dataset.name, MetaData(), *cols)
+        self.table = Table(self.name, MetaData(), *cols)
 
     def __enter__(self):
         """
@@ -341,12 +336,12 @@ class AdditionTable(object):
 
         derived_dates = func.cast(s.c[d.date], TIMESTAMP).label('point_date')
         derived_geoms = self._geom_col()
-        cols_to_insert = [s.c[d.bkey], derived_dates, derived_geoms]
+        cols_to_insert = [s.c['hash'], derived_dates, derived_geoms]
 
-        # Select the bkey and the columns we're deriving from the staging table.
+        # Select the hash and the columns we're deriving from the staging table.
         sel = select(cols_to_insert)
-        # And limit our results to records whose bkeys aren't already present in the existing table.
-        sel = sel.select_from(s.outerjoin(e, s.c[d.bkey] == e.c[d.bkey])).where(e.c[d.bkey] == None)
+        # And limit our results to records whose hashes aren't already present in the existing table.
+        sel = sel.select_from(s.outerjoin(e, s.c['hash'] == e.c['hash'])).where(e.c['hash'] == None)
 
         # Drop the table first out of healthy paranoia
         self._drop()
@@ -370,12 +365,10 @@ class AdditionTable(object):
         Join with the staging table to insert complete records into existing table.
         """
         derived_cols = [c for c in self.table.c if c.name in {'geom', 'point_date'}]
-        staging_cols = [c for c in self.staging.c if c.name != 'line_num']
+        staging_cols = [c for c in self.staging.c]
         sel_cols = staging_cols + derived_cols
 
-        bkey = self.dataset.bkey
-
-        sel = select(sel_cols).where(self.staging.c[bkey] == self.table.c[bkey])
+        sel = select(sel_cols).where(self.staging.c.hash == self.table.c.hash)
         ins = self.existing.insert().from_select(sel_cols, sel)
 
         try:
@@ -388,7 +381,7 @@ class AdditionTable(object):
             raise PlenarioETLError(repr(e) + '\n Failed to null out geoms with (0,0) geocoding')
 
     def _drop(self):
-        engine.execute("DROP TABLE IF EXISTS {};".format('n_' + self.dataset.name))
+        engine.execute("DROP TABLE IF EXISTS {};".format(self.name))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._drop()
@@ -413,8 +406,8 @@ class AdditionTable(object):
                         FROM (
                               SELECT FLOAT8((regexp_matches({loc_col}, '\((.*),.*\)'))[1]) AS latitude, \
                                      FLOAT8((regexp_matches({loc_col}, '\(.*,(.*)\)'))[1]) AS longitude \
-                              FROM s_{table} as t WHERE t."{bkey}" = {table}."{bkey}") AS subq'''\
-                        .format(table=d.name, bkey=d.bkey, loc_col=d.loc))
+                              FROM s_{table} as t WHERE t.hash = "{table}".hash) AS subq'''\
+                        .format(table=d.name, loc_col=d.loc))
             geom_col = geom_col.columns(column('geom')).label('geom')
 
         else:
@@ -423,33 +416,19 @@ class AdditionTable(object):
         return geom_col
 
 
-class Delete(object):
-    """
-    Identify all records in existing not present in staging
-    and get rid of them!
-    """
-    def __init__(self, staging, existing, dataset):
-        """
-        :param staging: table with CSV data
-        :param existing: table
-        :param dataset:
-        """
-        self.staging = staging
-        self.existing = existing
-        self.dataset = dataset
-
-    def execute(self):
-        del_ = """DELETE FROM "{existing}"
-                  WHERE "{id}" IN
-                     (SELECT "{id}" FROM "{existing}"
+def delete(staging_name, existing_name):
+    del_ = """DELETE FROM "{existing}"
+                  WHERE hash IN
+                     (SELECT hash FROM "{existing}"
                         EXCEPT
-                      SELECT "{id}" FROM  "{staging}");""".\
-            format(existing=self.existing.name, staging=self.staging.name, id=self.dataset.bkey)
+                      SELECT hash FROM  "{staging}");""".\
+            format(existing=existing_name, staging=staging_name)
 
-        try:
-            engine.execute(del_)
-        except Exception as e:
-            raise PlenarioETLError(repr(e) + '\n Failed to execute' + del_)
+    try:
+        engine.execute(del_)
+    except Exception as e:
+        raise PlenarioETLError(repr(e) + '\n Failed to execute' + del_)
+
 
 def update_meta(metadata, table):
     """

@@ -50,8 +50,7 @@ class PointAPITests(unittest.TestCase):
             'flu_shot_clinics',
             'landmarks',
             'crimes',
-            'meta_master',
-            'plenario_user'
+            'meta_master'
         ]
         drop_tables(tables_to_drop)
 
