@@ -24,17 +24,30 @@ sys.path.append(str(plenario_path))
 from plenario.alembic.version_helpers import dataset_names
 from plenario.database import session, app_engine as engine
 from plenario.models import MetaTable
-from plenario.tasks import add_dataset
 
 
 def upgrade():
-    for name in dataset_names(op):
-        print 'Trying to re-ingest ' + name
-        meta = MetaTable.get_by_dataset_name(name)
+    for dset_name in dataset_names(op):
+        # Generate columns to hash on
+        print dset_name
+        pt = MetaTable.get_by_dataset_name(dset_name).point_table
         session.close()
 
-        drop = 'DROP TABLE IF EXISTS "{}";'.format(name)
-        engine.execute(drop)
-        hash = meta.source_url_hash
-        session.close()
-        add_dataset(hash)
+        names_to_hash = [name for name in pt.c.keys()
+                         if name not in {'hash', 'point_date', 'geom'}]
+        quoted_names = ['"{}"'.format(name) for name in names_to_hash]
+        concatted_names = ','.join(quoted_names)
+
+        add_hash = '''
+        DROP TABLE IF EXISTS temp;
+        CREATE TABLE temp AS
+          SELECT DISTINCT {col_names},
+                 md5(CAST(({col_names})AS text))
+                    AS hash, geom, point_date FROM "{table_name}";
+        DROP TABLE "{table_name}";
+        ALTER TABLE temp RENAME TO "{table_name}";
+        ALTER TABLE "{table_name}" ADD PRIMARY KEY (hash);
+        '''.format(table_name=dset_name, col_names=concatted_names)
+
+        engine.execute(add_hash)
+
