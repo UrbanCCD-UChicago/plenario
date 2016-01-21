@@ -57,12 +57,17 @@ def iter_column(idx, f):
     col_type, null_values = normalize_column_type(col)
     return col_type, null_values
 
-def get_socrata_data_info(host, path, four_by_four):
+def get_socrata_data_info(host, path, four_by_four, is_shapefile=False):
     errors = []
     status_code = None
     dataset_info = {}
+    print host, path, four_by_four
     view_url = '%s/%s/%s' % (host, path, four_by_four)
-    source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url
+    
+    if is_shapefile:
+        source_url = '%s/download/%s/application/zip' % (host, four_by_four)
+    else:
+        source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url
 
     try:
         r = requests.get(view_url)
@@ -80,22 +85,23 @@ def get_socrata_data_info(host, path, four_by_four):
         errors.append('The Socrata dataset you supplied is not available currently')
         resp = None
     if resp:
-        columns = resp.get('columns')
+        dataset_info = {
+            'name': resp['name'],
+            'description': resp.get('description'),
+            'attribution': resp.get('attribution'),
+            'columns': [],
+            'view_url': view_url,
+            'source_url': source_url
+        }
+        try:
+            dataset_info['update_freq'] = \
+                resp['metadata']['custom_fields']['Metadata']['Update Frequency']
+        except KeyError:
+            dataset_info['update_freq'] = None
 
+        columns = resp.get('columns') #presence of columns implies table file
         if columns:
-            dataset_info = {
-                'name': resp['name'],
-                'description': resp.get('description'),
-                'attribution': resp.get('attribution'),
-                'columns': [],
-                'view_url': view_url,
-                'source_url': source_url
-            }
-            try:
-                dataset_info['update_freq'] = \
-                    resp['metadata']['custom_fields']['Metadata']['Update Frequency']
-            except KeyError:
-                dataset_info['update_freq'] = None
+            print 'WORKING WITH COLUMNS\n'
             for column in columns:
                 d = {
                     'human_name': column['name'],
@@ -127,7 +133,8 @@ def get_socrata_data_info(host, path, four_by_four):
                             d['null_values'] = False
                 dataset_info['columns'].append(d)
         else:
-            errors.append('Views endpoint not structured as expected')
+            if not is_shapefile:
+                errors.append('Views endpoint not structured as expected')
     return dataset_info, errors, status_code
 
 

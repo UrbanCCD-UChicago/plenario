@@ -7,7 +7,6 @@ from plenario.utils.weather import WeatherETL, WeatherStationsETL
 from argparse import ArgumentParser
 import datetime
 
-
 def init_db(args):
     if not any(vars(args).values()):
         # No specific arguments specified. Run it all!
