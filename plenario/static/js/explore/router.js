@@ -31,9 +31,12 @@ var AppRouter = Backbone.Router.extend({
             }
         )
     },
-    shapeDetail: function(shape_query){
-        var q = parseParams(shape_query);
-        shapeDetailView = new app.ShapeDetailView({el: '#map-view', shape_query: q});
+    shapeDetail: function(query){
+        var q = parseParams(query);
+        var collection = new app.Shapes();
+        collection.fetch({reset:true,success:function(){
+            shapeDetailView = new app.ShapeDetailView({el: '#map-view', model:collection.get(q['shape_dataset_name']),query:q});}
+        });
     }
 
 });

@@ -1,4 +1,4 @@
-<% var intersection = "http://plenar.io/v1/api/shapes/intersections/" + shape_query.location_geom__within %>
+<% var intersection = "http://plenar.io/v1/api/shapes/intersections/" + query.location_geom__within %>
 
 <div class='col-md-12'>
     <p><a href='#' id='back-to-explorer-shape'>&lt; back to Explorer</a></p>
@@ -24,19 +24,17 @@
             </div>
         </form>
 
-        <hr />
-
-        <h4>API queries</h4>
-        <p>View the API queries that are used on this page. <a href='/api-docs/'>Read the API docs</a>.</p>
-        <ul class=''>
-            <li><a href="<%= intersection %>" target="_blank"><code>/v1/api/shapes/intersections/&hellip;</code></a></li>
-        </ul>
+        <hr/>
 
     </div>
 </div>
 <div class='col-md-7'>
     <h3 class='detail-header' id="record-count"></h3>
-    <div id="map"></div>
+    <% if (shape.num_shapes <= 500 ) { %>
+        <div id="map"></div>
+    <% } else { %>
+        <br><br>
+    <% } %>
     <hr />
     <h4>Dataset details</h4>
     <table class="table">
@@ -44,6 +42,9 @@
             <tr>
                 <td>Name:</td>
                 <td><%= shape.human_name %></td>
+            </tr>
+            <tr><td>Total Number of Shapes:</td>
+                <td><%= shape.num_shapes %></td>
             </tr>
         </tbody>
     </table>

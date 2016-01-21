@@ -12,12 +12,10 @@ var app = app || {};
         initialize: function() {
             var self = this;
             this.query = {};
-            this.shape_query = {};
             this.collection = new app.Shapes();
             this.collection.fetch({reset:true,success:function(){
                 if (resp && resp.query.location_geom__within) {
                     self.query = resp.query;
-                    self.shape_query['location_geom__within'] = self.getGeoJson();
                     self.setIntersection();
                 }
             }
@@ -74,9 +72,8 @@ var app = app || {};
         },
         shapeDetailView: function(e){
             this.undelegateEvents();
-            var dataset_name = $(e.target).data('shape_dataset_name');
-            this.shape_query['shape_dataset_name'] = dataset_name;
 
+            //If no query has been made, setting default values
             if (_.isEmpty(this.query)) {
                 var start = $('#start-date-filter').val();
                 var end = $('#end-date-filter').val();
@@ -89,14 +86,16 @@ var app = app || {};
                 this.query['obs_date__le'] = end;
                 this.query['obs_date__ge'] = start;
                 this.query['agg'] = $('#time-agg-filter').val();
-                if (typeof this.query['resolution'] == 'undefined')
-                    this.query['resolution'] = "500";
+                this.query['resolution'] = "500";
             }
+
+            var dataset_name = $(e.target).data('shape_dataset_name');
+            this.query['shape_dataset_name'] = dataset_name;
 
             $('#map-view').empty();
             // currently not rendering meta data and have no filter options
-            shapeDetailView = new app.ShapeDetailView({model:this.collection.get(dataset_name), shape_query:this.shape_query, query:this.query});
-            var route = 'shapeDetail/' + $.param(this.shape_query);
+            shapeDetailView = new app.ShapeDetailView({model:this.collection.get(dataset_name), query:this.query});
+            var route = 'shapeDetail/' + $.param(this.query);
             _gaq.push(['_trackPageview', route]);
             router.navigate(route);
         }
