@@ -10,9 +10,6 @@ var DetailView = Backbone.View.extend({
         this.meta = this.attributes.meta;
         this.filters = this.attributes.filters;
 
-        // console.log('detail-view init')
-        // console.log(this.query)
-
         var start = moment().subtract('d', 90).format('MM/DD/YYYY');
         var end = moment().format('MM/DD/YYYY');
 
@@ -26,10 +23,10 @@ var DetailView = Backbone.View.extend({
 
         if (typeof this.query['resolution'] == 'undefined')
             this.query['resolution'] = "500";
-
         this.points_query = $.extend(true, {}, this.query);
         delete this.points_query['resolution'];
         delete this.points_query['center'];
+
         this.$el.html(template_cache('detailTemplate', {query: this.query, points_query: this.points_query, meta: this.meta, start: start, end: end}));
 
         var map_options = {
@@ -269,9 +266,10 @@ var DetailView = Backbone.View.extend({
     },
 
     backToExplorer: function(e){
+        //this function needs to get fixed
         e.preventDefault();
         this.undelegateEvents();
-        points_query = this.points_query;
+        var points_query = this.points_query;
 
         // delete filters and dataset name from query
         delete points_query['dataset_name'];
@@ -280,7 +278,9 @@ var DetailView = Backbone.View.extend({
             delete points_query[key];
         });
 
+        //if we've made a query go back to that aggregate view
         if (resp) { resp.undelegateEvents(); }
+        //if not use the initial query to render results which is why it's not rendering all the available datasets
         resp = new ResponseView({el: '#list-view', attributes: {query: points_query}});
         var attrs = { resp: resp }
         if (typeof points_query['location_geom__within'] !== 'undefined'){
@@ -289,7 +289,6 @@ var DetailView = Backbone.View.extend({
 
         if (map) { map.undelegateEvents(); }
         map = new MapView({el: '#map-view', attributes: attrs});
-
         var route = "aggregate/" + $.param(points_query);
         _gaq.push(['_trackPageview', route]);
         router.navigate(route);

@@ -10,7 +10,6 @@ import os
 import datetime
 import subprocess
 
-
 def init_db(args):
     if not any(vars(args).values()):
         # No specific arguments specified. Run it all!

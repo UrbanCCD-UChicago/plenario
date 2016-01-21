@@ -306,6 +306,8 @@ class ShapeMetadata(Base):
 
     # Organization that published this dataset
     attribution = Column(String)
+    description = Column(Text)
+    update_freq = Column(String(100), nullable=False)
 
     # We always ingest geometric data as 4326
     bbox = Column(Geometry('POLYGON', srid=4326))
@@ -338,10 +340,12 @@ class ShapeMetadata(Base):
                                       cls.date_added,
                                       func.ST_AsGeoJSON(cls.bbox),
                                       cls.num_shapes,
-                                      cls.attribution
+                                      cls.attribution,
+                                      cls.description,
+                                      cls.update_freq
                                       )\
                                  .filter(cls.is_ingested)
-        field_names = ['dataset_name', 'human_name', 'date_added', 'bounding_box', 'num_shapes', 'attribution']
+        field_names = ['dataset_name', 'human_name', 'date_added', 'bounding_box', 'num_shapes', 'attribution','description','update_freq']
         listing = [dict(zip(field_names, row)) for row in result]
         for dataset in listing:
             dataset['date_added'] = str(dataset['date_added'])
@@ -369,11 +373,14 @@ class ShapeMetadata(Base):
         return slugify(human_name)
 
     @classmethod
-    def add(cls, human_name, source_url, attribution=None):
+
+    def add(cls, human_name, source_url, attribution=None, description=None, update_freq=None):
         table_name = ShapeMetadata.make_table_name(human_name)
         new_shape_dataset = ShapeMetadata(dataset_name=table_name,
                                           human_name=human_name,
                                           attribution=attribution,
+                                          description=description,
+                                          update_freq=update_freq,
                                           is_ingested=False,
                                           source_url=source_url,
                                           date_added=datetime.now().date(),

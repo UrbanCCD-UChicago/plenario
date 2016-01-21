@@ -7,16 +7,17 @@ var MapView = Backbone.View.extend({
         var start = moment().subtract('d', 90).format('MM/DD/YYYY');
         var end = moment().format('MM/DD/YYYY');
 
-        if (this.attributes.resp && this.attributes.resp.query)
-        {
+        //if we have navigated to the resp
+        if (this.attributes.resp && this.attributes.resp.query) {
             start = moment(this.attributes.resp.query.obs_date__ge).format('MM/DD/YYYY');
             end = moment(this.attributes.resp.query.obs_date__le).format('MM/DD/YYYY');
         }
 
         this.$el.html(template_cache('mapTemplate', {end: end, start: start}));
 
-        if (this.attributes.resp && this.attributes.resp.query.agg)
-            $('#time-agg-filter').val(this.attributes.resp.query.agg)
+        if (this.attributes.resp && this.attributes.resp.query.agg) {
+             $('#time-agg-filter').val(this.attributes.resp.query.agg);
+        }
 
         // initialize the Leaflet map
         var map_options = {
@@ -134,7 +135,7 @@ var MapView = Backbone.View.extend({
 
         if(valid){
             if (resp) { resp.undelegateEvents(); }
-            resp = new ResponseView({el: '#list-view', attributes: {query: query}})
+            resp = new ResponseView({el: '#list-view', attributes: {query: query}});
             var route = "aggregate/" + $.param(query);
             _gaq.push(['_trackPageview', route]);
             router.navigate(route, {trigger: true});
