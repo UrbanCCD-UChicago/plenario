@@ -3,7 +3,7 @@ var AppRouter = Backbone.Router.extend({
         "": "defaultRoute",
         "aggregate/:query": "aggregate",
         "detail/:query": "detail",
-        "shapeDetail/:shape_query":"shapeDetail"
+        "shapeDetail/:query":"shapeDetail"
     },
     defaultRoute: function(){
         new AboutView({el: '#list-view'});
