@@ -1,0 +1,52 @@
+
+<div class='col-md-12'>
+    <p><a href='#' id='back-to-explorer-shape'>&lt; back to Explorer</a></p>
+</div>
+<div class='col-md-5'>
+    <div id="filters">
+        <h3 class='detail-header'>
+            <%= shape.human_name %>
+        </h3>
+        <form class='form' role="form">
+
+            <div class="btn-group">
+                <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                    <i class='fa fa-download'></i>
+                    Download
+                    <span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu" role="menu">
+                    <li><a href="<%='http://plenar.io/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=json'%>"><i class='fa fa-download'></i> GeoJson</a></li>
+                    <li><a href="<%='http://plenar.io/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=shapefile'%>"><i class='fa fa-download'></i> ESRI Shapefile</a></li>
+                    <li><a href="<%='http://plenar.io/v1/api/shapes/' + shape.dataset_name + '?' + 'data_type=kml'%>"><i class='fa fa-download'></i> KML</a></li>
+                </ul>
+            </div>
+        </form>
+
+        <hr/>
+
+    </div>
+</div>
+<div class='col-md-7'>
+    <h3 class='detail-header' id="record-count"></h3>
+    <% if (shape.num_shapes <= 500 ) { %>
+        <div id="map"></div>
+    <% } else { %>
+        <br><br>
+    <% } %>
+    <hr />
+    <h4>Dataset details</h4>
+    <table class="table">
+        <tbody>
+            <tr>
+                <td>Name:</td>
+                <td><%= shape.human_name %></td>
+            </tr>
+            <tr><td>Total Number of Shapes:</td>
+                <td><%= shape.num_shapes %></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<div class='clearfix'></div>
+<hr />

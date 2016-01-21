@@ -17,7 +17,7 @@
     <% $.each(shapes, function(i, shape){ %>
         <tr>
             <td><%= shape.attribution %></td>
-            <td><%= shape.human_name %></td>
+            <td><a href="javascript://" class="shape-detail" data-shape_dataset_name="<%= shape.dataset_name %>"><%= shape.human_name %></a></td>
             <% if (hasIntersect) { %>
             <td><%= shape.num_geoms %></td>
             <% } %>

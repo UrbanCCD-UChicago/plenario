@@ -178,7 +178,6 @@ def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_sou
         'is_socrata_source': socrata_source
     }
 
-    # add this to meta_master
     md = MetaTable(**d)
     session.add(md)
     session.commit()
