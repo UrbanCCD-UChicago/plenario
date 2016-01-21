@@ -282,7 +282,7 @@ class Creation(object):
         try:
             new_table.create(engine)
             # Disabled until trigger is debugged
-            # self._add_trigger()
+            self._add_trigger()
         except:
             new_table.drop(bind=engine, checkfirst=True)
             raise
