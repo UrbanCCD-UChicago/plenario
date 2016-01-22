@@ -44,6 +44,19 @@ def get_all_shape_datasets():
 
 
 @crossdomain(origin="*")
+def filter_shape(dataset_name, geojson):
+    """
+    Given a shape dataset and user-provided geojson,
+    return all shapes from the dataset that intersect the geojson.
+
+    :param dataset_name: Name of shape dataset
+    :param geojson: URL encoded goejson
+    :return:
+    """
+    return make_response('Yay', 200)
+
+
+@crossdomain(origin="*")
 def find_intersecting_shapes(geojson):
     """
     Respond with all shape datasets that intersect with the geojson provided.
