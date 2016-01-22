@@ -199,8 +199,13 @@ class ShapeTests(unittest.TestCase):
         with open(rect_path, 'r') as rect_json:
             query_rect = rect_json.read()
 
-        url = '/v1/api/shapes/filter/chicago_pedestrian_streets/' + query_rect
+        url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
         response = self.app.get(url)
-        print response
-
         self.assertEqual(response.status_code, 200)
+        print response.data
+
+        data = json.loads(response.data)
+        streets = data['features']
+        self.assertEqual(len(streets), 2)
+
+

@@ -53,7 +53,36 @@ def filter_shape(dataset_name, geojson):
     :param geojson: URL encoded goejson
     :return:
     """
-    return make_response('Yay', 200)
+    fragment = make_fragment_str(extract_first_geometry_fragment(geojson))
+
+    intersect_query = '''
+    SELECT *
+    FROM {dataset_name} AS g
+    WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
+    '''.format(dataset_name=dataset_name, geojson_fragment=fragment)
+
+    intersecting_records = engine.execute(intersect_query)
+
+    #table = ShapeMetadata.get_by_human_name(dataset_name).shape_table
+    meta = session.query(ShapeMetadata).get(dataset_name)
+    assert meta is not None
+    table = meta.shape_table
+
+
+    col_names = [c.name for c in table.columns]
+
+    output_records = []
+    for record in intersecting_records:
+        one_row = {c: r for c, r in zip(col_names, record)}
+        output_records.append(one_row)
+
+    '''if num_intersections > 0:
+        response_objects.append({
+            'dataset_name': dataset_name,
+            'num_geoms': num_intersections
+        })'''
+
+    return make_response(json.dumps(output_records), 200)
 
 
 @crossdomain(origin="*")
