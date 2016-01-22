@@ -28,11 +28,12 @@ class OgrExport(object):
     It is the caller's responsibility to clean up the file we create there.
     """
 
-    def __init__(self, export_format, export_path, table_name):
+    def __init__(self, export_format, export_path, table_name, query=None):
         self.ogr_format = self._requested_format_to_ogr_format_name(export_format)
         self.table_name = table_name
         self.flags = self._make_flags()
         self.export_path = export_path
+        self.query = query
 
     def write_file(self):
         if self.ogr_format == 'ESRI Shapefile':
@@ -59,7 +60,14 @@ class OgrExport(object):
         self._call_ogr2ogr(self.export_path)
 
     def _call_ogr2ogr(self, export_path):
-        args = ['ogr2ogr'] + self.flags + [export_path, postgres_connection_arg, self.table_name]
+        
+        if self.query:
+            query_flags = ['-sql', self.query] 
+        else:
+            query_flags = []
+
+        args = ['ogr2ogr'] + self.flags + query_flags + [export_path, postgres_connection_arg, self.table_name]
+        print args
         try:
             subprocess.check_call(args)
         except subprocess.CalledProcessError as e:
