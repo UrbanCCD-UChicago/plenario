@@ -9,7 +9,7 @@ from plenario.database import session, app_engine as engine
 from plenario.utils.ogr2ogr import OgrExport
 from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str
 
-def export_to_geojson(dataset_name, query=None):
+def export_dataset_to_json_response(dataset_name, query=None):
 
     """
     :param dataset_name: Name of shape dataset. Expected to be found in meta_shape table.
@@ -110,7 +110,7 @@ def filter_shape(dataset_name, geojson):
     WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
     '''.format(dataset_name=dataset_name, geojson_fragment=fragment)
 
-    return export_to_geojson(dataset_name, intersect_query)
+    return export_dataset_to_json_response(dataset_name, intersect_query)
 
 @crossdomain(origin="*")
 def find_intersecting_shapes(geojson):
@@ -178,7 +178,7 @@ def export_shape(dataset_name):
                                 If none of these (or unspecified), return JSON.
     """
     
-    return export_to_geojson(dataset_name)
+    return export_dataset_to_json_response(dataset_name)
 
 def _shape_format_to_content_header(requested_format):
 
