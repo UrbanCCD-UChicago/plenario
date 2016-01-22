@@ -267,7 +267,7 @@ def grab_dataset_details(is_shapefile=False):
  
     if request.args.get('dataset_url'):
         url = request.args.get('dataset_url')
-        (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url, True)
+        (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url, is_shapefile)
 
         # populate contributor info from session
         user = session.query(User).get(flask_session['user_id'])
