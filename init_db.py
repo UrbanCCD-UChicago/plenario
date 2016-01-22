@@ -94,7 +94,7 @@ def add_functions():
     pwd = os.path.dirname(os.path.realpath(__file__))
     db_script_path = os.path.join(pwd, 'plenario', 'dbscripts')
     trigger_path = os.path.join(db_script_path, 'audit_trigger.sql')
-    loc_func_path = os.path.join(db_script_path, '')
+    loc_func_path = os.path.join(db_script_path, 'point_from_location.sql')
 
     def add_function(script_path):
         args = ['psql', '-U', DB_USER, '-d', DB_NAME, '-f', script_path]
