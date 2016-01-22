@@ -400,14 +400,7 @@ class Update(object):
 
         elif d.loc:
             # Warning: this is really fragile.
-            geom_col = text(
-                    '''SELECT ST_PointFromText('POINT(' || subq.longitude || ' ' || subq.latitude || ')', 4326) \
-                        FROM (
-                              SELECT FLOAT8((regexp_matches({loc_col}, '\((.*),.*\)'))[1]) AS latitude, \
-                                     FLOAT8((regexp_matches({loc_col}, '\(.*,(.*)\)'))[1]) AS longitude \
-                              FROM s_{table} as t WHERE t.hash = "{table}".hash) AS subq'''\
-                        .format(table=d.name, loc_col=d.loc))
-            geom_col = geom_col.columns(column('geom')).label('geom')
+            geom_col = func.point_from_loc(t.c[d.loc]).label('geom')
 
         else:
             raise PlenarioETLError('Staging table does not have geometry information.')

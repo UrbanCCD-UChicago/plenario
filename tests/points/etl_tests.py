@@ -1,5 +1,4 @@
 from unittest import TestCase
-from plenario.models import MetaTable
 from plenario.database import session, app_engine
 import sqlalchemy as sa
 from sqlalchemy import Table, Column, Integer, Date, Float, String, TIMESTAMP, MetaData, Text
@@ -10,6 +9,7 @@ import os
 import json
 from datetime import date
 from init_db import init_meta
+from plenario.models import MetaTable
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 fixtures_path = os.path.join(pwd, '../test_fixtures')
@@ -203,6 +203,10 @@ class StagingTableTests(TestCase):
         session.close()
         new_table.drop(app_engine, checkfirst=True)
 
+        # Did we add a bbox?
+        bbox = MetaTable.get_by_dataset_name('community_radio_events').bbox
+        self.assertIsNotNone(bbox)
+
     def test_location_col_add(self):
         drop_if_exists(self.opera_meta.dataset_name)
 
@@ -213,6 +217,10 @@ class StagingTableTests(TestCase):
         self.assertEqual(len(all_rows), 5)
         session.close()
         new_table.drop(app_engine, checkfirst=True)
+
+        # Did we add a bbox?
+        bbox = MetaTable.get_by_dataset_name('public_opera_performances').bbox
+        self.assertIsNotNone(bbox)
 
     def test_location_col_update(self):
         drop_if_exists(self.opera_meta.dataset_name)

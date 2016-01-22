@@ -17,7 +17,7 @@ def init_db(args):
         init_weather()
         init_census()
         init_celery()
-        add_trigger()
+        add_functions()
     else:
         if args.meta:
             init_meta()
@@ -29,8 +29,8 @@ def init_db(args):
             init_census()
         if args.celery:
             init_celery()
-        if args.trigger:
-            add_trigger()
+        if args.functions:
+            add_functions()
 
 
 def init_master_meta_user():
@@ -86,15 +86,22 @@ def init_census():
     ShapeETL(meta=census_meta).ingest()
 
 
-def add_trigger():
-    # Makes bold assumption that you're executing on a local, passwprd-unprotected server
-    # for development purposes.
-    # If you can't connect this way, you'll need to execute the sql script yourself.
+def add_functions():
+    # Makes bold assumption that you're executing on a local,
+    # password-unprotected server for development purposes.
+    # If you can't connect this way,
+    # you'll need to execute the sql script yourself.
     pwd = os.path.dirname(os.path.realpath(__file__))
-    db_script_path = os.path.join(pwd, 'plenario', 'dbscripts', 'audit_trigger.sql')
-    args = ['psql', '-U', DB_USER, '-d', DB_NAME, '-f', db_script_path]
-    subprocess.check_call(args)
+    db_script_path = os.path.join(pwd, 'plenario', 'dbscripts')
+    trigger_path = os.path.join(db_script_path, 'audit_trigger.sql')
+    loc_func_path = os.path.join(db_script_path, '')
 
+    def add_function(script_path):
+        args = ['psql', '-U', DB_USER, '-d', DB_NAME, '-f', script_path]
+        subprocess.check_call(args)
+
+    add_function(trigger_path)
+    add_function(loc_func_path)
 
 def init_celery():
     hello_world.delay()
@@ -108,8 +115,9 @@ def build_arg_parser():
     creates tables, initializes NOAA weather station data and US Census block \
     data. If you specify no options, it will populate everything.'
     parser = ArgumentParser(description=description)
-    parser.add_argument('-m', '--meta', action="store_true", help="Set up the metadata \
-            registries needed to ingest point and shape datasets.")
+    parser.add_argument('-m', '--meta', action="store_true",
+                        help="Set up the metadata registries needed to"\
+                             " ingest point and shape datasets.")
     parser.add_argument('-u', '--users', action="store_true", help='Set up the a default\
             user to access the admin panel.')
     parser.add_argument('-w', '--weather', action="store_true", help='Set up NOAA \
@@ -119,8 +127,8 @@ def build_arg_parser():
             populate US Census blocks.')
     parser.add_argument('-cl', '--celery', action="store_true", help='Say hello \
             world from Celery')
-    parser.add_argument('-t', '--trigger', action='store_true',
-                        help='Add history tracking trigger function to database.')
+    parser.add_argument('-f', '--functions', action='store_true',
+                        help='Add plenario-specific functions to database.')
     return parser
 
 if __name__ == "__main__":
