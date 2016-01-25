@@ -91,6 +91,17 @@ def get_all_shape_datasets():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
+@crossdomain(origin="*")
+def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
+    """
+    Given a shape dataset and user-provided geojson,
+    return all shapes from the dataset that intersect the geojson.
+
+    :param dataset_name: Name of shape dataset
+    :param geojson: URL encoded goejson
+    :return:
+    """
+    
 
 @crossdomain(origin="*")
 def filter_shape(dataset_name, geojson):

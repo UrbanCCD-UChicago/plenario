@@ -27,6 +27,7 @@ api.add_url_rule(prefix + '/shapes/intersections/<geojson>', 'shape_intersection
 api.add_url_rule(prefix + '/shapes/<dataset_name>', 'shape_export', export_shape)
 api.add_url_rule(prefix + '/shapes/filter/<dataset_name>/<geojson>', 'shape_filter', filter_shape)
 
+#api.add_url_rule(prefix + '/shapes/polygon_filter/<dataset_name>/<geojson>', 'polygon_filter', filter_point_data_with_polygons)
 
 @api.route(prefix + '/flush-cache')
 def flush_cache():

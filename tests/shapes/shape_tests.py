@@ -208,4 +208,7 @@ class ShapeTests(unittest.TestCase):
         streets = data['features']
         self.assertEqual(len(streets), 2)
 
+    def test_filter_point_data_with_polygons(self):
+        #TODO:
+
 
