@@ -24,6 +24,8 @@ from sqlalchemy.exc import NoSuchTableError
 
 views = Blueprint('views', __name__)
 
+'''(Mostly) Static pages'''
+
 @views.route('/')
 def index():
     return render_template('index.html')
@@ -49,6 +51,47 @@ def examples_view():
 @views.route('/maintenance')
 def maintenance():
     return render_template('maintenance.html'), 503
+
+@views.route('/terms')
+def terms_view():
+    return render_template('terms.html')
+
+'''Approve a dataset'''
+
+@views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
+@login_required
+def approve_dataset_view(source_url_hash):
+
+    approve_dataset(source_url_hash)
+
+    return redirect(url_for('views.view_datasets'))
+
+
+def approve_dataset(source_url_hash):
+    # Approve it
+    meta = session.query(MetaTable).get(source_url_hash)
+    meta.approved_status = 'true'
+    session.commit()
+
+    # Ingest it
+    add_dataset_task.delay(source_url_hash)
+
+    # Email the submitter
+    msg_body = """Hello %s,\r\n
+\r\n
+Your dataset has been approved and added to Plenar.io:\r\n
+\r\n
+%s\r\n
+\r\n
+It should appear on http://plenar.io within 24 hours.\r\n
+\r\n
+Thank you!\r\n
+The Plenario Team\r\n
+http://plenar.io""" % (meta.contributor_name, meta.human_name)
+
+    send_mail(subject="Your dataset has been added to Plenar.io",
+              recipient=meta.contributor_email, body=msg_body)
+
 
 # Given a URL, this function returns a tuple (dataset_info, errors, socrata_source)
 def get_context_for_new_dataset(url, is_shapefile=False):
@@ -86,7 +129,7 @@ def get_context_for_new_dataset(url, is_shapefile=False):
                 dataset_info['name'] = urlparse(url).path.split('/')[-1]
                 inp = StringIO()
                 line_no = 0
-                lines = []
+
                 for line in r.iter_lines():
                     try:
                         inp.write(line + '\n')
@@ -111,21 +154,10 @@ def get_context_for_new_dataset(url, is_shapefile=False):
                     dataset_info['columns'].append(d)
     else:
         errors.append('Need a URL')
-    #print "get_context_for_new_dataset(): returning ", dataset_info, errors, socrata_source
-    return (dataset_info, errors, socrata_source)
+    return dataset_info, errors, socrata_source
 
-def table_row_estimate(table_name):
-    print table_name, "estimating"
-    try:
-        q = text(''' 
-            SELECT reltuples::bigint AS estimate FROM pg_class where relname=:table_name;
-        ''')
-        with engine.begin() as c:
-            return list(c.execute(q, table_name=table_name))[0][0]
-    except NoSuchTableError, e:
-        print "Table %s doesn't exist" % table_name 
 
-def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_source, approved_status):
+def add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, approved_status):
     data_types = []
     business_key = None
     observed_date = None
@@ -180,39 +212,7 @@ def add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_sou
 
     return md
 
-def approve_dataset(source_url_hash):
-    # get the MetaTable row and change the approved_status and bounce back to view-datasets.
 
-    meta = session.query(MetaTable).get(source_url_hash)
-
-    json_data_types = None
-    if ((not meta.is_socrata_source) and meta.contributed_data_types):
-        json_data_types = json.loads(meta.contributed_data_types)
-        
-    add_dataset_task.delay(source_url_hash, data_types=json_data_types)
-    
-    upd = { 'approved_status': 'true' }
-
-    meta.approved_status = 'true'
-    session.commit()
-
-    # Email the user who submitted that their dataset has been approved.
-    # email the response to somebody
-
-    msg_body = """Hello %s,\r\n
-\r\n
-Your dataset has been approved and added to Plenar.io:\r\n
-\r\n
-%s\r\n
-\r\n
-It should appear on http://plenar.io within 24 hours.\r\n
-\r\n
-Thank you!\r\n
-The Plenario Team\r\n
-http://plenar.io""" % (meta.contributor_name, meta.human_name)
-
-    send_mail(subject="Your dataset has been added to Plenar.io", 
-        recipient=meta.contributor_email, body=msg_body)
 
 
 # /contribute is similar to /admin/add-dataset, but sends an email instead of actually adding
@@ -237,7 +237,7 @@ def contrib_view():
             errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
 
     if request.method == 'POST' and not md:
-        md = add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_source, approved_status=False)
+        md = add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, approved_status=False)
 
         # email a confirmation to the submitter
         msg_body = """Hello %s,\r\n\r\n
@@ -276,19 +276,15 @@ def grab_dataset_details(is_shapefile=False):
         dataset_info['contributor_email'] = user.email
 
         dataset_info['is_shapefile'] = is_shapefile
-        #print dataset_info
 
-    return (dataset_info, errors, socrata_source, url)
+    return dataset_info, errors, socrata_source, url
 
 @views.route('/admin/add-dataset/table', methods=['GET', 'POST'])
 @login_required
 def add_table():
-    dataset_info = {}
     errors = []
-    socrata_source = False
-    md = None
 
-    (dataset_info, error, socrata_source, url) = grab_dataset_details()
+    dataset_info, error, socrata_source, url = grab_dataset_details()
 
     # check if dataset with the same URL has already been loaded
     dataset_id = md5(url).hexdigest()
@@ -297,7 +293,7 @@ def add_table():
         errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
 
     if request.method == 'POST' and not md:
-        md = add_dataset_to_metatable(request, url, dataset_id, dataset_info, socrata_source, approved_status=True)
+        md = add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, approved_status=True)
         
         json_data_types = None
         if ((not md.is_socrata_source) and md.contributed_data_types):
@@ -315,12 +311,9 @@ def add_table():
 @views.route('/admin/add-shape', methods=['GET', 'POST'])
 @login_required
 def add_shape():
-    dataset_info = {}
     errors = []
-    socrata_source = False
-    md = None
-
-    (dataset_info, error, socrata_source, url) = grab_dataset_details(True)
+    dataset_info, error, socrata_source, url = \
+        grab_dataset_details(is_shapefile=True)
 
     if request.method == 'POST':
         try:
@@ -330,8 +323,8 @@ def add_shape():
             description = request.form.get('dataset_description')
             update_freq = request.form['update_frequency']
         except KeyError:
-            # Front-end validation failed or someone is posting bogus query strings directly.
-            # re-render with error message
+            # A required field slipped by frontend validation.
+            # Re-render with error message
             errors.append('A required field was not submitted.')
         else:
             # Does a shape dataset with this human_name already exist?
@@ -340,11 +333,10 @@ def add_shape():
 
         if not errors:
             # Add the metadata right away
-            # Add some kind of ingestion method to examine shape url and grab metadata
-            # shape_info = get_context_for_new_shape(url)
-
-            meta = ShapeMetadata.add(human_name=human_name, source_url=source_url,
-                                     attribution=attribution, description=description,
+            meta = ShapeMetadata.add(human_name=human_name,
+                                     source_url=source_url,
+                                     attribution=attribution,
+                                     description=description,
                                      update_freq=update_freq)
             session.commit()
 
@@ -354,8 +346,10 @@ def add_shape():
             flash('Plenario is now trying to ingest your shapefile.', 'success')
             return redirect(url_for('views.view_datasets'))
 
-    context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source, 'is_admin': True}
+    context = {'dataset_info': dataset_info, 'errors': errors,
+               'socrata_source': socrata_source, 'is_admin': True}
     return render_template('submit-shape.html', **context)
+
 
 @views.route('/admin/view-datasets')
 @login_required
@@ -363,14 +357,6 @@ def view_datasets():
     datasets_pending = session.query(MetaTable)\
         .filter(MetaTable.approved_status != 'true')\
         .all()
-
-    # TODO: remove row estimate count box
-    counts = {
-        'master_row_count': 42,
-        'weather_daily_row_count': 1,
-        'weather_hourly_row_count': 2,
-        'census_block_row_count': 3
-    }
 
     try:
         q = text(''' 
@@ -401,7 +387,6 @@ def view_datasets():
     return render_template('admin/view-datasets.html',
                            datasets_pending=datasets_pending,
                            datasets=datasets,
-                           counts=counts,
                            shape_datasets=shape_datasets)
 
 
@@ -418,9 +403,7 @@ def shape_status():
 def dataset_status():
 
     source_url_hash = request.args.get("source_url_hash")
-    celery_table = Table('celery_taskmeta', Base.metadata, 
-                         autoload=True, autoload_with=engine)
-    results = []
+
     q = ''' 
         SELECT 
           m.human_name, 
@@ -472,15 +455,12 @@ class EditDatasetForm(Form):
     human_name = TextField('human_name', validators=[DataRequired()])
     description = TextField('description', validators=[DataRequired()])
     attribution = TextField('attribution', validators=[DataRequired()])
-    #obs_from = DateField('obs_from', validators=[DataRequired(message="Start of date range must be a valid date")])
-    #obs_to = DateField('obs_to', validators=[DataRequired(message="End of date range must be a valid date")])
     update_freq = SelectField('update_freq', 
                               choices=[('daily', 'Daily'),
                                        ('weekly', 'Weekly'),
                                        ('monthly', 'Monthly'),
                                        ('yearly', 'Yearly')], 
                               validators=[DataRequired()])
-    business_key = TextField('business_key', validators=[DataRequired()])
     observed_date = TextField('observed_date', validators=[DataRequired()])
     latitude = TextField('latitude')
     longitude = TextField('longitude')
@@ -507,13 +487,7 @@ class EditDatasetForm(Form):
 
         return valid
 
-@views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
-@login_required
-def approve_dataset_view(source_url_hash):
-    
-    approve_dataset(source_url_hash)
-    
-    return redirect(url_for('views.view_datasets'))
+
 
 
 @views.route('/admin/edit-dataset/<source_url_hash>', methods=['GET', 'POST'])
@@ -555,7 +529,6 @@ def edit_dataset(source_url_hash):
             'description': form.description.data,
             'attribution': form.attribution.data,
             'update_freq': form.update_freq.data,
-            'business_key': form.business_key.data,
             'latitude': form.latitude.data,
             'longitude': form.longitude.data,
             'location': form.location.data,
@@ -615,6 +588,4 @@ def check_update(task_id):
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-@views.route('/terms')
-def terms_view():
-    return render_template('terms.html')
+

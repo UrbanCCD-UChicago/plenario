@@ -44,11 +44,13 @@ class MetaTable(Base):
     longitude = Column(String)
     location = Column(String)
     # approved_status is used as a bool
-    approved_status = Column(String)  # if False, then do not display without first getting administrator approval
+    # if False, then do not display without first getting administrator approval
+    approved_status = Column(String)
     contributor_name = Column(String)
     contributor_organization = Column(String)
     contributor_email = Column(String)
-    contributed_data_types = Column(Text)  # Temporarily store user-submitted data types for later approval
+    # Temporarily store user-submitted data types for later approval
+    contributed_data_types = Column(Text)
     is_socrata_source = Column(Boolean, default=False)
     result_ids = Column(ARRAY(String))
 
@@ -66,7 +68,7 @@ class MetaTable(Base):
         :param is_socrata: Does this dataset come from Socrata?
         :param approved_status: Has an admin signed off on this dataset?
         :param contributed_data_types: stringified JSON mapping
-        :param update_freq: string: one of ['daily', 'weekly', 'monthly', 'yearly']
+        :param update_freq: one of ['daily', 'weekly', 'monthly', 'yearly']
         :param latitude: Name of col with latitude
         :param longitude: Name of col with longitude
         :param location: Name of col with location formatted as (lat, lon)
@@ -79,16 +81,19 @@ class MetaTable(Base):
             else:
                 return slugify(unicode(name), delim=u'_')
 
-        # We need some combination of columns from which we can derive a point in space
+        # Some combination of columns from which we can derive a point in space.
         assert(location or (latitude and longitude))
-        # Frontend validation should have slugified column names already, but enforcing it here is nice for testing.
-        self.latitude, self.longitude = curried_slug(latitude), curried_slug(longitude)
+        # Frontend validation should have slugified column names already,
+        # but enforcing it here is nice for testing.
+        self.latitude = curried_slug(latitude)
+        self.longitude = curried_slug(longitude)
         self.location = curried_slug(location)
 
         assert human_name
         self.human_name = human_name
         # Known issue: slugify fails hard on Non-ASCII
-        self.dataset_name = kwargs.get('dataset_name', curried_slug(human_name)[:50])
+        self.dataset_name = kwargs.get('dataset_name',
+                                       curried_slug(human_name)[:50])
 
         assert observed_date
         self.business_key = curried_slug(business_key)
@@ -100,13 +105,17 @@ class MetaTable(Base):
         assert update_freq
         self.update_freq = update_freq
 
-        # Can be None. In practice, frontend validation makes sure these are always passed along.
+        # Can be None. In practice,
+        # frontend validation makes sure these are always passed along.
         self.description, self.attribution = description, attribution
         self.is_socrata_source = is_socrata
         self.contributed_data_types = contributed_data_types
 
         # This boolish value is stored as a string in the DB.
-        self.approved_status = str(approved_status)
+        if approved_status is True:
+            self.approved_status = 'true'
+        else:
+            self.approved_status = str(approved_status)
 
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
@@ -130,7 +139,8 @@ class MetaTable(Base):
         try:
             return self._point_table
         except AttributeError:
-            self._point_table = Table(self.dataset_name, Base.metadata, autoload=True, extend_existing=True)
+            self._point_table = Table(self.dataset_name, Base.metadata,
+                                      autoload=True, extend_existing=True)
             return self._point_table
 
     # Return a list of [
@@ -172,7 +182,6 @@ class MetaTable(Base):
             panel.append(ts_dict)
 
         return panel
-
 
     # Information about all point datasets
     @classmethod

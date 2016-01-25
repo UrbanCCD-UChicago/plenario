@@ -37,27 +37,6 @@
                 </tbody>
             </table>
         </div>
-        <div class='col-sm-5'>
-            <table class='table table-bordered'>
-                <thead>
-                    <tr>
-                        <td><i class='fa fa-align-justify'></i> Total rows</td>
-                        <td><i class='fa fa-umbrella'></i> Weather observations</td>
-                        <td><i class='fa fa-square'></i> Census blocks</td>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>{{ counts.master_row_count | format_number }}</td>
-                        <td>
-                            Daily: {{ counts.weather_daily_row_count | format_number }}<br />
-                            Hourly: {{ counts.weather_hourly_row_count | format_number }}
-                        </td>
-                        <td>{{ counts.census_block_row_count | format_number }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
         <div class='col-sm-2'>
             <p>
                 <a href='/admin/add-dataset'>Add dataset &raquo;</a><br />
