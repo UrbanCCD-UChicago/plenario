@@ -159,7 +159,6 @@ def get_context_for_new_dataset(url, is_shapefile=False):
 
 def add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, approved_status):
     data_types = []
-    business_key = None
     observed_date = None
     latitude = None
     longitude = None 
@@ -171,15 +170,10 @@ def add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, appr
 
         if k.startswith('key_type_'):
             key = k.replace("key_type_", "")
-            if (v == "business_key"): business_key = key
             if (v == "observed_date"): observed_date = key
             if (v == "latitude"): latitude = key
             if (v == "longitude"): longitude = key
             if (v == "location"): location = key
-
-    if socrata_source:
-        data_types = dataset_info['columns']
-        url = dataset_info['source_url']
 
     # Horrible awful no good hack that reflects that we chck for literal string 'true'
     if approved_status is True:
@@ -193,7 +187,6 @@ def add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, appr
         'url': url,
         'source_url_hash': dataset_id,
         'update_freq': request.form.get('update_frequency'),
-        'business_key': business_key,
         'observed_date': observed_date,
         'latitude': latitude,
         'longitude': longitude,
@@ -201,9 +194,7 @@ def add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, appr
         'contributor_name': request.form.get('contributor_name'),
         'contributor_organization': request.form.get('contributor_organization'),
         'contributor_email': request.form.get('contributor_email'),
-        'contributed_data_types': json.dumps(data_types),
         'approved_status': approved_status,
-        'is_socrata_source': socrata_source
     }
 
     md = MetaTable(**d)
@@ -211,8 +202,6 @@ def add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, appr
     session.commit()
 
     return md
-
-
 
 
 # /contribute is similar to /admin/add-dataset, but sends an email instead of actually adding
@@ -253,6 +242,7 @@ Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (request.form.get('cont
     context = {'dataset_info': dataset_info, 'form': request.form, 'errors': errors, 'socrata_source': socrata_source}
     return render_template('submit-table.html', **context)
 
+
 @views.route('/contribute-thankyou')
 def contrib_thankyou():
     context = {}
@@ -279,6 +269,7 @@ def grab_dataset_details(is_shapefile=False):
 
     return dataset_info, errors, socrata_source, url
 
+
 @views.route('/admin/add-dataset/table', methods=['GET', 'POST'])
 @login_required
 def add_table():
@@ -294,61 +285,13 @@ def add_table():
 
     if request.method == 'POST' and not md:
         md = add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, approved_status=True)
-        
-        json_data_types = None
-        if ((not md.is_socrata_source) and md.contributed_data_types):
-            json_data_types = json.loads(md.contributed_data_types)
-
-        add_dataset_task.delay(md.source_url_hash, data_types=json_data_types)
+        add_dataset_task.delay(md.source_url_hash)
         
         flash('%s added successfully!' % md.human_name, 'success')
         return redirect(url_for('views.view_datasets'))
         
     context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source, 'is_admin': True}
     return render_template('submit-table.html', **context)
-
-
-@views.route('/admin/add-shape', methods=['GET', 'POST'])
-@login_required
-def add_shape():
-    errors = []
-    dataset_info, error, socrata_source, url = \
-        grab_dataset_details(is_shapefile=True)
-
-    if request.method == 'POST':
-        try:
-            human_name = request.form['dataset_name']
-            source_url = dataset_info['source_url']
-            attribution = request.form.get('dataset_attribution')
-            description = request.form.get('dataset_description')
-            update_freq = request.form['update_frequency']
-        except KeyError:
-            # A required field slipped by frontend validation.
-            # Re-render with error message
-            errors.append('A required field was not submitted.')
-        else:
-            # Does a shape dataset with this human_name already exist?
-            if ShapeMetadata.get_by_human_name(human_name=human_name):
-                errors.append('A shape dataset with that name already exists.')
-
-        if not errors:
-            # Add the metadata right away
-            meta = ShapeMetadata.add(human_name=human_name,
-                                     source_url=source_url,
-                                     attribution=attribution,
-                                     description=description,
-                                     update_freq=update_freq)
-            session.commit()
-
-            # And tell a worker to go ingest it
-            add_shape_task.delay(table_name=meta.dataset_name)
-
-            flash('Plenario is now trying to ingest your shapefile.', 'success')
-            return redirect(url_for('views.view_datasets'))
-
-    context = {'dataset_info': dataset_info, 'errors': errors,
-               'socrata_source': socrata_source, 'is_admin': True}
-    return render_template('submit-shape.html', **context)
 
 
 @views.route('/admin/view-datasets')
@@ -388,14 +331,6 @@ def view_datasets():
                            datasets_pending=datasets_pending,
                            datasets=datasets,
                            shape_datasets=shape_datasets)
-
-
-@views.route('/admin/shape-status/')
-@login_required
-def shape_status():
-    table_name = request.args['table_name']
-    shape_meta = ShapeMetadata.get_metadata_with_etl_result(table_name=table_name)
-    return render_template('admin/shape-status.html', shape=shape_meta)
 
 
 @views.route('/admin/dataset-status/')
@@ -488,8 +423,6 @@ class EditDatasetForm(Form):
         return valid
 
 
-
-
 @views.route('/admin/edit-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
 def edit_dataset(source_url_hash):
@@ -498,11 +431,8 @@ def edit_dataset(source_url_hash):
 
     fieldnames = None
     num_rows = 0
-    # Taking out support for these in move to master-less schema
-    num_weather_observations = 0
-    num_rows_w_censusblocks = 0
     
-    if (meta.approved_status == 'true'):
+    if meta.approved_status == 'true':
         try:
             table_name = meta.dataset_name
             
@@ -517,11 +447,6 @@ def edit_dataset(source_url_hash):
             # dataset has been approved, but perhaps still processing.
             pass
 
-    if (not fieldnames):
-        # This is the case when the csv dataset was not from Socrata
-        fieldnames = []
-        if meta.contributed_data_types:
-            fieldnames = [f['field_name'] for f in json.loads(meta.contributed_data_types)]
 
     if form.validate_on_submit():
         upd = {
@@ -539,8 +464,7 @@ def edit_dataset(source_url_hash):
             .update(upd)
         session.commit()
 
-        
-        if (meta.approved_status != 'true'):
+        if meta.approved_status != 'true':
             approve_dataset(source_url_hash)
         
         flash('%s updated successfully!' % meta.human_name, 'success')
@@ -553,17 +477,8 @@ def edit_dataset(source_url_hash):
         'meta': meta,
         'fieldnames': fieldnames,
         'num_rows': num_rows,
-        'num_weather_observations': num_weather_observations,
-        'num_rows_w_censusblocks': num_rows_w_censusblocks
     }
     return render_template('admin/edit-dataset.html', **context)
-
-
-@views.route('/admin/delete-shape/<table_name>')
-@login_required
-def delete_shape(table_name):
-    result = delete_shape_task.delay(table_name)
-    return make_response(json.dumps({'status': 'success', 'task_id': result.id}))
 
 
 @views.route('/admin/delete-dataset/<source_url_hash>')
@@ -589,3 +504,63 @@ def check_update(task_id):
     return resp
 
 
+''' Shape stuff '''
+
+
+@views.route('/admin/add-shape', methods=['GET', 'POST'])
+@login_required
+def add_shape():
+    errors = []
+    dataset_info, error, socrata_source, url = \
+        grab_dataset_details(is_shapefile=True)
+
+    if request.method == 'POST':
+        try:
+            human_name = request.form['dataset_name']
+            source_url = dataset_info['source_url']
+            attribution = request.form.get('dataset_attribution')
+            description = request.form.get('dataset_description')
+            update_freq = request.form['update_frequency']
+        except KeyError:
+            # A required field slipped by frontend validation.
+            # Re-render with error message
+            errors.append('A required field was not submitted.')
+        else:
+            # Does a shape dataset with this human_name already exist?
+            if ShapeMetadata.get_by_human_name(human_name=human_name):
+                errors.append('A shape dataset with that name already exists.')
+
+        if not errors:
+            # Add the metadata right away
+            meta = ShapeMetadata.add(human_name=human_name,
+                                     source_url=source_url,
+                                     attribution=attribution,
+                                     description=description,
+                                     update_freq=update_freq)
+            session.commit()
+
+            # And tell a worker to go ingest it
+            add_shape_task.delay(table_name=meta.dataset_name)
+
+            flash('Plenario is now trying to ingest your shapefile.', 'success')
+            return redirect(url_for('views.view_datasets'))
+
+    context = {'dataset_info': dataset_info, 'errors': errors,
+               'socrata_source': socrata_source, 'is_admin': True}
+    return render_template('submit-shape.html', **context)
+
+
+@views.route('/admin/shape-status/')
+@login_required
+def shape_status():
+    table_name = request.args['table_name']
+    shape_meta = ShapeMetadata.get_metadata_with_etl_result(table_name)
+    return render_template('admin/shape-status.html', shape=shape_meta)
+
+
+@views.route('/admin/delete-shape/<table_name>')
+@login_required
+def delete_shape(table_name):
+    result = delete_shape_task.delay(table_name)
+    return make_response(json.dumps({'status': 'success',
+                                     'task_id': result.id}))

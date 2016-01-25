@@ -25,33 +25,31 @@ PointDataset = namedtuple('PointDataset', 'name date lat lon loc')
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
-    dataset_name = Column(String(100), nullable=False)  # limited to 50 chars elsewhere
+    # limited to 50 chars elsewhere
+    dataset_name = Column(String(100), nullable=False)
     human_name = Column(String(255), nullable=False)
     description = Column(Text)
     source_url = Column(String(255))
     source_url_hash = Column(String(32), primary_key=True)
     attribution = Column(String(255))
+    # Spatial and temporal boundaries of observations in this dataset
     obs_from = Column(Date)
     obs_to = Column(Date)
     bbox = Column(Geometry('POLYGON', srid=4326))
+    # TODO: Add restriction list ['daily' etc.]
     update_freq = Column(String(100), nullable=False)
     last_update = Column(DateTime)
     date_added = Column(DateTime)
-    # Store the names of fields in source data
-    business_key = Column(String, nullable=True)
+    # The names of our "special" fields
     observed_date = Column(String, nullable=False)
     latitude = Column(String)
     longitude = Column(String)
     location = Column(String)
-    # approved_status is used as a bool
     # if False, then do not display without first getting administrator approval
-    approved_status = Column(String)
+    approved_status = Boolean
     contributor_name = Column(String)
     contributor_organization = Column(String)
     contributor_email = Column(String)
-    # Temporarily store user-submitted data types for later approval
-    contributed_data_types = Column(Text)
-    is_socrata_source = Column(Boolean, default=False)
     result_ids = Column(ARRAY(String))
 
     def __init__(self, url, human_name,
@@ -164,8 +162,8 @@ class MetaTable(Base):
         panel = []
         for dataset_name, ts in groupby(panel_vals, lambda row: row.dataset_name):
 
-            # Looks silly, but ts gets closed after it's been iterated over once,
-            # so we need to store all the rows somewhere if we want to iterate over them twice.
+            # ts gets closed after it's been iterated over once,
+            # so we need to store the rows somewhere to iterate over them twice.
             rows = [row for row in ts]
             # If no records were found, don't include this dataset
             if all([row.count == 0 for row in rows]):
@@ -176,7 +174,7 @@ class MetaTable(Base):
 
             for row in rows:
                 ts_dict['items'].append({
-                    'datetime': row.time_bucket.date(),  # Return without tz info. Should be UTC.
+                    'datetime': row.time_bucket.date(),  # UTC time
                     'count':    row.count
                 })
             panel.append(ts_dict)
@@ -195,15 +193,19 @@ class MetaTable(Base):
     def narrow_candidates(cls, dataset_names, start, end, geom=None):
         """
         :param dataset_names: Names of point datasets to be considered
-        :return names: Names of point datasets whose bounding box and date range interesects with the given bounds.
+        :return names: Names of point datasets whose bounding box and date range
+                       interesects with the given bounds.
         """
         # Filter out datsets that don't intersect the time boundary
-        q = session.query(MetaTable.dataset_name)\
-            .filter(MetaTable.dataset_name.in_(dataset_names), MetaTable.obs_from < end, MetaTable.obs_to > start)
+        q = session.query(cls.dataset_name)\
+            .filter(cls.dataset_name.in_(dataset_names),
+                    cls.obs_from < end,
+                    cls.obs_to > start)
 
         # or the geometry boundary
         if geom:
-            q = q.filter(MetaTable.bbox.ST_Intersects(func.ST_GeomFromGeoJSON(geom)))
+            intersecting = cls.bbox.ST_Intersects(func.ST_GeomFromGeoJSON(geom))
+            q = q.filter(intersecting)
 
         return [row.dataset_name for row in q.all()]
 
@@ -213,7 +215,8 @@ class MetaTable(Base):
         return foo
 
     def get_bbox_center(self):
-        result = session.execute(select([func.ST_AsGeoJSON(func.ST_centroid(self.bbox))]))
+        sel = select([func.ST_AsGeoJSON(func.ST_centroid(self.bbox))])
+        result = session.execute(sel)
         # returns [lon, lat]
         return json.loads(result.first()[0])['coordinates']
 
@@ -223,8 +226,6 @@ class MetaTable(Base):
             self.date_added = now
         self.last_update = now
 
-
-
     def make_grid(self, resolution, geom=None, conditions=None):
         """
         :param resolution: length of side of grid square in meters
@@ -232,14 +233,17 @@ class MetaTable(Base):
         :param geom: string representation of geojson fragment
         :type geom: str
         :param conditions: conditions on columns to filter on
-        :type conditions: list of SQLAlchemy binary operations (e.g. col > value)
-        :return: result proxy with all result rows
-                 size_x and size_y: the horizontal and vertical size of the grid squares in degrees
+        :type conditions: list of SQLAlchemy binary operations
+                          (e.g. col > value)
+        :return: grid: result proxy with all result rows
+                 size_x, size_y: the horizontal and vertical size
+                                    of the grid squares in degrees
         """
         if conditions is None:
             conditions = []
 
-        # We need to convert resolution (given in meters) to degrees - which is the unit of measure for EPSG 4326
+        # We need to convert resolution (given in meters) to degrees
+        # - which is the unit of measure for EPSG 4326 -
         # - in order to generate our grid.
         center = self.get_bbox_center()
         # center[1] is longitude
@@ -248,7 +252,8 @@ class MetaTable(Base):
         # Generate a count for each resolution by resolution square
         t = self.point_table
         q = session.query(func.count(t.c.hash),
-                          func.ST_SnapToGrid(t.c.geom, size_x, size_y).label('squares'))\
+                          func.ST_SnapToGrid(t.c.geom, size_x, size_y)
+                          .label('squares'))\
             .filter(*conditions)\
             .group_by('squares')
 
@@ -274,26 +279,32 @@ class MetaTable(Base):
                            day_generator.label('time_bucket')])\
             .alias('defaults')
 
-        # Create a CTE that grabs the number of records contained in each time bucket.
+        # Create a CTE that grabs the number of records
+        # contained in each time bucket.
         # Will only have rows for buckets with records.
-        actuals = select([func.count(t.c.hash).label('count'),  # Count unique records
-                          func.date_trunc(agg_unit, t.c.point_date).label('time_bucket')])\
-            .where(sa.and_(t.c.point_date >= start,            # Only include records in time window
+        actuals = select([func.count(t.c.hash).label('count'),
+                          func.date_trunc(agg_unit, t.c.point_date).
+                         label('time_bucket')])\
+            .where(sa.and_(t.c.point_date >= start,
                            t.c.point_date <= end))\
             .group_by('time_bucket')
 
         # Also filter by geometry if requested
         if geom:
-            actuals = actuals.where(func.ST_Within(t.c.geom, func.ST_GeomFromGeoJSON(geom)))
+            contains = func.ST_Within(t.c.geom, func.ST_GeomFromGeoJSON(geom))
+            actuals = actuals.where(contains)
 
         # Need to alias to make it usable in a subexpression
         actuals = actuals.alias('actuals')
 
-        # Outer join the default and observed values to create the timeseries select statement.
+        # Outer join the default and observed values
+        # to create the timeseries select statement.
         # If no observed value in a bucket, use the default.
-        ts = select([sa.literal_column("'{}'".format(self.dataset_name)).label('dataset_name'),
-                     defaults.c.time_bucket.label('time_bucket'),
-                     func.coalesce(actuals.c.count, defaults.c.count).label('count')]).\
+        name = sa.literal_column("'{}'".format(self.dataset_name))\
+            .label('dataset_name')
+        bucket = defaults.c.time_bucket.label('time_bucket')
+        count = func.coalesce(actuals.c.count, defaults.c.count).label('count')
+        ts = select([name, bucket, count]).\
             select_from(defaults.outerjoin(actuals, actuals.c.time_bucket == defaults.c.time_bucket))
 
         return ts
@@ -302,8 +313,10 @@ class MetaTable(Base):
         ts_select = self.timeseries(agg_unit, start, end, geom)
         rows = session.execute(ts_select.order_by('time_bucket'))
 
-        ts = [['count', 'datetime']] + [[count, time_bucket.date()] for _, time_bucket, count in rows]
-        return ts
+        header = [['count', 'datetime']]
+        # Discard the name attribute.
+        rows = [[count, time_bucket.date()] for _, time_bucket, count in rows]
+        return header + rows
 
 
 class ShapeMetadata(Base):
@@ -345,16 +358,17 @@ class ShapeMetadata(Base):
     @classmethod
     def index(cls):
         result = session.query(cls.dataset_name,
-                                      cls.human_name,
-                                      cls.date_added,
-                                      func.ST_AsGeoJSON(cls.bbox),
-                                      cls.num_shapes,
-                                      cls.attribution,
-                                      cls.description,
-                                      cls.update_freq
-                                      )\
+                               cls.human_name,
+                               cls.date_added,
+                               func.ST_AsGeoJSON(cls.bbox),
+                               cls.num_shapes,
+                               cls.attribution,
+                               cls.description,
+                               cls.update_freq)\
                                  .filter(cls.is_ingested)
-        field_names = ['dataset_name', 'human_name', 'date_added', 'bounding_box', 'num_shapes', 'attribution','description','update_freq']
+        field_names = ['dataset_name', 'human_name', 'date_added',
+                       'bounding_box', 'num_shapes', 'attribution',
+                       'description', 'update_freq']
         listing = [dict(zip(field_names, row)) for row in result]
         for dataset in listing:
             dataset['date_added'] = str(dataset['date_added'])
@@ -382,8 +396,8 @@ class ShapeMetadata(Base):
         return slugify(human_name)
 
     @classmethod
-
-    def add(cls, human_name, source_url, attribution=None, description=None, update_freq=None):
+    def add(cls, human_name, source_url,
+            attribution=None, description=None, update_freq=None):
         table_name = ShapeMetadata.make_table_name(human_name)
         new_shape_dataset = ShapeMetadata(dataset_name=table_name,
                                           human_name=human_name,
@@ -395,7 +409,6 @@ class ShapeMetadata(Base):
                                           date_added=datetime.now().date(),
                                           bbox=None,
                                           num_shapes=None)
-
         session.add(new_shape_dataset)
         return new_shape_dataset
 
@@ -404,7 +417,8 @@ class ShapeMetadata(Base):
         try:
             return self._shape_table
         except AttributeError:
-            self._shape_table = Table(self.dataset_name, Base.metadata, autoload=True, extend_existing=True)
+            self._shape_table = Table(self.dataset_name, Base.metadata,
+                                      autoload=True, extend_existing=True)
             return self._shape_table
 
     def remove_table(self):
@@ -419,7 +433,8 @@ class ShapeMetadata(Base):
         self.num_shapes = self._get_num_shapes()
 
     def _make_bbox(self):
-        bbox_query = 'SELECT ST_Envelope(ST_Union(geom)) FROM {};'.format(self.dataset_name)
+        bbox_query = 'SELECT ST_Envelope(ST_Union(geom)) FROM {};'.\
+            format(self.dataset_name)
         box = session.execute(bbox_query).first().st_envelope
         return box
 
@@ -427,7 +442,8 @@ class ShapeMetadata(Base):
         table = self.shape_table
         # Arbitrarily select the first column of the table to count against
         count_query = select([func.count(table.c.geom)])
-        # Should return only one row. And we want the 0th and only attribute of that row (the count).
+        # Should return only one row.
+        # And we want the 0th and only attribute of that row (the count).
         return session.execute(count_query).fetchone()[0]
 
 

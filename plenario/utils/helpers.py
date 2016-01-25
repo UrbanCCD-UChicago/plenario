@@ -101,7 +101,6 @@ def get_socrata_data_info(host, path, four_by_four, is_shapefile=False):
 
         columns = resp.get('columns') #presence of columns implies table file
         if columns:
-            print 'WORKING WITH COLUMNS\n'
             for column in columns:
                 d = {
                     'human_name': column['name'],
@@ -155,33 +154,14 @@ def slugify(text, delim=u'_'):
     else:
         return text
 
-def increment_datetime_aggregate(sourcedate, time_agg):
-    delta = None
-    if time_agg == 'day':
-        delta = timedelta(days=1)
-    elif time_agg == 'week':
-        delta = timedelta(days=7)
-    elif time_agg == 'month':
-        _, days_to_add = calendar.monthrange(sourcedate.year, sourcedate.month)
-        delta = timedelta(days=days_to_add)
-    elif time_agg == 'quarter':
-        _, days_to_add_1 = calendar.monthrange(sourcedate.year, sourcedate.month)
-        _, days_to_add_2 = calendar.monthrange(sourcedate.year, sourcedate.month+1)
-        _, days_to_add_3 = calendar.monthrange(sourcedate.year, sourcedate.month+2)
-        delta = timedelta(days=(days_to_add_1 + days_to_add_2 + days_to_add_3))
-    elif time_agg == 'year':
-        days_to_add = 366 if calendar.isleap(sourcedate.year) else 365
-        delta = timedelta(days=days_to_add)
-
-    return sourcedate + delta
 
 def send_mail(subject, recipient, body):
     msg = Message(subject,
-              sender=(MAIL_DISPLAY_NAME, MAIL_USERNAME),
-              recipients=[recipient], bcc=[ADMIN_EMAIL])
+                  sender=(MAIL_DISPLAY_NAME, MAIL_USERNAME),
+                  recipients=[recipient], bcc=[ADMIN_EMAIL])
 
     msg.body = body
-    msg.html = string.replace(msg.body,'\r\n','<br />')
+    msg.html = string.replace(msg.body, '\r\n', '<br />')
     try: 
         mail.send(msg)
     except SMTPAuthenticationError, e:
