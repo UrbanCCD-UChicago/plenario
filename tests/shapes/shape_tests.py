@@ -194,7 +194,7 @@ class ShapeTests(unittest.TestCase):
 
     '''/filter'''
 
-    def test_filter(self):
+    def test_filter_with_pedestrian_streets_in_university_village(self):
         rect_path = os.path.join(FIXTURE_PATH, 'university_village_rectangle.json')
         with open(rect_path, 'r') as rect_json:
             query_rect = rect_json.read()
@@ -202,13 +202,27 @@ class ShapeTests(unittest.TestCase):
         url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
         response = self.app.get(url)
         self.assertEqual(response.status_code, 200)
-        print response.data
 
         data = json.loads(response.data)
         streets = data['features']
         self.assertEqual(len(streets), 2)
 
+    def test_filter_with_pedestrian_streets_in_loop(self):
+        rect_path = os.path.join(FIXTURE_PATH, 'loop_rectangle.json')
+        with open(rect_path, 'r') as rect_json:
+            query_rect = rect_json.read()
+
+        url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        data = json.loads(response.data)
+        streets = data['features']
+        self.assertEqual(len(streets), 6)
+
+
     def test_filter_point_data_with_polygons(self):
         #TODO:
+        pass
 
 
