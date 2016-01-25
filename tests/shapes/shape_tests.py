@@ -27,6 +27,7 @@ class Fixture(object):
         self.human_name = human_name
         self.table_name = ShapeMetadata.make_table_name(human_name)
         self.path = os.path.join(FIXTURE_PATH, file_name)
+        self.update_freq = 'yearly'
 
 fixtures = {
     'city': Fixture(human_name=u'Chicago City Limits',
@@ -57,7 +58,9 @@ class ShapeTests(unittest.TestCase):
         ShapeTests.ingest_fixture(fixtures['zips'])
 
         # Add a dummy dataset to the metadata without ingesting a shapefile for it
-        cls.dummy_name = ShapeMetadata.add(human_name=u'Dummy Name', source_url=None).dataset_name
+        cls.dummy_name = ShapeMetadata.add(human_name=u'Dummy Name',
+                                           source_url=None,
+                                           update_freq='yearly').dataset_name
         session.commit()
 
         cls.app = create_app().test_client()
@@ -65,7 +68,9 @@ class ShapeTests(unittest.TestCase):
     @staticmethod
     def ingest_fixture(fixture):
         # Add the fixture to the metadata first
-        shape_meta = ShapeMetadata.add(human_name=fixture.human_name, source_url=None)
+        shape_meta = ShapeMetadata.add(human_name=fixture.human_name,
+                                       source_url=None,
+                                       update_freq=fixture.update_freq)
         session.commit()
         # Bypass the celery task and call on a ShapeETL directly
         ShapeETL(meta=shape_meta, source_path=fixture.path).ingest()
@@ -182,5 +187,42 @@ class ShapeTests(unittest.TestCase):
 
         # Add them back to return to original test state
         ShapeTests.ingest_fixture(fixtures['city'])
-        ShapeMetadata.add(human_name=u'Dummy Name', source_url=None)
+        ShapeMetadata.add(human_name=u'Dummy Name',
+                          source_url=None,
+                          update_freq='yearly')
         session.commit()
+
+    '''/filter'''
+
+    def test_filter_with_pedestrian_streets_in_university_village(self):
+        rect_path = os.path.join(FIXTURE_PATH, 'university_village_rectangle.json')
+        with open(rect_path, 'r') as rect_json:
+            query_rect = rect_json.read()
+
+        url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        data = json.loads(response.data)
+        streets = data['features']
+        self.assertEqual(len(streets), 2)
+
+    def test_filter_with_pedestrian_streets_in_loop(self):
+        rect_path = os.path.join(FIXTURE_PATH, 'loop_rectangle.json')
+        with open(rect_path, 'r') as rect_json:
+            query_rect = rect_json.read()
+
+        url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        data = json.loads(response.data)
+        streets = data['features']
+        self.assertEqual(len(streets), 6)
+
+
+    def test_filter_point_data_with_polygons(self):
+        #TODO:
+        pass
+
+

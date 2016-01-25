@@ -1064,19 +1064,31 @@
 
       {{ panel(endpoint='shapes/intersections/<geojson>',
                      endpoint_id='shape_intersections',
-                     short_description='find how many shapes in Plenario intersect with a geometry',
+                     short_description='find how many shapes in a datasect intersect with a geometry',
                      long_description="Given a geometry encoded in GeoJSON,
                                        find how many shapes in each of Plenario's shape datasets in Plenario intersect it.",
                      query_desc='This endpoint takes no query parameters.',
                      query_params=None,
-                     response_desc='One record per shape dataset that intersects the given geometry.',
+                     response_desc='A document of shapes from a given shape dataset that intersect with a given geometry',
                      response_attrs=[('dataset_name', 'The name of a dataset that intersects the query geometry.'),
                                      ('num_intersections', 'A count of how many shapes in that dataset intersect with the query geometry.')],
                      examples=[('shapes/intersections/{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.67248630523682,41.86454328565965],[-87.67248630523682,41.872117384500754],[-87.6549768447876,41.872117384500754],[-87.6549768447876,41.86454328565965],[-87.67248630523682,41.86454328565965]]]}}',
                                 "For each shape dataset in Plenario,
                                 get a count of the shapes that intersect a geometry encoded in the given GeoJSON.
                                 (This GeoJSON happens to represent a chunk of Chicago's Little Italy neighborhood.)")]) }}
-      
+
+      {{ panel(endpoint='shapes/filter/<dataset_name>/<geojson>',
+                     endpoint_id='shape_filter',
+                     short_description='find the shapes in a dataset that intersect with a geometry',
+                     long_description="Given a shape dataset and a geometry encoded in GeoJSON,
+                                       return a GeoJSON document of all the shapes in the dataset that intersect with the given geometry.",
+                     query_desc='This endpoint takes no query parameters.',
+                     query_params=None,
+                     response_desc='A document of shapes from the given dataset that intersect the given geometry.',
+                     examples=[('shapes/intersections/chicago_pedestrian_streets/{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.67248630523682,41.86454328565965],[-87.67248630523682,41.872117384500754],[-87.6549768447876,41.872117384500754],[-87.6549768447876,41.86454328565965],[-87.67248630523682,41.86454328565965]]]}}',
+                                "Find all of the pedestrian streets in Chicago that intersect a geometry encoded in the given GeoJSON.
+                                (This GeoJSON happens to represent a chunk of Chicago's Little Italy neighborhood.)")]) }}
+
       <h2 id='responses'>Response format</h2>
       <p>All JSON API calls return their data in the <code>objects</code> block. Additional information is returned in the <code>meta</code> block:</p>
 

@@ -2,7 +2,9 @@ import json
 from flask import make_response, Blueprint
 from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate
 from common import cache
-from shape import get_all_shape_datasets, find_intersecting_shapes, export_shape
+from shape import get_all_shape_datasets, find_intersecting_shapes, \
+                    export_shape, filter_shape
+
 from sensor import weather_stations, weather
 
 API_VERSION = '/v1'
@@ -23,7 +25,9 @@ api.add_url_rule(prefix + '/weather-stations/', 'weather_stations', weather_stat
 api.add_url_rule(prefix + '/shapes/', 'shape_index', get_all_shape_datasets)
 api.add_url_rule(prefix + '/shapes/intersections/<geojson>', 'shape_intersections', find_intersecting_shapes)
 api.add_url_rule(prefix + '/shapes/<dataset_name>', 'shape_export', export_shape)
+api.add_url_rule(prefix + '/shapes/filter/<dataset_name>/<geojson>', 'shape_filter', filter_shape)
 
+#api.add_url_rule(prefix + '/shapes/polygon_filter/<dataset_name>/<geojson>', 'polygon_filter', filter_point_data_with_polygons)
 
 @api.route(prefix + '/flush-cache')
 def flush_cache():
