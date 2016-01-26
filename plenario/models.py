@@ -51,11 +51,15 @@ class MetaTable(Base):
     contributor_organization = Column(String)
     contributor_email = Column(String)
     result_ids = Column(ARRAY(String))
+    column_names = Column(ARRAY(String))
 
     def __init__(self, url, human_name, observed_date,
                  approved_status=False, update_freq='yearly',
                  latitude=None, longitude=None, location=None,
-                 attribution=None, description=None, **kwargs):
+                 attribution=None, description=None,
+                 column_names=None,
+                 contributor_name=None, contributor_email=None,
+                 contributor_organization=None, **kwargs):
         """
         :param url: url where CSV or Socrata dataset with this dataset resides
         :param human_name: Nicely formatted name to display to people
@@ -102,8 +106,15 @@ class MetaTable(Base):
         # frontend validation makes sure these are always passed along.
         self.description, self.attribution = description, attribution
 
+        # Expect a list of strings
+        self.column_names = column_names
+
         # Boolean
         self.approved_status = approved_status
+
+        self.contributor_name = contributor_name
+        self.contributor_organization = contributor_organization
+        self.contributor_email = contributor_email
 
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
