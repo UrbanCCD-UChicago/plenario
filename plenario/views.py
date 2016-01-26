@@ -2,7 +2,7 @@ from flask import make_response, request, redirect, url_for, render_template, \
     Blueprint, flash, session as flask_session
 from plenario.models import MetaTable, User, ShapeMetadata
 from plenario.database import session, Base, app_engine as engine
-from plenario.utils.helpers import get_socrata_data_info, iter_column, send_mail, slugify
+from plenario.utils.helpers import iter_column, send_mail, slugify
 from plenario.tasks import update_dataset as update_dataset_task, \
     delete_dataset as delete_dataset_task, add_dataset as add_dataset_task, \
     add_shape as add_shape_task, delete_shape as delete_shape_task
@@ -64,12 +64,13 @@ def terms_view():
 '''Approve a dataset'''
 
 
+# TODO: Catch an email exception and flash email failure
+
+
 @views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
 def approve_dataset_view(source_url_hash):
-
     approve_dataset(source_url_hash)
-
     return redirect(url_for('views.view_datasets'))
 
 
@@ -78,7 +79,6 @@ def approve_dataset(source_url_hash):
     meta = session.query(MetaTable).get(source_url_hash)
     meta.approved_status = 'true'
     session.commit()
-
     # Ingest it
     add_dataset_task.delay(source_url_hash)
 
@@ -98,9 +98,160 @@ http://plenar.io""" % (meta.contributor_name, meta.human_name)
     send_mail(subject="Your dataset has been added to Plenar.io",
               recipient=meta.contributor_email, body=msg_body)
 
+#
+#
+''' Submit a dataset (Add it to MetaData
+    and try to ingest it now or later.) '''
+#
+#
 
-# Given a URL, this function returns a tuple (dataset_info, errors, socrata_source)
+
+def add_dataset_to_metatable(url, approved_status):
+    """
+    Called during request cycles with form guaranteed to have
+    the fields used below.
+    Derives a MetaTable object from the form and adds it to the DB.
+    :param url: Download url
+    :param approved_status: Whether this dataset should be viewable
+    :return: MetaTable instance that was persisted to DB.
+    """
+
+    labels = extract_form_labels(request.form)
+    name = slugify(request.form.get('dataset_name'), delim=u'_')[:50]
+
+    md = MetaTable(
+        url=url,
+        dataset_name=name,
+        human_name=request.form.get('dataset_name'),
+        attribution=request.form.get('dataset_attribution'),
+        description=request.form.get('dataset_description'),
+        contributor_name=request.form.get('contributor_name'),
+        contributor_organization=request.form.get('contributor_organization'),
+        contributor_email=request.form.get('contributor_email'),
+        approved_status=approved_status,
+        observed_date=labels.get('observed_date', None),
+        latitude=labels.get('latitude', None),
+        longitude=labels.get('longitude', None),
+        location=labels.get('location', None),
+    )
+    session.add(md)
+    session.commit()
+    return md
+
+
+def extract_form_labels(form):
+    """
+    :param form: Taken from requests.form
+    :return: dict mapping string labels of special column types
+             (observed_date, latitude, longitude, location)
+             to names of columns
+    """
+    labels = {}
+    for k, v in form.iteritems():
+        if k.startswith('key_type_'):
+            # key_type_observed_date
+            key = k.replace("key_type_", "")
+            # e.g labels['observed_date'] = 'date'
+            labels[v] = key
+    return labels
+
+
+def get_socrata_data_info(host, path, four_by_four, is_shapefile=False):
+    """
+
+    :param host:
+    :param path:
+    :param four_by_four: Socrata unique ID like abcd-efgh
+    :param is_shapefile: Is this an endpoint of an ESRI shapefile?
+    :return: (dataset_info, errors, status_code)
+            dataset_info is a big dict with all of Socrata's metadata
+            errors
+    """
+    errors = []
+    status_code = None
+    dataset_info = {}
+    print host, path, four_by_four
+    view_url = '%s/%s/%s' % (host, path, four_by_four)
+
+    if is_shapefile:
+        source_url = '%s/download/%s/application/zip' % (host, four_by_four)
+    else:
+        source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url
+
+    try:
+        r = requests.get(view_url)
+        status_code = r.status_code
+    except requests.exceptions.InvalidURL:
+        errors.append('Invalid URL')
+    except requests.exceptions.ConnectionError:
+        errors.append('URL can not be reached')
+    try:
+        resp = r.json()
+    except AttributeError:
+        errors.append('No Socrata views endpoint available for this dataset')
+        resp = None
+    except ValueError:
+        errors.append('The Socrata dataset you supplied is not available currently')
+        resp = None
+    if resp:
+        dataset_info = {
+            'name': resp['name'],
+            'description': resp.get('description'),
+            'attribution': resp.get('attribution'),
+            'columns': [],
+            'view_url': view_url,
+            'source_url': source_url
+        }
+        try:
+            dataset_info['update_freq'] = \
+                resp['metadata']['custom_fields']['Metadata']['Update Frequency']
+        except KeyError:
+            dataset_info['update_freq'] = None
+
+        columns = resp.get('columns') #presence of columns implies table file
+        if columns:
+            for column in columns:
+                d = {
+                    'human_name': column['name'],
+                    'machine_name': column['fieldName'],
+                    #'field_name': column['fieldName'], # duplicate definition for code compatibility
+                    #'field_name': column['name'], # duplicate definition for code compatibility
+                    'field_name': slugify(column['name']), # duplicate definition for code compatibility
+                    'data_type': column['dataTypeName'],
+                    'description': column.get('description', ''),
+                    'width': column['width'],
+                    'sample_values': [],
+                    'smallest': '',
+                    'largest': '',
+                }
+
+                if column.get('cachedContents'):
+                    cached = column['cachedContents']
+                    if cached.get('top'):
+                        d['sample_values'] = \
+                            [c['item'] for c in cached['top']][:5]
+                    if cached.get('smallest'):
+                        d['smallest'] = cached['smallest']
+                    if cached.get('largest'):
+                        d['largest'] = cached['largest']
+                    if cached.get('null'):
+                        if cached['null'] > 0:
+                            d['null_values'] = True
+                        else:
+                            d['null_values'] = False
+                dataset_info['columns'].append(d)
+        else:
+            if not is_shapefile:
+                errors.append('Views endpoint not structured as expected')
+    return dataset_info, errors, status_code
+
+
 def get_context_for_new_dataset(url, is_shapefile=False):
+    """
+    :param url:
+    :param is_shapefile: A
+    :return: a tuple (dataset_info, errors, socrata_source)
+    """
     dataset_info = {}
     errors = []
     socrata_source = False
@@ -162,50 +313,8 @@ def get_context_for_new_dataset(url, is_shapefile=False):
     return dataset_info, errors, socrata_source
 
 
-def extract_form_labels(form):
-    """
-
-    :param form: Taken from requests.form
-    :return: dict mapping string labels of special column types
-             (observed_date, latitude, longitude, location)
-             to names of columns
-    """
-    labels = {}
-    for k, v in form.iteritems():
-        if k.startswith('key_type_'):
-            # key_type_observed_date
-            key = k.replace("key_type_", "")
-            # e.g labels['observed_date'] = 'date'
-            labels[v] = key
-    return labels
-
-
-def add_dataset_to_metatable(url, approved_status):
-
-    labels = extract_form_labels(request.form)
-    name = slugify(request.form.get('dataset_name'), delim=u'_')[:50]
-
-    md = MetaTable(
-        url=url,
-        dataset_name=name,
-        human_name=request.form.get('dataset_name'),
-        attribution=request.form.get('dataset_attribution'),
-        description=request.form.get('dataset_description'),
-        contributor_name=request.form.get('contributor_name'),
-        contributor_organization=request.form.get('contributor_organization'),
-        contributor_email=request.form.get('contributor_email'),
-        approved_status=approved_status,
-        observed_date=labels.get('observed_date', None),
-        latitude=labels.get('latitude', None),
-        longitude=labels.get('longitude', None),
-        location=labels.get('location', None),
-    )
-    session.add(md)
-    session.commit()
-    return md
-
-
-# /contribute is similar to /admin/add-dataset, but sends an email instead of actually adding
+# /contribute is similar to /admin/add-dataset,
+# but sends an email instead of actually adding
 @views.route('/contribute', methods=['GET','POST'])
 def contrib_view():
     dataset_info = {}
@@ -432,6 +541,8 @@ def edit_dataset(source_url_hash):
     form = EditDatasetForm()
     meta = session.query(MetaTable).get(source_url_hash)
 
+    # Bug: If the table has never been ingested,
+    #  we don't know the name of its columns.
     fieldnames = None
     num_rows = 0
     
@@ -487,13 +598,15 @@ def edit_dataset(source_url_hash):
 @login_required
 def delete_dataset(source_url_hash):
     result = delete_dataset_task.delay(source_url_hash)
-    return make_response(json.dumps({'status': 'success', 'task_id': result.id}))
+    return make_response(json.dumps({'status': 'success',
+                                     'task_id': result.id}))
 
 
 @views.route('/update-dataset/<source_url_hash>')
 def update_dataset(source_url_hash):
     result = update_dataset_task.delay(source_url_hash)
-    return make_response(json.dumps({'status': 'success', 'task_id': result.id}))
+    return make_response(json.dumps({'status': 'success',
+                                     'task_id': result.id}))
 
 
 @views.route('/check-update/<task_id>')

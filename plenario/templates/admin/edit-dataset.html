@@ -126,6 +126,7 @@
                 </div>
             </div>
         </div>
+    {% if fieldnames %}
         <div class="row">
             <div class="col-sm-6">
                 {% if form.observed_date.errors %}
@@ -227,6 +228,9 @@
                 </div>
             </div>
         </div>
+    {% else %}
+        <h3>Oops. We don't know the names of this dataset's columns.</h3>
+    {% endif %}
 
         {% if not meta.approved_status %}
             <button type="submit" class="btn btn-success"><i class='fa fa-check'></i> Approve</button>
@@ -268,7 +272,7 @@
                 $.getJSON('/admin/delete-dataset/' + hash, {}, function(resp){
                     // Slight hack: reload the view-datasets page after waiting for a couple seconds.
                     setTimeout( function(){
-                            window.location = "/admin/add-dataset?dataset_url=" + $("#source_url").html();
+                            window.location = "/admin/add-dataset/table/?dataset_url=" + $("#source_url").html();
                         }, 2500 );
                 })
             })

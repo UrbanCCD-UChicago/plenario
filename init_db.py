@@ -1,7 +1,6 @@
 import plenario.models
 import plenario.settings
 from plenario.database import session, app_engine, Base
-from plenario.etl.shape import ShapeETL
 from plenario.tasks import hello_world
 from plenario.settings import DB_NAME, DB_USER
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
@@ -10,12 +9,12 @@ import os
 import datetime
 import subprocess
 
+
 def init_db(args):
     if not any(vars(args).values()):
         # No specific arguments specified. Run it all!
         init_master_meta_user()
         init_weather()
-        init_census()
         init_celery()
         add_functions()
     else:
@@ -25,8 +24,6 @@ def init_db(args):
             init_user()
         if args.weather:
             init_weather()
-        if args.census:
-            init_census()
         if args.celery:
             init_celery()
         if args.functions:
@@ -70,22 +67,6 @@ def init_weather():
         raise e
 
 
-def init_census():
-    print 'initializing and populating US Census blocks'
-    print 'this will *also* take a few minutes ...'
-    census_settings = plenario.settings.CENSUS_BLOCKS
-
-    census_meta = plenario.models.ShapeMetadata.add(human_name=census_settings['human_name'],
-                                                    source_url=census_settings['source_url'])
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        raise e
-
-    ShapeETL(meta=census_meta).ingest()
-
-
 def add_functions():
     # Makes bold assumption that you're executing on a local,
     # password-unprotected server for development purposes.
@@ -103,6 +84,7 @@ def add_functions():
     add_function(trigger_path)
     add_function(loc_func_path)
 
+
 def init_celery():
     hello_world.delay()
 
@@ -116,17 +98,17 @@ def build_arg_parser():
     data. If you specify no options, it will populate everything.'
     parser = ArgumentParser(description=description)
     parser.add_argument('-m', '--meta', action="store_true",
-                        help="Set up the metadata registries needed to"\
+                        help="Set up the metadata registries needed to"
                              " ingest point and shape datasets.")
-    parser.add_argument('-u', '--users', action="store_true", help='Set up the a default\
-            user to access the admin panel.')
-    parser.add_argument('-w', '--weather', action="store_true", help='Set up NOAA \
-            weather station data. This includes the daily and hourly weather \
-            observations.')
-    parser.add_argument('-c', '--census', action="store_true", help='Set up and \
-            populate US Census blocks.')
-    parser.add_argument('-cl', '--celery', action="store_true", help='Say hello \
-            world from Celery')
+    parser.add_argument('-u', '--users', action="store_true",
+                        help='Set up the a default\
+                              user to access the admin panel.')
+    parser.add_argument('-w', '--weather', action="store_true",
+                        help='Set up NOAA weather station data.\
+                              This includes the daily and hourly weather \
+                              observations.')
+    parser.add_argument('-cl', '--celery', action="store_true",
+                        help='Say hello world from Celery')
     parser.add_argument('-f', '--functions', action='store_true',
                         help='Add plenario-specific functions to database.')
     return parser

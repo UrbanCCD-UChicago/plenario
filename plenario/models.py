@@ -52,8 +52,7 @@ class MetaTable(Base):
     contributor_email = Column(String)
     result_ids = Column(ARRAY(String))
 
-    def __init__(self, url, human_name,
-                 business_key, observed_date,
+    def __init__(self, url, human_name, observed_date,
                  approved_status=False, update_freq='yearly',
                  latitude=None, longitude=None, location=None,
                  attribution=None, description=None, **kwargs):
@@ -91,7 +90,6 @@ class MetaTable(Base):
                                        curried_slug(human_name)[:50])
 
         assert observed_date
-        self.business_key = curried_slug(business_key)
         self.observed_date = curried_slug(observed_date)
 
         assert url
