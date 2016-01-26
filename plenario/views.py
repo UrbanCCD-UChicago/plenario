@@ -106,18 +106,172 @@ http://plenar.io""" % (meta.contributor_name, meta.human_name)
 #
 
 
-def add_dataset_to_metatable(url, approved_status):
+@views.route('/admin/add-dataset/table', methods=['GET', 'POST'])
+@login_required
+def add_table():
+    errors = []
+
+    dataset_info, error, url = grab_dataset_details()
+
+    # check if dataset with the same URL has already been loaded
+    dataset_id = md5(url).hexdigest()
+    md = session.query(MetaTable).get(dataset_id)
+    if md:
+        errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
+
+    if request.method == 'POST' and not md:
+        md = add_dataset_to_metatable(url, dataset_info, approved_status=True)
+        add_dataset_task.delay(md.source_url_hash)
+
+        flash('%s added successfully!' % md.human_name, 'success')
+        return redirect(url_for('views.view_datasets'))
+
+    context = {'dataset_info': dataset_info, 'errors': errors,
+               'is_admin': True}
+    return render_template('submit-table.html', **context)
+
+
+# /contribute is similar to /admin/add-dataset,
+# but sends an email instead of actually adding
+@views.route('/contribute', methods=['GET','POST'])
+def contrib_view():
+    dataset_info = {}
+    errors = []
+
+    url = ""
+    md = None
+
+    if request.args.get('dataset_url'):
+        url = request.args.get('dataset_url')
+        dataset_info, errors = get_context_for_new_dataset(url)
+
+        # check if dataset with the same URL has already been loaded
+        dataset_id = md5(url).hexdigest()
+        md = session.query(MetaTable).get(dataset_id)
+        if md:
+            errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
+
+    if request.method == 'POST' and not md:
+        md = add_dataset_to_metatable(url, dataset_info, approved_status=False)
+
+        # email a confirmation to the submitter
+        msg_body = """Hello %s,\r\n\r\n
+We received your recent dataset submission to Plenar.io:\r\n\r\n%s\r\n\r\n
+After we review it, we'll notify you when your data is loaded and available.\r\n\r\n
+Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (request.form.get('contributor_name'), md.human_name)
+
+        send_mail(subject="Your dataset has been submitted to Plenar.io",
+                  recipient=request.form.get('contributor_email'),
+                  body=msg_body)
+
+        return redirect(url_for('views.contrib_thankyou'))
+
+    context = {'dataset_info': dataset_info, 'form': request.form,
+               'errors': errors}
+    return render_template('submit-table.html', **context)
+
+
+@views.route('/admin/add-shape', methods=['GET', 'POST'])
+@login_required
+def add_shape():
+    errors = []
+    dataset_info, error, url = \
+        grab_dataset_details(is_shapefile=True)
+
+    if request.method == 'POST':
+        try:
+            human_name = request.form['dataset_name']
+            source_url = dataset_info['source_url']
+            attribution = request.form.get('dataset_attribution')
+            description = request.form.get('dataset_description')
+            update_freq = request.form['update_frequency']
+        except KeyError:
+            # A required field slipped by frontend validation.
+            # Re-render with error message
+            errors.append('A required field was not submitted.')
+        else:
+            # Does a shape dataset with this human_name already exist?
+            if ShapeMetadata.get_by_human_name(human_name=human_name):
+                errors.append('A shape dataset with that name already exists.')
+
+        if not errors:
+            # Add the metadata right away
+            meta = ShapeMetadata.add(human_name=human_name,
+                                     source_url=source_url,
+                                     attribution=attribution,
+                                     description=description,
+                                     update_freq=update_freq)
+            session.commit()
+
+            # And tell a worker to go ingest it
+            add_shape_task.delay(table_name=meta.dataset_name)
+
+            flash('Plenario is now trying to ingest your shapefile.', 'success')
+            return redirect(url_for('views.view_datasets'))
+
+    context = {'dataset_info': dataset_info, 'errors': errors,
+               'is_admin': True}
+    return render_template('submit-shape.html', **context)
+
+
+def grab_dataset_details(is_shapefile=False):
+    """
+    Supplements dataset_info from source with contributor information
+    from the session
+    when an administrator submits a dataset
+    :param is_shapefile:
+    :return: (dataset_info, errors, url)
+    """
+    dataset_info = {}
+    errors = []
+    url = ""
+
+    if request.args.get('dataset_url'):
+        url = request.args.get('dataset_url')
+        dataset_info, errors = get_context_for_new_dataset(url, is_shapefile)
+
+        # populate contributor info from session
+        user = session.query(User).get(flask_session['user_id'])
+        dataset_info['contributor_name'] = user.name
+        dataset_info['contributor_organization'] = 'Plenario Admin'
+        dataset_info['contributor_email'] = user.email
+
+        dataset_info['is_shapefile'] = is_shapefile
+
+    return dataset_info, errors, url
+
+
+@views.route('/contribute-thankyou')
+def contrib_thankyou():
+    context = {}
+    return render_template('contribute_thankyou.html', **context)
+
+
+''' Helpers that can create a new MetaTable instance
+    with a filled out submission form and dataset_info
+    taken from the source URL.'''
+
+
+def add_dataset_to_metatable(url, dataset_info, approved_status):
     """
     Called during request cycles with form guaranteed to have
     the fields used below.
     Derives a MetaTable object from the form and adds it to the DB.
     :param url: Download url
+    :param dataset_info: Big dict with lots of metadata
+                         We only care about a tiny subset of it here.
     :param approved_status: Whether this dataset should be viewable
     :return: MetaTable instance that was persisted to DB.
     """
 
     labels = extract_form_labels(request.form)
     name = slugify(request.form.get('dataset_name'), delim=u'_')[:50]
+    column_names = extract_column_names(dataset_info)
+    try:
+        # Is there another url we should be using
+        url = dataset_info['source_url']
+    except KeyError:
+        pass
 
     md = MetaTable(
         url=url,
@@ -133,10 +287,15 @@ def add_dataset_to_metatable(url, approved_status):
         latitude=labels.get('latitude', None),
         longitude=labels.get('longitude', None),
         location=labels.get('location', None),
+        column_names=column_names
     )
     session.add(md)
     session.commit()
     return md
+
+
+def extract_column_names(dataset_info):
+    return [slugify(col['human_name'], '_') for col in dataset_info['columns']]
 
 
 def extract_form_labels(form):
@@ -155,6 +314,8 @@ def extract_form_labels(form):
             labels[v] = key
     return labels
 
+''' Terrifying functions that fetch dataset metadata.'''
+
 
 def get_socrata_data_info(host, path, four_by_four, is_shapefile=False):
     """
@@ -165,7 +326,8 @@ def get_socrata_data_info(host, path, four_by_four, is_shapefile=False):
     :param is_shapefile: Is this an endpoint of an ESRI shapefile?
     :return: (dataset_info, errors, status_code)
             dataset_info is a big dict with all of Socrata's metadata
-            errors
+            errors is a list of strings indicating errors encountered
+            status_code is the HTTP status code of a failed request
     """
     errors = []
     status_code = None
@@ -324,95 +486,7 @@ def get_context_for_new_dataset(url, is_shapefile=False):
     return dataset_info, errors
 
 
-# /contribute is similar to /admin/add-dataset,
-# but sends an email instead of actually adding
-@views.route('/contribute', methods=['GET','POST'])
-def contrib_view():
-    dataset_info = {}
-    errors = []
-
-    url = ""
-    md = None
-
-    if request.args.get('dataset_url'):
-        url = request.args.get('dataset_url')
-        dataset_info, errors = get_context_for_new_dataset(url)
-
-        # check if dataset with the same URL has already been loaded
-        dataset_id = md5(url).hexdigest()
-        md = session.query(MetaTable).get(dataset_id)
-        if md:
-            errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
-
-    if request.method == 'POST' and not md:
-        md = add_dataset_to_metatable(url, approved_status=False)
-
-        # email a confirmation to the submitter
-        msg_body = """Hello %s,\r\n\r\n
-We received your recent dataset submission to Plenar.io:\r\n\r\n%s\r\n\r\n
-After we review it, we'll notify you when your data is loaded and available.\r\n\r\n
-Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (request.form.get('contributor_name'), md.human_name)
-
-        send_mail(subject="Your dataset has been submitted to Plenar.io", 
-                  recipient=request.form.get('contributor_email'),
-                  body=msg_body)
-
-        return redirect(url_for('views.contrib_thankyou'))
-
-    context = {'dataset_info': dataset_info, 'form': request.form,
-               'errors': errors}
-    return render_template('submit-table.html', **context)
-
-
-@views.route('/contribute-thankyou')
-def contrib_thankyou():
-    context = {}
-    return render_template('contribute_thankyou.html', **context)
-
-
-def grab_dataset_details(is_shapefile=False):
-    dataset_info = {}
-    errors = []
-    url = ""
- 
-    if request.args.get('dataset_url'):
-        url = request.args.get('dataset_url')
-        dataset_info, errors = get_context_for_new_dataset(url, is_shapefile)
-
-        # populate contributor info from session
-        user = session.query(User).get(flask_session['user_id'])
-        dataset_info['contributor_name'] = user.name
-        dataset_info['contributor_organization'] = 'Plenario Admin'
-        dataset_info['contributor_email'] = user.email
-
-        dataset_info['is_shapefile'] = is_shapefile
-
-    return dataset_info, errors, url
-
-
-@views.route('/admin/add-dataset/table', methods=['GET', 'POST'])
-@login_required
-def add_table():
-    errors = []
-
-    dataset_info, error, url = grab_dataset_details()
-
-    # check if dataset with the same URL has already been loaded
-    dataset_id = md5(url).hexdigest()
-    md = session.query(MetaTable).get(dataset_id)
-    if md:
-        errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
-
-    if request.method == 'POST' and not md:
-        md = add_dataset_to_metatable(url, approved_status=True)
-        add_dataset_task.delay(md.source_url_hash)
-        
-        flash('%s added successfully!' % md.human_name, 'success')
-        return redirect(url_for('views.view_datasets'))
-        
-    context = {'dataset_info': dataset_info, 'errors': errors,
-               'is_admin': True}
-    return render_template('submit-table.html', **context)
+''' Monitoring and editing point datasets '''
 
 
 @views.route('/admin/view-datasets')
@@ -476,7 +550,10 @@ def dataset_status():
     '''
 
     if source_url_hash:
+        name = session.query(MetaTable).get(source_url_hash).dataset_name
         q = q + "AND m.source_url_hash = :source_url_hash"
+    else:
+        name = None
 
     q = q + " ORDER BY c.id DESC"
 
@@ -502,7 +579,8 @@ def dataset_status():
         if result.date_done:
             d['date_done'] = result.date_done.strftime('%B %d, %Y %H:%M'),
         r.append(d)
-    return render_template('admin/dataset-status.html', results=r)
+    return render_template('admin/dataset-status.html', results=r, name=name)
+
 
 class EditDatasetForm(Form):
     """ 
@@ -549,19 +627,15 @@ class EditDatasetForm(Form):
 def edit_dataset(source_url_hash):
     form = EditDatasetForm()
     meta = session.query(MetaTable).get(source_url_hash)
-
-    # Bug: If the table has never been ingested,
-    #  we don't know the name of its columns.
-    fieldnames = None
+    print meta.location
+    fieldnames = meta.column_names
     num_rows = 0
     
     if meta.approved_status:
         try:
             table_name = meta.dataset_name
-            
             table = Table(table_name, Base.metadata,
                           autoload=True, autoload_with=engine)
-            fieldnames = table.columns.keys()
             pk_name = [p.name for p in table.primary_key][0]
             pk = table.c[pk_name]
             num_rows = session.query(pk).count()
@@ -630,50 +704,7 @@ def check_update(task_id):
     return resp
 
 
-''' Shape stuff '''
-
-
-@views.route('/admin/add-shape', methods=['GET', 'POST'])
-@login_required
-def add_shape():
-    errors = []
-    dataset_info, error, url = \
-        grab_dataset_details(is_shapefile=True)
-
-    if request.method == 'POST':
-        try:
-            human_name = request.form['dataset_name']
-            source_url = dataset_info['source_url']
-            attribution = request.form.get('dataset_attribution')
-            description = request.form.get('dataset_description')
-            update_freq = request.form['update_frequency']
-        except KeyError:
-            # A required field slipped by frontend validation.
-            # Re-render with error message
-            errors.append('A required field was not submitted.')
-        else:
-            # Does a shape dataset with this human_name already exist?
-            if ShapeMetadata.get_by_human_name(human_name=human_name):
-                errors.append('A shape dataset with that name already exists.')
-
-        if not errors:
-            # Add the metadata right away
-            meta = ShapeMetadata.add(human_name=human_name,
-                                     source_url=source_url,
-                                     attribution=attribution,
-                                     description=description,
-                                     update_freq=update_freq)
-            session.commit()
-
-            # And tell a worker to go ingest it
-            add_shape_task.delay(table_name=meta.dataset_name)
-
-            flash('Plenario is now trying to ingest your shapefile.', 'success')
-            return redirect(url_for('views.view_datasets'))
-
-    context = {'dataset_info': dataset_info, 'errors': errors,
-               'is_admin': True}
-    return render_template('submit-shape.html', **context)
+''' Shape monitoring '''
 
 
 @views.route('/admin/shape-status/')

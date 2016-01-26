@@ -69,9 +69,6 @@ class Staging(object):
             # Can we just grab columns from an existing table?
             self.cols = self._from_ingested(meta.column_info())
         except NoSuchTableError:
-            # We want to try contributed_column_types here eventually,
-            # but it's crazy broken right now.
-            # So either we already have the column info, or we try to infer it.
             self.cols = None
 
         # Retrieve the source file
@@ -89,14 +86,15 @@ class Staging(object):
         """
         with self.file_helper as helper:
             if not self.cols:
-                # We couldn't get the column metadata from an existing table or from the user.
+                # We couldn't get the column metadata from an existing table
                 self.cols = self._from_inference(helper.handle)
 
             # Grab the handle to build a table from the CSV
             try:
                 self.table = self._make_table(helper.handle)
                 self._add_unique_hash(self.table.name)
-                self.table = Table(self.name, MetaData(), autoload_with=engine, extend_existing=True)
+                self.table = Table(self.name, MetaData(),
+                                   autoload_with=engine, extend_existing=True)
                 return self
             except Exception as e:
                 raise PlenarioETLError(e)
@@ -165,7 +163,8 @@ class Staging(object):
         except Exception as e:
             raise PlenarioETLError(repr(e) + '\n Failed to deduplicate with ' + add_hash)
 
-    '''Utility methods to generate columns into which we can dump the CSV data.'''
+    '''Utility methods to generate columns
+    into which we can dump the CSV data.'''
 
     @staticmethod
     def _from_ingested(column_info):
@@ -196,35 +195,10 @@ class Staging(object):
             cols.append(_make_col(col_name, col_type, nullable))
         return cols
 
-    @staticmethod
-    def _from_contributed(data_types):
-        """
-        :param data_types: List of dictionaries, each of which has 'field_name' and 'data_type' fields.
-
-        Generate columns from user-given specifications.
-        (Warning: assumes user has completely specified every column.
-        We don't support mixing inferred and user-specified columns.)
-        """
-        # The keys in this mapping are taken from the frontend form
-        # where users can specify column types.
-        col_types = {
-            'boolean': Boolean,
-            'integer': Integer,
-            'big_integer': BigInteger,
-            'float': Float,
-            'string': String,
-            'date': Date,
-            'time': TIME,
-            'timestamp': TIMESTAMP,
-            'datetime': TIMESTAMP,
-        }
-
-        cols = [_make_col(c['field_name'], col_types[c['data_type']], True) for c in data_types]
-        return cols
-
 
 def _null_malformed_geoms(existing):
-    # We decide to set the geom to NULL when the given lon/lat is (0,0) (e.g. off the coast of Africa).
+    # We decide to set the geom to NULL when the given lon/lat is (0,0)
+    # (off the coast of Africa).
     upd = existing.update().values(geom=None).\
         where(existing.c.geom == select([func.ST_SetSRID(func.ST_MakePoint(0, 0), 4326)]))
     engine.execute(upd)
