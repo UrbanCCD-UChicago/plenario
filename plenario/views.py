@@ -246,27 +246,38 @@ def get_socrata_data_info(host, path, four_by_four, is_shapefile=False):
     return dataset_info, errors, status_code
 
 
+def extract_four_by_four(url):
+    """
+    Return last string fragment matching Socrata 4x4 pattern
+    :param url: URL that could contain a 4x4
+    :return: 9 character string or None if couldn't find 4x4
+    """
+    url = url.strip(' \t\n\r') # strip whitespace, tabs, etc
+    matches = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
+    if matches:
+        return matches[-1]
+    else:
+        return None
+
+
 def get_context_for_new_dataset(url, is_shapefile=False):
     """
     :param url:
     :param is_shapefile: A
-    :return: a tuple (dataset_info, errors, socrata_source)
+    :return: a tuple (dataset_info, errors)
     """
     dataset_info = {}
     errors = []
-    socrata_source = False
     if url:
-        url = url.strip(' \t\n\r') # strip whitespace, tabs, etc
-        four_by_four = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
+        four_by_four = extract_four_by_four(url)
         errors = True
         if four_by_four:
             parsed = urlparse(url)
             host = 'https://%s' % parsed.netloc
             path = 'api/views'
 
-            dataset_info, errors, status_code = get_socrata_data_info(host, path, four_by_four[-1], is_shapefile)
+            dataset_info, errors, status_code = get_socrata_data_info(host, path, four_by_four, is_shapefile)
             if not errors:
-                socrata_source = True
                 dataset_info['submitted_url'] = url
         if errors:
             print errors, "ERRORS"
@@ -310,7 +321,7 @@ def get_context_for_new_dataset(url, is_shapefile=False):
                     dataset_info['columns'].append(d)
     else:
         errors.append('Need a URL')
-    return dataset_info, errors, socrata_source
+    return dataset_info, errors
 
 
 # /contribute is similar to /admin/add-dataset,
@@ -319,14 +330,13 @@ def get_context_for_new_dataset(url, is_shapefile=False):
 def contrib_view():
     dataset_info = {}
     errors = []
-    socrata_source = False
 
     url = ""
     md = None
 
     if request.args.get('dataset_url'):
         url = request.args.get('dataset_url')
-        (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url)
+        dataset_info, errors = get_context_for_new_dataset(url)
 
         # check if dataset with the same URL has already been loaded
         dataset_id = md5(url).hexdigest()
@@ -350,7 +360,7 @@ Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (request.form.get('cont
         return redirect(url_for('views.contrib_thankyou'))
 
     context = {'dataset_info': dataset_info, 'form': request.form,
-               'errors': errors, 'socrata_source': socrata_source}
+               'errors': errors}
     return render_template('submit-table.html', **context)
 
 
@@ -363,12 +373,11 @@ def contrib_thankyou():
 def grab_dataset_details(is_shapefile=False):
     dataset_info = {}
     errors = []
-    socrata_source = False
     url = ""
  
     if request.args.get('dataset_url'):
         url = request.args.get('dataset_url')
-        (dataset_info, errors, socrata_source) = get_context_for_new_dataset(url, is_shapefile)
+        dataset_info, errors = get_context_for_new_dataset(url, is_shapefile)
 
         # populate contributor info from session
         user = session.query(User).get(flask_session['user_id'])
@@ -378,7 +387,7 @@ def grab_dataset_details(is_shapefile=False):
 
         dataset_info['is_shapefile'] = is_shapefile
 
-    return dataset_info, errors, socrata_source, url
+    return dataset_info, errors, url
 
 
 @views.route('/admin/add-dataset/table', methods=['GET', 'POST'])
@@ -386,7 +395,7 @@ def grab_dataset_details(is_shapefile=False):
 def add_table():
     errors = []
 
-    dataset_info, error, socrata_source, url = grab_dataset_details()
+    dataset_info, error, url = grab_dataset_details()
 
     # check if dataset with the same URL has already been loaded
     dataset_id = md5(url).hexdigest()
@@ -402,7 +411,7 @@ def add_table():
         return redirect(url_for('views.view_datasets'))
         
     context = {'dataset_info': dataset_info, 'errors': errors,
-               'socrata_source': socrata_source, 'is_admin': True}
+               'is_admin': True}
     return render_template('submit-table.html', **context)
 
 
@@ -628,7 +637,7 @@ def check_update(task_id):
 @login_required
 def add_shape():
     errors = []
-    dataset_info, error, socrata_source, url = \
+    dataset_info, error, url = \
         grab_dataset_details(is_shapefile=True)
 
     if request.method == 'POST':
@@ -663,7 +672,7 @@ def add_shape():
             return redirect(url_for('views.view_datasets'))
 
     context = {'dataset_info': dataset_info, 'errors': errors,
-               'socrata_source': socrata_source, 'is_admin': True}
+               'is_admin': True}
     return render_template('submit-shape.html', **context)
 
 

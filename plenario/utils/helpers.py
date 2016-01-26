@@ -36,9 +36,6 @@ def iter_column(idx, f):
     :return: col_type, null_values
              where col_type is inferred type from typeinference.py
              and null_values is whether null values were found and normalized.
-
-             (It looks like normalize_column_type goes to the trouble
-             of mutating a column that nobody ever uses. IDK why.)
     """
     f.seek(0)
     reader = UnicodeCSVReader(f)
