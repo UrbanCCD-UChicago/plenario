@@ -46,7 +46,7 @@ class MetaTable(Base):
     longitude = Column(String)
     location = Column(String)
     # if False, then do not display without first getting administrator approval
-    approved_status = Boolean
+    approved_status = Column(Boolean)
     contributor_name = Column(String)
     contributor_organization = Column(String)
     contributor_email = Column(String)
@@ -54,8 +54,7 @@ class MetaTable(Base):
 
     def __init__(self, url, human_name,
                  business_key, observed_date,
-                 is_socrata=False, approved_status=False,
-                 contributed_data_types=None, update_freq='yearly',
+                 approved_status=False, update_freq='yearly',
                  latitude=None, longitude=None, location=None,
                  attribution=None, description=None, **kwargs):
         """
@@ -63,9 +62,7 @@ class MetaTable(Base):
         :param human_name: Nicely formatted name to display to people
         :param business_key: Name of column with the dataset's unique ID
         :param observed_date: Name of column with the datset's timestamp
-        :param is_socrata: Does this dataset come from Socrata?
         :param approved_status: Has an admin signed off on this dataset?
-        :param contributed_data_types: stringified JSON mapping
         :param update_freq: one of ['daily', 'weekly', 'monthly', 'yearly']
         :param latitude: Name of col with latitude
         :param longitude: Name of col with longitude
@@ -106,14 +103,9 @@ class MetaTable(Base):
         # Can be None. In practice,
         # frontend validation makes sure these are always passed along.
         self.description, self.attribution = description, attribution
-        self.is_socrata_source = is_socrata
-        self.contributed_data_types = contributed_data_types
 
-        # This boolish value is stored as a string in the DB.
-        if approved_status is True:
-            self.approved_status = 'true'
-        else:
-            self.approved_status = str(approved_status)
+        # Boolean
+        self.approved_status = approved_status
 
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
@@ -185,7 +177,7 @@ class MetaTable(Base):
     @classmethod
     def index(cls):
         results = session.query(cls.dataset_name)\
-                        .filter(cls.approved_status == 'true')
+                        .filter(cls.approved_status == True)
         names = [result.dataset_name for result in results]
         return names
 

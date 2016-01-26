@@ -8,7 +8,7 @@
     <p><a href='{{ url_for('views.view_datasets') }}'>&laquo; view datasets</a></p>
     <h1>{{ meta.human_name }}</h1>
 
-    {% if meta.approved_status == 'true' %}
+    {% if meta.approved_status %}
         <ul class="nav nav-tabs">
           <li role="presentation" class="active"><a href="{{ url_for('views.edit_dataset', source_url_hash=meta.source_url_hash) }}"><i class='fa fa-edit'></i> Edit metadata</a></li>
           <li role="presentation"><a href="{{ url_for('views.dataset_status', source_url_hash=meta.source_url_hash) }}"><i class='fa fa-database'></i> ETL status</a></li>
@@ -228,7 +228,7 @@
             </div>
         </div>
 
-        {% if meta.approved_status != 'true' %}
+        {% if not meta.approved_status %}
             <button type="submit" class="btn btn-success"><i class='fa fa-check'></i> Approve</button>
         {% else %}
             <button type="submit" class="btn btn-success">Save</button>

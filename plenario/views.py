@@ -298,7 +298,7 @@ def add_table():
 @login_required
 def view_datasets():
     datasets_pending = session.query(MetaTable)\
-        .filter(MetaTable.approved_status != 'true')\
+        .filter(MetaTable.approved_status != True)\
         .all()
 
     try:
@@ -318,7 +318,7 @@ def view_datasets():
             datasets = list(c.execute(q))
     except NoSuchTableError, e:
         datasets = session.query(MetaTable)\
-        .filter(MetaTable.approved_status == 'true')\
+        .filter(MetaTable.approved_status == True)\
         .all()
 
     try:
@@ -432,7 +432,7 @@ def edit_dataset(source_url_hash):
     fieldnames = None
     num_rows = 0
     
-    if meta.approved_status == 'true':
+    if meta.approved_status:
         try:
             table_name = meta.dataset_name
             
@@ -443,10 +443,9 @@ def edit_dataset(source_url_hash):
             pk = table.c[pk_name]
             num_rows = session.query(pk).count()
             
-        except sqlalchemy.exc.NoSuchTableError, e:
+        except sqlalchemy.exc.NoSuchTableError:
             # dataset has been approved, but perhaps still processing.
             pass
-
 
     if form.validate_on_submit():
         upd = {
@@ -464,7 +463,7 @@ def edit_dataset(source_url_hash):
             .update(upd)
         session.commit()
 
-        if meta.approved_status != 'true':
+        if not meta.approved_status:
             approve_dataset(source_url_hash)
         
         flash('%s updated successfully!' % meta.human_name, 'success')
