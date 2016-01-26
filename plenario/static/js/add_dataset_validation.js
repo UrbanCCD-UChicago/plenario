@@ -9,8 +9,7 @@ $('#datatype-submit').on('click', function(e){
     }
 
     var definitions = {
-        'field_definitions': {},
-        'data_types': []
+        'field_definitions': {}
     }
     var valid = true;
     $('#errors').hide();
@@ -28,23 +27,6 @@ $('#datatype-submit').on('click', function(e){
                 }
             }
         }
-    });
-
-    $.each($('.data-type option'), function(i, opt){
-    var field_name = $(opt).val();
-        if($(opt).is(':selected')){
-            var d_type = $(opt).text().split(' ').join('_').toLowerCase().replace(/-/g, "")
-            if(d_type){
-                definitions['data_types'].push({
-                    'field_name': field_name,
-                    'data_type': d_type
-                })
-            } else {
-                valid = false;
-                appendError('Provide a data type for ' + field_name);
-            }
-        }
-
     });
 
     var defined = []

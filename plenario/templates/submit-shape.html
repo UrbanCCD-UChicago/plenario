@@ -1,5 +1,6 @@
 {% extends 'submit-dataset.html' %}
-{% from "macros/add-shapefile-dataset.html" import add_shapefile_dataset %}
+{% from "macros/contributor-form.html" import contributor_form %}
+{% from "macros/metadata-form-fragment.html" import metadata_form_fragment %}
 
 {% set is_shape=True %}
 
@@ -29,9 +30,31 @@
             {% endblock fetch_details %}
 
               {% if dataset_info %}
-                {% block submit_form %}
-                    {{ add_shapefile_dataset(submit_button_verb=submit_button_verb, dataset_info=dataset_info) }}
-                {% endblock %}
+                    <hr />
+                    <div class="row">
+                        <div class="col-md-10 col-md-offset-1">
+                            <form role="form" class="form" method="POST">
+                                <div id="errors" class="alert alert-danger alert-dismissible" role="alert" style="display: none;">
+                                    <button type="button" class="close" data-dismiss="alert">
+                                        <span aria-hidden="true">&times;</span><span class="sr-only">Close</span>
+                                    </button>
+                                    <p><strong>There were some errors with your submission:</strong></p>
+                                    <p id="error-list"></p>
+                                </div>
+
+                                {{ metadata_form_fragment(dataset_info) }}
+
+                                {{ contributor_form(submit_button_verb, dataset_info) }}
+
+                                <hr />
+                                <p>
+                                    <button type="submit" class="btn btn-success" id="datatype-submit">
+                                      Submit &raquo;
+                                    </button>
+                                </p>
+                            </form>
+                        </div>
+                    </div>
               {% endif %}
 {% endblock submission %}
 

@@ -30,33 +30,39 @@ views = Blueprint('views', __name__)
 def index():
     return render_template('index.html')
 
+
 @views.route('/explore')
 def explore_view():
     return render_template('explore.html')
 
+
 @views.route('/api-docs')
 def api_docs_view():
     dt_now = datetime.now()
-    
     return render_template('api-docs.html', yesterday=dt_now-timedelta(days=1))
+
 
 @views.route('/about')
 def about_view():
     return render_template('about.html')
 
+
 @views.route('/examples')
 def examples_view():
     return render_template('examples.html')
 
+
 @views.route('/maintenance')
 def maintenance():
     return render_template('maintenance.html'), 503
+
 
 @views.route('/terms')
 def terms_view():
     return render_template('terms.html')
 
 '''Approve a dataset'''
+
 
 @views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
@@ -98,7 +104,6 @@ def get_context_for_new_dataset(url, is_shapefile=False):
     dataset_info = {}
     errors = []
     socrata_source = False
-    print url
     if url:
         url = url.strip(' \t\n\r') # strip whitespace, tabs, etc
         four_by_four = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
@@ -157,50 +162,46 @@ def get_context_for_new_dataset(url, is_shapefile=False):
     return dataset_info, errors, socrata_source
 
 
-def add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, approved_status):
-    data_types = []
-    observed_date = None
-    latitude = None
-    longitude = None 
-    location = None
-    for k, v in request.form.iteritems():
-        if k.startswith('data_type_'):
-            key = k.replace("data_type_", "")
-            data_types.append({"field_name": key, "data_type": v})
+def extract_form_labels(form):
+    """
 
+    :param form: Taken from requests.form
+    :return: dict mapping string labels of special column types
+             (observed_date, latitude, longitude, location)
+             to names of columns
+    """
+    labels = {}
+    for k, v in form.iteritems():
         if k.startswith('key_type_'):
+            # key_type_observed_date
             key = k.replace("key_type_", "")
-            if (v == "observed_date"): observed_date = key
-            if (v == "latitude"): latitude = key
-            if (v == "longitude"): longitude = key
-            if (v == "location"): location = key
+            # e.g labels['observed_date'] = 'date'
+            labels[v] = key
+    return labels
 
-    # Horrible awful no good hack that reflects that we chck for literal string 'true'
-    if approved_status is True:
-        approved_status = 'true'
 
-    d = {
-        'dataset_name': slugify(request.form.get('dataset_name'), delim=u'_')[:50],
-        'human_name': request.form.get('dataset_name'),
-        'attribution': request.form.get('dataset_attribution'),
-        'description': request.form.get('dataset_description'),
-        'url': url,
-        'source_url_hash': dataset_id,
-        'update_freq': request.form.get('update_frequency'),
-        'observed_date': observed_date,
-        'latitude': latitude,
-        'longitude': longitude,
-        'location': location,
-        'contributor_name': request.form.get('contributor_name'),
-        'contributor_organization': request.form.get('contributor_organization'),
-        'contributor_email': request.form.get('contributor_email'),
-        'approved_status': approved_status,
-    }
+def add_dataset_to_metatable(url, approved_status):
 
-    md = MetaTable(**d)
+    labels = extract_form_labels(request.form)
+    name = slugify(request.form.get('dataset_name'), delim=u'_')[:50]
+
+    md = MetaTable(
+        url=url,
+        dataset_name=name,
+        human_name=request.form.get('dataset_name'),
+        attribution=request.form.get('dataset_attribution'),
+        description=request.form.get('dataset_description'),
+        contributor_name=request.form.get('contributor_name'),
+        contributor_organization=request.form.get('contributor_organization'),
+        contributor_email=request.form.get('contributor_email'),
+        approved_status=approved_status,
+        observed_date=labels.get('observed_date', None),
+        latitude=labels.get('latitude', None),
+        longitude=labels.get('longitude', None),
+        location=labels.get('location', None),
+    )
     session.add(md)
     session.commit()
-
     return md
 
 
@@ -212,7 +213,6 @@ def contrib_view():
     socrata_source = False
 
     url = ""
-    dataset_id = None
     md = None
 
     if request.args.get('dataset_url'):
@@ -226,7 +226,7 @@ def contrib_view():
             errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
 
     if request.method == 'POST' and not md:
-        md = add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, approved_status=False)
+        md = add_dataset_to_metatable(url, approved_status=False)
 
         # email a confirmation to the submitter
         msg_body = """Hello %s,\r\n\r\n
@@ -235,11 +235,13 @@ After we review it, we'll notify you when your data is loaded and available.\r\n
 Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (request.form.get('contributor_name'), md.human_name)
 
         send_mail(subject="Your dataset has been submitted to Plenar.io", 
-            recipient=request.form.get('contributor_email'), body=msg_body)
+                  recipient=request.form.get('contributor_email'),
+                  body=msg_body)
 
         return redirect(url_for('views.contrib_thankyou'))
 
-    context = {'dataset_info': dataset_info, 'form': request.form, 'errors': errors, 'socrata_source': socrata_source}
+    context = {'dataset_info': dataset_info, 'form': request.form,
+               'errors': errors, 'socrata_source': socrata_source}
     return render_template('submit-table.html', **context)
 
 
@@ -284,13 +286,14 @@ def add_table():
         errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
 
     if request.method == 'POST' and not md:
-        md = add_dataset_to_metatable(url, dataset_id, dataset_info, socrata_source, approved_status=True)
+        md = add_dataset_to_metatable(url, approved_status=True)
         add_dataset_task.delay(md.source_url_hash)
         
         flash('%s added successfully!' % md.human_name, 'success')
         return redirect(url_for('views.view_datasets'))
         
-    context = {'dataset_info': dataset_info, 'errors': errors, 'socrata_source': socrata_source, 'is_admin': True}
+    context = {'dataset_info': dataset_info, 'errors': errors,
+               'socrata_source': socrata_source, 'is_admin': True}
     return render_template('submit-table.html', **context)
 
 
@@ -316,10 +319,10 @@ def view_datasets():
         ''')
         with engine.begin() as c:
             datasets = list(c.execute(q))
-    except NoSuchTableError, e:
+    except NoSuchTableError:
         datasets = session.query(MetaTable)\
-        .filter(MetaTable.approved_status == True)\
-        .all()
+            .filter(MetaTable.approved_status == True)\
+            .all()
 
     try:
         shape_datasets = ShapeMetadata.get_all_with_etl_status()
@@ -408,7 +411,7 @@ class EditDatasetForm(Form):
         
         valid = True
         
-        if not self.location.data and not self.latitude.data and not self.longitude.data:
+        if not self.location.data and (not self.latitude.data or not self.longitude.data):
             valid = False
             self.location.errors.append('You must either provide a Latitude and Longitude field name or a Location field name')
         
@@ -486,10 +489,12 @@ def delete_dataset(source_url_hash):
     result = delete_dataset_task.delay(source_url_hash)
     return make_response(json.dumps({'status': 'success', 'task_id': result.id}))
 
+
 @views.route('/update-dataset/<source_url_hash>')
 def update_dataset(source_url_hash):
     result = update_dataset_task.delay(source_url_hash)
     return make_response(json.dumps({'status': 'success', 'task_id': result.id}))
+
 
 @views.route('/check-update/<task_id>')
 def check_update(task_id):
