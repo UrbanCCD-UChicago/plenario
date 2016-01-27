@@ -643,7 +643,8 @@ def grid():
     return resp
 
 
-@cache.cached(timeout=CACHE_TIMEOUT)
+@cache.cached(timeout=CACHE_TIMEOUT,
+              unless=lambda: request.args.get('dataset_name') is not None)
 @crossdomain(origin="*")
 def meta():
     status_code = 200
@@ -664,7 +665,7 @@ def meta():
                 m.longitude, m.observed_date, m.human_name, m.dataset_name,
                 m.update_freq, ST_AsGeoJSON(m.bbox) as bbox
         FROM meta_master AS m
-        WHERE m.approved_status = 'true'
+        WHERE m.date_added IS NOT NULL
     '''
 
     if dataset_name:

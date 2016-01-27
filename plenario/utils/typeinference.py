@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import datetime
 
 from dateutil.parser import parse
@@ -20,7 +18,14 @@ NULL_TIME = datetime.time(0, 0, 0)
 
 def normalize_column_type(l):
     """
-    Docs to come...
+    Given a sequence of values in a column (l),
+    guess its type.
+
+    :param l: A column
+    :return: (col_type, null_values)
+             where col_type is a SQLAlchemy TypeEngine
+             and null_values is a boolean
+             representing whether nulls of any kind were detected.
     """
     
     null_values = False

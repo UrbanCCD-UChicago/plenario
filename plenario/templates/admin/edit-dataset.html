@@ -8,7 +8,7 @@
     <p><a href='{{ url_for('views.view_datasets') }}'>&laquo; view datasets</a></p>
     <h1>{{ meta.human_name }}</h1>
 
-    {% if meta.approved_status == 'true' %}
+    {% if meta.approved_status %}
         <ul class="nav nav-tabs">
           <li role="presentation" class="active"><a href="{{ url_for('views.edit_dataset', source_url_hash=meta.source_url_hash) }}"><i class='fa fa-edit'></i> Edit metadata</a></li>
           <li role="presentation"><a href="{{ url_for('views.dataset_status', source_url_hash=meta.source_url_hash) }}"><i class='fa fa-database'></i> ETL status</a></li>
@@ -45,14 +45,6 @@
                     <tr>
                         <td><strong><i class='fa fa-align-justify'></i> Rows</strong></td>
                         <td>{{ num_rows | format_number }}</td>
-                    </tr>
-                    <tr>
-                        <td><strong><i class='fa fa-umbrella'></i> Weather observations</strong></td>
-                        <td>{{ num_weather_observations | format_number }}</td>
-                    </tr>
-                    <tr>
-                        <td><strong><i class='fa fa-square'></i> Census blocks</strong></td>
-                        <td>{{ num_rows_w_censusblocks | format_number }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -134,6 +126,7 @@
                 </div>
             </div>
         </div>
+    {% if fieldnames %}
         <div class="row">
             <div class="col-sm-6">
                 {% if form.observed_date.errors %}
@@ -160,29 +153,6 @@
             </div>
         </div>
         <div class="row">
-            <div class="col-sm-6">
-                {% if form.business_key.errors %}
-                <div class="form-group has-error has-feedback">
-                {% else %}
-                <div class="form-group">
-                {% endif %}
-                    <label for="id_business_key">Unique Id Field Name</label>
-                    <select id="id_business_key" name="business_key" class="form-control" autocomplete=off>
-                        {% for column in fieldnames %}
-                            {% if column == meta.business_key %}
-                                <option selected="selected" value="{{ column }}">{{column}}</option>
-                            {% else %}
-                                <option value="{{ column }}">{{column}}</option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
-                    {% if form.business_key.errors %}
-                        {% for error in form.business_key.errors %}
-                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-            </div>
             <div class="col-sm-6">
                 {% if form.location.errors %}
                 <div class="form-group has-error has-feedback">
@@ -258,8 +228,11 @@
                 </div>
             </div>
         </div>
+    {% else %}
+        <h3>Oops. We don't know the names of this dataset's columns.</h3>
+    {% endif %}
 
-        {% if meta.approved_status != 'true' %}
+        {% if not meta.approved_status %}
             <button type="submit" class="btn btn-success"><i class='fa fa-check'></i> Approve</button>
         {% else %}
             <button type="submit" class="btn btn-success">Save</button>
@@ -299,7 +272,7 @@
                 $.getJSON('/admin/delete-dataset/' + hash, {}, function(resp){
                     // Slight hack: reload the view-datasets page after waiting for a couple seconds.
                     setTimeout( function(){
-                            window.location = "/admin/add-dataset?dataset_url=" + $("#source_url").html();
+                            window.location = "/admin/add-dataset/table/?dataset_url=" + $("#source_url").html();
                         }, 2500 );
                 })
             })

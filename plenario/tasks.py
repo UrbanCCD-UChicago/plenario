@@ -45,9 +45,7 @@ def add_dataset(self, source_url_hash, data_types=None):
         c.execute(MetaTable.__table__.update()\
             .where(MetaTable.source_url_hash == source_url_hash)\
             .values(result_ids=ids))
-    # HACK: contributed_data_types reporting is seemingly broken.
-    # Force type inference every time.
-    md.contributed_data_types = None  # data_types
+
     etl = PlenarioETL(md)
     etl.add()
     return 'Finished adding {0} ({1})'.format(md.human_name, md.source_url_hash)
