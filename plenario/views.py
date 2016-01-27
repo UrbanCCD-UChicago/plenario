@@ -442,7 +442,6 @@ def get_context_for_new_dataset(url, is_shapefile=False):
             if not errors:
                 dataset_info['submitted_url'] = url
         if errors:
-            print errors, "ERRORS"
             errors = []
             try:
                 r = requests.get(url, stream=True)
@@ -455,7 +454,13 @@ def get_context_for_new_dataset(url, is_shapefile=False):
                 errors.append('URL returns a %s status code' % status_code)
             if not errors:
                 dataset_info['submitted_url'] = url
+                dataset_info['source_url'] = url
                 dataset_info['name'] = urlparse(url).path.split('/')[-1]
+
+                # Don't try to read shapefiles like a CSV
+                if is_shapefile:
+                    return dataset_info, errors
+
                 inp = StringIO()
                 line_no = 0
 
