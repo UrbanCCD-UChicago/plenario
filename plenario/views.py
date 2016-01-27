@@ -627,7 +627,6 @@ class EditDatasetForm(Form):
 def edit_dataset(source_url_hash):
     form = EditDatasetForm()
     meta = session.query(MetaTable).get(source_url_hash)
-    print meta.location
     fieldnames = meta.column_names
     num_rows = 0
     
@@ -636,6 +635,10 @@ def edit_dataset(source_url_hash):
             table_name = meta.dataset_name
             table = Table(table_name, Base.metadata,
                           autoload=True, autoload_with=engine)
+
+            # Would prefer to just get the names from the metadata
+            # without needing to reflect.
+            fieldnames = table.columns.keys()
             pk_name = [p.name for p in table.primary_key][0]
             pk = table.c[pk_name]
             num_rows = session.query(pk).count()
