@@ -163,19 +163,17 @@ class ShapeTests(BasePlenarioTest):
         streets = data['features']
         self.assertEqual(len(streets), 6)
 
-    def test_filter_point_data_with_polygons_wi(self):
+    def test_filter_point_data_with_polygons_with_crimes_and_neighborhoods(self):
         url = '/v1/api/shapes/polygon_filter/crimes/chicago_neighborhoods/'
         response = self.app.get(url)
         self.assertEqual(response.status_code, 200)
 
         data = json.loads(response.data)
-        #print data
         neighborhoods = data['features']
         self.assertEqual(len(neighborhoods), 7)
 
         for neighborhood in neighborhoods:
             self.assertEqual(neighborhood['properties']['count'], 1)
-            #print neighborhood['properties']['pri_neigh']
 
 
 

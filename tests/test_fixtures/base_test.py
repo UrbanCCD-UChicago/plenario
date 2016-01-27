@@ -28,9 +28,6 @@ pwd = os.path.dirname(os.path.realpath(__file__))
 fixtures_path = pwd
 FIXTURE_PATH = pwd
 
-print fixtures_path
-print FIXTURE_PATH
-
 def ingest_from_fixture(fixture_meta, fname):
     md = MetaTable(**fixture_meta)
     session.add(md)
@@ -43,7 +40,6 @@ def ingest_from_fixture(fixture_meta, fname):
 def drop_tables(table_names):
     drop_template = 'DROP TABLE IF EXISTS {};'
     command = ''.join([drop_template.format(table_name) for table_name in table_names])
-    print command
     session.execute(command)
     session.commit()
 
