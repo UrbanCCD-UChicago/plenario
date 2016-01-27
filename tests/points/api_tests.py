@@ -12,26 +12,7 @@ import urllib
 from StringIO import StringIO
 import csv
 
-
-pwd = os.path.dirname(os.path.realpath(__file__))
-fixtures_path = os.path.join(pwd, '../test_fixtures')
-
-
-def ingest_from_fixture(fixture_meta, fname):
-    md = MetaTable(**fixture_meta)
-    session.add(md)
-    session.commit()
-    path = os.path.join(fixtures_path, fname)
-    point_etl = PlenarioETL(md, source_path=path)
-    point_etl.add()
-
-
-def drop_tables(table_names):
-    drop_template = 'DROP TABLE IF EXISTS {};'
-    command = ''.join([drop_template.format(table_name) for table_name in table_names])
-    session.execute(command)
-    session.commit()
-
+from tests.test_fixtures.base_test import BasePlenarioTest, fixtures_path
 
 def get_loop_rect():
     pwd = os.path.dirname(os.path.realpath(__file__))
@@ -42,27 +23,11 @@ def get_loop_rect():
     return escaped_query_rect
 
 
-class PointAPITests(unittest.TestCase):
+class PointAPITests(BasePlenarioTest):
 
     @classmethod
     def setUpClass(cls):
-        tables_to_drop = [
-            'flu_shot_clinics',
-            'landmarks',
-            'crimes',
-            'meta_master'
-        ]
-        drop_tables(tables_to_drop)
-
-        init_meta()
-
-        ingest_from_fixture(flu_shot_meta, flu_path)
-        ingest_from_fixture(landmarks_meta, landmarks_path)
-        ingest_from_fixture(crime_meta, crime_path)
-
-        cls.app = create_app().test_client()
-
-    '''/detail'''
+        super(PointAPITests, cls).setUpClass()
 
     def test_time_filter(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'

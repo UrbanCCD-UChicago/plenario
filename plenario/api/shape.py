@@ -101,7 +101,16 @@ def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
     :param geojson: URL encoded goejson
     :return:
     """
-    
+
+    intersect_query = '''
+    SELECT COUNT(*), polys.*
+    FROM {point_dataset_name} AS pts, {polygon_dataset_name} AS polys
+    WHERE ST_Intersects(pts.geom, polys.geom)
+    GROUP BY polys.ogc_fid
+    '''.format(point_dataset_name=point_dataset_name, 
+               polygon_dataset_name=polygon_dataset_name)
+
+    return export_dataset_to_json_response(polygon_dataset_name, intersect_query)  
 
 @crossdomain(origin="*")
 def filter_shape(dataset_name, geojson):

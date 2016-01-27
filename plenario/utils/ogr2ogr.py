@@ -67,7 +67,6 @@ class OgrExport(object):
             query_flags = []
 
         args = ['ogr2ogr'] + self.flags + query_flags + [export_path, postgres_connection_arg, self.table_name]
-        print args
         try:
             subprocess.check_call(args)
         except subprocess.CalledProcessError as e:
