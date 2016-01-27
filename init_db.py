@@ -37,6 +37,10 @@ def init_master_meta_user():
 
 
 def init_meta():
+    non_meta_table_names = [name for name in Base.metadata.sorted_tables
+                            if name not in {'meta_master', 'meta_shape'}]
+    for name in non_meta_table_names:
+        Base.metadata.remove(name)
     Base.metadata.create_all(bind=app_engine)
 
 
