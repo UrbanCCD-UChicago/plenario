@@ -11,70 +11,13 @@ from plenario.database import session, app_engine as engine
 from plenario.etl.shape import ShapeETL
 from plenario.models import ShapeMetadata
 from plenario.utils.shapefile import Shapefile
+from tests.test_fixtures.base_test import BasePlenarioTest, FIXTURE_PATH, fixtures
 
-pwd = os.path.dirname(os.path.realpath(__file__))
-FIXTURE_PATH = os.path.join(pwd, '..', 'test_fixtures')
-
-
-def drop_tables(table_names):
-    drop_template = 'DROP TABLE IF EXISTS {};'
-    command = ''.join([drop_template.format(table_name) for table_name in table_names])
-    engine.execute(command)
-
-
-class Fixture(object):
-    def __init__(self, human_name, file_name):
-        self.human_name = human_name
-        self.table_name = ShapeMetadata.make_table_name(human_name)
-        self.path = os.path.join(FIXTURE_PATH, file_name)
-        self.update_freq = 'yearly'
-
-fixtures = {
-    'city': Fixture(human_name=u'Chicago City Limits',
-                    file_name='chicago_city_limits.zip'),
-    'streets': Fixture(human_name=u'Pedestrian Streets',
-                       file_name='chicago_pedestrian_streets.zip'),
-    'zips': Fixture(human_name=u'Zip Codes',
-                    file_name='chicago_zip_codes.zip')
-}
-
-
-class ShapeTests(unittest.TestCase):
+class ShapeTests(BasePlenarioTest):
+ 
     @classmethod
     def setUpClass(cls):
-
-        # Remove tables that we're about to recreate.
-        # This doesn't happen in teardown because I find it helpful to inspect them in the DB after running the tests.
-        meta_table_names = ['meta_shape']
-        fixture_table_names = [fixture.table_name for key, fixture in fixtures.iteritems()]
-        drop_tables(meta_table_names + fixture_table_names)
-
-        # Re-add meta tables
-        init_meta()
-
-        # Fully ingest the fixtures
-        ShapeTests.ingest_fixture(fixtures['city'])
-        ShapeTests.ingest_fixture(fixtures['streets'])
-        ShapeTests.ingest_fixture(fixtures['zips'])
-
-        # Add a dummy dataset to the metadata without ingesting a shapefile for it
-        cls.dummy_name = ShapeMetadata.add(human_name=u'Dummy Name',
-                                           source_url=None,
-                                           update_freq='yearly').dataset_name
-        session.commit()
-
-        cls.app = create_app().test_client()
-
-    @staticmethod
-    def ingest_fixture(fixture):
-        # Add the fixture to the metadata first
-        shape_meta = ShapeMetadata.add(human_name=fixture.human_name,
-                                       source_url=None,
-                                       update_freq=fixture.update_freq)
-        session.commit()
-        # Bypass the celery task and call on a ShapeETL directly
-        ShapeETL(meta=shape_meta, source_path=fixture.path).ingest()
-        return shape_meta
+        super(ShapeTests, cls).setUpClass(shutdown=True)
 
     def test_names_in_shape_list(self):
         resp = self.app.get('/v1/api/shapes/')
@@ -220,9 +163,17 @@ class ShapeTests(unittest.TestCase):
         streets = data['features']
         self.assertEqual(len(streets), 6)
 
+    def test_filter_point_data_with_polygons_with_crimes_and_neighborhoods(self):
+        url = '/v1/api/shapes/polygon_filter/crimes/chicago_neighborhoods/'
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 200)
 
-    def test_filter_point_data_with_polygons(self):
-        #TODO:
-        pass
+        data = json.loads(response.data)
+        neighborhoods = data['features']
+        self.assertEqual(len(neighborhoods), 7)
+
+        for neighborhood in neighborhoods:
+            self.assertEqual(neighborhood['properties']['count'], 1)
+
 
 
