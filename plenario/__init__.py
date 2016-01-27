@@ -75,5 +75,14 @@ def create_app():
         else:
             return '0'
 
+    @app.template_filter('has_description')
+    def has_description(list_of_cols):
+        try:
+            # Any description attribute filled?
+            return any([col['description'] for col in list_of_cols])
+        except KeyError:
+            # Is there even a description attribute?
+            return False
+
     return app
 
