@@ -1089,6 +1089,18 @@
                                 "Find all of the pedestrian streets in Chicago that intersect a geometry encoded in the given GeoJSON.
                                 (This GeoJSON happens to represent a chunk of Chicago's Little Italy neighborhood.)")]) }}
 
+      {{ panel(endpoint='shapes/polygon_filter/<point_dataset_name>/<polygon_dataset_name>',
+                     endpoint_id='polygon_filter',
+                     short_description='group the points in a dataset by their intersections with polygons from a polygon dataset',
+                     long_description="Given a point dataset and a polygon dataset,
+                                       return a JSON document of all of the polygons in the polygon dataset together with the counts of the
+                                       points that intersect them",
+                     query_desc='This endpoint takes no query parameters.',
+                     query_params=None,
+                     response_desc='A document of polygons from the given dataset and the count of the points that intersect them.',
+                     examples=[('shapes/polygon_filter/individual_landmarks/chicago_wards',
+                                "Count the number of individual landmarks in Chicago in each ward precinct in Chicago, and return these counts.")]) }}
+
       <h2 id='responses'>Response format</h2>
       <p>All JSON API calls return their data in the <code>objects</code> block. Additional information is returned in the <code>meta</code> block:</p>
 
