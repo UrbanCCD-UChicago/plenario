@@ -167,6 +167,7 @@ class ShapeTests(BasePlenarioTest):
         self.assertEqual(response.status_code, 200)
 
         data = json.loads(response.data)
+        print data
         neighborhoods = data['features']
         self.assertEqual(len(neighborhoods), 7)
 
