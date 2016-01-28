@@ -73,7 +73,7 @@ class ShapeTests(unittest.TestCase):
                                        update_freq=fixture.update_freq)
         session.commit()
         # Bypass the celery task and call on a ShapeETL directly
-        ShapeETL(meta=shape_meta, source_path=fixture.path).ingest()
+        ShapeETL(meta=shape_meta, source_path=fixture.path).add()
         return shape_meta
 
     def test_names_in_shape_list(self):

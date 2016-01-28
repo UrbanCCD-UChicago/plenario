@@ -59,7 +59,7 @@ def add_shape(self, table_name):
     session.commit()
 
     # Ingest the shapefile
-    ShapeETL(meta=meta).ingest()
+    ShapeETL(meta=meta).add()
     return 'Finished adding shape dataset {} from {}.'.format(meta.dataset_name, meta.source_url)
 
 @celery_app.task(bind=True)
