@@ -1,29 +1,19 @@
-import json
 import os
-import unittest
-import urllib
-import zipfile
-import csv
-from StringIO import StringIO
 
 import unittest
 
-from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta, flu_path, landmarks_path, \
-    crime_meta, crime_path
+from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta, \
+    flu_path, landmarks_path, crime_meta, crime_path
 from plenario.models import MetaTable
-from plenario.database import session
 from plenario.etl.point import PlenarioETL
 
 from init_db import init_meta
 from plenario import create_app
-from plenario.database import session, app_engine as engine
+from plenario.database import session
 from plenario.etl.shape import ShapeETL
 from plenario.models import ShapeMetadata
-from plenario.utils.shapefile import Shapefile
 
 pwd = os.path.dirname(os.path.realpath(__file__))
-#fixtures_path = os.path.join(pwd, 'test_fixtures')
-#FIXTURE_PATH = os.path.join(pwd, 'test_fixtures')
 
 fixtures_path = pwd
 FIXTURE_PATH = pwd
@@ -114,6 +104,6 @@ class BasePlenarioTest(unittest.TestCase):
                                        update_freq=fixture.update_freq)
         session.commit()
         # Bypass the celery task and call on a ShapeETL directly
-        ShapeETL(meta=shape_meta, source_path=fixture.path).ingest()
+        ShapeETL(meta=shape_meta, source_path=fixture.path).add()
         return shape_meta
 
