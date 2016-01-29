@@ -31,19 +31,17 @@ class ShapeETL:
         if self.meta.is_ingested:
             raise PlenarioETLError("Table {} has already been ingested.".
                                    format(self.table_name))
-
-        # NB: this function is not atomic.
-        # update_after_ingest could fail after _ingest_shapefile succeeds,
-        # leaving us with inaccurate metadata.
-        # If this becomes a problem,
-        # we can tweak the ogr2ogr import to return a big SQL string
-        # rather than just going ahead and importing the shapefile.
-        # Then we could put both operations in the same transaction.
-
-        HashedShape(self.table_name, self.source_url, self.source_path).ingest()
-        self.meta.update_after_ingest()
-
-        session.commit()
+        
+        new = HashedShape(self.table_name, self.source_url, self.source_path)
+        try:
+            new.ingest()
+            self.meta.update_after_ingest()
+            session.commit()
+        except:
+            # In case ingestion failed partway through,
+            # be sure to leave no trace.
+            new.drop()
+            raise
 
     def update(self):
         assert self.meta.is_ingested
@@ -117,4 +115,7 @@ class HashedShape(object):
         return self.ingest()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.drop()
+
+    def drop(self):
         engine.execute("DROP TABLE IF EXISTS {};".format(self.name))
