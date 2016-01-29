@@ -68,7 +68,8 @@ class ShapeETL:
             where(existing.c['hash'] == None)
 
         # Insert those into existing
-        ins = existing.insert().from_select(sel)
+        col_names = [col.name for col in existing.columns]
+        ins = existing.insert().from_select(col_names, sel)
         try:
             engine.execute(ins)
         except Exception as e:

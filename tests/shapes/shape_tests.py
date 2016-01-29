@@ -6,16 +6,38 @@ from StringIO import StringIO
 
 from plenario.database import session
 from plenario.models import ShapeMetadata
+from plenario.etl.shape import ShapeETL
 from plenario.utils.shapefile import Shapefile
 from tests.test_fixtures.base_test import BasePlenarioTest, FIXTURE_PATH, \
     fixtures
 
 
 class ShapeTests(BasePlenarioTest):
- 
+
     @classmethod
     def setUpClass(cls):
         super(ShapeTests, cls).setUpClass(shutdown=True)
+
+    ''' /etl '''
+
+    def test_update(self):
+        # Try to ingest slightly changed shape
+        fixture = fixtures['changed_neighborhoods']
+        # Add the fixture to the registry first
+        shape_meta = session.query(ShapeMetadata).get('chicago_neighborhoods')
+        #shape_meta = ShapeMetadata.add(human_name=fixture.human_name,
+        #                               source_url=None,
+        #                               update_freq=fixture.update_freq)
+        #session.commit()
+        # Do a ShapeETL update
+        ShapeETL(meta=shape_meta, source_path=fixture.path).update()
+        return shape_meta
+
+    def test_no_import_when_name_conflict(self):
+        # The city fixture should already be ingested
+        with self.assertRaises(Exception):
+            ShapeTests.ingest_fixture(fixtures['city'])
+        session.rollback()
 
     def test_names_in_shape_list(self):
         resp = self.app.get('/v1/api/shapes/')
@@ -41,6 +63,32 @@ class ShapeTests(BasePlenarioTest):
         self.assertEqual(shape_nums['zip_codes'], 61)
         self.assertEqual(shape_nums['pedestrian_streets'], 41)
 
+    def test_delete_shape(self):
+        # Can we remove a shape that's fully ingested?
+        city_meta = session.query(ShapeMetadata).get(fixtures['city'].table_name)
+        self.assertIsNotNone(city_meta)
+        city_meta.remove_table()
+        session.commit()
+        city_meta = session.query(ShapeMetadata).get(fixtures['city'].table_name)
+        self.assertIsNone(city_meta)
+
+        # Can we remove a shape that's only in the metadata?
+        dummy_meta = session.query(ShapeMetadata).get(self.dummy_name)
+        self.assertIsNotNone(dummy_meta)
+        dummy_meta.remove_table()
+        session.commit()
+        dummy_meta = session.query(ShapeMetadata).get(self.dummy_name)
+        self.assertIsNone(dummy_meta)
+
+        # Add them back to return to original test state
+        ShapeTests.ingest_fixture(fixtures['city'])
+        ShapeMetadata.add(human_name=u'Dummy Name',
+                          source_url=None,
+                          update_freq='yearly')
+        session.commit()
+
+    ''' /intersections '''
+
     def test_find_intersecting(self):
         # See test_fixtures/README for a picture of the rectangle
         rect_path = os.path.join(FIXTURE_PATH, 'university_village_rectangle.json')
@@ -57,6 +105,8 @@ class ShapeTests(BasePlenarioTest):
         datasets_to_num_geoms = {obj['dataset_name']: obj['num_geoms'] for obj in response_data['objects']}
         self.assertEqual(datasets_to_num_geoms[fixtures['zips'].table_name], 3)
         self.assertEqual(datasets_to_num_geoms[fixtures['streets'].table_name], 2)
+
+    ''' /shapes/<shape_name> '''
 
     def test_export_geojson(self):
         # Do we at least get some json back?
@@ -96,42 +146,11 @@ class ShapeTests(BasePlenarioTest):
         resp = self.app.get('/v1/api/shapes/{}?data_type=kml'.format(fixtures['city'].table_name))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.content_type, 'application/vnd.google-earth.kml+xml')
-
         # Don't have good automated way to test that it gives valid KML :(
-
-    def test_no_import_when_name_conflict(self):
-        # The city fixture should already be ingested
-        with self.assertRaises(Exception):
-            ShapeTests.ingest_fixture(fixtures['city'])
-        session.rollback()
 
     def test_uningested_shape_unavailable_for_export(self):
         resp = self.app.get('/v1/api/shapes/' + self.dummy_name)
         self.assertEqual(resp.status_code, 404)
-
-    def test_delete_shape(self):
-        # Can we remove a shape that's fully ingested?
-        city_meta = session.query(ShapeMetadata).get(fixtures['city'].table_name)
-        self.assertIsNotNone(city_meta)
-        city_meta.remove_table()
-        session.commit()
-        city_meta = session.query(ShapeMetadata).get(fixtures['city'].table_name)
-        self.assertIsNone(city_meta)
-
-        # Can we remove a shape that's only in the metadata?
-        dummy_meta = session.query(ShapeMetadata).get(self.dummy_name)
-        self.assertIsNotNone(dummy_meta)
-        dummy_meta.remove_table()
-        session.commit()
-        dummy_meta = session.query(ShapeMetadata).get(self.dummy_name)
-        self.assertIsNone(dummy_meta)
-
-        # Add them back to return to original test state
-        ShapeTests.ingest_fixture(fixtures['city'])
-        ShapeMetadata.add(human_name=u'Dummy Name',
-                          source_url=None,
-                          update_freq='yearly')
-        session.commit()
 
     '''/filter'''
 

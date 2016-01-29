@@ -33,6 +33,7 @@ def drop_tables(table_names):
     session.execute(command)
     session.commit()
 
+
 class Fixture(object):
     def __init__(self, human_name, file_name):
         self.human_name = human_name
@@ -48,8 +49,11 @@ fixtures = {
     'zips': Fixture(human_name=u'Zip Codes',
                     file_name='chicago_zip_codes.zip'),
     'neighborhoods': Fixture(human_name=u'Chicago Neighborhoods',
-                             file_name='chicago_neighborhoods.zip')
+                             file_name='chicago_neighborhoods.zip'),
+    'changed_neighborhoods': Fixture(human_name=u'Chicago Neighborhoods',
+        file_name='chicago_neighborhoods_changed.zip',)
 }
+
 
 class BasePlenarioTest(unittest.TestCase):
 
@@ -57,7 +61,8 @@ class BasePlenarioTest(unittest.TestCase):
     def setUpClass(cls, shutdown=False):
 
         # Remove tables that we're about to recreate.
-        # This doesn't happen in teardown because I find it helpful to inspect them in the DB after running the tests.
+        # This doesn't happen in teardown because I find it helpful
+        # to inspect them in the DB after running the tests.
         meta_table_names = ['meta_shape']
         fixture_table_names = [fixture.table_name for key, fixture in fixtures.iteritems()]
 
