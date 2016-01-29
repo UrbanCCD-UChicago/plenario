@@ -4,7 +4,7 @@ import urllib
 import zipfile
 from StringIO import StringIO
 
-from plenario.database import session
+from plenario.database import session, app_engine as engine
 from plenario.models import ShapeMetadata
 from plenario.etl.shape import ShapeETL
 from plenario.utils.shapefile import Shapefile
@@ -25,13 +25,16 @@ class ShapeTests(BasePlenarioTest):
         fixture = fixtures['changed_neighborhoods']
         # Add the fixture to the registry first
         shape_meta = session.query(ShapeMetadata).get('chicago_neighborhoods')
-        #shape_meta = ShapeMetadata.add(human_name=fixture.human_name,
-        #                               source_url=None,
-        #                               update_freq=fixture.update_freq)
-        #session.commit()
         # Do a ShapeETL update
         ShapeETL(meta=shape_meta, source_path=fixture.path).update()
-        return shape_meta
+        t = shape_meta.shape_table
+        sel = t.select().where(t.c['sec_neigh'] == 'ENGLEWOOD')
+        res = engine.execute(sel).fetchall()
+        altered_value = res[0]['pri_neigh']
+        # I changed Englewood to Englerwood :P
+        self.assertEqual(altered_value, 'Englerwood')
+
+
 
     def test_no_import_when_name_conflict(self):
         # The city fixture should already be ingested
