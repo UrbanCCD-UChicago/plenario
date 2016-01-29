@@ -209,7 +209,7 @@ class MetaTable(Base):
         """
         # Filter out datsets that don't intersect the time boundary
         q = session.query(cls.dataset_name)\
-            .filter(cls.dataset_name.in_(dataset_names),
+            .filter(cls.dataset_name.in_(dataset_names), cls.date_added != None,
                     cls.obs_from < end,
                     cls.obs_to > start)
 
