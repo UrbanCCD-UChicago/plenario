@@ -29,6 +29,23 @@ class PointAPITests(BasePlenarioTest):
     def setUpClass(cls):
         super(PointAPITests, cls).setUpClass()
 
+    ''' /datasets '''
+
+    def test_metadata_single(self):
+        query = '/v1/api/datasets/?dataset_name=crimes'
+        resp = self.app.get(query)
+        response_data = json.loads(resp.data)
+
+        self.assertEqual(len(response_data['objects']), 1)
+        self.assertEqual(response_data['objects'][0]['view_url'],
+                         "http://data.cityofchicago.org/api/views/ijzp-q8t2/rows")
+
+    def test_metadata_all(self):
+        pass
+
+
+    ''' /detail '''
+
     def test_time_filter(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'
         resp = self.app.get(query)

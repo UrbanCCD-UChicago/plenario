@@ -41,6 +41,7 @@ var ResponseView = Backbone.View.extend({
                 var objects = []
                 self.meta = {}
                 $.each(m, function(i, obj){
+                    // setting meta data for each obj
                     self.meta[obj.dataset_name] = obj
                 })
                 $.each(results, function(i, obj){
@@ -50,7 +51,6 @@ var ResponseView = Backbone.View.extend({
                         obj['values'].push([moment(o.datetime + "+0000").valueOf(),o.count]);
                         obj['count'] += o.count;
                     });
-                    // console.log(obj['values'])
                     obj['meta'] = self.meta[obj['dataset_name']]
                     objects.push(obj)
                 });

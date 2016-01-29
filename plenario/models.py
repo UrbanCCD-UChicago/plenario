@@ -31,6 +31,7 @@ class MetaTable(Base):
     description = Column(Text)
     source_url = Column(String(255))
     source_url_hash = Column(String(32), primary_key=True)
+    view_url = Column(String(255))
     attribution = Column(String(255))
     # Spatial and temporal boundaries of observations in this dataset
     obs_from = Column(Date)
@@ -98,6 +99,7 @@ class MetaTable(Base):
 
         assert url
         self.source_url, self.source_url_hash = url, md5(url).hexdigest()
+        self.view_url = self._get_view_url_val(url)
 
         assert update_freq
         self.update_freq = update_freq
@@ -115,6 +117,14 @@ class MetaTable(Base):
         self.contributor_name = contributor_name
         self.contributor_organization = contributor_organization
         self.contributor_email = contributor_email
+
+    @staticmethod
+    def _get_view_url_val(url):
+        trunc_index = url.find('.csv?accessType=DOWNLOAD')
+        if trunc_index == -1:
+            return None
+        else:
+            return url[:trunc_index]
 
     def __repr__(self):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
@@ -199,7 +209,7 @@ class MetaTable(Base):
         """
         # Filter out datsets that don't intersect the time boundary
         q = session.query(cls.dataset_name)\
-            .filter(cls.dataset_name.in_(dataset_names),
+            .filter(cls.dataset_name.in_(dataset_names), cls.date_added != None,
                     cls.obs_from < end,
                     cls.obs_to > start)
 

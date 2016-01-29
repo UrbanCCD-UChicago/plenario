@@ -692,7 +692,7 @@ def meta():
     q = '''
         SELECT  m.obs_from, m.location, m.latitude, m.last_update,
                 m.source_url_hash, m.attribution, m.description, m.source_url,
-                m.obs_to, m.date_added,
+                m.obs_to, m.date_added, m.view_url,
                 m.longitude, m.observed_date, m.human_name, m.dataset_name,
                 m.update_freq, ST_AsGeoJSON(m.bbox) as bbox
         FROM meta_master AS m
