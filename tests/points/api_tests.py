@@ -186,3 +186,11 @@ class PointAPITests(BasePlenarioTest):
         expected_counts = [1, 1, 3]
         observed_counts = [obj['count'] for obj in response_data['objects']]
         self.assertEqual(expected_counts, observed_counts)
+
+    def test_polygon_filter(self):
+        query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&shape=chicago_neighborhoods'
+        resp = self.app.get(query)
+        response_data = json.loads(resp.data)
+
+        self.assertEqual(response_data['meta']['total'], 5)
+        self.assertEqual(len(response_data['objects'][0]), 22)
