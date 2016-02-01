@@ -493,6 +493,107 @@ def detail_aggregate():
 
     return resp
 
+def remove_columns_from_dict(rows, col_names):
+    for row in rows:
+        for name in col_names:
+            del row[name]
+
+def form_json_detail_response(to_remove, validator, rows):
+    to_remove.append('geom')
+    remove_columns_from_dict(rows, to_remove)
+    resp = {
+        'meta': {},
+        'message': validator.warnings,
+        'objects': rows,
+    }
+
+    resp['meta']['total'] = len(resp['objects'])
+    resp['meta']['query'] = validator.vals
+    resp = make_response(json.dumps(resp, default=unknownObjectHandler), 200)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+def form_csv_detail_response(to_remove, validator, rows):
+    to_remove.append('geom')
+    remove_columns_from_dict(rows, to_remove)
+
+    # Column headers from arbitrary row,
+    # then the values from all the others
+    csv_resp = [rows[0].keys()] + [row.values() for row in rows]
+    resp = make_response(make_csv(csv_resp), 200)
+    dname = validator.dataset.name #dataset_name
+    filedate = datetime.now().strftime('%Y-%m-%d')
+    resp.headers['Content-Type'] = 'text/csv'
+    resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
+    return resp
+
+def form_geojson_detail_response(to_remove, validator, rows):
+    geojson_resp = {
+        "type": "FeatureCollection",
+        "features": []
+    }
+    # We want the geom this time.
+    remove_columns_from_dict(rows, to_remove)
+    for row in rows:
+        try:
+            wkb = row.pop('geom')
+            geom = shapely.wkb.loads(wkb.desc, hex=True).__geo_interface__
+        except (KeyError, AttributeError):
+            # If we couldn't fund a geom value,
+            # or said value was not of the expected type,
+            # then skip this column
+            continue
+        else:
+            feature = {
+                "type": "Feature",
+                "geometry": geom,
+                "properties": row
+            }
+            geojson_resp['features'].append(feature)
+
+    resp = make_response(json.dumps(geojson_resp, default=dthandler), 200)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+def form_detail_sql_query(validator):
+    dset = validator.dataset
+    try:
+        q = session.query(dset)
+        if validator.conditions:
+            q = q.filter(*validator.conditions)
+    except Exception as e:
+        return internal_error('Failed to construct column filters.', e)
+
+    try:
+        # Add time filters
+        maker = FilterMaker(validator.vals, dataset=dset)
+        q = q.filter(*maker.time_filters())
+
+        # Add geom filter, if provided
+        geom = validator.get_geom()
+        if geom is not None:
+            geom_filter = maker.geom_filter(geom)
+            q = q.filter(geom_filter)
+    except Exception as e:
+        return internal_error('Failed to construct time and geometry filters.', e)
+
+    #if the query specified a shape dataset, add a join to the sql query with that dataset
+    shape_table = validator.vals['shape']
+    if shape_table != None:
+        q = q.join(shape_table, dset.c.geom.ST_Within(shape_table.c.geom))
+
+        #add columns from shape dataset to the select statement
+        shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
+        validator.cols += ['{}.{}'.format(shape_table.name, key) for key in shape_table.columns.keys()]
+        q = q.add_columns(*shape_columns)
+    
+    # Page in RESPONSE_LIMIT chunks
+    offset = validator.vals['offset']
+    q = q.limit(RESPONSE_LIMIT)
+    if offset > 0:
+        q = q.offset(offset)
+
+    return q
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
@@ -534,43 +635,8 @@ def detail():
     if err:
         return bad_request(err)
 
-    # Part 2: Construct SQL query
-    dset = validator.dataset
-    try:
-        q = session.query(dset)
-        if validator.conditions:
-            q = q.filter(*validator.conditions)
-    except Exception as e:
-        return internal_error('Failed to construct column filters.', e)
-
-    try:
-        # Add time filters
-        maker = FilterMaker(validator.vals, dataset=dset)
-        q = q.filter(*maker.time_filters())
-
-        # Add geom filter, if provided
-        geom = validator.get_geom()
-        if geom is not None:
-            geom_filter = maker.geom_filter(geom)
-            q = q.filter(geom_filter)
-    except Exception as e:
-        return internal_error('Failed to construct time and geometry filters.', e)
-
-    #if the query specified a shape dataset, add a join to the sql query with that dataset
-    shape_table = validator.vals['shape']
-    if shape_table != None:
-        q = q.join(shape_table, dset.c.geom.ST_Within(shape_table.c.geom))
-
-        #add columns from shape dataset to the select statement
-        shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
-        validator.cols += ['{}.{}'.format(shape_table.name, key) for key in shape_table.columns.keys()]
-        q = q.add_columns(*shape_columns)
-
-    # Page in RESPONSE_LIMIT chunks
-    offset = validator.vals['offset']
-    q = q.limit(RESPONSE_LIMIT)
-    if offset > 0:
-        q = q.offset(offset)
+    #Part 2: Form SQL query from parameters stored in 'validator' object
+    q = form_detail_sql_query(validator)
 
     # Part 3: Make SQL query and dump output into list of rows
     # (Could explicitly not request point_date and geom here
@@ -580,73 +646,21 @@ def detail():
     except Exception as e:
         return internal_error('Failed to fetch records.', e)
 
-    def remove_columns(col_names):
-        for row in rows:
-            for name in col_names:
-                del row[name]
-
     # Part 4: Format response
     to_remove = ['point_date', 'hash']
-    if shape_table is not None:
-        print rows[0]
-        to_remove.append('{}.geom'.format(shape_table.name))
+    if validator.vals['shape'] is not None:
+        to_remove.append('{}.geom'.format(validator.vals['shape'].name))
 
     datatype = validator.vals['data_type']
     if datatype == 'json':
-        to_remove.append('geom')
-        remove_columns(to_remove)
-        resp = {
-            'meta': {},
-            'message': validator.warnings,
-            'objects': rows,
-        }
-
-        resp['meta']['total'] = len(resp['objects'])
-        resp['meta']['query'] = validator.vals
-        resp = make_response(json.dumps(resp, default=unknownObjectHandler), 200)
-        resp.headers['Content-Type'] = 'application/json'
+        resp = form_json_detail_response(to_remove, validator, rows)
 
     elif datatype == 'csv':
-        to_remove.append('geom')
-        remove_columns(to_remove)
-
-        # Column headers from arbitrary row,
-        # then the values from all the others
-        csv_resp = [rows[0].keys()] + [row.values() for row in rows]
-        resp = make_response(make_csv(csv_resp), 200)
-
-        dname = dataset_name
-        filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Type'] = 'text/csv'
-        resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
+        resp = form_csv_detail_response(to_remove, validator, rows)
 
     elif datatype == 'geojson':
-        geojson_resp = {
-          "type": "FeatureCollection",
-          "features": []
-        }
-        # We want the geom this time.
-        remove_columns(['point_date', 'hash'])
-        for row in rows:
-            try:
-                wkb = row.pop('geom')
-                geom = shapely.wkb.loads(wkb.desc, hex=True).__geo_interface__
-            except (KeyError, AttributeError):
-                # If we couldn't fund a geom value,
-                # or said value was not of the expected type,
-                # then skip this column
-                continue
-            else:
-                feature = {
-                    "type": "Feature",
-                    "geometry": geom,
-                    "properties": row
-                }
-                geojson_resp['features'].append(feature)
-
-        resp = make_response(json.dumps(geojson_resp, default=dthandler), 200)
-        resp.headers['Content-Type'] = 'application/json'
-
+        resp = form_geojson_detail_response(to_remove, validator, rows)
+    
     return resp
 
 
