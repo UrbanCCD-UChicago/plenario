@@ -1,5 +1,6 @@
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, make_cache_key, \
-    dthandler, make_csv, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT
+    dthandler, make_csv, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT, \
+    unknownObjectHandler
 from flask import request, make_response
 import dateutil.parser
 from datetime import timedelta, datetime
@@ -15,6 +16,9 @@ import shapely.wkb, shapely.geometry
 from sqlalchemy.types import NullType
 from collections import OrderedDict
 
+from sqlalchemy import func, cast, select, Column, MetaData
+from sqlalchemy import Integer, String
+from plenario.models import ShapeMetadata
 
 class ParamValidator(object):
 
@@ -241,6 +245,13 @@ def time_of_day_validator(hour_str):
         return None, error_message
     else:
         return num, None
+
+def shape_validator(shape_str):
+    shape_table = session.query(ShapeMetadata).get(shape_str)
+    if shape_table:
+        return shape_table.shape_table, None
+    else:
+        return None, "{} is not an available shape dataset in Plenario".format(shape_str)
 
 
 class FilterMaker(object):
@@ -511,7 +522,11 @@ def detail():
                       make_format_validator(['json', 'csv', 'geojson']),
                       'json')\
         .set_optional('date__time_of_day_ge', time_of_day_validator, 0)\
-        .set_optional('date__time_of_day_le', time_of_day_validator, 23)
+        .set_optional('date__time_of_day_le', time_of_day_validator, 23)\
+        .set_optional('shape', shape_validator, None)
+
+    '''create another validator to check if shape dataset is in meta_shape, then return
+    the actual table object for that shape if it is present'''
 
     # If any optional parameters are malformed, we're better off bailing and telling the user
     # than using a default and confusing them.
@@ -541,6 +556,16 @@ def detail():
     except Exception as e:
         return internal_error('Failed to construct time and geometry filters.', e)
 
+    #if the query specified a shape dataset, add a join to the sql query with that dataset
+    shape_table = validator.vals['shape']
+    if shape_table != None:
+        q = q.join(shape_table, dset.c.geom.ST_Within(shape_table.c.geom))
+
+        #add columns from shape dataset to the select statement
+        shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
+        validator.cols += ['{}.{}'.format(shape_table.name, key) for key in shape_table.columns.keys()]
+        q = q.add_columns(*shape_columns)
+
     # Page in RESPONSE_LIMIT chunks
     offset = validator.vals['offset']
     q = q.limit(RESPONSE_LIMIT)
@@ -550,9 +575,8 @@ def detail():
     # Part 3: Make SQL query and dump output into list of rows
     # (Could explicitly not request point_date and geom here
     #  to transfer less data)
-    col_names = [c.name for c in dset.columns]
     try:
-        rows = [OrderedDict(zip(col_names, res)) for res in q.all()]
+        rows = [OrderedDict(zip(validator.cols, res)) for res in q.all()]
     except Exception as e:
         return internal_error('Failed to fetch records.', e)
 
@@ -562,9 +586,15 @@ def detail():
                 del row[name]
 
     # Part 4: Format response
+    to_remove = ['point_date', 'hash']
+    if shape_table is not None:
+        print rows[0]
+        to_remove.append('{}.geom'.format(shape_table.name))
+
     datatype = validator.vals['data_type']
     if datatype == 'json':
-        remove_columns(['point_date', 'geom', 'hash'])
+        to_remove.append('geom')
+        remove_columns(to_remove)
         resp = {
             'meta': {},
             'message': validator.warnings,
@@ -573,11 +603,13 @@ def detail():
 
         resp['meta']['total'] = len(resp['objects'])
         resp['meta']['query'] = validator.vals
-        resp = make_response(json.dumps(resp, default=dthandler), 200)
+        resp = make_response(json.dumps(resp, default=unknownObjectHandler), 200)
         resp.headers['Content-Type'] = 'application/json'
 
     elif datatype == 'csv':
-        remove_columns(['point_date', 'geom', 'hash'])
+        to_remove.append('geom')
+        remove_columns(to_remove)
+
         # Column headers from arbitrary row,
         # then the values from all the others
         csv_resp = [rows[0].keys()] + [row.values() for row in rows]

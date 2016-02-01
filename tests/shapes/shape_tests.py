@@ -175,5 +175,14 @@ class ShapeTests(BasePlenarioTest):
         for neighborhood in neighborhoods:
             self.assertEqual(neighborhood['properties']['count'], 1)
 
+    def test_filter_point_data_with_polygons_with_crimes_and_neighborhoods(self):
+        url = '/v1/api/shapes/polygon_filter/landmarks/chicago_neighborhoods/'
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 200)
 
+        data = json.loads(response.data)
+        neighborhoods = data['features']
+
+        #for neighborhood in neighborhoods:
+        #    print neighborhood['properties']['count'], neighborhood['properties']['pri_neigh'] 
 

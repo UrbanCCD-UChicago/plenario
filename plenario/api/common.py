@@ -8,12 +8,21 @@ import csv
 from shapely.geometry import asShape
 from cStringIO import StringIO
 from plenario.utils.helpers import get_size_in_degrees
+from sqlalchemy.sql.schema import Table
 
 cache = Cache(config=CACHE_CONFIG)
 
 RESPONSE_LIMIT = 1000
 CACHE_TIMEOUT = 60*60*6
 
+def unknownObjectHandler(obj):
+    #convert Plenario objects into json for response; currently handles geoms and dates
+    if type(obj) == Table:
+        return obj.name
+    elif isinstance(obj, date):
+        return obj.isoformat()
+    else:
+        raise ValueError
 
 def dthandler(obj):
     if isinstance(obj, date):
