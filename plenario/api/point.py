@@ -345,6 +345,125 @@ def internal_error(context_msg, exception):
     msg = context_msg + '\nDebug:\n' + repr(exception)
     return make_error(msg, 500)
 
+def remove_columns_from_dict(rows, col_names):
+    for row in rows:
+        for name in col_names:
+            del row[name]
+
+def json_response_base(validator, objects, query=''):
+    meta = {
+        'status': 'ok',
+        'message': '',
+        'query': query,
+    }
+
+    if validator:
+        meta['message'] = validator.warnings
+        meta['query'] = validator.vals
+
+    return {
+        'meta': meta,
+        'objects': objects,
+    }
+
+def geojson_response_base():
+    return {
+        "type": "FeatureCollection",
+        "features": []
+    }
+
+def add_geojson_feature(geojson_response, feature_geom, feature_properties):
+    new_feature = {
+        "type": "Feature",
+        "geometry": feature_geom,
+        "properties": feature_properties
+    }
+    geojson_response['features'].append(new_feature)
+
+def form_json_detail_response(to_remove, validator, rows):
+    to_remove.append('geom')
+    remove_columns_from_dict(rows, to_remove)
+    resp = json_response_base(validator, rows)
+
+    resp['meta']['total'] = len(resp['objects'])
+    resp['meta']['query'] = validator.vals
+    resp = make_response(json.dumps(resp, default=unknownObjectHandler), 200)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+def form_csv_detail_response(to_remove, validator, rows):
+    to_remove.append('geom')
+    remove_columns_from_dict(rows, to_remove)
+
+    # Column headers from arbitrary row,
+    # then the values from all the others
+    csv_resp = [rows[0].keys()] + [row.values() for row in rows]
+    resp = make_response(make_csv(csv_resp), 200)
+    dname = validator.dataset.name #dataset_name
+    filedate = datetime.now().strftime('%Y-%m-%d')
+    resp.headers['Content-Type'] = 'text/csv'
+    resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
+    return resp
+
+def form_geojson_detail_response(to_remove, validator, rows):
+    geojson_resp = geojson_response_base()
+    # We want the geom this time.
+    remove_columns_from_dict(rows, to_remove)
+    for row in rows:
+        try:
+            wkb = row.pop('geom')
+            geom = shapely.wkb.loads(wkb.desc, hex=True).__geo_interface__
+        except (KeyError, AttributeError):
+            # If we couldn't fund a geom value,
+            # or said value was not of the expected type,
+            # then skip this column
+            continue
+        else:
+            add_geojson_feature(geojson_resp, geom, row)
+
+    resp = make_response(json.dumps(geojson_resp, default=dthandler), 200)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+def form_detail_sql_query(validator):
+    dset = validator.dataset
+    try:
+        q = session.query(dset)
+        if validator.conditions:
+            q = q.filter(*validator.conditions)
+    except Exception as e:
+        return internal_error('Failed to construct column filters.', e)
+
+    try:
+        # Add time filters
+        maker = FilterMaker(validator.vals, dataset=dset)
+        q = q.filter(*maker.time_filters())
+
+        # Add geom filter, if provided
+        geom = validator.get_geom()
+        if geom is not None:
+            geom_filter = maker.geom_filter(geom)
+            q = q.filter(geom_filter)
+    except Exception as e:
+        return internal_error('Failed to construct time and geometry filters.', e)
+
+    #if the query specified a shape dataset, add a join to the sql query with that dataset
+    shape_table = validator.vals['shape']
+    if shape_table != None:
+        q = q.join(shape_table, dset.c.geom.ST_Within(shape_table.c.geom))
+
+        #add columns from shape dataset to the select statement
+        shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
+        validator.cols += ['{}.{}'.format(shape_table.name, key) for key in shape_table.columns.keys()]
+        q = q.add_columns(*shape_columns)
+    
+    # Page in RESPONSE_LIMIT chunks
+    offset = validator.vals['offset']
+    q = q.limit(RESPONSE_LIMIT)
+    if offset > 0:
+        q = q.offset(offset)
+
+    return q
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
@@ -385,14 +504,7 @@ def timeseries():
         msg = 'Failed to construct timeseries.'
         return internal_error(msg, e)
 
-    resp = {
-        'meta': {
-            'status': 'ok',
-            'message': validator.warnings,
-            'query': validator.vals
-        },
-        'objects': panel,
-    }
+    resp = json_response_base(validator, panel)
 
     datatype = validator.vals['data_type']
     if datatype == 'json':
@@ -474,17 +586,11 @@ def detail_aggregate():
 
     datatype = validator.vals['data_type']
     if datatype == 'json':
-        resp = {
-            'meta': {
-                'status': 'ok',
-                'message': validator.warnings,
-                'query': validator.vals
-            },
-            'objects': [{'count': c, 'datetime': d} for c, d in ts[1:]],
-        }
-
+        time_counts = [{'count': c, 'datetime': d} for c, d in ts[1:]]
+        resp = json_response_base(validator, time_counts)
         resp = make_response(json.dumps(resp, default=dthandler), 200)
         resp.headers['Content-Type'] = 'application/json'
+
     elif datatype == 'csv':
         resp = make_csv(ts)
         resp.headers['Content-Type'] = 'text/csv'
@@ -492,108 +598,6 @@ def detail_aggregate():
         resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
 
     return resp
-
-def remove_columns_from_dict(rows, col_names):
-    for row in rows:
-        for name in col_names:
-            del row[name]
-
-def form_json_detail_response(to_remove, validator, rows):
-    to_remove.append('geom')
-    remove_columns_from_dict(rows, to_remove)
-    resp = {
-        'meta': {},
-        'message': validator.warnings,
-        'objects': rows,
-    }
-
-    resp['meta']['total'] = len(resp['objects'])
-    resp['meta']['query'] = validator.vals
-    resp = make_response(json.dumps(resp, default=unknownObjectHandler), 200)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
-
-def form_csv_detail_response(to_remove, validator, rows):
-    to_remove.append('geom')
-    remove_columns_from_dict(rows, to_remove)
-
-    # Column headers from arbitrary row,
-    # then the values from all the others
-    csv_resp = [rows[0].keys()] + [row.values() for row in rows]
-    resp = make_response(make_csv(csv_resp), 200)
-    dname = validator.dataset.name #dataset_name
-    filedate = datetime.now().strftime('%Y-%m-%d')
-    resp.headers['Content-Type'] = 'text/csv'
-    resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
-    return resp
-
-def form_geojson_detail_response(to_remove, validator, rows):
-    geojson_resp = {
-        "type": "FeatureCollection",
-        "features": []
-    }
-    # We want the geom this time.
-    remove_columns_from_dict(rows, to_remove)
-    for row in rows:
-        try:
-            wkb = row.pop('geom')
-            geom = shapely.wkb.loads(wkb.desc, hex=True).__geo_interface__
-        except (KeyError, AttributeError):
-            # If we couldn't fund a geom value,
-            # or said value was not of the expected type,
-            # then skip this column
-            continue
-        else:
-            feature = {
-                "type": "Feature",
-                "geometry": geom,
-                "properties": row
-            }
-            geojson_resp['features'].append(feature)
-
-    resp = make_response(json.dumps(geojson_resp, default=dthandler), 200)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
-
-def form_detail_sql_query(validator):
-    dset = validator.dataset
-    try:
-        q = session.query(dset)
-        if validator.conditions:
-            q = q.filter(*validator.conditions)
-    except Exception as e:
-        return internal_error('Failed to construct column filters.', e)
-
-    try:
-        # Add time filters
-        maker = FilterMaker(validator.vals, dataset=dset)
-        q = q.filter(*maker.time_filters())
-
-        # Add geom filter, if provided
-        geom = validator.get_geom()
-        if geom is not None:
-            geom_filter = maker.geom_filter(geom)
-            q = q.filter(geom_filter)
-    except Exception as e:
-        return internal_error('Failed to construct time and geometry filters.', e)
-
-    #if the query specified a shape dataset, add a join to the sql query with that dataset
-    shape_table = validator.vals['shape']
-    if shape_table != None:
-        q = q.join(shape_table, dset.c.geom.ST_Within(shape_table.c.geom))
-
-        #add columns from shape dataset to the select statement
-        shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
-        validator.cols += ['{}.{}'.format(shape_table.name, key) for key in shape_table.columns.keys()]
-        q = q.add_columns(*shape_columns)
-    
-    # Page in RESPONSE_LIMIT chunks
-    offset = validator.vals['offset']
-    q = q.limit(RESPONSE_LIMIT)
-    if offset > 0:
-        q = q.offset(offset)
-
-    return q
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
@@ -708,21 +712,17 @@ def grid():
     except Exception as e:
         return internal_error('Could not make grid aggregation.', e)
 
-    resp = {'type': 'FeatureCollection', 'features': []}
+    resp = geojson_response_base()
     for value in grid_rows:
-        d = {
-            'type': 'Feature',
-            'properties': {
-                'count': value[0],
-            },
-        }
         if value[1]:
             pt = shapely.wkb.loads(value[1].decode('hex'))
             south, west = (pt.x - (size_x / 2)), (pt.y - (size_y /2))
             north, east = (pt.x + (size_x / 2)), (pt.y + (size_y / 2))
-            d['geometry'] = shapely.geometry.box(south, west, north, east).__geo_interface__
-
-        resp['features'].append(d)
+            new_geom = shapely.geometry.box(south, west, north, east).__geo_interface__
+        else:
+            new_geom = None
+        new_property = {'count': value[0],}
+        add_geojson_feature(resp, new_geom, new_property)
 
     resp = make_response(json.dumps(resp, default=dthandler), 200)
     resp.headers['Content-Type'] = 'application/json'
@@ -734,13 +734,6 @@ def grid():
 @crossdomain(origin="*")
 def meta():
     status_code = 200
-    resp = {
-            'meta': {
-                'status': 'ok',
-                'message': '',
-            },
-            'objects': []
-        }
 
     dataset_name = request.args.get('dataset_name')
 
@@ -755,14 +748,19 @@ def meta():
     '''
 
     if dataset_name:
+        response_query = {'dataset_name': dataset_name}
+
         # We need to get the bbox separately so we can request it as json
         q = text('{0} AND m.dataset_name=:dataset_name'.format(q))
 
         with engine.begin() as c:
             metas = list(c.execute(q, dataset_name=dataset_name))
     else:
+        response_query = None
         with engine.begin() as c:
             metas = list(c.execute(q))
+
+    resp = json_response_base(None, [], query=response_query)
 
     for m in metas:
         keys = dict(zip(m.keys(), m.values()))
@@ -784,14 +782,8 @@ def dataset_fields(dataset_name):
         table = Table(dataset_name, Base.metadata,
                       autoload=True, autoload_with=engine,
                       extend_existing=True)
-        data = {
-            'meta': {
-                'status': 'ok',
-                'message': '',
-                'query': {'dataset_name': dataset_name}
-            },
-            'objects': []
-        }
+
+        resp = json_response_base(None, [], query={'dataset_name': dataset_name})
         status_code = 200
         for col in table.columns:
             if not isinstance(col.type, NullType):
@@ -802,16 +794,12 @@ def dataset_fields(dataset_name):
                 d = {}
                 d['field_name'] = col.name
                 d['field_type'] = str(col.type)
-                data['objects'].append(d)
+                resp['objects'].append(d)
+        resp = make_response(json.dumps(resp), status_code)
+
     except NoSuchTableError:
-        data = {
-            'meta': {
-                'status': 'error',
-                'message': "'%s' is not a valid table name" % dataset_name
-            },
-            'objects': []
-        }
-        status_code = 400
-    resp = make_response(json.dumps(data), status_code)
+        error_msg = "'%s' is not a valid table name" % dataset_name
+        resp = bad_request(error_msg)
+
     resp.headers['Content-Type'] = 'application/json'
     return resp
