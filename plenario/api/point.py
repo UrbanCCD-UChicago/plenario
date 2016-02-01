@@ -590,16 +590,22 @@ def detail():
                      {'point_date', 'hash'}]
         for row in rows:
             # Fragile, and badly needs improvement:
-            # For now,  we know that the last column in each point table
+            # For now, we know that the last column in each point table
             # is the location geom as WKB.
             if row[-1] is not None:
-                row[-1] = shapely.wkb.loads(row[-1].desc, hex=True).__geo_interface__
-                feature = {
-                  "type": "Feature",
-                  "geometry": row[-1],
-                  "properties": {col: val for col, val in zip(col_names, row)}
-                }
-                geojson_resp['features'].append(feature)
+                try:
+                    row[-1] = shapely.wkb.loads(row[-1].desc, hex=True).__geo_interface__
+                    feature = {
+                      "type": "Feature",
+                      "geometry": row[-1],
+                      "properties": {col: val for col, val in zip(col_names, row)}
+                    }
+                    geojson_resp['features'].append(feature)
+                except AttributeError:
+                    # The last element of the tuple wasn't WKB
+                    # This row must not have a properly formed geom.
+                    # Skip it.
+                    pass
         resp = make_response(json.dumps(geojson_resp, default=dthandler), 200)
         resp.headers['Content-Type'] = 'application/json'
 
