@@ -13,6 +13,7 @@ from sqlalchemy.exc import NoSuchTableError
 from plenario.database import session, Base, app_engine as engine
 import shapely.wkb, shapely.geometry
 from sqlalchemy.types import NullType
+from collections import OrderedDict
 
 
 class ParamValidator(object):
@@ -547,25 +548,28 @@ def detail():
         q = q.offset(offset)
 
     # Part 3: Make SQL query and dump output into list of rows
-    # (Could explicitly not request point_date and geom here to transfer less data)
+    # (Could explicitly not request point_date and geom here
+    #  to transfer less data)
+    col_names = [c.name for c in dset.columns]
     try:
-        rows = [list(record) for record in q.all()]
+        rows = [OrderedDict(zip(col_names, res)) for res in q.all()]
     except Exception as e:
         return internal_error('Failed to fetch records.', e)
 
+    def remove_columns(col_names):
+        for row in rows:
+            for name in col_names:
+                del row[name]
+
     # Part 4: Format response
-    col_names = [name for name in validator.cols if name not in
-                 {'point_date', 'geom', 'hash'}]
     datatype = validator.vals['data_type']
     if datatype == 'json':
+        remove_columns(['point_date', 'geom', 'hash'])
         resp = {
             'meta': {},
             'message': validator.warnings,
-            'objects': [],
+            'objects': rows,
         }
-        for row in rows:
-            fields = {col: val for col, val in zip(col_names, row)}
-            resp['objects'].append(fields)
 
         resp['meta']['total'] = len(resp['objects'])
         resp['meta']['query'] = validator.vals
@@ -573,8 +577,12 @@ def detail():
         resp.headers['Content-Type'] = 'application/json'
 
     elif datatype == 'csv':
-        csv_resp = [col_names] + rows
+        remove_columns(['point_date', 'geom', 'hash'])
+        # Column headers from arbitrary row,
+        # then the values from all the others
+        csv_resp = [rows[0].keys()] + [row.values() for row in rows]
         resp = make_response(make_csv(csv_resp), 200)
+
         dname = dataset_name
         filedate = datetime.now().strftime('%Y-%m-%d')
         resp.headers['Content-Type'] = 'text/csv'
@@ -585,27 +593,25 @@ def detail():
           "type": "FeatureCollection",
           "features": []
         }
-
-        col_names = [name for name in validator.cols if name not in
-                     {'point_date', 'hash'}]
+        # We want the geom this time.
+        remove_columns(['point_date', 'hash'])
         for row in rows:
-            # Fragile, and badly needs improvement:
-            # For now, we know that the last column in each point table
-            # is the location geom as WKB.
-            if row[-1] is not None:
-                try:
-                    row[-1] = shapely.wkb.loads(row[-1].desc, hex=True).__geo_interface__
-                    feature = {
-                      "type": "Feature",
-                      "geometry": row[-1],
-                      "properties": {col: val for col, val in zip(col_names, row)}
-                    }
-                    geojson_resp['features'].append(feature)
-                except AttributeError:
-                    # The last element of the tuple wasn't WKB
-                    # This row must not have a properly formed geom.
-                    # Skip it.
-                    pass
+            try:
+                wkb = row.pop('geom')
+                geom = shapely.wkb.loads(wkb.desc, hex=True).__geo_interface__
+            except (KeyError, AttributeError):
+                # If we couldn't fund a geom value,
+                # or said value was not of the expected type,
+                # then skip this column
+                continue
+            else:
+                feature = {
+                    "type": "Feature",
+                    "geometry": geom,
+                    "properties": row
+                }
+                geojson_resp['features'].append(feature)
+
         resp = make_response(json.dumps(geojson_resp, default=dthandler), 200)
         resp.headers['Content-Type'] = 'application/json'
 
