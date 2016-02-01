@@ -21,6 +21,7 @@ from sqlalchemy import Table, text
 import sqlalchemy
 from hashlib import md5
 from sqlalchemy.exc import NoSuchTableError
+from collections import namedtuple
 
 views = Blueprint('views', __name__)
 
@@ -314,6 +315,106 @@ def extract_form_labels(form):
             labels[v] = key
     return labels
 
+ColumnMeta = namedtuple("ColumnMeta", 'name type')
+DescriptionMeta = namedtuple("DescriptionMeta",
+                             'human_name attribution description')
+
+
+class Submission(object):
+    """
+    What do we need to know about a dataset when someone submits it?
+    1) The source url and view url
+    2) The url where a user can view it (if applicable)
+    3) ColumnMeta for each column
+    4) DescriptionMeta
+    """
+
+    def __init__(self, url, is_shapefile=False):
+        self._assert_reachable(url)
+        self.submitted_url = url
+        self.is_shapefile = is_shapefile
+
+    @staticmethod
+    def _assert_reachable(url):
+        try:
+            resp = requests.get(url)
+            resp.raise_for_status()
+        except:
+            raise RuntimeError('Could not reach URL ' + url)
+
+
+    def infer_column_types(self):
+        assert not self.is_shapefile
+        pass
+
+
+class SocrataPage(object):
+    """
+    All the metadata we can derive from a Socrata 4x4.
+    Includes attribution and description.
+    Can also derive url of file
+    given a url to a UI page describing that file.
+
+    Throws an exception if either the given url or derived url
+    does not point to a file of the right type.
+    """
+
+    def __init__(self, url, is_shapefile=False):
+        self.four_by_four = self._extract_four_by_four(url)
+        if self.four_by_four is None:
+            msg = 'URLs to Socrata datasets must contain a 4x4 id'
+            raise RuntimeError(msg)
+        self.submitted_url = url
+        self.file_url = self._derive_file_url()
+        self.view_url = self._derive_view_url()
+        self.is_shapefile = is_shapefile
+
+    def _derive_file_url(self):
+        """
+        Try the "standard" url formats that we can construct
+        with the submitted URL.
+        Raises exception if we can't derive a file URL.
+        :return:
+        """
+        """view_url = '%s/%s/%s' % (host, path, four_by_four)
+
+        if is_shapefile:
+            source_url = '%s/download/%s/application/zip' % (host, four_by_four)
+        else:
+            source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url"""
+        return 'foo'
+
+    def _derive_view_url(self):
+        """
+        In case the user provided a direct link to the file,
+        try to figure out somewhere we could link them to show the dataset
+        in its original Socrata spreadsheet form.
+        Can also return None. (Namely, if it's a shapefile)
+        :return:
+        """
+        return 'foo'
+
+    @staticmethod
+    def _extract_four_by_four(url):
+        """
+        Return last string fragment matching Socrata 4x4 pattern
+        :param url: URL from which to extract Socrata 4x4 id.
+        :type url: str
+        :return: 4x4 string like abc1-d2ef if found
+                 else None
+        """
+        url = url.strip(' \t\n\r')  # strip whitespace, tabs, etc
+        matches = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
+        if matches:
+            return matches[-1]
+        else:
+            return None
+
+    @classmethod
+    def is_socrata_url(cls, url):
+        return cls._extract_four_by_four(url) is not None
+
+
 ''' Terrifying functions that fetch dataset metadata.'''
 
 
@@ -376,8 +477,6 @@ def get_socrata_data_info(host, path, four_by_four, is_shapefile=False):
                 d = {
                     'human_name': column['name'],
                     'machine_name': column['fieldName'],
-                    #'field_name': column['fieldName'], # duplicate definition for code compatibility
-                    #'field_name': column['name'], # duplicate definition for code compatibility
                     'field_name': slugify(column['name']), # duplicate definition for code compatibility
                     'data_type': column['dataTypeName'],
                     'description': column.get('description', ''),
