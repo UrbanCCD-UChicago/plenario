@@ -500,11 +500,15 @@ def detail():
         return bad_request("Cannot find dataset named {}".format(dataset_name))
 
     validator\
-        .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
+        .set_optional('obs_date__ge',
+                      date_validator,
+                      datetime.now() - timedelta(days=90))\
         .set_optional('obs_date__le', date_validator, datetime.now())\
         .set_optional('location_geom__within', geom_validator, None)\
         .set_optional('offset', int_validator, 0)\
-        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json')\
+        .set_optional('data_type',
+                      make_format_validator(['json', 'csv', 'geojson']),
+                      'json')\
         .set_optional('date__time_of_day_ge', time_of_day_validator, 0)\
         .set_optional('date__time_of_day_le', time_of_day_validator, 23)
 
@@ -550,7 +554,8 @@ def detail():
         return internal_error('Failed to fetch records.', e)
 
     # Part 4: Format response
-    col_names = [name for name in validator.cols if name not in {'point_date', 'geom'}]
+    col_names = [name for name in validator.cols if name not in
+                 {'point_date', 'geom', 'hash'}]
     datatype = validator.vals['data_type']
     if datatype == 'json':
         resp = {
@@ -574,6 +579,29 @@ def detail():
         filedate = datetime.now().strftime('%Y-%m-%d')
         resp.headers['Content-Type'] = 'text/csv'
         resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
+
+    elif datatype == 'geojson':
+        geojson_resp = {
+          "type": "FeatureCollection",
+          "features": []
+        }
+
+        col_names = [name for name in validator.cols if name not in
+                     {'point_date', 'hash'}]
+        for row in rows:
+            # Fragile, and badly needs improvement:
+            # For now,  we know that the last column in each point table
+            # is the location geom as WKB.
+            if row[-1] is not None:
+                row[-1] = shapely.wkb.loads(row[-1].desc, hex=True).__geo_interface__
+                feature = {
+                  "type": "Feature",
+                  "geometry": row[-1],
+                  "properties": {col: val for col, val in zip(col_names, row)}
+                }
+                geojson_resp['features'].append(feature)
+        resp = make_response(json.dumps(geojson_resp, default=dthandler), 200)
+        resp.headers['Content-Type'] = 'application/json'
 
     return resp
 
