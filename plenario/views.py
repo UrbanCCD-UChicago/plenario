@@ -2,7 +2,8 @@ from flask import make_response, request, redirect, url_for, render_template, \
     Blueprint, flash, session as flask_session
 from plenario.models import MetaTable, User, ShapeMetadata
 from plenario.database import session, Base, app_engine as engine
-from plenario.utils.helpers import iter_column, send_mail, slugify
+from plenario.utils.helpers import iter_column, send_mail, slugify, \
+    infer_csv_columns
 from plenario.tasks import update_dataset as update_dataset_task, \
     delete_dataset as delete_dataset_task, add_dataset as add_dataset_task, \
     add_shape as add_shape_task, delete_shape as delete_shape_task
@@ -22,6 +23,7 @@ import sqlalchemy
 from hashlib import md5
 from sqlalchemy.exc import NoSuchTableError
 from collections import namedtuple
+import itertools
 
 views = Blueprint('views', __name__)
 
@@ -313,7 +315,7 @@ def extract_form_labels(form):
             labels[v] = key
     return labels
 
-ColumnMeta = namedtuple("ColumnMeta", 'name type')
+ColumnMeta = namedtuple("ColumnMeta", 'name type_')
 DescriptionMeta = namedtuple("DescriptionMeta",
                              'human_name attribution description')
 
@@ -360,7 +362,7 @@ def is_certainly_html(url):
         try:
             return 'text/html' in head.headers['content-type']
         except KeyError:
-            # No content-type
+            # No content-type? Bummer.
             return False
 
 
@@ -372,7 +374,16 @@ class GenericDataset(object):
         self.columns = self._infer_columns()
 
     def _infer_columns(self):
-        return 'foo'
+        r = requests.get(self.file_url)
+        inp = StringIO()
+
+        head = itertools.islice(r.iter_lines(), 1000)
+        for line in head:
+            inp.write(line + '\n')
+        inp.seek(0)
+        column_info = infer_csv_columns(inp)
+
+        return [ColumnMeta(name, type_) for name, type_, _ in column_info]
 
 
 class SocrataPage(object):
@@ -398,12 +409,12 @@ class SocrataPage(object):
         self.view_url = self._derive_view_url()
         self.columns = self._derive_columns()
 
-        self.is_shapefile = is_shapefile
-
+        self._is_shapefile = is_shapefile
         self._metadata = None
 
     def _derive_columns(self):
-        return 'foo'
+        return [ColumnMeta(c['name'], c['dataTypeName'])
+                for c in self.metadata['columns']]
 
     def _derive_view_url(self):
         """
@@ -411,7 +422,7 @@ class SocrataPage(object):
         with the submitted URL.
         """
         # CSV case
-        if not self.is_shapefile:
+        if not self._is_shapefile:
             return '{}/api/views/{}/rows'.format(self.url_prefix(),
                                                  self.four_by_four)
         # Shapefile case
@@ -425,7 +436,7 @@ class SocrataPage(object):
 
     def _derive_file_url(self):
         # CSV is the easy case.
-        if not self.is_shapefile:
+        if not self._is_shapefile:
             # Assumes view_url is of the format '{}/api/views/{}/rows'
             return '%s.csv?accessType=DOWNLOAD' % self.view_url
 
@@ -605,7 +616,7 @@ def extract_four_by_four(url):
     :param url: URL that could contain a 4x4
     :return: 9 character string or None if couldn't find 4x4
     """
-    url = url.strip(' \t\n\r') # strip whitespace, tabs, etc
+    url = url.strip(' \t\n\r')  # strip whitespace, tabs, etc
     matches = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
     if matches:
         return matches[-1]
