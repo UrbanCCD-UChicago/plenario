@@ -100,10 +100,8 @@ http://plenar.io""" % (meta.contributor_name, meta.human_name)
               recipient=meta.contributor_email, body=msg_body)
 
 #
-#
 ''' Submit a dataset (Add it to MetaData
     and try to ingest it now or later.) '''
-#
 #
 
 
@@ -324,25 +322,22 @@ class Submission(object):
     """
     What do we need to know about a dataset when someone submits it?
     1) The source url and view url
-    2) The url where a user can view it (if applicable)
-    3) ColumnMeta for each column
-    4) DescriptionMeta
+    2) ColumnMeta for each column
+    3) DescriptionMeta
     """
 
-    def __init__(self, url, is_shapefile=False):
+    def __init__(self, url, is_shapefile=False, description_meta=None):
         self._assert_reachable(url)
         self.submitted_url = url
         self.is_shapefile = is_shapefile
 
-        # Check if it's Socrata
         if SocrataPage.is_socrata_url(url):
-            socrata_info = SocrataPage(url)
+            self.dataset = SocrataPage(url)
         else:
-            pass
-            # The default case
-
-        if self.is_certainly_html(url):
-            raise RuntimeError('Must point to raw file.')
+            assert description_meta is not None
+            assert not is_certainly_html(url)
+            '''self.dataset = GenericDataset(submitted_url=url,
+                                          description_meta=description_meta)'''
 
     @staticmethod
     def _assert_reachable(url):
@@ -352,21 +347,32 @@ class Submission(object):
         except:
             raise RuntimeError('Could not reach URL ' + url)
 
-    @staticmethod
-    def is_certainly_html(url):
-        head = requests.head(url)
-        if head.status_code != 200:
-            return False
-        else:
-            try:
-                return 'text/html' in head.headers['content-type']
-            except KeyError:
-                # No content-type
-                return False
-
     def infer_column_types(self):
         assert not self.is_shapefile
         pass
+
+
+def is_certainly_html(url):
+    head = requests.head(url)
+    if head.status_code != 200:
+        return False
+    else:
+        try:
+            return 'text/html' in head.headers['content-type']
+        except KeyError:
+            # No content-type
+            return False
+
+
+class GenericDataset(object):
+    def __init__(self, url, description_meta):
+        self.view_url = None
+        self.file_url = url
+        self.description_meta = description_meta
+        self.columns = self._infer_columns()
+
+    def _infer_columns(self):
+        return 'foo'
 
 
 class SocrataPage(object):
@@ -390,9 +396,14 @@ class SocrataPage(object):
         self.description_meta = self.derive_description_meta()
         self.file_url = self._derive_file_url()
         self.view_url = self._derive_view_url()
+        self.columns = self._derive_columns()
+
         self.is_shapefile = is_shapefile
 
         self._metadata = None
+
+    def _derive_columns(self):
+        return 'foo'
 
     def _derive_view_url(self):
         """
@@ -404,7 +415,7 @@ class SocrataPage(object):
             return '{}/api/views/{}/rows'.format(self.url_prefix(),
                                                  self.four_by_four)
         # Shapefile case
-        if Submission.is_certainly_html(self.submitted_url):
+        if is_certainly_html(self.submitted_url):
             # If the user pointed us to HTML, use that.
             return self.submitted_url
         else:
@@ -452,8 +463,12 @@ class SocrataPage(object):
     def derive_description_meta(self):
         # Grab from correct JSON fields
         description = self.metadata['description']
+        human_name = self.metadata['name']
+        attribution = self.metadata['attribution']
 
-        return DescriptionMeta('foo', 'bar', 'baz')
+        return DescriptionMeta(description=description,
+                               human_name=human_name,
+                               attribution=attribution)
 
     @property
     def metadata(self):
