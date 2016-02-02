@@ -12,26 +12,18 @@ class EvilSubmitTests(unittest.TestCase):
 
 
 class SubmitCSVTests(unittest.TestCase):
-    def test_nonsense_url(self):
-        pass
-
-    def test_hopeless_url(self):
-        pass
-
     def test_socrata_url(self):
-        pass
+        sub = Submission('https://data.cityofchicago.org/Health-Human-Services/'
+                   'Flu-Shot-Clinic-Locations-2013/g5vx-5vqf')
+        self.assertEqual(sub.source_url,
+                         'https://data.cityofchicago.org/api/views/'
+                         'g5vx-5vqf/rows.csv?accessType=DOWNLOAD')
 
     def test_non_socrata_url(self):
         pass
 
 
 class SubmitShapeTests(unittest.TestCase):
-    def test_nonsense_url(self):
-        pass
-
-    def test_hopeless_url(self):
-        pass
-
     def test_socrata_url(self):
         pass
 

@@ -334,14 +334,35 @@ class Submission(object):
         self.submitted_url = url
         self.is_shapefile = is_shapefile
 
+        # Check if it's Socrata
+        if SocrataPage.is_socrata_url(url):
+            socrata_info = SocrataPage(url)
+        else:
+            pass
+            # The default case
+
+        if self.is_certainly_html(url):
+            raise RuntimeError('Must point to raw file.')
+
     @staticmethod
     def _assert_reachable(url):
         try:
-            resp = requests.get(url)
-            resp.raise_for_status()
+            resp = requests.head(url)
+            assert resp.status_code != 404
         except:
             raise RuntimeError('Could not reach URL ' + url)
 
+    @staticmethod
+    def is_certainly_html(url):
+        head = requests.head(url)
+        if head.status_code != 200:
+            return False
+        else:
+            try:
+                return 'text/html' in head.headers['content-type']
+            except KeyError:
+                # No content-type
+                return False
 
     def infer_column_types(self):
         assert not self.is_shapefile
@@ -365,34 +386,89 @@ class SocrataPage(object):
             msg = 'URLs to Socrata datasets must contain a 4x4 id'
             raise RuntimeError(msg)
         self.submitted_url = url
+
+        self.description_meta = self.derive_description_meta()
         self.file_url = self._derive_file_url()
         self.view_url = self._derive_view_url()
         self.is_shapefile = is_shapefile
 
-    def _derive_file_url(self):
-        """
-        Try the "standard" url formats that we can construct
-        with the submitted URL.
-        Raises exception if we can't derive a file URL.
-        :return:
-        """
-        """view_url = '%s/%s/%s' % (host, path, four_by_four)
-
-        if is_shapefile:
-            source_url = '%s/download/%s/application/zip' % (host, four_by_four)
-        else:
-            source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url"""
-        return 'foo'
+        self._metadata = None
 
     def _derive_view_url(self):
         """
-        In case the user provided a direct link to the file,
-        try to figure out somewhere we could link them to show the dataset
-        in its original Socrata spreadsheet form.
-        Can also return None. (Namely, if it's a shapefile)
-        :return:
+        Try the "standard" url formats that we can construct
+        with the submitted URL.
         """
-        return 'foo'
+        # CSV case
+        if not self.is_shapefile:
+            return '{}/api/views/{}/rows'.format(self.url_prefix(),
+                                                 self.four_by_four)
+        # Shapefile case
+        if Submission.is_certainly_html(self.submitted_url):
+            # If the user pointed us to HTML, use that.
+            return self.submitted_url
+        else:
+            # Don't know of a consistent way to derive
+            # an HTML view of a Socrata shape dataset. :(
+            return None
+
+    def _derive_file_url(self):
+        # CSV is the easy case.
+        if not self.is_shapefile:
+            # Assumes view_url is of the format '{}/api/views/{}/rows'
+            return '%s.csv?accessType=DOWNLOAD' % self.view_url
+
+        # We're dealing with a shapefile
+
+        # I noticed that if Socrata displays the shape as a map,
+        # we can usually download through the geospatial API.
+        # When it doesn't display the map,
+        # we can download with /application/zip
+        # This heuristic tends to work,
+        # but a more robust way might be drilling into
+        # metadata['metadata'] and seeing if there's a 'geo' key there
+        # that denotes the geospatial API is enabled.
+
+        try:
+            display_type = self.metadata['display_type']
+        except KeyError:
+            raise RuntimeError('Socrata endpoint missing display metadata.')
+        else:
+            if 'blob' == display_type:
+                return '{}/download/{}/application/zip'\
+                    .format(self.url_prefix(), self.four_by_four)
+            else:
+                return '{}/api/geospatial/{}?method=export&format=Shapefile'.\
+                    format(self.url_prefix(), self.four_by_four)
+
+    def url_prefix(self):
+        parsed = urlparse(self.submitted_url)
+        if not parsed.scheme:
+            raise RuntimeError('URL missing protocol (like https://)')
+
+        prefix = parsed.scheme + parsed.netloc
+        return prefix
+
+    def derive_description_meta(self):
+        # Grab from correct JSON fields
+        description = self.metadata['description']
+
+        return DescriptionMeta('foo', 'bar', 'baz')
+
+    @property
+    def metadata(self):
+        """
+        Dictionary of metadata pulled straight from the Socrata API
+        """
+        if self._metadata:
+            return self._metadata
+
+        # Construct for the first time
+        prefix = self.url_prefix()
+        metadata_endpoint = '{}/api/views/{}'.format(prefix, self.four_by_four)
+        resp = requests.get(metadata_endpoint)
+        self._metadata = resp.json()
+        return self._metadata
 
     @staticmethod
     def _extract_four_by_four(url):
@@ -434,6 +510,7 @@ def get_socrata_data_info(host, path, four_by_four, is_shapefile=False):
     status_code = None
     dataset_info = {}
     print host, path, four_by_four
+    # path is always /api/views
     view_url = '%s/%s/%s' % (host, path, four_by_four)
 
     if is_shapefile:
