@@ -460,13 +460,13 @@ class SocrataSubmission(object):
             return None
 
     def _derive_file_url(self, view_url):
-        # CSV is the easy case.
-        if not self._is_shapefile:
+        if self._is_shapefile:
+            return self._shapefile_file_url()
+        else:
             # Assumes view_url is of the format '{}/api/views/{}/rows'
             return '%s.csv?accessType=DOWNLOAD' % view_url
 
-        # We're dealing with a shapefile
-
+    def _shapefile_file_url(self):
         # I noticed that if Socrata displays the shape as a map,
         # we can usually download through the geospatial API.
         # When it doesn't display the map,
@@ -476,17 +476,18 @@ class SocrataSubmission(object):
         # metadata['metadata'] and seeing if there's a 'geo' key there
         # that denotes the geospatial API is enabled.
 
+        blob_url = '{}/download/{}/application/zip'\
+            .format(self.url_prefix(), self.four_by_four)
+        map_url = '{}/api/geospatial/{}?method=export&format=Shapefile'.\
+            format(self.url_prefix(), self.four_by_four)
         try:
-            display_type = self.metadata['display_type']
+            display_type = self.metadata['displayType']
         except KeyError:
-            raise RuntimeError('Socrata endpoint missing display metadata.')
+            # No display_type means it's definitely a blob.
+            return blob_url
         else:
-            if 'blob' == display_type:
-                return '{}/download/{}/application/zip'\
-                    .format(self.url_prefix(), self.four_by_four)
-            else:
-                return '{}/api/geospatial/{}?method=export&format=Shapefile'.\
-                    format(self.url_prefix(), self.four_by_four)
+            # Or maybe we were told it's a blob.
+            return blob_url if display_type == 'blob' else map_url
 
     def url_prefix(self):
         parsed = urlparse(self.submitted_url)

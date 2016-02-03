@@ -47,8 +47,27 @@ class SubmitCSVTests(unittest.TestCase):
 
 
 class SubmitShapeTests(unittest.TestCase):
-    def test_socrata_url(self):
-        pass
+    def test_socrata_url_map(self):
+        url = 'https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-City/ewy2-6yfk'
+        sub = process_submission(url, is_shapefile=True)
+        expected_file_url = 'https://data.cityofchicago.org/api/geospatial/ewy2-6yfk?method=export&format=Shapefile'
+        self.assertEqual(sub.file_url, expected_file_url)
+
+        expected_description = 'City boundary of Chicago. The data can be viewed on the Chicago Data Portal with a web browser. However, to view or use the files outside of a web browser, you will need to use compression software and special GIS software, such as ESRI ArcGIS (shapefile) or Google Earth (KML or KMZ).'
+        expected_attribution = 'City of Chicago'
+        expected_human_name = 'Boundaries - City'
+        self.assertEqual(sub.description_meta.description, expected_description)
+        self.assertEqual(sub.description_meta.attribution, expected_attribution)
+        self.assertEqual(sub.description_meta.human_name, expected_human_name)
+
+    def test_socrata_url_blob(self):
+        url = 'https://data.cityofchicago.org/Transportation/Major-Streets/ueqs-5wr6'
+        sub = process_submission(url, is_shapefile=True)
+        expected_file_url = 'https://data.cityofchicago.org/download/ueqs-5wr6/application/zip'
+        self.assertEqual(sub.file_url, expected_file_url)
+        self.assertEqual(sub.view_url, url)
 
     def test_non_socrata_url(self):
-        pass
+        url = 'http://www.statsilk.com/files/country/StatPlanet_Romania.zip'
+        sub = process_submission(url, is_shapefile=True)
+        self.assertEqual(sub.file_url, url)
