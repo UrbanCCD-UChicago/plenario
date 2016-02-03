@@ -113,6 +113,9 @@ def add_table():
     errors = []
 
     dataset_info, error, url = grab_dataset_details()
+    url = request.args.get('dataset_url')
+    if url:
+        submission = process_suggestion(url)
 
     # check if dataset with the same URL has already been loaded
     dataset_id = md5(url).hexdigest()
@@ -144,6 +147,8 @@ def contrib_view():
 
     if request.args.get('dataset_url'):
         url = request.args.get('dataset_url')
+        # HERE we grab submission info
+
         dataset_info, errors = get_context_for_new_dataset(url)
 
         # check if dataset with the same URL has already been loaded
@@ -320,41 +325,6 @@ DescriptionMeta = namedtuple("DescriptionMeta",
                              'human_name attribution description')
 
 
-# This class really just proxies to GenericSubmission and SocrataSubmission
-# Maybe I can get rid of it.
-'''class Submission(object):
-    """
-    What do we need to know about a dataset when someone submits it?
-    1) The file url and view url
-    2) ColumnMeta for each column
-    3) DescriptionMeta
-    """
-
-    def __init__(self, url, is_shapefile=False, description_meta=None):
-        # Fail fast if the URL gives a 404
-        _assert_reachable(url)
-
-        # Submissions can be Socrata or non-socrata
-        # and shapefile or CSV
-        # So submissions are of 2x2 = 4 types
-        self.is_shapefile = is_shapefile
-        self.is_socrata = SocrataSubmission.is_socrata_url(url)
-
-        if SocrataSubmission.is_socrata_url(url):
-            dataset = SocrataSubmission(url)
-            self.description_meta = dataset.description_meta
-        else:
-            # Use the provied metadata,
-            # because we can't derive it from a non-Socrata URL
-            assert description_meta is not None
-            self.description_meta = description_meta
-            dataset = GenericSubmission(url, self.is_shapefile)
-
-        self.view_url = dataset.view_url
-        self.file_url = dataset.file_url
-        self.columns = dataset.columns'''
-
-
 def _assert_reachable(url):
     try:
         resp = requests.head(url)
@@ -375,16 +345,25 @@ def is_certainly_html(url):
             return False
 
 
-def process_submission(url, is_shapefile=False):
+def process_suggestion(url, is_shapefile=False):
     _assert_reachable(url)
-    if SocrataSubmission.is_socrata_url(url):
-        submission = SocrataSubmission(url, is_shapefile)
+    if SocrataSuggestion.is_socrata_url(url):
+        suggestion = SocrataSuggestion(url, is_shapefile)
     else:
-        submission = GenericSubmission(url, is_shapefile)
-    return submission
+        suggestion = GenericSuggestion(url, is_shapefile)
+    return suggestion
 
 
-class GenericSubmission(object):
+def csv_alreadt_submitted(url):
+    hash = md5(url).hexdigest()
+    return session.query(MetaTable).get(hash) is not None
+
+
+def shape_already_submitted(name):
+    return session.query(ShapeMetadata).get(name) is not None
+
+
+class GenericSuggestion(object):
     def __init__(self, url, is_shapefile=False):
         if is_certainly_html(url):
             raise RuntimeError('URL must point directly to a CSV or Shapefile')
@@ -406,7 +385,7 @@ class GenericSubmission(object):
         return [ColumnMeta(name, type_) for name, type_, _ in column_info]
 
 
-class SocrataSubmission(object):
+class SocrataSuggestion(object):
     """
     All the metadata we can derive from a Socrata 4x4.
     Includes attribution and description.

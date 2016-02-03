@@ -1,19 +1,19 @@
 import unittest
-from plenario.views import process_submission
+from plenario.views import process_suggestion
 
 
 class EvilSubmitTests(unittest.TestCase):
     def test_nonsense_url(self):
-        self.assertRaises(RuntimeError, process_submission, 'totes Non$ense')
+        self.assertRaises(RuntimeError, process_suggestion, 'totes Non$ense')
 
     def test_hopeless_url(self):
-        self.assertRaises(RuntimeError, process_submission,
+        self.assertRaises(RuntimeError, process_suggestion,
                           'https://www.google.com/')
 
 
 class SubmitCSVTests(unittest.TestCase):
     def test_socrata_url(self):
-        sub = process_submission('https://data.cityofchicago.org/'
+        sub = process_suggestion('https://data.cityofchicago.org/'
                                  'Health-Human-Services/'
                                  'Flu-Shot-Clinic-Locations-2013/g5vx-5vqf')
         self.assertEqual(sub.file_url,
@@ -37,7 +37,7 @@ class SubmitCSVTests(unittest.TestCase):
 
     def test_non_socrata_url(self):
         url = 'http://plenario.s3.amazonaws.com/chicago_redlight_tickets.csv'
-        sub = process_submission(url)
+        sub = process_suggestion(url)
         self.assertEqual(sub.file_url, url)
         col_names = {col.name for col in sub.columns}
         expected_names = {'citation_number', 'issue_time', 'plate_number',
@@ -49,7 +49,7 @@ class SubmitCSVTests(unittest.TestCase):
 class SubmitShapeTests(unittest.TestCase):
     def test_socrata_url_map(self):
         url = 'https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-City/ewy2-6yfk'
-        sub = process_submission(url, is_shapefile=True)
+        sub = process_suggestion(url, is_shapefile=True)
         expected_file_url = 'https://data.cityofchicago.org/api/geospatial/ewy2-6yfk?method=export&format=Shapefile'
         self.assertEqual(sub.file_url, expected_file_url)
 
@@ -62,12 +62,12 @@ class SubmitShapeTests(unittest.TestCase):
 
     def test_socrata_url_blob(self):
         url = 'https://data.cityofchicago.org/Transportation/Major-Streets/ueqs-5wr6'
-        sub = process_submission(url, is_shapefile=True)
+        sub = process_suggestion(url, is_shapefile=True)
         expected_file_url = 'https://data.cityofchicago.org/download/ueqs-5wr6/application/zip'
         self.assertEqual(sub.file_url, expected_file_url)
         self.assertEqual(sub.view_url, url)
 
     def test_non_socrata_url(self):
         url = 'http://www.statsilk.com/files/country/StatPlanet_Romania.zip'
-        sub = process_submission(url, is_shapefile=True)
+        sub = process_suggestion(url, is_shapefile=True)
         self.assertEqual(sub.file_url, url)
