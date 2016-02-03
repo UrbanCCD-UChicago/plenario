@@ -17,7 +17,6 @@ from wtforms.validators import DataRequired
 import json
 import re
 from cStringIO import StringIO
-from csvkit.unicsv import UnicodeCSVReader
 from sqlalchemy import Table, text
 import sqlalchemy
 from hashlib import md5
@@ -220,33 +219,6 @@ def add_shape():
     return render_template('submit-shape.html', **context)
 
 
-def grab_dataset_details(is_shapefile=False):
-    """
-    Supplements dataset_info from source with contributor information
-    from the session
-    when an administrator submits a dataset
-    :param is_shapefile:
-    :return: (dataset_info, errors, url)
-    """
-    dataset_info = {}
-    errors = []
-    url = ""
-
-    if request.args.get('dataset_url'):
-        url = request.args.get('dataset_url')
-        dataset_info, errors = get_context_for_new_dataset(url, is_shapefile)
-
-        # populate contributor info from session
-        user = session.query(User).get(flask_session['user_id'])
-        dataset_info['contributor_name'] = user.name
-        dataset_info['contributor_organization'] = 'Plenario Admin'
-        dataset_info['contributor_email'] = user.email
-
-        dataset_info['is_shapefile'] = is_shapefile
-
-    return dataset_info, errors, url
-
-
 @views.route('/contribute-thankyou')
 def contrib_thankyou():
     context = {}
@@ -270,7 +242,7 @@ def add_dataset_to_metatable(url, dataset_info, approved_status):
     :return: MetaTable instance that was persisted to DB.
     """
 
-    labels = extract_form_labels(request.form)
+    labels = form_labels(request.form)
     name = slugify(request.form.get('dataset_name'), delim=u'_')[:50]
     column_names = extract_column_names(dataset_info)
     try:
@@ -304,7 +276,10 @@ def extract_column_names(dataset_info):
     return [slugify(col['human_name'], '_') for col in dataset_info['columns']]
 
 
-def extract_form_labels(form):
+''' Submission helpers '''
+
+
+def form_labels(form):
     """
     :param form: Taken from requests.form
     :return: dict mapping string labels of special column types
@@ -320,9 +295,56 @@ def extract_form_labels(form):
             labels[v] = key
     return labels
 
+
+def form_urls(form):
+    try:
+        return form['file_url'], form.get('view_url')
+    except KeyError:
+        raise RuntimeError('File URL is a required field.')
+
+
+def form_frequency(form):
+    try:
+        return form['update_frequency']
+    except KeyError:
+        raise RuntimeError('Update frequency is a required field.')
+
+
+def form_description_meta(form):
+    try:
+        return DescriptionMeta(human_name=form['name'],
+                               attribution=form.get('dataset_attribution'),
+                               description=form.get('dataset_description'))
+    except KeyError:
+        raise RuntimeError('Dataset name is a required field.')
+
+
+def form_contributor_meta(form):
+    try:
+        return ContributorMeta(
+            name=form['contributor_name'],
+            email=form['contributor_email'],
+            organization=form.get('contributor_organization'))
+    except KeyError:
+        raise RuntimeError('Contributor name and email are required fields.')
+
+
+def csv_already_submitted(url):
+    hash = md5(url).hexdigest()
+    return session.query(MetaTable).get(hash) is not None
+
+
+def shape_already_submitted(name):
+    return session.query(ShapeMetadata).get(name) is not None
+
+
 ColumnMeta = namedtuple('ColumnMeta', 'name type_')
 DescriptionMeta = namedtuple("DescriptionMeta",
                              'human_name attribution description')
+ContributorMeta = namedtuple('ContributorMeta', 'name organization email')
+
+
+'''Suggestion helpers.'''
 
 
 def _assert_reachable(url):
@@ -352,15 +374,6 @@ def process_suggestion(url, is_shapefile=False):
     else:
         suggestion = GenericSuggestion(url, is_shapefile)
     return suggestion
-
-
-def csv_alreadt_submitted(url):
-    hash = md5(url).hexdigest()
-    return session.query(MetaTable).get(hash) is not None
-
-
-def shape_already_submitted(name):
-    return session.query(ShapeMetadata).get(name) is not None
 
 
 class GenericSuggestion(object):
@@ -524,178 +537,191 @@ class SocrataSuggestion(object):
 
 ''' Terrifying functions that fetch dataset metadata.'''
 
-
-def get_socrata_data_info(host, path, four_by_four, is_shapefile=False):
-    """
-
-    :param host:
-    :param path:
-    :param four_by_four: Socrata unique ID like abcd-efgh
-    :param is_shapefile: Is this an endpoint of an ESRI shapefile?
-    :return: (dataset_info, errors, status_code)
-            dataset_info is a big dict with all of Socrata's metadata
-            errors is a list of strings indicating errors encountered
-            status_code is the HTTP status code of a failed request
-    """
-    errors = []
-    status_code = None
-    dataset_info = {}
-    print host, path, four_by_four
-    # path is always /api/views
-    view_url = '%s/%s/%s' % (host, path, four_by_four)
-
-    if is_shapefile:
-        source_url = '%s/download/%s/application/zip' % (host, four_by_four)
-    else:
-        source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url
-
-    try:
-        r = requests.get(view_url)
-        status_code = r.status_code
-    except requests.exceptions.InvalidURL:
-        errors.append('Invalid URL')
-    except requests.exceptions.ConnectionError:
-        errors.append('URL can not be reached')
-    try:
-        resp = r.json()
-    except AttributeError:
-        errors.append('No Socrata views endpoint available for this dataset')
-        resp = None
-    except ValueError:
-        errors.append('The Socrata dataset you supplied is not available currently')
-        resp = None
-    if resp:
-        dataset_info = {
-            'name': resp['name'],
-            'description': resp.get('description'),
-            'attribution': resp.get('attribution'),
-            'columns': [],
-            'view_url': view_url,
-            'source_url': source_url
-        }
-        try:
-            dataset_info['update_freq'] = \
-                resp['metadata']['custom_fields']['Metadata']['Update Frequency']
-        except KeyError:
-            dataset_info['update_freq'] = None
-
-        columns = resp.get('columns') #presence of columns implies table file
-        if columns:
-            for column in columns:
-                d = {
-                    'human_name': column['name'],
-                    'machine_name': column['fieldName'],
-                    'field_name': slugify(column['name']), # duplicate definition for code compatibility
-                    'data_type': column['dataTypeName'],
-                    'description': column.get('description', ''),
-                    'width': column['width'],
-                    'sample_values': [],
-                    'smallest': '',
-                    'largest': '',
-                }
-
-                if column.get('cachedContents'):
-                    cached = column['cachedContents']
-                    if cached.get('top'):
-                        d['sample_values'] = \
-                            [c['item'] for c in cached['top']][:5]
-                    if cached.get('smallest'):
-                        d['smallest'] = cached['smallest']
-                    if cached.get('largest'):
-                        d['largest'] = cached['largest']
-                    if cached.get('null'):
-                        if cached['null'] > 0:
-                            d['null_values'] = True
-                        else:
-                            d['null_values'] = False
-                dataset_info['columns'].append(d)
-        else:
-            if not is_shapefile:
-                errors.append('Views endpoint not structured as expected')
-    return dataset_info, errors, status_code
-
-
-def extract_four_by_four(url):
-    """
-    Return last string fragment matching Socrata 4x4 pattern
-    :param url: URL that could contain a 4x4
-    :return: 9 character string or None if couldn't find 4x4
-    """
-    url = url.strip(' \t\n\r')  # strip whitespace, tabs, etc
-    matches = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
-    if matches:
-        return matches[-1]
-    else:
-        return None
-
-
-def get_context_for_new_dataset(url, is_shapefile=False):
-    """
-    :param url:
-    :param is_shapefile: A
-    :return: a tuple (dataset_info, errors)
-    """
-    dataset_info = {}
-    errors = []
-    if url:
-        four_by_four = extract_four_by_four(url)
-        errors = True
-        if four_by_four:
-            parsed = urlparse(url)
-            host = 'https://%s' % parsed.netloc
-            path = 'api/views'
-
-            dataset_info, errors, status_code = get_socrata_data_info(host, path, four_by_four, is_shapefile)
-            if not errors:
-                dataset_info['submitted_url'] = url
-        if errors:
-            errors = []
-            try:
-                r = requests.get(url, stream=True)
-                status_code = r.status_code
-            except requests.exceptions.InvalidURL:
-                errors.append('Invalid URL')
-            except requests.exceptions.ConnectionError:
-                errors.append('URL can not be reached')
-            if status_code != 200:
-                errors.append('URL returns a %s status code' % status_code)
-            if not errors:
-                dataset_info['submitted_url'] = url
-                dataset_info['source_url'] = url
-                dataset_info['name'] = urlparse(url).path.split('/')[-1]
-
-                # Don't try to read shapefiles like a CSV
-                if is_shapefile:
-                    return dataset_info, errors
-
-                inp = StringIO()
-                line_no = 0
-
-                for line in r.iter_lines():
-                    try:
-                        inp.write(line + '\n')
-                        line_no += 1
-                        if line_no > 1000:
-                            raise StopIteration
-                    except StopIteration:
-                        break
-                inp.seek(0)
-                reader = UnicodeCSVReader(inp)
-                header = reader.next()
-                col_types = []
-                inp.seek(0)
-                for col in range(len(header)):
-                    col_types.append(iter_column(col, inp)[0])
-                dataset_info['columns'] = []
-                for idx, col in enumerate(col_types):
-                    d = {
-                        'human_name': header[idx],
-                        'data_type': col.__visit_name__.lower()
-                    }
-                    dataset_info['columns'].append(d)
-    else:
-        errors.append('Need a URL')
-    return dataset_info, errors
+#
+# def grab_dataset_details(is_shapefile=False):
+#     """
+#     Supplements dataset_info from source with contributor information
+#     from the session
+#     when an administrator submits a dataset
+#     :param is_shapefile:
+#     :return: (dataset_info, errors, url)
+#     """
+#     dataset_info = {}
+#     errors = []
+#     url = ""
+#
+#     if request.args.get('dataset_url'):
+#         url = request.args.get('dataset_url')
+#         dataset_info, errors = get_context_for_new_dataset(url, is_shapefile)
+#
+#         # populate contributor info from session
+#         user = session.query(User).get(flask_session['user_id'])
+#         dataset_info['contributor_name'] = user.name
+#         dataset_info['contributor_organization'] = 'Plenario Admin'
+#         dataset_info['contributor_email'] = user.email
+#
+#         dataset_info['is_shapefile'] = is_shapefile
+#
+#     return dataset_info, errors, url
+#
+#
+# def get_socrata_data_info(host, path, four_by_four, is_shapefile=False):
+#     """
+#
+#     :param host:
+#     :param path:
+#     :param four_by_four: Socrata unique ID like abcd-efgh
+#     :param is_shapefile: Is this an endpoint of an ESRI shapefile?
+#     :return: (dataset_info, errors, status_code)
+#             dataset_info is a big dict with all of Socrata's metadata
+#             errors is a list of strings indicating errors encountered
+#             status_code is the HTTP status code of a failed request
+#     """
+#     errors = []
+#     status_code = None
+#     dataset_info = {}
+#     print host, path, four_by_four
+#     # path is always /api/views
+#     view_url = '%s/%s/%s' % (host, path, four_by_four)
+#
+#     if is_shapefile:
+#         source_url = '%s/download/%s/application/zip' % (host, four_by_four)
+#     else:
+#         source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url
+#
+#     try:
+#         r = requests.get(view_url)
+#         status_code = r.status_code
+#     except requests.exceptions.InvalidURL:
+#         errors.append('Invalid URL')
+#     except requests.exceptions.ConnectionError:
+#         errors.append('URL can not be reached')
+#     try:
+#         resp = r.json()
+#     except AttributeError:
+#         errors.append('No Socrata views endpoint available for this dataset')
+#         resp = None
+#     except ValueError:
+#         errors.append('The Socrata dataset you supplied is not available currently')
+#         resp = None
+#     if resp:
+#         dataset_info = {
+#             'name': resp['name'],
+#             'description': resp.get('description'),
+#             'attribution': resp.get('attribution'),
+#             'columns': [],
+#             'view_url': view_url,
+#             'source_url': source_url
+#         }
+#         try:
+#             dataset_info['update_freq'] = \
+#                 resp['metadata']['custom_fields']['Metadata']['Update Frequency']
+#         except KeyError:
+#             dataset_info['update_freq'] = None
+#
+#         columns = resp.get('columns') #presence of columns implies table file
+#         if columns:
+#             for column in columns:
+#                 d = {
+#                     'human_name': column['name'],
+#                     'machine_name': column['fieldName'],
+#                     'field_name': slugify(column['name']), # duplicate definition for code compatibility
+#                     'data_type': column['dataTypeName'],
+#                     'description': column.get('description', ''),
+#                     'width': column['width'],
+#                     'sample_values': [],
+#                     'smallest': '',
+#                     'largest': '',
+#                 }
+#
+#                 if column.get('cachedContents'):
+#                     cached = column['cachedContents']
+#                     if cached.get('top'):
+#                         d['sample_values'] = \
+#                             [c['item'] for c in cached['top']][:5]
+#                     if cached.get('smallest'):
+#                         d['smallest'] = cached['smallest']
+#                     if cached.get('largest'):
+#                         d['largest'] = cached['largest']
+#                     if cached.get('null'):
+#                         if cached['null'] > 0:
+#                             d['null_values'] = True
+#                         else:
+#                             d['null_values'] = False
+#                 dataset_info['columns'].append(d)
+#         else:
+#             if not is_shapefile:
+#                 errors.append('Views endpoint not structured as expected')
+#     return dataset_info, errors, status_code
+#
+#
+# def get_context_for_new_dataset(url, is_shapefile=False):
+#     """
+#     :param url:
+#     :param is_shapefile: A
+#     :return: a tuple (dataset_info, errors)
+#     """
+#     dataset_info = {}
+#     errors = []
+#     if url:
+#         four_by_four = extract_four_by_four(url)
+#         errors = True
+#         if four_by_four:
+#             parsed = urlparse(url)
+#             host = 'https://%s' % parsed.netloc
+#             path = 'api/views'
+#
+#             dataset_info, errors, status_code = get_socrata_data_info(host, path, four_by_four, is_shapefile)
+#             if not errors:
+#                 dataset_info['submitted_url'] = url
+#         if errors:
+#             errors = []
+#             try:
+#                 r = requests.get(url, stream=True)
+#                 status_code = r.status_code
+#             except requests.exceptions.InvalidURL:
+#                 errors.append('Invalid URL')
+#             except requests.exceptions.ConnectionError:
+#                 errors.append('URL can not be reached')
+#             if status_code != 200:
+#                 errors.append('URL returns a %s status code' % status_code)
+#             if not errors:
+#                 dataset_info['submitted_url'] = url
+#                 dataset_info['source_url'] = url
+#                 dataset_info['name'] = urlparse(url).path.split('/')[-1]
+#
+#                 # Don't try to read shapefiles like a CSV
+#                 if is_shapefile:
+#                     return dataset_info, errors
+#
+#                 inp = StringIO()
+#                 line_no = 0
+#
+#                 for line in r.iter_lines():
+#                     try:
+#                         inp.write(line + '\n')
+#                         line_no += 1
+#                         if line_no > 1000:
+#                             raise StopIteration
+#                     except StopIteration:
+#                         break
+#                 inp.seek(0)
+#                 reader = UnicodeCSVReader(inp)
+#                 header = reader.next()
+#                 col_types = []
+#                 inp.seek(0)
+#                 for col in range(len(header)):
+#                     col_types.append(iter_column(col, inp)[0])
+#                 dataset_info['columns'] = []
+#                 for idx, col in enumerate(col_types):
+#                     d = {
+#                         'human_name': header[idx],
+#                         'data_type': col.__visit_name__.lower()
+#                     }
+#                     dataset_info['columns'].append(d)
+#     else:
+#         errors.append('Need a URL')
+#     return dataset_info, errors
 
 
 ''' Monitoring and editing point datasets '''
