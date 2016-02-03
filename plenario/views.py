@@ -315,43 +315,52 @@ def extract_form_labels(form):
             labels[v] = key
     return labels
 
-ColumnMeta = namedtuple("ColumnMeta", 'name type_')
+ColumnMeta = namedtuple('ColumnMeta', 'name type_')
 DescriptionMeta = namedtuple("DescriptionMeta",
                              'human_name attribution description')
 
 
-class Submission(object):
+# This class really just proxies to GenericSubmission and SocrataSubmission
+# Maybe I can get rid of it.
+'''class Submission(object):
     """
     What do we need to know about a dataset when someone submits it?
-    1) The source url and view url
+    1) The file url and view url
     2) ColumnMeta for each column
     3) DescriptionMeta
     """
 
     def __init__(self, url, is_shapefile=False, description_meta=None):
-        self._assert_reachable(url)
-        self.submitted_url = url
+        # Fail fast if the URL gives a 404
+        _assert_reachable(url)
+
+        # Submissions can be Socrata or non-socrata
+        # and shapefile or CSV
+        # So submissions are of 2x2 = 4 types
         self.is_shapefile = is_shapefile
+        self.is_socrata = SocrataSubmission.is_socrata_url(url)
 
-        if SocrataPage.is_socrata_url(url):
-            self.dataset = SocrataPage(url)
+        if SocrataSubmission.is_socrata_url(url):
+            dataset = SocrataSubmission(url)
+            self.description_meta = dataset.description_meta
         else:
+            # Use the provied metadata,
+            # because we can't derive it from a non-Socrata URL
             assert description_meta is not None
-            assert not is_certainly_html(url)
-            '''self.dataset = GenericDataset(submitted_url=url,
-                                          description_meta=description_meta)'''
+            self.description_meta = description_meta
+            dataset = GenericSubmission(url, self.is_shapefile)
 
-    @staticmethod
-    def _assert_reachable(url):
-        try:
-            resp = requests.head(url)
-            assert resp.status_code != 404
-        except:
-            raise RuntimeError('Could not reach URL ' + url)
+        self.view_url = dataset.view_url
+        self.file_url = dataset.file_url
+        self.columns = dataset.columns'''
 
-    def infer_column_types(self):
-        assert not self.is_shapefile
-        pass
+
+def _assert_reachable(url):
+    try:
+        resp = requests.head(url)
+        assert resp.status_code != 404
+    except:
+        raise RuntimeError('Could not reach URL ' + url)
 
 
 def is_certainly_html(url):
@@ -366,15 +375,26 @@ def is_certainly_html(url):
             return False
 
 
-class GenericDataset(object):
-    def __init__(self, url, description_meta):
-        self.view_url = None
+def process_submission(url, is_shapefile=False):
+    _assert_reachable(url)
+    if SocrataSubmission.is_socrata_url(url):
+        submission = SocrataSubmission(url, is_shapefile)
+    else:
+        submission = GenericSubmission(url, is_shapefile)
+    return submission
+
+
+class GenericSubmission(object):
+    def __init__(self, url, is_shapefile=False):
+        if is_certainly_html(url):
+            raise RuntimeError('URL must point directly to a CSV or Shapefile')
         self.file_url = url
-        self.description_meta = description_meta
-        self.columns = self._infer_columns()
+
+        self.view_url = None
+        self.columns = (None if is_shapefile else self._infer_columns())
 
     def _infer_columns(self):
-        r = requests.get(self.file_url)
+        r = requests.get(self.file_url, stream=True)
         inp = StringIO()
 
         head = itertools.islice(r.iter_lines(), 1000)
@@ -386,7 +406,7 @@ class GenericDataset(object):
         return [ColumnMeta(name, type_) for name, type_, _ in column_info]
 
 
-class SocrataPage(object):
+class SocrataSubmission(object):
     """
     All the metadata we can derive from a Socrata 4x4.
     Includes attribution and description.
@@ -399,22 +419,27 @@ class SocrataPage(object):
 
     def __init__(self, url, is_shapefile=False):
         self.four_by_four = self._extract_four_by_four(url)
+        self._metadata = None
+        self._is_shapefile = is_shapefile
+
         if self.four_by_four is None:
             msg = 'URLs to Socrata datasets must contain a 4x4 id'
             raise RuntimeError(msg)
         self.submitted_url = url
 
         self.description_meta = self.derive_description_meta()
-        self.file_url = self._derive_file_url()
-        self.view_url = self._derive_view_url()
-        self.columns = self._derive_columns()
+        self.view_url, self.file_url = self._derive_urls()
 
-        self._is_shapefile = is_shapefile
-        self._metadata = None
+        self.columns = (None if is_shapefile else self._derive_columns())
 
     def _derive_columns(self):
         return [ColumnMeta(c['name'], c['dataTypeName'])
                 for c in self.metadata['columns']]
+
+    def _derive_urls(self):
+        view_url = self._derive_view_url()
+        file_url = self._derive_file_url(view_url)
+        return view_url, file_url
 
     def _derive_view_url(self):
         """
@@ -434,11 +459,11 @@ class SocrataPage(object):
             # an HTML view of a Socrata shape dataset. :(
             return None
 
-    def _derive_file_url(self):
+    def _derive_file_url(self, view_url):
         # CSV is the easy case.
         if not self._is_shapefile:
             # Assumes view_url is of the format '{}/api/views/{}/rows'
-            return '%s.csv?accessType=DOWNLOAD' % self.view_url
+            return '%s.csv?accessType=DOWNLOAD' % view_url
 
         # We're dealing with a shapefile
 
@@ -468,7 +493,7 @@ class SocrataPage(object):
         if not parsed.scheme:
             raise RuntimeError('URL missing protocol (like https://)')
 
-        prefix = parsed.scheme + parsed.netloc
+        prefix = parsed.scheme + '://' + parsed.netloc
         return prefix
 
     def derive_description_meta(self):

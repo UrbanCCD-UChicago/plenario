@@ -38,12 +38,11 @@ def infer_csv_columns(inp):
     reader = UnicodeCSVReader(inp)
     header = reader.next()
     inp.seek(0)
-    iter_output = [iter_column(col_idx, inp)[0]
+    iter_output = [iter_column(col_idx, inp)
                    for col_idx in range(len(header))]
 
     return [ColumnInfo(name, type_, has_nulls)
-            for name, type_, has_nulls in zip(header, iter_output)]
-
+            for name, (type_, has_nulls) in zip(header, iter_output)]
 
 
 def iter_column(idx, f):
