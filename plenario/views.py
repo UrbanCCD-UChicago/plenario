@@ -184,9 +184,8 @@ def submit(context):
     is_admin = context['is_admin']
 
     try:  # Store the metadata
-        human_name = form['dataset_name']
         if is_shapefile:
-            if shape_already_submitted(human_name):
+            if shape_already_submitted(form['dataset_name']):
                 msg = 'A Shapefile with this name has already been submitted'
                 raise RuntimeError(msg)
             else:
@@ -261,7 +260,10 @@ def csv_already_submitted(url):
 
 
 def shape_already_submitted(name):
-    return session.query(ShapeMetadata).get(name) is not None
+    shape = ShapeMetadata.get_by_human_name(name)
+    print shape, shape is not None
+
+    return shape is not None
 
 
 @views.route('/contribute-thankyou')

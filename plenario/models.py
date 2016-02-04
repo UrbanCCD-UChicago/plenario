@@ -410,7 +410,7 @@ class ShapeMetadata(Base):
 
     @classmethod
     def get_by_human_name(cls, human_name):
-        session.query(cls).get(cls.make_table_name(human_name))
+        return session.query(cls).get(cls.make_table_name(human_name))
 
     @classmethod
     def make_table_name(cls, human_name):
