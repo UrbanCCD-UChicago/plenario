@@ -335,12 +335,21 @@ class ShapeMetadata(Base):
     dataset_name = Column(String, primary_key=True)
     human_name = Column(String, nullable=False)
     source_url = Column(String)
+    view_url = Column(String)
     date_added = Column(Date, nullable=False)
 
     # Organization that published this dataset
     attribution = Column(String)
     description = Column(Text)
     update_freq = Column(String(100), nullable=False)
+
+    # Who submitted this dataset?
+    contributor_name = Column(String)
+    contributor_organization = Column(String)
+    contributor_email = Column(String)
+
+    # Has an admin signed off on it?
+    approved_status = Column(Boolean)
 
     # We always ingest geometric data as 4326
     bbox = Column(Geometry('POLYGON', srid=4326))

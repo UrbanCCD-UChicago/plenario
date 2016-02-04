@@ -2,8 +2,7 @@ from flask import make_response, request, redirect, url_for, render_template, \
     Blueprint, flash, session as flask_session
 from plenario.models import MetaTable, User, ShapeMetadata
 from plenario.database import session, Base, app_engine as engine
-from plenario.utils.helpers import iter_column, send_mail, slugify, \
-    infer_csv_columns
+from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 from plenario.tasks import update_dataset as update_dataset_task, \
     delete_dataset as delete_dataset_task, add_dataset as add_dataset_task, \
     add_shape as add_shape_task, delete_shape as delete_shape_task
@@ -114,7 +113,6 @@ def admin_add_dataset():
                'contributor_name': user.name,
                'contributor_organization': 'Plenario Admin',
                'contributor_email': user.email}
-    # Add contributor metadata to context
     return add(context)
 
 
@@ -124,13 +122,12 @@ def user_add_dataset():
     return add(context)
 
 
-def add(context):
-    def render_with_context(context):
-        return render_template('submit-table.html', **context)
+def render_with_context(context):
+    return render_template('submit-table.html', **context)
 
-    is_shapefile = request.args.get('is_shapefile')
-    is_csv = not is_shapefile
-    context['is_shapefile'] = is_shapefile
+
+def add(context):
+    context['is_shapefile'] = request.args.get('is_shapefile')
 
     # Step 1: User looking at page for the first time
     if request.method == 'GET' and not request.args.get('dataset_url'):
@@ -138,60 +135,85 @@ def add(context):
 
     # Step 2: User suggested a URL for a dataset
     if request.method == 'GET':
-        suggested_url = request.args.get('dataset_url')
-        try:
-            suggestion = process_suggestion(suggested_url, is_shapefile)
-            if is_csv and csv_already_submitted(suggestion.file_url):
-                msg = 'A CSV at this url has already been submitted'
-                raise RuntimeError(msg)
-        except RuntimeError as e:
-            # Something was jank with that suggestion.
-            context['error_msg'] = e.message
-            return render_with_context(context)
-        else:
-            # Merge exsting context into new context so that no values
-            # from the suggestion overwrite existing values
-            suggestion_context = context_from_suggestion(suggestion)
-            suggestion_context.update(context)
-            return render_with_context(suggestion_context)
+        return suggest(context)
 
     # Step 3: User POSTed all the submission data
-    #           and made it past frontend validation
+    #          and made it past frontend validation
     if request.method == 'POST':
-        form = request.form
-        try:
-            human_name = form_description_meta(form).human_name
-            if is_shapefile and shape_already_submitted(human_name):
+        return submit(context)
+
+
+def submit(context):
+    form = request.form
+    is_shapefile = context['is_shapefile']
+    is_admin = context['is_admin']
+
+    try:  # Store the metadata
+        human_name = form['dataset_name']
+        if is_shapefile:
+            if shape_already_submitted(human_name):
                 msg = 'A Shapefile with this name has already been submitted'
                 raise RuntimeError(msg)
-            # Construct and submit MetaMaster or ShapeMeta from form
-        except RuntimeError as e:
-            context['error_msg'] = e.message
-            return render_with_context(context)
+            else:
+                shape_meta_from_submit_form(form, is_approved=is_admin)
         else:
-            # Fire ingestion task
-            # Or send thankyou email
+            point_meta_from_submit_form(form, is_approved=is_admin)
+    except RuntimeError as e:
+        context['error_msg'] = e.message
+        return render_with_context(context)
+    else:
+        # Successfully stored the metadata
+        # Now fire ingestion task or send thankyou email
+        if is_admin:
             pass
-        
+            # ingest
+        else:
+            pass
+            # email
+
+
+def suggest(context):
+    is_shapefile = context['is_shapefile']
+    is_csv = not is_shapefile
+    suggested_url = request.args.get('dataset_url')
+    try:
+        suggestion = process_suggestion(suggested_url, is_shapefile)
+        if is_csv and csv_already_submitted(suggestion.file_url):
+            msg = 'A CSV at this url has already been submitted'
+            raise RuntimeError(msg)
+    except RuntimeError as e:
+        # Something was jank with that suggestion.
+        context['error_msg'] = e.message
+        return render_with_context(context)
+    else:
+        # Merge exsting context into new context so that no values
+        # from the suggestion overwrite existing values
+        suggestion_context = context_from_suggestion(suggestion)
+        suggestion_context.update(context)
+        return render_with_context(suggestion_context)
 
 ''' Submission helpers '''
 
 
-def form_labels(form):
+def form_columns(form):
     """
     :param form: Taken from requests.form
-    :return: dict mapping string labels of special column types
+    :return: columns: list of slugified column names
+             labels: dict mapping string labels of special column types
              (observed_date, latitude, longitude, location)
              to names of columns
     """
+
     labels = {}
+    columns = []
     for k, v in form.iteritems():
-        if k.startswith('key_type_'):
+        if k.startswith('col_name_'):
             # key_type_observed_date
-            key = k.replace("key_type_", "")
+            key = k.replace("col_name_", "")
+            columns.append(key)
             # e.g labels['observed_date'] = 'date'
             labels[v] = key
-    return labels
+    return columns, labels
 
 
 def form_urls(form):
@@ -235,6 +257,7 @@ def csv_already_submitted(url):
 def shape_already_submitted(name):
     return session.query(ShapeMetadata).get(name) is not None
 
+
 @views.route('/contribute-thankyou')
 def contrib_thankyou():
     context = {}
@@ -246,38 +269,23 @@ def contrib_thankyou():
     taken from the source URL.'''
 
 
-def add_dataset_to_metatable(url, dataset_info, approved_status):
-    """
-    Called during request cycles with form guaranteed to have
-    the fields used below.
-    Derives a MetaTable object from the form and adds it to the DB.
-    :param url: Download url
-    :param dataset_info: Big dict with lots of metadata
-                         We only care about a tiny subset of it here.
-    :param approved_status: Whether this dataset should be viewable
-    :return: MetaTable instance that was persisted to DB.
-    """
-
-    labels = form_labels(request.form)
-    name = slugify(request.form.get('dataset_name'), delim=u'_')[:50]
-    column_names = extract_column_names(dataset_info)
-    try:
-        # Is there another url we should be using
-        url = dataset_info['source_url']
-    except KeyError:
-        pass
+def point_meta_from_submit_form(form, is_approved):
+    column_names, labels = form_columns(form)
+    name = slugify(form['dataset_name'], delim=u'_')[:50]
 
     md = MetaTable(
-        url=url,
+        url=form['dataset_url'],
+        view_url=form.get('view_url'),
         dataset_name=name,
-        human_name=request.form.get('dataset_name'),
-        attribution=request.form.get('dataset_attribution'),
-        description=request.form.get('dataset_description'),
-        contributor_name=request.form.get('contributor_name'),
-        contributor_organization=request.form.get('contributor_organization'),
-        contributor_email=request.form.get('contributor_email'),
-        approved_status=approved_status,
-        observed_date=labels.get('observed_date', None),
+        human_name=form['dataset_name'],
+        attribution=form.get('dataset_attribution'),
+        description=form.get('dataset_description'),
+        update_freq=form['update_frequency'],
+        contributor_name=form['contributor_name'],
+        contributor_organization=form.get('contributor_organization'),
+        contributor_email=form['contributor_email'],
+        approved_status=is_approved,
+        observed_date=labels['observed_date'],
         latitude=labels.get('latitude', None),
         longitude=labels.get('longitude', None),
         location=labels.get('location', None),
@@ -288,11 +296,65 @@ def add_dataset_to_metatable(url, dataset_info, approved_status):
     return md
 
 
-def extract_column_names(dataset_info):
-    return [slugify(col['human_name'], '_') for col in dataset_info['columns']]
+def shape_meta_from_submit_form(form, is_approved):
+    meta = ShapeMetadata.add(
+        human_name=form['dataset_name'],
+        source_url=form['source_url'],
+        view_url=form.get('view_url'),
+        attribution=form.get('dataset_attribution'),
+        description=form.get('dataset_description'),
+        update_freq=form['update_frequency'],
+        contributor_name=form['contributor_name'],
+        contributor_organization=form.get('contributor_organization'),
+        contributor_email=form['contributor_email'],
+        approved_status=is_approved)
+    session.commit()
 
 
+# def add_dataset_to_metatable(url, dataset_info, approved_status):
+#     """
+#     Called during request cycles with form guaranteed to have
+#     the fields used below.
+#     Derives a MetaTable object from the form and adds it to the DB.
+#     :param url: Download url
+#     :param dataset_info: Big dict with lots of metadata
+#                          We only care about a tiny subset of it here.
+#     :param approved_status: Whether this dataset should be viewable
+#     :return: MetaTable instance that was persisted to DB.
+#     """
+#
+#     labels = form_labels(request.form)
+#     name = slugify(request.form.get('dataset_name'), delim=u'_')[:50]
+#     column_names = extract_column_names(dataset_info)
+#     try:
+#         # Is there another url we should be using
+#         url = dataset_info['source_url']
+#     except KeyError:
+#         pass
+#
+#     md = MetaTable(
+#         url=url,
+#         dataset_name=name,
+#         human_name=request.form.get('dataset_name'),
+#         attribution=request.form.get('dataset_attribution'),
+#         description=request.form.get('dataset_description'),
+#         contributor_name=request.form.get('contributor_name'),
+#         contributor_organization=request.form.get('contributor_organization'),
+#         contributor_email=request.form.get('contributor_email'),
+#         approved_status=approved_status,
+#         observed_date=labels.get('observed_date', None),
+#         latitude=labels.get('latitude', None),
+#         longitude=labels.get('longitude', None),
+#         location=labels.get('location', None),
+#         column_names=column_names
+#     )
+#     session.add(md)
+#     session.commit()
+#     return md
 
+
+# def extract_column_names(dataset_info):
+#     return [slugify(col['human_name'], '_') for col in dataset_info['columns']]
 
 
 ColumnMeta = namedtuple('ColumnMeta', 'name type_')
