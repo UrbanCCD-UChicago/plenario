@@ -2,11 +2,15 @@
 {% from "macros/contributor-form.html" import contributor_form %}
 {% from "macros/metadata-form-fragment.html" import metadata_form_fragment %}
 
-{% set is_shape=True %}
+{% set is_shapefile=True %}
 
 {% block headline %}
     Submit a new shapefile.
 {% endblock headline %}
+
+{% block requirements %}
+    <p>Detailed requirements go here. Should be a shapefile, ya dig?</p>
+{% endblock requirements %}
 
 {% block submission %}
 
@@ -16,12 +20,12 @@
             {% block fetch_details %}
             <form role="form" method="GET" id="fetch-details-form">
                 <div class="form-group">
-                    {% if dataset_info %}
-                    <input type="text" class="form-control" name="dataset_url" value="{{dataset_info.submitted_url}}" />
+                    {% if submitted_url %}
+                        <input type="text" class="form-control" name="dataset_url" value="{{submitted_url}}" />
                     {% else %}
-                    <input type="text" class="form-control" name="dataset_url" placeholder="http://data.mycity.gov/path/to/file.csv"/>
+                        <input type="text" class="form-control" name="dataset_url" placeholder="http://data.mycity.gov/path/to/shape.zip"/>
                     {% endif %}
-                    <p class="help-block">Publicly available URL for a data source in CSV format or a Socrata dataset.</p>
+                    <p class="help-block">Publicly available URL for a shapefile.</p>
                 </div>
                 <div class="form-group">
                     <button class="btn btn-info" type="submit">Fetch details &raquo;</button>
@@ -29,22 +33,25 @@
             </form>
             {% endblock fetch_details %}
 
-              {% if dataset_info %}
+                {# Use file_url as our sentinel to judge if the user has suggested a dataset #}
+              {% if file_url %}
                     <hr />
                     <div class="row">
                         <div class="col-md-10 col-md-offset-1">
                             <form role="form" class="form" method="POST">
-                                <div id="errors" class="alert alert-danger alert-dismissible" role="alert" style="display: none;">
-                                    <button type="button" class="close" data-dismiss="alert">
-                                        <span aria-hidden="true">&times;</span><span class="sr-only">Close</span>
-                                    </button>
-                                    <p><strong>There were some errors with your submission:</strong></p>
-                                    <p id="error-list"></p>
-                                </div>
+                                <input type="text" class="form-control" name="file_url" value="{{file_url}}" />
+                                <p class="help-block">The URL where the shapefile is located.</p>
 
-                                {{ metadata_form_fragment(dataset_info) }}
+                                {% if view_url %}
+                                    <input type="text" class="form-control" name="view_url" value="{{view_url}}" />
+                                {% else %}
+                                    <input type="text" class="form-control" name="dataset_url" placeholder="http://data.mycity.gov/info/about/shape.html"/>
+                                {% endif %}
+                                <p class="help-block">If available, URL to a web page with information about this dataset.</p>
 
-                                {{ contributor_form(submit_button_verb, dataset_info) }}
+                                {{ metadata_form_fragment(human_name, attribution, description) }}
+
+                                {{ contributor_form(submit_button_verb, contributor_name, contributor_organization, contributor_email) }}
 
                                 <hr />
                                 <p>

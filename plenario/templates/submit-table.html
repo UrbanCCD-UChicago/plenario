@@ -50,10 +50,10 @@
             {% block fetch_details %}
             <form role="form" method="GET" id="fetch-details-form">
                 <div class="form-group">
-                    {% if dataset_info %}
-                    <input type="text" class="form-control" name="dataset_url" value="{{dataset_info.submitted_url}}" />
+                    {% if submitted_url %}
+                        <input type="text" class="form-control" name="submitted_url" value="{{submitted_url}}" />
                     {% else %}
-                    <input type="text" class="form-control" name="dataset_url" placeholder="http://data.mycity.gov/path/to/file.csv"/>
+                        <input type="text" class="form-control" name="dataset_url" placeholder="http://data.mycity.gov/path/to/file.csv"/>
                     {% endif %}
                     <p class="help-block">Publicly available URL for a data source in CSV format or a Socrata dataset.</p>
                 </div>
@@ -63,22 +63,24 @@
             </form>
             {% endblock fetch_details %}
 
-              {% if dataset_info %}
+                {# Use file_url as our sentinel to judge
+                if the user has suggested a dataset #}
+              {% if file_url %}
                   <hr />
                     <div class="row">
                         <div class="col-md-10 col-md-offset-1">
                             <form role="form" class="form" method="POST">
-                                <div id="errors" class="alert alert-danger alert-dismissible" role="alert" style="display: none;">
-                                    <button type="button" class="close" data-dismiss="alert">
-                                        <span aria-hidden="true">&times;</span><span class="sr-only">Close</span>
-                                    </button>
-                                    <p><strong>There were some errors with your submission:</strong></p>
-                                    <p id="error-list"></p>
-                                </div>
+                                <input type="text" class="form-control" name="file_url" value="{{file_url}}" />
+                                <p class="help-block">The URL where the shapefile is located.</p>
 
+                                {% if view_url %}
+                                    <input type="text" class="form-control" name="view_url" value="{{view_url}}" />
+                                {% else %}
+                                    <input type="text" class="form-control" name="dataset_url" placeholder="http://data.mycity.gov/info/about/shape.html"/>
+                                {% endif %}
+                                <p class="help-block">If available, URL to a web page with information about this dataset.</p>
 
-                                {{ metadata_form_fragment(dataset_info) }}
-
+                                    {{ metadata_form_fragment(human_name, attribution, description) }}
 
                                 <p>Below, select which columns correspond to the <code>Observation date</code>, <code>Latitude</code> and <code>Longitude</code> fields for your dataset. These are all <span class="red">*</span>required.</p>
 
@@ -87,15 +89,15 @@
                                         <th>Choose Type</th>
                                         <th>Name</th>
                                         <th>Data Type</th>
-                                        {% if dataset_info.columns|has_description %}
+                                        {% if columns|has_description %}
                                             <th style="width: 30%">Description</th>
                                         {% endif %}
                                     </thead>
                                     <tbody>
-                                        {% for info in dataset_info.columns %}
+                                        {% for col in columns %}
                                             <tr>
                                                 <td>
-                                                    <select id="col_name_{{info.human_name|slugify}}" name="col_name_{{info.human_name|slugify}}" class="plenario-field form-control">
+                                                    <select id="col_name_{{col.human_name|slugify}}" name="col_name_{{col.human_name|slugify}}" class="plenario-field form-control">
                                                         <option value="">---------</option>
                                                         <option value="observed_date">Observation date</option>
                                                         <option value="latitude">Latitude</option>
@@ -103,15 +105,15 @@
                                                         <option value="location">Location</option>
                                                     </select>
                                                 </td>
-                                                <td>{{ info.human_name }}</td>
-                                                <td>{{ info.data_type }}</td>
-                                                <td>{{ info.description }}</td>
+                                                <td>{{ col.human_name }}</td>
+                                                <td>{{ col.data_type }}</td>
+                                                <td>{{ col.description }}</td>
                                             </tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
 
-                                    {{ contributor_form(submit_button_verb, dataset_info) }}
+                                    {{ contributor_form(submit_button_verb, contributor_name, contributor_organization, contributor_email) }}
 
                                 <hr />
                                 <div class="row">

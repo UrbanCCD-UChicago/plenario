@@ -140,7 +140,7 @@ def render_with_context(context):
 
 
 def add(context):
-    context['is_shapefile'] = request.args.get('is_shapefile')
+    context['is_shapefile'] = request.args.get('is_shapefile', False)
 
     # Step 1: User looking at page for the first time
     if request.method == 'GET' and not request.args.get('dataset_url'):
@@ -296,14 +296,13 @@ def shape_meta_from_submit_form(form, is_approved):
     return md
 
 
+'''Suggestion helpers.'''
 
-ColumnMeta = namedtuple('ColumnMeta', 'name type_')
+
+ColumnMeta = namedtuple('ColumnMeta', 'name type_ description')
 DescriptionMeta = namedtuple("DescriptionMeta",
                              'human_name attribution description')
 ContributorMeta = namedtuple('ContributorMeta', 'name organization email')
-
-
-'''Suggestion helpers.'''
 
 
 def _assert_reachable(url):
@@ -376,7 +375,7 @@ class GenericSuggestion(object):
         inp.seek(0)
         column_info = infer_csv_columns(inp)
 
-        return [ColumnMeta(name, type_) for name, type_, _ in column_info]
+        return [ColumnMeta(name, type_, None) for name, type_, _ in column_info]
 
 
 class SocrataSuggestion(object):
@@ -406,7 +405,9 @@ class SocrataSuggestion(object):
         self.columns = (None if is_shapefile else self._derive_columns())
 
     def _derive_columns(self):
-        return [ColumnMeta(c['name'], c['dataTypeName'])
+        return [ColumnMeta(c['name'],
+                           c['dataTypeName'],
+                           c.get('description', None))
                 for c in self.metadata['columns']]
 
     def _derive_urls(self):
