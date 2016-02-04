@@ -68,6 +68,19 @@ def terms_view():
 # TODO: Catch an email exception and flash email failure
 
 
+@views.route('/admin/approve-shape/<dataset_name>')
+@login_required
+def approve_shape(dataset_name):
+    # Approve it
+    meta = session.query(ShapeMetadata).get(dataset_name)
+    meta.approved_status = True
+    session.commit()
+    # Ingest it
+    add_shape_task.delay(dataset_name)
+    send_approval_email(meta.human_name, meta.contributor_name,
+                        meta.contributor_email)
+
+
 @views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
 def approve_dataset_view(source_url_hash):
@@ -78,11 +91,15 @@ def approve_dataset_view(source_url_hash):
 def approve_dataset(source_url_hash):
     # Approve it
     meta = session.query(MetaTable).get(source_url_hash)
-    meta.approved_status = 'true'
+    meta.approved_status = True
     session.commit()
     # Ingest it
     add_dataset_task.delay(source_url_hash)
+    send_approval_email(meta.human_name, meta.contributor_name,
+                        meta.contributor_email)
 
+
+def send_approval_email(dataset_name, contributor_name, contributor_email):
     # Email the submitter
     msg_body = """Hello %s,\r\n
 \r\n
@@ -94,10 +111,10 @@ It should appear on http://plenar.io within 24 hours.\r\n
 \r\n
 Thank you!\r\n
 The Plenario Team\r\n
-http://plenar.io""" % (meta.contributor_name, meta.human_name)
+http://plenar.io""" % (contributor_name, dataset_name)
 
     send_mail(subject="Your dataset has been added to Plenar.io",
-              recipient=meta.contributor_email, body=msg_body)
+              recipient=contributor_email, body=msg_body)
 
 #
 ''' Submit a dataset (Add it to MetaData
@@ -263,7 +280,7 @@ def point_meta_from_submit_form(form, is_approved):
     name = slugify(form['dataset_name'], delim=u'_')[:50]
 
     md = MetaTable(
-        url=form['dataset_url'],
+        url=form['file_url'],
         view_url=form.get('view_url'),
         dataset_name=name,
         human_name=form['dataset_name'],
@@ -529,9 +546,13 @@ class SocrataSuggestion(object):
 @views.route('/admin/view-datasets')
 @login_required
 def view_datasets():
-    datasets_pending = session.query(MetaTable)\
-        .filter(MetaTable.approved_status != True)\
-        .all()
+    datasets_pending = session.query(MetaTable).\
+        filter(MetaTable.approved_status != True).\
+        all()
+
+    shapes_pending = session.query(ShapeMetadata).\
+        filter(ShapeMetadata.approved_status != True).\
+        all()
 
     try:
         q = text(''' 
@@ -561,6 +582,7 @@ def view_datasets():
 
     return render_template('admin/view-datasets.html',
                            datasets_pending=datasets_pending,
+                           shapes_pending=shapes_pending,
                            datasets=datasets,
                            shape_datasets=shape_datasets)
 

@@ -68,7 +68,7 @@
                     <div class="row">
                         <div class="col-md-10 col-md-offset-1">
                             <form role="form" class="form" method="POST">
-                                    <input type="hidden" name="is_shapefile" value="true">
+                                    <input type="hidden" name="is_shapefile" value="false">
                                     {{ metadata_form_fragment(human_name, attribution, description, file_url, view_url) }}
 
                                 <p>Below, select which columns correspond to the <code>Observation date</code>, <code>Latitude</code> and <code>Longitude</code> fields for your dataset. These are all <span class="red">*</span>required.</p>
@@ -86,7 +86,7 @@
                                         {% for col in columns %}
                                             <tr>
                                                 <td>
-                                                    <select id="col_name_{{col.human_name|slugify}}" name="col_name_{{col.human_name|slugify}}" class="plenario-field form-control">
+                                                    <select id="col_name_{{col.name|slugify}}" name="col_name_{{col.name|slugify}}" class="plenario-field form-control">
                                                         <option value="">---------</option>
                                                         <option value="observed_date">Observation date</option>
                                                         <option value="latitude">Latitude</option>
@@ -94,8 +94,8 @@
                                                         <option value="location">Location</option>
                                                     </select>
                                                 </td>
-                                                <td>{{ col.human_name }}</td>
-                                                <td>{{ col.data_type }}</td>
+                                                <td>{{ col.name }}</td>
+                                                <td>{{ col.type_ }}</td>
                                                 <td>{{ col.description }}</td>
                                             </tr>
                                         {% endfor %}

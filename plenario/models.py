@@ -370,7 +370,8 @@ class ShapeMetadata(Base):
             SELECT meta.*, celery.status
             FROM meta_shape as meta
             LEFT JOIN celery_taskmeta as celery
-            ON celery.task_id = meta.celery_task_id;
+            ON celery.task_id = meta.celery_task_id
+            WHERE meta.approved_status = TRUE;
         '''
 
         return list(session.execute(shape_query))
