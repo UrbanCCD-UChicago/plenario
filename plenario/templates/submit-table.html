@@ -2,8 +2,6 @@
 {% from "macros/contributor-form.html" import contributor_form %}
 {% from "macros/metadata-form-fragment.html" import metadata_form_fragment %}
 
-{% set submit_button_verb = "Submit" if is_admin else "Contribute" %}
-
 {% block requirements %}
     <div class="panel-group" id="accordion-api-datasets">
       <div class="panel panel-default">
@@ -105,7 +103,7 @@
                                     </tbody>
                                 </table>
 
-                                    {{ contributor_form(submit_button_verb, contributor_name, contributor_organization, contributor_email) }}
+                                    {{ contributor_form(is_admin, contributor_name, contributor_organization, contributor_email) }}
 
                                 <hr />
                                 <div class="row">

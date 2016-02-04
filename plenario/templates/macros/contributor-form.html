@@ -1,6 +1,9 @@
-{% macro contributor_form(submit_button_verb, contributor_name, contributor_organization, contributor_email) -%}
-    {% if submit_button_verb == 'Contribute' %}
-
+{% macro contributor_form(is_admin, contributor_name, contributor_organization, contributor_email) -%}
+    {% if is_admin %}
+        <input type="hidden" id="contributor_name" name="contributor_name" value="{{contributor_name}}">
+        <input type="hidden" id="contributor_organization" name="contributor_organization" value="{{contributor_organization}}">
+        <input type="hidden" id="contributor_email" name="contributor_email" value="{{contributor_email}}">
+    {% else %}
         <h3>About you</h3>
 
         <p>Finally, tell us about yourself so we can contact you about this dataset.</p>
@@ -23,10 +26,5 @@
                 </div>
             </div>
         </div>
-
-    {% else %}
-        <input type="hidden" id="contributor_name" name="contributor_name" value="{{contributor_name}}">
-        <input type="hidden" id="contributor_organization" name="contributor_organization" value="{{contributor_organization}}">
-        <input type="hidden" id="contributor_email" name="contributor_email" value="{{contributor_email}}">
     {% endif %}
 {% endmacro %}

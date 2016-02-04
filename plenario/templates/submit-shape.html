@@ -2,8 +2,6 @@
 {% from "macros/contributor-form.html" import contributor_form %}
 {% from "macros/metadata-form-fragment.html" import metadata_form_fragment %}
 
-{% set is_shapefile=True %}
-
 {% block headline %}
     Submit a new shapefile.
 {% endblock headline %}
@@ -42,7 +40,7 @@
                             <form role="form" class="form" method="POST">
                                 <input type="hidden" name="is_shapefile" value="true">
                                 {{ metadata_form_fragment(human_name, attribution, description, file_url, view_url) }}
-                                {{ contributor_form(submit_button_verb, contributor_name, contributor_organization, contributor_email) }}
+                                {{ contributor_form(is_admin, contributor_name, contributor_organization, contributor_email) }}
 
                                 <hr />
                                 <p>

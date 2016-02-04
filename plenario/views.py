@@ -286,9 +286,10 @@ def point_meta_from_submit_form(form, is_approved):
 
 
 def shape_meta_from_submit_form(form, is_approved):
+
     md = ShapeMetadata.add(
         human_name=form['dataset_name'],
-        source_url=form['source_url'],
+        source_url=form['file_url'],
         view_url=form.get('view_url'),
         attribution=form.get('dataset_attribution'),
         description=form.get('dataset_description'),
