@@ -16,6 +16,7 @@ if CELERY_SENTRY_URL:
     handler = SentryHandler(CELERY_SENTRY_URL)
     setup_logging(handler)
 
+
 @celery_app.task(bind=True)
 def delete_dataset(self, source_url_hash):
     md = session.query(MetaTable).get(source_url_hash)
@@ -31,6 +32,7 @@ def delete_dataset(self, source_url_hash):
     except InternalError, e:
         raise delete_dataset.retry(exc=e)
     return 'Deleted {0} ({1})'.format(md.human_name, md.source_url_hash)
+
 
 @celery_app.task(bind=True)
 def add_dataset(self, source_url_hash, data_types=None):
@@ -50,17 +52,34 @@ def add_dataset(self, source_url_hash, data_types=None):
     etl.add()
     return 'Finished adding {0} ({1})'.format(md.human_name, md.source_url_hash)
 
+
 @celery_app.task(bind=True)
 def add_shape(self, table_name):
-
-    # Associate the dataset with this celery task so we can check on the task's status
+    # Associate the dataset with this celery task
+    # so we can check on the task's status
     meta = session.query(ShapeMetadata).get(table_name)
     meta.celery_task_id = self.request.id
     session.commit()
 
     # Ingest the shapefile
     ShapeETL(meta=meta).add()
-    return 'Finished adding shape dataset {} from {}.'.format(meta.dataset_name, meta.source_url)
+    return 'Finished adding shape dataset {} from {}.'.format(meta.dataset_name,
+                                                              meta.source_url)
+
+
+@celery_app.task(bind=True)
+def update_shape(self, table_name):
+    # Associate the dataset with this celery task
+    # so we can check on the task's status
+    meta = session.query(ShapeMetadata).get(table_name)
+    meta.celery_task_id = self.request.id
+    session.commit()
+
+    # Update the shapefile
+    ShapeETL(meta=meta).update()
+    return 'Finished updating shape dataset {} from {}.'.\
+        format(meta.dataset_name, meta.source_url)
+
 
 @celery_app.task(bind=True)
 def delete_shape(self, table_name):
@@ -69,6 +88,7 @@ def delete_shape(self, table_name):
     session.commit()
     return 'Removed {}'.format(table_name)
 
+
 @celery_app.task
 def frequency_update(frequency):
     # hourly, daily, weekly, monthly, yearly
@@ -76,7 +96,15 @@ def frequency_update(frequency):
         .filter(MetaTable.update_freq == frequency).all()
     for m in md:
         update_dataset.delay(m.source_url_hash)
+
+    md = session.query(ShapeMetadata)\
+        .filter(ShapeMetadata.update_freq == frequency)\
+        .filter(ShapeMetadata.is_ingested == True)\
+        .all()
+    for m in md:
+        update_shape.delay(m.dataset_name)
     return '%s update complete' % frequency
+
 
 @celery_app.task(bind=True)
 def update_dataset(self, source_url_hash):
@@ -93,6 +121,7 @@ def update_dataset(self, source_url_hash):
     etl = PlenarioETL(md)
     etl.update()
     return 'Finished updating {0} ({1})'.format(md.human_name, md.source_url_hash)
+
 
 @celery_app.task
 def update_metar():
@@ -112,6 +141,7 @@ def hello_world():
     Just running a task will create the celery_taskmeta tables in the database/
     """
     print "Hello from celery!"
+
 
 @celery_app.task
 def update_weather():

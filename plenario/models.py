@@ -20,8 +20,6 @@ from collections import namedtuple
 
 bcrypt = Bcrypt()
 
-PointDataset = namedtuple('PointDataset', 'name date lat lon loc')
-
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
@@ -130,6 +128,8 @@ class MetaTable(Base):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
 
     def meta_tuple(self):
+        PointDataset = namedtuple('PointDataset', 'name date lat lon loc')
+
         basic_info = PointDataset(name=self.dataset_name,
                                   date=self.observed_date,
                                   lat=self.latitude,
@@ -472,6 +472,7 @@ class ShapeMetadata(Base):
 
 def get_uuid():
     return unicode(uuid4())
+
 
 class User(Base):
     __tablename__ = 'plenario_user'
