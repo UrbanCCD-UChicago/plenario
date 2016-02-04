@@ -293,11 +293,10 @@ def point_meta_from_submit_form(form, is_approved):
     )
     session.add(md)
     session.commit()
-    return md
 
 
 def shape_meta_from_submit_form(form, is_approved):
-    meta = ShapeMetadata.add(
+    ShapeMetadata.add(
         human_name=form['dataset_name'],
         source_url=form['source_url'],
         view_url=form.get('view_url'),
@@ -309,52 +308,6 @@ def shape_meta_from_submit_form(form, is_approved):
         contributor_email=form['contributor_email'],
         approved_status=is_approved)
     session.commit()
-
-
-# def add_dataset_to_metatable(url, dataset_info, approved_status):
-#     """
-#     Called during request cycles with form guaranteed to have
-#     the fields used below.
-#     Derives a MetaTable object from the form and adds it to the DB.
-#     :param url: Download url
-#     :param dataset_info: Big dict with lots of metadata
-#                          We only care about a tiny subset of it here.
-#     :param approved_status: Whether this dataset should be viewable
-#     :return: MetaTable instance that was persisted to DB.
-#     """
-#
-#     labels = form_labels(request.form)
-#     name = slugify(request.form.get('dataset_name'), delim=u'_')[:50]
-#     column_names = extract_column_names(dataset_info)
-#     try:
-#         # Is there another url we should be using
-#         url = dataset_info['source_url']
-#     except KeyError:
-#         pass
-#
-#     md = MetaTable(
-#         url=url,
-#         dataset_name=name,
-#         human_name=request.form.get('dataset_name'),
-#         attribution=request.form.get('dataset_attribution'),
-#         description=request.form.get('dataset_description'),
-#         contributor_name=request.form.get('contributor_name'),
-#         contributor_organization=request.form.get('contributor_organization'),
-#         contributor_email=request.form.get('contributor_email'),
-#         approved_status=approved_status,
-#         observed_date=labels.get('observed_date', None),
-#         latitude=labels.get('latitude', None),
-#         longitude=labels.get('longitude', None),
-#         location=labels.get('location', None),
-#         column_names=column_names
-#     )
-#     session.add(md)
-#     session.commit()
-#     return md
-
-
-# def extract_column_names(dataset_info):
-#     return [slugify(col['human_name'], '_') for col in dataset_info['columns']]
 
 
 ColumnMeta = namedtuple('ColumnMeta', 'name type_')

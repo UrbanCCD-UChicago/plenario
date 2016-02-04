@@ -416,19 +416,21 @@ class ShapeMetadata(Base):
         return slugify(human_name)
 
     @classmethod
-    def add(cls, human_name, source_url,
-            attribution=None, description=None, update_freq=None):
+    def add(cls, human_name, source_url, approved_status, **kwargs):
         table_name = ShapeMetadata.make_table_name(human_name)
-        new_shape_dataset = ShapeMetadata(dataset_name=table_name,
-                                          human_name=human_name,
-                                          attribution=attribution,
-                                          description=description,
-                                          update_freq=update_freq,
-                                          is_ingested=False,
-                                          source_url=source_url,
-                                          date_added=datetime.now().date(),
-                                          bbox=None,
-                                          num_shapes=None)
+        new_shape_dataset = ShapeMetadata(
+            # Required params
+            dataset_name=table_name,
+            human_name=human_name,
+            source_url=source_url,
+            approved_status=approved_status,
+            # Params that reflect just-submitted, not yet ingested status.
+            is_ingested=False,
+            bbox=None,
+            num_shapes=None,
+            date_added=datetime.now().date(),
+            # The rest
+            **kwargs)
         session.add(new_shape_dataset)
         return new_shape_dataset
 
