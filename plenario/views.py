@@ -365,7 +365,7 @@ def context_from_suggestion(suggestion):
     try:
         context.update(suggestion.description_meta._asdict())
     except AttributeError:
-        context.update(DescriptionMeta(None, None, None)._asdict())
+        context.update(DescriptionMeta(None, None, '')._asdict())
 
     return context
 
@@ -398,7 +398,8 @@ class GenericSuggestion(object):
         inp.seek(0)
         column_info = infer_csv_columns(inp)
 
-        return [ColumnMeta(name, type_, None) for name, type_, _ in column_info]
+        return [ColumnMeta(name, type_.__visit_name__.lower(), '')
+                for name, type_, _ in column_info]
 
 
 class SocrataSuggestion(object):
