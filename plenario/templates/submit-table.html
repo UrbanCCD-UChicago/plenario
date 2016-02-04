@@ -47,7 +47,6 @@
      <h3>Link to a dataset</h3>
             {% block fetch_details %}
             <form role="form" method="GET" id="fetch-details-form">
-                <input type="hidden" name="is_shapefile" value="true">
                 <div class="form-group">
                     {% if submitted_url %}
                         <input type="text" class="form-control" name="submitted_url" value="{{submitted_url}}" />
