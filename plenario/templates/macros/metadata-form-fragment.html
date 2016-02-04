@@ -1,10 +1,26 @@
-{% macro metadata_form_fragment(human_name, attribution, description) -%}
+{% macro metadata_form_fragment(human_name, attribution, description, file_url, view_url) -%}
 
 <p>Fill out the name, description and frequency of update for your dataset. <span class="red">*</span> denotes a required field</p>
-            
+
 <div class="form-group">
     <label for="dataset_name"><span class="red">*</span>File name</label>
     <input id="dataset_name" name="dataset_name" class="form-control" type="text" value="{{human_name}}" />
+</div>
+
+<div class="form-group">
+    <label for="file_url"><span class="red">*</span>File URL</label>
+    <input type="text" class="form-control" name="file_url" value="{{file_url}}" />
+    <p class="help-block">The URL where the file is located.</p>
+</div>
+
+<div class="form-group">
+    <label for="view_url">View URL</label>
+    {% if view_url %}
+        <input type="text" class="form-control" name="view_url" value="{{view_url}}" />
+    {% else %}
+        <input type="text" class="form-control" name="view_url" placeholder="http://data.mycity.gov/info/file_info.html"/>
+    {% endif %}
+    <p class="help-block">If available, a URL pointing to a webpage that describes this file.</p>
 </div>
 
 <div class="form-group">

@@ -19,6 +19,7 @@
      <h3>Link to a shapefile</h3>
             {% block fetch_details %}
             <form role="form" method="GET" id="fetch-details-form">
+                <input type="hidden" name="is_shapefile" value="true">
                 <div class="form-group">
                     {% if submitted_url %}
                         <input type="text" class="form-control" name="dataset_url" value="{{submitted_url}}" />
@@ -39,18 +40,8 @@
                     <div class="row">
                         <div class="col-md-10 col-md-offset-1">
                             <form role="form" class="form" method="POST">
-                                <input type="text" class="form-control" name="file_url" value="{{file_url}}" />
-                                <p class="help-block">The URL where the shapefile is located.</p>
-
-                                {% if view_url %}
-                                    <input type="text" class="form-control" name="view_url" value="{{view_url}}" />
-                                {% else %}
-                                    <input type="text" class="form-control" name="dataset_url" placeholder="http://data.mycity.gov/info/about/shape.html"/>
-                                {% endif %}
-                                <p class="help-block">If available, URL to a web page with information about this dataset.</p>
-
-                                {{ metadata_form_fragment(human_name, attribution, description) }}
-
+                                <input type="hidden" name="is_shapefile" value="true">
+                                {{ metadata_form_fragment(human_name, attribution, description, file_url, view_url) }}
                                 {{ contributor_form(submit_button_verb, contributor_name, contributor_organization, contributor_email) }}
 
                                 <hr />

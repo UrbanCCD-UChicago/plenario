@@ -136,7 +136,10 @@ Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (contributor_name, data
 
 
 def render_with_context(context):
-    return render_template('submit-table.html', **context)
+    if context['is_shapefile']:
+        return render_template('submit-shape.html', **context)
+    else:
+        return render_template('submit-table.html', **context)
 
 
 def add(context):
