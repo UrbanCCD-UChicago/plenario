@@ -140,7 +140,9 @@ def render_with_context(context):
 
 
 def add(context):
-    context['is_shapefile'] = request.args.get('is_shapefile', False)
+    # If is_shapefile query arg is present and not 'false', display shape form.
+    shape_arg = request.args.get('is_shapefile', 'false')
+    context['is_shapefile'] = shape_arg != 'false'
 
     # Step 1: User looking at page for the first time
     if request.method == 'GET' and not request.args.get('dataset_url'):

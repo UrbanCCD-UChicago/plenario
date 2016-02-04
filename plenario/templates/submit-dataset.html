@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% set url_prefix= %}
 
 {% block title %}Submit a dataset - Plenar.io{% endblock %}
 
@@ -28,11 +27,11 @@
 
                 <h3>Type of dataset</h3>
 
-                    <a href=".?is_shapefile=false" type="button"
+                    <a href="?is_shapefile=false" type="button"
                        class="btn btn-info {% if is_shapefile %} active {% else %} disabled {% endif %}">
                         Tabular data (CSV or a Socrata dataset).
                     </a>
-                    <a href=".?is_shapefile=true" type="button"
+                    <a href="?is_shapefile=true" type="button"
                        class="btn btn-info {% if not is_shapefile %} active {% else %} disabled {% endif %}">
                         Shapefile (ESRI format).
                     </a>
