@@ -275,7 +275,7 @@ class MetaTable(Base):
 
 
     # Return select statement to execute or union
-    def timeseries(self, agg_unit, start, end, geom=None):
+    def timeseries(self, agg_unit, start, end, geom=None, column_filters=None):
         # Reading this blog post
         # http://no0p.github.io/postgresql/2014/05/08/timeseries-tips-pg.html
         # inspired this implementation.
@@ -293,11 +293,15 @@ class MetaTable(Base):
         # Create a CTE that grabs the number of records
         # contained in each time bucket.
         # Will only have rows for buckets with records.
+        where_filters = [t.c.point_date >= start,
+                         t.c.point_date <= end]
+        if column_filters:
+            where_filters += column_filters
+
         actuals = select([func.count(t.c.hash).label('count'),
                           func.date_trunc(agg_unit, t.c.point_date).
                          label('time_bucket')])\
-            .where(sa.and_(t.c.point_date >= start,
-                           t.c.point_date <= end))\
+            .where(sa.and_(*where_filters))\
             .group_by('time_bucket')
 
         # Also filter by geometry if requested
@@ -320,8 +324,8 @@ class MetaTable(Base):
 
         return ts
 
-    def timeseries_one(self, agg_unit, start, end, geom=None):
-        ts_select = self.timeseries(agg_unit, start, end, geom)
+    def timeseries_one(self, agg_unit, start, end, geom=None, column_filters=None):
+        ts_select = self.timeseries(agg_unit, start, end, geom, column_filters)
         rows = session.execute(ts_select.order_by('time_bucket'))
 
         header = [['count', 'datetime']]
