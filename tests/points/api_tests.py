@@ -62,6 +62,25 @@ class PointAPITests(BasePlenarioTest):
         lines = [line for line in reader]
         # One header line, 5 data lines
         self.assertEqual(len(lines), 6)
+        for line in lines:
+            self.assertEqual(len(line), len(lines[0]))
+        
+        self.assertTrue('date' in lines[0])
+        self.assertTrue('latitude' in lines[0])
+        self.assertTrue('longitude' in lines[0])
+
+    def test_geojson_response(self):
+        query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&data_type=geojson'
+        resp = self.app.get(query)
+
+        response_data = json.loads(resp.data)
+        points = response_data['features']
+
+        self.assertEqual(len(points), 5)
+        attributes = points[0]
+        self.assertTrue('geometry' in attributes)
+        self.assertTrue('latitude' in attributes['properties'])
+        self.assertTrue('longitude' in attributes['properties'])
 
     def test_space_filter(self):
         escaped_query_rect = get_loop_rect()
