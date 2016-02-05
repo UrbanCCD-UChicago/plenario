@@ -169,6 +169,31 @@ class ParamValidator(object):
     where error_message is non-None only when the transformation could not produce an object of the expected type.
 '''
 
+def setup_detail_validator(dataset_name, params):
+    
+    try:
+        validator = ParamValidator(dataset_name)
+    except NoSuchTableError:
+        return bad_request("Cannot find dataset named {}".format(dataset_name))
+
+    validator\
+        .set_optional('obs_date__ge',
+                      date_validator,
+                      datetime.now() - timedelta(days=90))\
+        .set_optional('obs_date__le', date_validator, datetime.now())\
+        .set_optional('location_geom__within', geom_validator, None)\
+        .set_optional('offset', int_validator, 0)\
+        .set_optional('data_type',
+                      make_format_validator(['json', 'csv', 'geojson']),
+                      'json')\
+        .set_optional('date__time_of_day_ge', time_of_day_validator, 0)\
+        .set_optional('date__time_of_day_le', time_of_day_validator, 23)\
+        .set_optional('shape', shape_validator, None)
+
+    '''create another validator to check if shape dataset is in meta_shape, then return
+    the actual table object for that shape if it is present'''
+
+    return validator
 
 def agg_validator(agg_str):
     VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
@@ -384,7 +409,6 @@ def form_json_detail_response(to_remove, validator, rows):
     to_remove.append('geom')
     remove_columns_from_dict(rows, to_remove)
     resp = json_response_base(validator, rows)
-
     resp['meta']['total'] = len(resp['objects'])
     resp['meta']['query'] = validator.vals
     resp = make_response(json.dumps(resp, default=unknownObjectHandler), 200)
@@ -409,6 +433,7 @@ def form_geojson_detail_response(to_remove, validator, rows):
     geojson_resp = geojson_response_base()
     # We want the geom this time.
     remove_columns_from_dict(rows, to_remove)
+
     for row in rows:
         try:
             wkb = row.pop('geom')
@@ -425,7 +450,7 @@ def form_geojson_detail_response(to_remove, validator, rows):
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-def form_detail_sql_query(validator):
+def form_detail_sql_query(validator, aggregate_points=False):
     dset = validator.dataset
     try:
         q = session.query(dset)
@@ -450,18 +475,15 @@ def form_detail_sql_query(validator):
     #if the query specified a shape dataset, add a join to the sql query with that dataset
     shape_table = validator.vals['shape']
     if shape_table != None:
-        q = q.join(shape_table, dset.c.geom.ST_Within(shape_table.c.geom))
-
-        #add columns from shape dataset to the select statement
         shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
         validator.cols += ['{}.{}'.format(shape_table.name, key) for key in shape_table.columns.keys()]
-        q = q.add_columns(*shape_columns)
-    
-    # Page in RESPONSE_LIMIT chunks
-    offset = validator.vals['offset']
-    q = q.limit(RESPONSE_LIMIT)
-    if offset > 0:
-        q = q.offset(offset)
+            
+        if aggregate_points: 
+            q = q.from_self(shape_table).filter(dset.c.geom.ST_Intersects(shape_table.c.geom)).group_by('ogc_fid')
+        else:
+            q = q.join(shape_table, dset.c.geom.ST_Within(shape_table.c.geom))
+            #add columns from shape dataset to the select statement
+            q = q.add_columns(*shape_columns)
 
     return q
 
@@ -641,7 +663,12 @@ def detail():
 
     #Part 2: Form SQL query from parameters stored in 'validator' object
     q = form_detail_sql_query(validator)
-
+    
+    # Page in RESPONSE_LIMIT chunks
+    offset = validator.vals['offset']
+    q = q.limit(RESPONSE_LIMIT)
+    if offset > 0:
+        q = q.offset(offset)
     # Part 3: Make SQL query and dump output into list of rows
     # (Could explicitly not request point_date and geom here
     #  to transfer less data)

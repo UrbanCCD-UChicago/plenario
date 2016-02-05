@@ -7,7 +7,11 @@ from flask import make_response, request
 from plenario.models import ShapeMetadata
 from plenario.database import session, app_engine as engine
 from plenario.utils.ogr2ogr import OgrExport
-from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str
+from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT
+from plenario.api.point import ParamValidator, setup_detail_validator, form_detail_sql_query, form_geojson_detail_response, bad_request
+
+from collections import OrderedDict
+from sqlalchemy import func
 
 def export_dataset_to_json_response(dataset_name, query=None):
 
@@ -91,26 +95,37 @@ def get_all_shape_datasets():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-@crossdomain(origin="*")
-def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
-    """
-    Given a shape dataset and user-provided geojson,
-    return all shapes from the dataset that intersect the geojson.
+def aggregate_point_data(point_dataset_name, polygon_dataset_name):
 
-    :param dataset_name: Name of shape dataset
-    :param geojson: URL encoded goejson
-    :return:
-    """
+    params = request.args.copy()
+    if not params.get('shape'):
+        params['shape'] = polygon_dataset_name
 
-    intersect_query = '''
-    SELECT COUNT(*), polys.*
-    FROM {point_dataset_name} AS pts, {polygon_dataset_name} AS polys
-    WHERE ST_Intersects(pts.geom, polys.geom)
-    GROUP BY polys.ogc_fid
-    '''.format(point_dataset_name=point_dataset_name, 
-               polygon_dataset_name=polygon_dataset_name)
+    validator = setup_detail_validator(point_dataset_name, params)
 
-    return export_dataset_to_json_response(polygon_dataset_name, intersect_query)  
+    err = validator.validate(params)
+    if err:
+        return bad_request(err)
+
+    q = form_detail_sql_query(validator, True)
+    q = q.add_columns(func.count(validator.dataset.c.id))
+
+    # Page in RESPONSE_LIMIT chunks
+    offset = validator.vals['offset']
+    q = q.limit(RESPONSE_LIMIT)
+    if offset > 0:
+        q = q.offset(offset)
+
+    res_cols = []
+    for col in validator.cols:
+        if col[:len(polygon_dataset_name)] == polygon_dataset_name:
+            res_cols.append(col[len(polygon_dataset_name)+1:])
+    res_cols.append('count')
+
+    rows = [OrderedDict(zip(res_cols, res)) for res in q.all()]
+    resp = form_geojson_detail_response([], validator, rows)
+
+    return resp
 
 @crossdomain(origin="*")
 def filter_shape(dataset_name, geojson):

@@ -163,28 +163,30 @@ class ShapeTests(BasePlenarioTest):
         streets = data['features']
         self.assertEqual(len(streets), 6)
 
-    def test_filter_point_data_with_polygons_with_crimes_and_neighborhoods(self):
-        url = '/v1/api/shapes/polygon_filter/crimes/chicago_neighborhoods/'
+    def test_filter_point_data_with_landmarks_neighborhoods_and_time(self):
+        url = '/v1/api/shapes/chicago_neighborhoods/landmarks/?obs_date__ge=2000-09-22&obs_date__le=2013-10-1'
         response = self.app.get(url)
         self.assertEqual(response.status_code, 200)
 
         data = json.loads(response.data)
         neighborhoods = data['features']
-        self.assertEqual(len(neighborhoods), 7)
-
-        for neighborhood in neighborhoods:
-            self.assertEqual(neighborhood['properties']['count'], 1)
-
-    def test_filter_point_data_with_polygons_with_crimes_and_neighborhoods(self):
-        url = '/v1/api/shapes/polygon_filter/landmarks/chicago_neighborhoods/'
-        response = self.app.get(url)
-        self.assertEqual(response.status_code, 200)
-
-        data = json.loads(response.data)
-        neighborhoods = data['features']
-        self.assertEqual(len(neighborhoods), 69)
+        self.assertEqual(len(neighborhoods), 54)
 
         for neighborhood in neighborhoods:
             self.assertGreaterEqual(neighborhood['properties']['count'], 1)
-            #print neighborhood['properties']['count'], neighborhood['properties']['pri_neigh'] 
+            #print neighborhood['properties']['sec_neigh'], neighborhood['properties']['count']
 
+    def test_filter_point_data_with_landmarks_neighborhoods_architect_and_time(self):
+        url = '/v1/api/shapes/chicago_neighborhoods/landmarks/?obs_date__ge=1900-09-22&obs_date__le=2013-10-1&architect__in=Frank Lloyd Wright,Fritz Lang'
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        data = json.loads(response.data)
+        neighborhoods = data['features']
+        self.assertEqual(len(neighborhoods), 6)
+        for hood in neighborhoods:
+            continue
+            #print hood['properties']['sec_neigh'], hood['properties']['count']
+
+        for neighborhood in neighborhoods:
+            self.assertGreaterEqual(neighborhood['properties']['count'], 1)
