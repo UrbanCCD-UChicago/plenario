@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from urlparse import urlparse
 import requests
 from flask_wtf import Form
-from wtforms import TextField, SelectField
+from wtforms import TextField, SelectField, StringField
 from wtforms.validators import DataRequired
 import json
 import re
@@ -208,6 +208,7 @@ def submit(context):
             return send_submission_email(meta.human_name,
                                          meta.contributor_name,
                                          meta.contributor_email)
+        return view_datasets()
 
 
 def suggest(context):
@@ -642,6 +643,54 @@ def dataset_status():
             d['date_done'] = result.date_done.strftime('%B %d, %Y %H:%M'),
         r.append(d)
     return render_template('admin/dataset-status.html', results=r, name=name)
+
+
+class EditShapeForm(Form):
+    human_name = StringField('human_name', validators=[DataRequired()])
+    description = StringField('description', validators=[DataRequired()])
+    attribution = StringField('attribution', validators=[DataRequired()])
+    update_freq = SelectField('update_freq',
+                              choices=[('daily', 'Daily'),
+                                       ('weekly', 'Weekly'),
+                                       ('monthly', 'Monthly'),
+                                       ('yearly', 'Yearly')],
+                              validators=[DataRequired()])
+
+    def validate(self):
+        return Form.validate(self)
+
+
+@views.route('/admin/edit-shape/<dataset_name>', methods=['GET', 'POST'])
+@login_required
+def edit_shape(dataset_name):
+    form = EditShapeForm()
+    meta = session.query(ShapeMetadata).get(dataset_name)
+
+    if form.validate_on_submit():
+        upd = {
+            'human_name': form.human_name.data,
+            'description': form.description.data,
+            'attribution': form.attribution.data,
+            'update_freq': form.update_freq.data,
+        }
+        session.query(ShapeMetadata)\
+            .filter(ShapeMetadata.source_url_hash == meta.source_url_hash)\
+            .update(upd)
+        session.commit()
+
+        if not meta.approved_status:
+            approve_shape(dataset_name)
+
+        flash('%s updated successfully!' % meta.human_name, 'success')
+        return redirect(url_for('views.view_datasets'))
+    else:
+        pass
+
+    context = {
+        'form': form,
+        'meta': meta,
+    }
+    return render_template('admin/edit-shape.html', **context)
 
 
 class EditDatasetForm(Form):

@@ -87,10 +87,10 @@
                         </td>
                         <td>{{ dataset.update_freq }}</td>
                         <td>
-                            <a href="{{ url_for('views.approve_shape',
+                            <a href="{{ url_for('views.edit_shape',
                                     dataset_name=dataset.dataset_name) }}"
                                 class="btn btn-success btn-sm dataset-approval">
-                                <i class='fa fa-edit'></i> Approve
+                                <i class='fa fa-edit'></i> Review
                             </a>
                         </td>
                     </tr>
@@ -174,20 +174,32 @@
                         <td>
                             {% if shape_dataset.status %}
                                 {% if shape_dataset.status == 'SUCCESS' %}
-                                    <a href="{{url_for('views.shape_status', table_name=shape_dataset.dataset_name)}}" class='btn btn-success btn-sm dataset-success'>
+                                    <a href="{{url_for('views.shape_status', dataset_name=shape_dataset.dataset_name)}}" class='btn btn-success btn-sm dataset-success'>
                                         <i class='fa fa-check'></i>
                                         {{ shape_dataset.status|title }}
                                     </a>
                                 {% else %}
-                                    <a href="{{url_for('views.shape_status', table_name=shape_dataset.dataset_name) }}" class='btn btn-primary btn-sm dataset-error'>
+                                    <a href="{{url_for('views.shape_status', dataset_name=shape_dataset.dataset_name) }}" class='btn btn-primary btn-sm dataset-error'>
                                         <i class='fa fa-exclamation'></i>
                                         {{ shape_dataset.status|title }}
                                     </a>
                                 {% endif %}
                             {% else %}
-                                <a href="{{url_for('views.shape_status', table_name=shape_dataset.dataset_name) }}" class='btn btn-default btn-sm dataset-running'>
+                                <a href="{{url_for('views.shape_status', dataset_name=shape_dataset.dataset_name) }}" class='btn btn-default btn-sm dataset-running'>
                                         Ingest pending
                                     </a>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('views.edit_shape', dataset_name=shape_dataset.dataset_name) }}"
+                                class="btn btn-info btn-sm">
+                                <i class='fa fa-edit'></i> Edit
+                            </a>
+                            {% if shape_dataset.approved_status == False %}
+                                <a href="{{ url_for('views.approve_shape', dataset_name=shape_dataset.dataset_name) }}"
+                                    class="btn btn-success btn-sm">
+                                    <i class='fa fa-check'></i> Approve
+                                </a>
                             {% endif %}
                         </td>
                     </tr>
