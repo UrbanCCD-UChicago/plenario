@@ -7,12 +7,28 @@
 {% endblock headline %}
 
 {% block requirements %}
-    <p>Detailed requirements go here. Should be a shapefile, ya dig?</p>
+    <div class="panel-group" id="accordion-api-datasets">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <a data-toggle="collapse" data-parent="#accordion-api-datasets" href="#collapse-api-datasets" id="api-datasets">
+            <span class='label label-info'>Requirements</span>
+            Dataset must be an ESRI shapefile in a <code>.zip</code> archive. Read more &raquo;
+          </a>
+        </div>
+        <div id="collapse-api-datasets" class="panel-collapse collapse">
+          <div class="panel-body">
+              <p>Plenario can ingest ESRI shapefiles packaged in a <code>.zip</code> archive.</p>
+              <p>Shapefiles must contain a <code>.shp</code> component with geometry data
+                  and a <code>.prj</code> component with a map projection.</p>
+              <p>Optionally, the shapefile can contain a <code>.dbf</code>
+                 component with tabular data.</p>
+          </div>
+        </div>
+      </div>
+    </div>
 {% endblock requirements %}
 
 {% block submission %}
-
-    <p><em><span class="red">*</span> denotes a required field</em></p>
 
      <h3>Link to a shapefile</h3>
             {% block fetch_details %}
@@ -34,6 +50,7 @@
 
                 {# Use file_url as our sentinel to judge if the user has suggested a dataset #}
               {% if file_url %}
+                    <p><em><span class="red">*</span> denotes a required field</em></p>
                     <hr />
                     <div class="row">
                         <div class="col-md-10 col-md-offset-1">
