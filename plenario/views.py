@@ -674,7 +674,7 @@ def edit_shape(dataset_name):
             'update_freq': form.update_freq.data,
         }
         session.query(ShapeMetadata)\
-            .filter(ShapeMetadata.source_url_hash == meta.source_url_hash)\
+            .filter(ShapeMetadata.dataset_name == meta.dataset_name)\
             .update(upd)
         session.commit()
 
@@ -824,7 +824,7 @@ def check_update(task_id):
 @views.route('/admin/shape-status/')
 @login_required
 def shape_status():
-    table_name = request.args['table_name']
+    table_name = request.args['dataset_name']
     shape_meta = ShapeMetadata.get_metadata_with_etl_result(table_name)
     return render_template('admin/shape-status.html', shape=shape_meta)
 

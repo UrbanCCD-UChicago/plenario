@@ -47,9 +47,9 @@
 
     <div id="errors"></div>
 
-    {% if datasets_pending %}
+    {% if datasets_pending or shapes_pending %}
         <h3>
-            {{ datasets_pending|length }} datasets pending approval
+            {{ datasets_pending|length + shapes_pending|length }} datasets pending approval
         </h3>
         <table id='datasets-pending-table' class="table table-condensed">
             <thead>
@@ -102,7 +102,7 @@
     {% endif %}
     <!-- datasets loaded in the system -->
     <h3>
-        {{ datasets|length }} datasets available
+        {{ datasets|length + shape_datasets|length }} datasets available
     </h3>
 
     <table id='datasets-table' class="table table-condensed">
