@@ -184,9 +184,9 @@ class ShapeTests(BasePlenarioTest):
         data = json.loads(response.data)
         neighborhoods = data['features']
         self.assertEqual(len(neighborhoods), 6)
-        for hood in neighborhoods:
-            continue
-            #print hood['properties']['sec_neigh'], hood['properties']['count']
-
+        
         for neighborhood in neighborhoods:
             self.assertGreaterEqual(neighborhood['properties']['count'], 1)
+            #print hood['properties']['sec_neigh'], hood['properties']['count']
+
+

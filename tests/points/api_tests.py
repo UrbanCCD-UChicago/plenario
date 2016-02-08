@@ -107,7 +107,7 @@ class PointAPITests(BasePlenarioTest):
 
     def test_space_and_time(self):
         escaped_query_rect = get_loop_rect()
-        query = 'v1/api/grid/?obs_date__ge=2013-1-1&obs_date_le=2014-1-1&dataset_name=flu_shot_clinics&location_geom__within=' + escaped_query_rect
+        query = 'v1/api/grid/?obs_date__ge=2013-1-1&obs_date__le=2014-1-1&dataset_name=flu_shot_clinics&location_geom__within=' + escaped_query_rect
         resp = self.app.get(query)
         response_data = json.loads(resp.data)
         self.assertEqual(len(response_data['features']), 4)
@@ -213,3 +213,12 @@ class PointAPITests(BasePlenarioTest):
 
         self.assertEqual(response_data['meta']['total'], 5)
         self.assertEqual(len(response_data['objects'][0]), 22)
+
+    def test_filter_point_data_with_landmarks_in_one_neighborhood(self):
+        url = '/v1/api/detail/?dataset_name=landmarks&obs_date__ge=1900-09-22&obs_date__le=2013-10-1&shape=chicago_neighborhoods&sec_neigh__in=BRONZEVILLE'
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        points = data['objects']
+        for point in points:
+            self.assertEqual(point['chicago_neighborhoods.sec_neigh'], 'BRONZEVILLE')

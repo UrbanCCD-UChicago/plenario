@@ -22,7 +22,7 @@ from plenario.models import ShapeMetadata
 
 class ParamValidator(object):
 
-    def __init__(self, dataset_name=None):
+    def __init__(self, dataset_name=None, shape_dataset_name=None):
         # Maps param keys to functions that validate and transform its string value.
         # Each transform returns (transformed_value, error_string)
         self.transforms = {}
@@ -38,6 +38,20 @@ class ParamValidator(object):
             self.cols = self.dataset.columns.keys()
             # SQLAlchemy boolean expressions
             self.conditions = []
+
+            '''TODO: Make this a helper func'''
+            if shape_dataset_name:
+                self.set_shape(shape_dataset_name)
+
+    def set_shape(self, shape_dataset_name):
+        shape_table_meta = session.query(ShapeMetadata).get(shape_dataset_name)
+        if shape_table_meta:
+            shape_table = shape_table_meta.shape_table
+            shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
+            self.cols += ['{}.{}'.format(shape_table.name, key) for key in shape_table.columns.keys()]
+            self.vals['shape'] = shape_table
+
+
 
     def set_optional(self, name, transform, default):
         """
@@ -114,20 +128,27 @@ class ParamValidator(object):
         'ilike': 'ilike',
     }
 
+    def _check_shape_condition(self, field):
+        return self.vals.get('shape') is not None\
+         and '{}.{}'.format(self.vals['shape'], field) not in self.cols
+
     def _make_condition(self, k, v):
         # Generally, we expect the form k = [field]__[op]
         # Can also be just [field] in the case of simple equality
         tokens = k.split('__')
         # An attribute of the dataset
         field = tokens[0]
-        if field not in self.cols:
+        if field not in self.cols and self._check_shape_condition(field):
             # No column matches this key.
             # Rather than return an error here,
             # we'll return None to indicate that this field wasn't present
             # and let the calling function send a warning to the client.
+            
             return None, None
 
         col = self.dataset.columns.get(field)
+        if col is None and self.vals.get('shape') is not None:
+            col = self.vals['shape'].columns.get(field)
 
         if len(tokens) == 1:
             # One token? Then it's an equality operation of the form k=v
@@ -172,7 +193,11 @@ class ParamValidator(object):
 def setup_detail_validator(dataset_name, params):
     
     try:
-        validator = ParamValidator(dataset_name)
+        if 'shape' in params:
+            shape = params['shape']
+        else:
+            shape = None
+        validator = ParamValidator(dataset_name, shape)
     except NoSuchTableError:
         return bad_request("Cannot find dataset named {}".format(dataset_name))
 
@@ -187,8 +212,7 @@ def setup_detail_validator(dataset_name, params):
                       make_format_validator(['json', 'csv', 'geojson']),
                       'json')\
         .set_optional('date__time_of_day_ge', time_of_day_validator, 0)\
-        .set_optional('date__time_of_day_le', time_of_day_validator, 23)\
-        .set_optional('shape', shape_validator, None)
+        .set_optional('date__time_of_day_le', time_of_day_validator, 23)
 
     '''create another validator to check if shape dataset is in meta_shape, then return
     the actual table object for that shape if it is present'''
@@ -270,14 +294,6 @@ def time_of_day_validator(hour_str):
         return None, error_message
     else:
         return num, None
-
-def shape_validator(shape_str):
-    shape_table = session.query(ShapeMetadata).get(shape_str)
-    if shape_table:
-        return shape_table.shape_table, None
-    else:
-        return None, "{} is not an available shape dataset in Plenario".format(shape_str)
-
 
 class FilterMaker(object):
     """
@@ -473,11 +489,9 @@ def form_detail_sql_query(validator, aggregate_points=False):
         return internal_error('Failed to construct time and geometry filters.', e)
 
     #if the query specified a shape dataset, add a join to the sql query with that dataset
-    shape_table = validator.vals['shape']
+    shape_table = validator.vals.get('shape')
     if shape_table != None:
-        shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
-        validator.cols += ['{}.{}'.format(shape_table.name, key) for key in shape_table.columns.keys()]
-            
+        shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]   
         if aggregate_points: 
             q = q.from_self(shape_table).filter(dset.c.geom.ST_Intersects(shape_table.c.geom)).group_by('ogc_fid')
         else:
@@ -632,28 +646,7 @@ def detail():
     except KeyError:
         return bad_request("'dataset_name' is required")
 
-    # and that we have that dataset.
-    try:
-        validator = ParamValidator(dataset_name)
-    except NoSuchTableError:
-        return bad_request("Cannot find dataset named {}".format(dataset_name))
-
-    validator\
-        .set_optional('obs_date__ge',
-                      date_validator,
-                      datetime.now() - timedelta(days=90))\
-        .set_optional('obs_date__le', date_validator, datetime.now())\
-        .set_optional('location_geom__within', geom_validator, None)\
-        .set_optional('offset', int_validator, 0)\
-        .set_optional('data_type',
-                      make_format_validator(['json', 'csv', 'geojson']),
-                      'json')\
-        .set_optional('date__time_of_day_ge', time_of_day_validator, 0)\
-        .set_optional('date__time_of_day_le', time_of_day_validator, 23)\
-        .set_optional('shape', shape_validator, None)
-
-    '''create another validator to check if shape dataset is in meta_shape, then return
-    the actual table object for that shape if it is present'''
+    validator = setup_detail_validator(dataset_name, raw_query_params)
 
     # If any optional parameters are malformed, we're better off bailing and telling the user
     # than using a default and confusing them.
@@ -669,6 +662,7 @@ def detail():
     q = q.limit(RESPONSE_LIMIT)
     if offset > 0:
         q = q.offset(offset)
+
     # Part 3: Make SQL query and dump output into list of rows
     # (Could explicitly not request point_date and geom here
     #  to transfer less data)
@@ -679,7 +673,7 @@ def detail():
 
     # Part 4: Format response
     to_remove = ['point_date', 'hash']
-    if validator.vals['shape'] is not None:
+    if validator.vals.get('shape') is not None:
         to_remove.append('{}.geom'.format(validator.vals['shape'].name))
 
     datatype = validator.vals['data_type']
