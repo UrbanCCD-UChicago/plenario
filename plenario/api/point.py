@@ -580,7 +580,9 @@ def detail_aggregate():
     dataset = MetaTable.get_by_dataset_name(dataset_name)
 
     try:
-        ts = dataset.timeseries_one(agg_unit=agg, start=start_date, end=end_date, geom=geom)
+        ts = dataset.timeseries_one(agg_unit=agg, start=start_date,
+                                    end=end_date, geom=geom,
+                                    column_filters=validator.conditions)
     except Exception as e:
         return internal_error('Failed to construct timeseries', e)
 
