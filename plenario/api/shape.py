@@ -108,7 +108,7 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
         return bad_request(err)
 
     q = form_detail_sql_query(validator, True)
-    q = q.add_columns(func.count(validator.dataset.c.id))
+    q = q.add_columns(func.count(validator.dataset.c.hash))
 
     # Page in RESPONSE_LIMIT chunks
     offset = validator.vals['offset']
