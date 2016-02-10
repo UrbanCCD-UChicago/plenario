@@ -87,7 +87,9 @@ class ShapeTests(BasePlenarioTest):
         ShapeTests.ingest_fixture(fixtures['city'])
         ShapeMetadata.add(human_name=u'Dummy Name',
                           source_url=None,
-                          update_freq='yearly')
+                          update_freq='yearly',
+                          approved_status=False)
+
         session.commit()
 
     ''' /intersections '''
@@ -183,29 +185,47 @@ class ShapeTests(BasePlenarioTest):
         streets = data['features']
         self.assertEqual(len(streets), 6)
 
-    def test_filter_point_data_with_polygons_with_crimes_and_neighborhoods(self):
-        url = '/v1/api/shapes/polygon_filter/crimes/chicago_neighborhoods/'
-        response = self.app.get(url)
-        self.assertEqual(response.status_code, 200)
-
-        data = json.loads(response.data)
-        print data
-        neighborhoods = data['features']
-        self.assertEqual(len(neighborhoods), 7)
-
-        for neighborhood in neighborhoods:
-            self.assertEqual(neighborhood['properties']['count'], 1)
-
-    def test_filter_point_data_with_polygons_with_crimes_and_neighborhoods(self):
-        url = '/v1/api/shapes/polygon_filter/landmarks/chicago_neighborhoods/'
+    def test_aggregate_point_data_with_landmarks_neighborhoods_and_time(self):
+        url = '/v1/api/shapes/chicago_neighborhoods/landmarks/?obs_date__ge=2000-09-22&obs_date__le=2013-10-1'
         response = self.app.get(url)
         self.assertEqual(response.status_code, 200)
 
         data = json.loads(response.data)
         neighborhoods = data['features']
-        self.assertEqual(len(neighborhoods), 69)
+        self.assertEqual(len(neighborhoods), 54)
 
         for neighborhood in neighborhoods:
             self.assertGreaterEqual(neighborhood['properties']['count'], 1)
-            #print neighborhood['properties']['count'], neighborhood['properties']['pri_neigh'] 
+            #print neighborhood['properties']['sec_neigh'], neighborhood['properties']['count']
+
+    def test_aggregate_point_data_with_landmarks_neighborhoods_architect_and_time(self):
+        url = '/v1/api/shapes/chicago_neighborhoods/landmarks/?obs_date__ge=1900-09-22&obs_date__le=2013-10-1&architect__in=Frank Lloyd Wright,Fritz Lang'
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        data = json.loads(response.data)
+        neighborhoods = data['features']
+        self.assertEqual(len(neighborhoods), 6)
+        
+        for neighborhood in neighborhoods:
+            self.assertGreaterEqual(neighborhood['properties']['count'], 1)
+            #print neighborhood['properties']['sec_neigh'], neighborhood['properties']['count']
+
+    def test_filter_point_data_with_landmarks_neighborhoods_and_bounding_box(self):
+        rect_path = os.path.join(FIXTURE_PATH, 'loop_rectangle.json')
+        with open(rect_path, 'r') as rect_json:
+            query_rect = rect_json.read()
+
+        url = '/v1/api/shapes/chicago_neighborhoods/landmarks/?obs_date__ge=1900-09-22&obs_date__le=2013-10-1&location_geom__within=' + query_rect
+        response = self.app.get(url)
+        data = json.loads(response.data)
+        neighborhoods = data['features']
+        self.assertGreaterEqual(20, len(neighborhoods)) 
+          #check that total number of neighborhoods does not exceed number within this bounding box (The Loop)
+
+        for neighborhood in neighborhoods:
+            self.assertGreaterEqual(neighborhood['properties']['count'], 1)
+            #print neighborhood['properties']['sec_neigh'], neighborhood['properties']['count']
+
+
 

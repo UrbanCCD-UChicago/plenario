@@ -80,7 +80,8 @@ class BasePlenarioTest(unittest.TestCase):
         # Add a dummy dataset to the metadata without ingesting a shapefile for it
         cls.dummy_name = ShapeMetadata.add(human_name=u'Dummy Name',
                                            source_url=None,
-                                           update_freq='yearly').dataset_name
+                                           update_freq='yearly',
+                                           approved_status=False).dataset_name
         session.commit()
 
         tables_to_drop = [
@@ -106,7 +107,8 @@ class BasePlenarioTest(unittest.TestCase):
         # Add the fixture to the metadata first
         shape_meta = ShapeMetadata.add(human_name=fixture.human_name,
                                        source_url=None,
-                                       update_freq=fixture.update_freq)
+                                       update_freq=fixture.update_freq,
+                                       approved_status=False)
         session.commit()
         # Bypass the celery task and call on a ShapeETL directly
         ShapeETL(meta=shape_meta, source_path=fixture.path).add()

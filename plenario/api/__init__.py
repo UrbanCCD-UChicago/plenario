@@ -3,7 +3,7 @@ from flask import make_response, Blueprint
 from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate
 from common import cache
 from shape import get_all_shape_datasets, find_intersecting_shapes, \
-                    export_shape, filter_shape, filter_point_data_with_polygons
+                    export_shape, filter_shape, aggregate_point_data
 
 from sensor import weather_stations, weather
 
@@ -27,7 +27,8 @@ api.add_url_rule(prefix + '/shapes/intersections/<geojson>', 'shape_intersection
 api.add_url_rule(prefix + '/shapes/<dataset_name>', 'shape_export', export_shape)
 api.add_url_rule(prefix + '/shapes/filter/<dataset_name>/<geojson>', 'shape_filter', filter_shape)
 
-api.add_url_rule(prefix + '/shapes/polygon_filter/<point_dataset_name>/<polygon_dataset_name>', 'polygon_filter', filter_point_data_with_polygons)
+api.add_url_rule(prefix + '/shapes/<polygon_dataset_name>/<point_dataset_name>', 'aggregate', aggregate_point_data)
+
 
 @api.route(prefix + '/flush-cache')
 def flush_cache():
