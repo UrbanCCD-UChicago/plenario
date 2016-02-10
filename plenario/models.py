@@ -20,8 +20,6 @@ from collections import namedtuple
 
 bcrypt = Bcrypt()
 
-PointDataset = namedtuple('PointDataset', 'name date lat lon loc')
-
 
 class MetaTable(Base):
     __tablename__ = 'meta_master'
@@ -130,6 +128,8 @@ class MetaTable(Base):
         return '<MetaTable %r (%r)>' % (self.human_name, self.dataset_name)
 
     def meta_tuple(self):
+        PointDataset = namedtuple('PointDataset', 'name date lat lon loc')
+
         basic_info = PointDataset(name=self.dataset_name,
                                   date=self.observed_date,
                                   lat=self.latitude,
@@ -275,7 +275,7 @@ class MetaTable(Base):
 
 
     # Return select statement to execute or union
-    def timeseries(self, agg_unit, start, end, geom=None):
+    def timeseries(self, agg_unit, start, end, geom=None, column_filters=None):
         # Reading this blog post
         # http://no0p.github.io/postgresql/2014/05/08/timeseries-tips-pg.html
         # inspired this implementation.
@@ -293,11 +293,15 @@ class MetaTable(Base):
         # Create a CTE that grabs the number of records
         # contained in each time bucket.
         # Will only have rows for buckets with records.
+        where_filters = [t.c.point_date >= start,
+                         t.c.point_date <= end]
+        if column_filters:
+            where_filters += column_filters
+
         actuals = select([func.count(t.c.hash).label('count'),
                           func.date_trunc(agg_unit, t.c.point_date).
                          label('time_bucket')])\
-            .where(sa.and_(t.c.point_date >= start,
-                           t.c.point_date <= end))\
+            .where(sa.and_(*where_filters))\
             .group_by('time_bucket')
 
         # Also filter by geometry if requested
@@ -320,8 +324,8 @@ class MetaTable(Base):
 
         return ts
 
-    def timeseries_one(self, agg_unit, start, end, geom=None):
-        ts_select = self.timeseries(agg_unit, start, end, geom)
+    def timeseries_one(self, agg_unit, start, end, geom=None, column_filters=None):
+        ts_select = self.timeseries(agg_unit, start, end, geom, column_filters)
         rows = session.execute(ts_select.order_by('time_bucket'))
 
         header = [['count', 'datetime']]
@@ -335,12 +339,21 @@ class ShapeMetadata(Base):
     dataset_name = Column(String, primary_key=True)
     human_name = Column(String, nullable=False)
     source_url = Column(String)
+    view_url = Column(String)
     date_added = Column(Date, nullable=False)
 
     # Organization that published this dataset
     attribution = Column(String)
     description = Column(Text)
     update_freq = Column(String(100), nullable=False)
+
+    # Who submitted this dataset?
+    contributor_name = Column(String)
+    contributor_organization = Column(String)
+    contributor_email = Column(String)
+
+    # Has an admin signed off on it?
+    approved_status = Column(Boolean)
 
     # We always ingest geometric data as 4326
     bbox = Column(Geometry('POLYGON', srid=4326))
@@ -361,7 +374,8 @@ class ShapeMetadata(Base):
             SELECT meta.*, celery.status
             FROM meta_shape as meta
             LEFT JOIN celery_taskmeta as celery
-            ON celery.task_id = meta.celery_task_id;
+            ON celery.task_id = meta.celery_task_id
+            WHERE meta.approved_status = TRUE;
         '''
 
         return list(session.execute(shape_query))
@@ -400,26 +414,28 @@ class ShapeMetadata(Base):
 
     @classmethod
     def get_by_human_name(cls, human_name):
-        session.query(cls).get(cls.make_table_name(human_name))
+        return session.query(cls).get(cls.make_table_name(human_name))
 
     @classmethod
     def make_table_name(cls, human_name):
         return slugify(human_name)
 
     @classmethod
-    def add(cls, human_name, source_url,
-            attribution=None, description=None, update_freq=None):
+    def add(cls, human_name, source_url, approved_status, **kwargs):
         table_name = ShapeMetadata.make_table_name(human_name)
-        new_shape_dataset = ShapeMetadata(dataset_name=table_name,
-                                          human_name=human_name,
-                                          attribution=attribution,
-                                          description=description,
-                                          update_freq=update_freq,
-                                          is_ingested=False,
-                                          source_url=source_url,
-                                          date_added=datetime.now().date(),
-                                          bbox=None,
-                                          num_shapes=None)
+        new_shape_dataset = ShapeMetadata(
+            # Required params
+            dataset_name=table_name,
+            human_name=human_name,
+            source_url=source_url,
+            approved_status=approved_status,
+            # Params that reflect just-submitted, not yet ingested status.
+            is_ingested=False,
+            bbox=None,
+            num_shapes=None,
+            date_added=datetime.now().date(),
+            # The rest
+            **kwargs)
         session.add(new_shape_dataset)
         return new_shape_dataset
 
@@ -460,6 +476,7 @@ class ShapeMetadata(Base):
 
 def get_uuid():
     return unicode(uuid4())
+
 
 class User(Base):
     __tablename__ = 'plenario_user'

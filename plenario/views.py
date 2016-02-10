@@ -2,7 +2,7 @@ from flask import make_response, request, redirect, url_for, render_template, \
     Blueprint, flash, session as flask_session
 from plenario.models import MetaTable, User, ShapeMetadata
 from plenario.database import session, Base, app_engine as engine
-from plenario.utils.helpers import iter_column, send_mail, slugify
+from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 from plenario.tasks import update_dataset as update_dataset_task, \
     delete_dataset as delete_dataset_task, add_dataset as add_dataset_task, \
     add_shape as add_shape_task, delete_shape as delete_shape_task
@@ -11,16 +11,17 @@ from datetime import datetime, timedelta
 from urlparse import urlparse
 import requests
 from flask_wtf import Form
-from wtforms import TextField, SelectField
+from wtforms import TextField, SelectField, StringField
 from wtforms.validators import DataRequired
 import json
 import re
 from cStringIO import StringIO
-from csvkit.unicsv import UnicodeCSVReader
 from sqlalchemy import Table, text
 import sqlalchemy
 from hashlib import md5
 from sqlalchemy.exc import NoSuchTableError
+from collections import namedtuple
+import itertools
 
 views = Blueprint('views', __name__)
 
@@ -67,6 +68,19 @@ def terms_view():
 # TODO: Catch an email exception and flash email failure
 
 
+@views.route('/admin/approve-shape/<dataset_name>')
+@login_required
+def approve_shape(dataset_name):
+    # Approve it
+    meta = session.query(ShapeMetadata).get(dataset_name)
+    meta.approved_status = True
+    session.commit()
+    # Ingest it
+    add_shape_task.delay(dataset_name)
+    send_approval_email(meta.human_name, meta.contributor_name,
+                        meta.contributor_email)
+
+
 @views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
 @login_required
 def approve_dataset_view(source_url_hash):
@@ -77,11 +91,15 @@ def approve_dataset_view(source_url_hash):
 def approve_dataset(source_url_hash):
     # Approve it
     meta = session.query(MetaTable).get(source_url_hash)
-    meta.approved_status = 'true'
+    meta.approved_status = True
     session.commit()
     # Ingest it
     add_dataset_task.delay(source_url_hash)
+    send_approval_email(meta.human_name, meta.contributor_name,
+                        meta.contributor_email)
 
+
+def send_approval_email(dataset_name, contributor_name, contributor_email):
     # Email the submitter
     msg_body = """Hello %s,\r\n
 \r\n
@@ -93,152 +111,160 @@ It should appear on http://plenar.io within 24 hours.\r\n
 \r\n
 Thank you!\r\n
 The Plenario Team\r\n
-http://plenar.io""" % (meta.contributor_name, meta.human_name)
+http://plenar.io""" % (contributor_name, dataset_name)
 
     send_mail(subject="Your dataset has been added to Plenar.io",
-              recipient=meta.contributor_email, body=msg_body)
+              recipient=contributor_email, body=msg_body)
 
-#
 #
 ''' Submit a dataset (Add it to MetaData
     and try to ingest it now or later.) '''
 #
-#
 
 
-@views.route('/admin/add-dataset/table', methods=['GET', 'POST'])
+@views.route('/admin/add', methods=['GET', 'POST'])
 @login_required
-def add_table():
-    errors = []
-
-    dataset_info, error, url = grab_dataset_details()
-
-    # check if dataset with the same URL has already been loaded
-    dataset_id = md5(url).hexdigest()
-    md = session.query(MetaTable).get(dataset_id)
-    if md:
-        errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
-
-    if request.method == 'POST' and not md:
-        md = add_dataset_to_metatable(url, dataset_info, approved_status=True)
-        add_dataset_task.delay(md.source_url_hash)
-
-        flash('%s added successfully!' % md.human_name, 'success')
-        return redirect(url_for('views.view_datasets'))
-
-    context = {'dataset_info': dataset_info, 'errors': errors,
-               'is_admin': True}
-    return render_template('submit-table.html', **context)
+def admin_add_dataset():
+    user = session.query(User).get(flask_session['user_id'])
+    context = {'is_admin': True,
+               'contributor_name': user.name,
+               'contributor_organization': 'Plenario Admin',
+               'contributor_email': user.email}
+    return add(context)
 
 
-# /contribute is similar to /admin/add-dataset,
-# but sends an email instead of actually adding
-@views.route('/contribute', methods=['GET','POST'])
-def contrib_view():
-    dataset_info = {}
-    errors = []
+@views.route('/add', methods=['GET', 'POST'])
+def user_add_dataset():
+    context = {'is_admin': False}
+    return add(context)
 
-    url = ""
-    md = None
 
-    if request.args.get('dataset_url'):
-        url = request.args.get('dataset_url')
-        dataset_info, errors = get_context_for_new_dataset(url)
-
-        # check if dataset with the same URL has already been loaded
-        dataset_id = md5(url).hexdigest()
-        md = session.query(MetaTable).get(dataset_id)
-        if md:
-            errors.append("A dataset with that URL has already been loaded: '%s'" % md.human_name)
-
-    if request.method == 'POST' and not md:
-        md = add_dataset_to_metatable(url, dataset_info, approved_status=False)
-
-        # email a confirmation to the submitter
-        msg_body = """Hello %s,\r\n\r\n
+def send_submission_email(dataset_name, contributor_name, contributor_email):
+    msg_body = """Hello %s,\r\n\r\n
 We received your recent dataset submission to Plenar.io:\r\n\r\n%s\r\n\r\n
 After we review it, we'll notify you when your data is loaded and available.\r\n\r\n
-Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (request.form.get('contributor_name'), md.human_name)
+Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (contributor_name, dataset_name)
 
-        send_mail(subject="Your dataset has been submitted to Plenar.io",
-                  recipient=request.form.get('contributor_email'),
-                  body=msg_body)
+    send_mail(subject="Your dataset has been submitted to Plenar.io",
+              recipient=contributor_email,
+              body=msg_body)
 
-        return redirect(url_for('views.contrib_thankyou'))
-
-    context = {'dataset_info': dataset_info, 'form': request.form,
-               'errors': errors}
-    return render_template('submit-table.html', **context)
+    return redirect(url_for('views.contrib_thankyou'))
 
 
-@views.route('/admin/add-shape', methods=['GET', 'POST'])
-@login_required
-def add_shape():
-    errors = []
-    dataset_info, error, url = \
-        grab_dataset_details(is_shapefile=True)
+def render_with_context(context):
+    if context['is_shapefile']:
+        return render_template('submit-shape.html', **context)
+    else:
+        return render_template('submit-table.html', **context)
 
+
+def add(context):
+    # If is_shapefile query arg is present and not 'false', display shape form.
+    shape_arg = request.args.get('is_shapefile', 'false')
+    context['is_shapefile'] = shape_arg != 'false'
+
+    # Step 1: User looking at page for the first time
+    if request.method == 'GET' and not request.args.get('dataset_url'):
+        return render_with_context(context)
+
+    # Step 2: User suggested a URL for a dataset
+    if request.method == 'GET':
+        return suggest(context)
+
+    # Step 3: User POSTed all the submission data
+    #          and made it past frontend validation
     if request.method == 'POST':
-        try:
-            human_name = request.form['dataset_name']
-            source_url = dataset_info['source_url']
-            attribution = request.form.get('dataset_attribution')
-            description = request.form.get('dataset_description')
-            update_freq = request.form['update_frequency']
-        except KeyError:
-            # A required field slipped by frontend validation.
-            # Re-render with error message
-            errors.append('A required field was not submitted.')
+        return submit(context)
+
+
+def submit(context):
+    form = request.form
+    is_shapefile = context['is_shapefile']
+    is_admin = context['is_admin']
+
+    try:  # Store the metadata
+        if is_shapefile:
+            if shape_already_submitted(form['dataset_name']):
+                msg = 'A Shapefile with this name has already been submitted'
+                raise RuntimeError(msg)
+            else:
+                meta = shape_meta_from_submit_form(form, is_approved=is_admin)
         else:
-            # Does a shape dataset with this human_name already exist?
-            if ShapeMetadata.get_by_human_name(human_name=human_name):
-                errors.append('A shape dataset with that name already exists.')
-
-        if not errors:
-            # Add the metadata right away
-            meta = ShapeMetadata.add(human_name=human_name,
-                                     source_url=source_url,
-                                     attribution=attribution,
-                                     description=description,
-                                     update_freq=update_freq)
-            session.commit()
-
-            # And tell a worker to go ingest it
-            add_shape_task.delay(table_name=meta.dataset_name)
-
-            flash('Plenario is now trying to ingest your shapefile.', 'success')
-            return redirect(url_for('views.view_datasets'))
-
-    context = {'dataset_info': dataset_info, 'errors': errors,
-               'is_admin': True}
-    return render_template('submit-shape.html', **context)
+            meta = point_meta_from_submit_form(form, is_approved=is_admin)
+    except RuntimeError as e:
+        context['error_msg'] = e.message
+        return render_with_context(context)
+    else:
+        # Successfully stored the metadata
+        # Now fire ingestion task...
+        if is_admin:
+            if is_shapefile:
+                add_shape_task.delay(meta.dataset_name)
+            else:
+                add_dataset_task.delay(meta.source_url_hash)
+        # or send thankyou email
+        else:
+            return send_submission_email(meta.human_name,
+                                         meta.contributor_name,
+                                         meta.contributor_email)
+        return view_datasets()
 
 
-def grab_dataset_details(is_shapefile=False):
+def suggest(context):
+    is_shapefile = context['is_shapefile']
+    is_csv = not is_shapefile
+    suggested_url = request.args.get('dataset_url')
+    try:
+        suggestion = process_suggestion(suggested_url, is_shapefile)
+        if is_csv and csv_already_submitted(suggestion.file_url):
+            msg = 'A CSV at this url has already been submitted'
+            raise RuntimeError(msg)
+    except RuntimeError as e:
+        # Something was jank with that suggestion.
+        context['error_msg'] = e.message
+        return render_with_context(context)
+    else:
+        # Merge exsting context into new context so that no values
+        # from the suggestion overwrite existing values
+        suggestion_context = context_from_suggestion(suggestion)
+        suggestion_context.update(context)
+        return render_with_context(suggestion_context)
+
+''' Submission helpers '''
+
+
+def form_columns(form):
     """
-    Supplements dataset_info from source with contributor information
-    from the session
-    when an administrator submits a dataset
-    :param is_shapefile:
-    :return: (dataset_info, errors, url)
+    :param form: Taken from requests.form
+    :return: columns: list of slugified column names
+             labels: dict mapping string labels of special column types
+             (observed_date, latitude, longitude, location)
+             to names of columns
     """
-    dataset_info = {}
-    errors = []
-    url = ""
 
-    if request.args.get('dataset_url'):
-        url = request.args.get('dataset_url')
-        dataset_info, errors = get_context_for_new_dataset(url, is_shapefile)
+    labels = {}
+    columns = []
+    for k, v in form.iteritems():
+        if k.startswith('col_name_'):
+            # key_type_observed_date
+            key = k.replace("col_name_", "")
+            columns.append(key)
+            # e.g labels['observed_date'] = 'date'
+            labels[v] = key
+    return columns, labels
 
-        # populate contributor info from session
-        user = session.query(User).get(flask_session['user_id'])
-        dataset_info['contributor_name'] = user.name
-        dataset_info['contributor_organization'] = 'Plenario Admin'
-        dataset_info['contributor_email'] = user.email
 
-        dataset_info['is_shapefile'] = is_shapefile
+def csv_already_submitted(url):
+    hash = md5(url).hexdigest()
+    return session.query(MetaTable).get(hash) is not None
 
-    return dataset_info, errors, url
+
+def shape_already_submitted(name):
+    shape = ShapeMetadata.get_by_human_name(name)
+    print shape, shape is not None
+
+    return shape is not None
 
 
 @views.route('/contribute-thankyou')
@@ -252,38 +278,23 @@ def contrib_thankyou():
     taken from the source URL.'''
 
 
-def add_dataset_to_metatable(url, dataset_info, approved_status):
-    """
-    Called during request cycles with form guaranteed to have
-    the fields used below.
-    Derives a MetaTable object from the form and adds it to the DB.
-    :param url: Download url
-    :param dataset_info: Big dict with lots of metadata
-                         We only care about a tiny subset of it here.
-    :param approved_status: Whether this dataset should be viewable
-    :return: MetaTable instance that was persisted to DB.
-    """
-
-    labels = extract_form_labels(request.form)
-    name = slugify(request.form.get('dataset_name'), delim=u'_')[:50]
-    column_names = extract_column_names(dataset_info)
-    try:
-        # Is there another url we should be using
-        url = dataset_info['source_url']
-    except KeyError:
-        pass
+def point_meta_from_submit_form(form, is_approved):
+    column_names, labels = form_columns(form)
+    name = slugify(form['dataset_name'], delim=u'_')[:50]
 
     md = MetaTable(
-        url=url,
+        url=form['file_url'],
+        view_url=form.get('view_url'),
         dataset_name=name,
-        human_name=request.form.get('dataset_name'),
-        attribution=request.form.get('dataset_attribution'),
-        description=request.form.get('dataset_description'),
-        contributor_name=request.form.get('contributor_name'),
-        contributor_organization=request.form.get('contributor_organization'),
-        contributor_email=request.form.get('contributor_email'),
-        approved_status=approved_status,
-        observed_date=labels.get('observed_date', None),
+        human_name=form['dataset_name'],
+        attribution=form.get('dataset_attribution'),
+        description=form.get('dataset_description'),
+        update_freq=form['update_frequency'],
+        contributor_name=form['contributor_name'],
+        contributor_organization=form.get('contributor_organization'),
+        contributor_email=form['contributor_email'],
+        approved_status=is_approved,
+        observed_date=labels['observed_date'],
         latitude=labels.get('latitude', None),
         longitude=labels.get('longitude', None),
         location=labels.get('location', None),
@@ -294,201 +305,243 @@ def add_dataset_to_metatable(url, dataset_info, approved_status):
     return md
 
 
-def extract_column_names(dataset_info):
-    return [slugify(col['human_name'], '_') for col in dataset_info['columns']]
+def shape_meta_from_submit_form(form, is_approved):
+
+    md = ShapeMetadata.add(
+        human_name=form['dataset_name'],
+        source_url=form['file_url'],
+        view_url=form.get('view_url'),
+        attribution=form.get('dataset_attribution'),
+        description=form.get('dataset_description'),
+        update_freq=form['update_frequency'],
+        contributor_name=form['contributor_name'],
+        contributor_organization=form.get('contributor_organization'),
+        contributor_email=form['contributor_email'],
+        approved_status=is_approved)
+    session.commit()
+    return md
 
 
-def extract_form_labels(form):
-    """
-    :param form: Taken from requests.form
-    :return: dict mapping string labels of special column types
-             (observed_date, latitude, longitude, location)
-             to names of columns
-    """
-    labels = {}
-    for k, v in form.iteritems():
-        if k.startswith('key_type_'):
-            # key_type_observed_date
-            key = k.replace("key_type_", "")
-            # e.g labels['observed_date'] = 'date'
-            labels[v] = key
-    return labels
-
-''' Terrifying functions that fetch dataset metadata.'''
+'''Suggestion helpers.'''
 
 
-def get_socrata_data_info(host, path, four_by_four, is_shapefile=False):
-    """
+ColumnMeta = namedtuple('ColumnMeta', 'name type_ description')
+DescriptionMeta = namedtuple("DescriptionMeta",
+                             'human_name attribution description')
+ContributorMeta = namedtuple('ContributorMeta', 'name organization email')
 
-    :param host:
-    :param path:
-    :param four_by_four: Socrata unique ID like abcd-efgh
-    :param is_shapefile: Is this an endpoint of an ESRI shapefile?
-    :return: (dataset_info, errors, status_code)
-            dataset_info is a big dict with all of Socrata's metadata
-            errors is a list of strings indicating errors encountered
-            status_code is the HTTP status code of a failed request
-    """
-    errors = []
-    status_code = None
-    dataset_info = {}
-    print host, path, four_by_four
-    view_url = '%s/%s/%s' % (host, path, four_by_four)
 
-    if is_shapefile:
-        source_url = '%s/download/%s/application/zip' % (host, four_by_four)
+def _assert_reachable(url):
+    try:
+        resp = requests.head(url)
+        assert resp.status_code != 404
+    except:
+        raise RuntimeError('Could not reach URL ' + url)
+
+
+def is_certainly_html(url):
+    head = requests.head(url)
+    if head.status_code != 200:
+        return False
     else:
-        source_url = '%s/rows.csv?accessType=DOWNLOAD' % view_url
-
-    try:
-        r = requests.get(view_url)
-        status_code = r.status_code
-    except requests.exceptions.InvalidURL:
-        errors.append('Invalid URL')
-    except requests.exceptions.ConnectionError:
-        errors.append('URL can not be reached')
-    try:
-        resp = r.json()
-    except AttributeError:
-        errors.append('No Socrata views endpoint available for this dataset')
-        resp = None
-    except ValueError:
-        errors.append('The Socrata dataset you supplied is not available currently')
-        resp = None
-    if resp:
-        dataset_info = {
-            'name': resp['name'],
-            'description': resp.get('description'),
-            'attribution': resp.get('attribution'),
-            'columns': [],
-            'view_url': view_url,
-            'source_url': source_url
-        }
         try:
-            dataset_info['update_freq'] = \
-                resp['metadata']['custom_fields']['Metadata']['Update Frequency']
+            return 'text/html' in head.headers['content-type']
         except KeyError:
-            dataset_info['update_freq'] = None
+            # No content-type? Bummer.
+            return False
 
-        columns = resp.get('columns') #presence of columns implies table file
-        if columns:
-            for column in columns:
-                d = {
-                    'human_name': column['name'],
-                    'machine_name': column['fieldName'],
-                    #'field_name': column['fieldName'], # duplicate definition for code compatibility
-                    #'field_name': column['name'], # duplicate definition for code compatibility
-                    'field_name': slugify(column['name']), # duplicate definition for code compatibility
-                    'data_type': column['dataTypeName'],
-                    'description': column.get('description', ''),
-                    'width': column['width'],
-                    'sample_values': [],
-                    'smallest': '',
-                    'largest': '',
-                }
 
-                if column.get('cachedContents'):
-                    cached = column['cachedContents']
-                    if cached.get('top'):
-                        d['sample_values'] = \
-                            [c['item'] for c in cached['top']][:5]
-                    if cached.get('smallest'):
-                        d['smallest'] = cached['smallest']
-                    if cached.get('largest'):
-                        d['largest'] = cached['largest']
-                    if cached.get('null'):
-                        if cached['null'] > 0:
-                            d['null_values'] = True
-                        else:
-                            d['null_values'] = False
-                dataset_info['columns'].append(d)
+def context_from_suggestion(suggestion):
+    # Start with the attributes guaranteed to be present
+    context = {
+        'submitted_url': suggestion.submitted_url,
+        'file_url': suggestion.file_url,
+        'view_url': suggestion.view_url,
+        'columns': suggestion.columns
+    }
+    # If this suggestion has column info (read: is for a CSV),
+    # then put those tuples in dict form.
+    if context['columns']:
+        context['columns'] = [col._asdict() for col in context['columns']]
+
+    # Get what metadata we can glean
+    try:
+        context.update(suggestion.description_meta._asdict())
+    except AttributeError:
+        context.update(DescriptionMeta(None, None, '')._asdict())
+
+    return context
+
+
+def process_suggestion(url, is_shapefile=False):
+    _assert_reachable(url)
+    if SocrataSuggestion.is_socrata_url(url):
+        suggestion = SocrataSuggestion(url, is_shapefile)
+    else:
+        suggestion = GenericSuggestion(url, is_shapefile)
+    return suggestion
+
+
+class GenericSuggestion(object):
+    def __init__(self, url, is_shapefile=False):
+        if is_certainly_html(url):
+            raise RuntimeError('URL must point directly to a CSV or Shapefile')
+        self.file_url = url
+        self.submitted_url = url
+        self.view_url = None
+        self.columns = (None if is_shapefile else self._infer_columns())
+
+    def _infer_columns(self):
+        r = requests.get(self.file_url, stream=True)
+        inp = StringIO()
+
+        head = itertools.islice(r.iter_lines(), 1000)
+        for line in head:
+            inp.write(line + '\n')
+        inp.seek(0)
+        column_info = infer_csv_columns(inp)
+
+        return [ColumnMeta(name, type_.__visit_name__.lower(), '')
+                for name, type_, _ in column_info]
+
+
+class SocrataSuggestion(object):
+    """
+    All the metadata we can derive from a Socrata 4x4.
+    Includes attribution and description.
+    Can also derive url of file
+    given a url to a UI page describing that file.
+
+    Throws an exception if either the given url or derived url
+    does not point to a file of the right type.
+    """
+
+    def __init__(self, url, is_shapefile=False):
+        self.four_by_four = self._extract_four_by_four(url)
+        self._metadata = None
+        self._is_shapefile = is_shapefile
+
+        if self.four_by_four is None:
+            msg = 'URLs to Socrata datasets must contain a 4x4 id'
+            raise RuntimeError(msg)
+        self.submitted_url = url
+
+        self.description_meta = self.derive_description_meta()
+        self.view_url, self.file_url = self._derive_urls()
+
+        self.columns = (None if is_shapefile else self._derive_columns())
+
+    def _derive_columns(self):
+        return [ColumnMeta(c['name'],
+                           c['dataTypeName'],
+                           c.get('description', None))
+                for c in self.metadata['columns']]
+
+    def _derive_urls(self):
+        view_url = self._derive_view_url()
+        file_url = self._derive_file_url(view_url)
+        return view_url, file_url
+
+    def _derive_view_url(self):
+        """
+        Try the "standard" url formats that we can construct
+        with the submitted URL.
+        """
+        # CSV case
+        if not self._is_shapefile:
+            return '{}/api/views/{}/rows'.format(self.url_prefix(),
+                                                 self.four_by_four)
+        # Shapefile case
+        if is_certainly_html(self.submitted_url):
+            # If the user pointed us to HTML, use that.
+            return self.submitted_url
         else:
-            if not is_shapefile:
-                errors.append('Views endpoint not structured as expected')
-    return dataset_info, errors, status_code
+            # Don't know of a consistent way to derive
+            # an HTML view of a Socrata shape dataset. :(
+            return None
 
+    def _derive_file_url(self, view_url):
+        if self._is_shapefile:
+            return self._shapefile_file_url()
+        else:
+            # Assumes view_url is of the format '{}/api/views/{}/rows'
+            return '%s.csv?accessType=DOWNLOAD' % view_url
 
-def extract_four_by_four(url):
-    """
-    Return last string fragment matching Socrata 4x4 pattern
-    :param url: URL that could contain a 4x4
-    :return: 9 character string or None if couldn't find 4x4
-    """
-    url = url.strip(' \t\n\r') # strip whitespace, tabs, etc
-    matches = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
-    if matches:
-        return matches[-1]
-    else:
-        return None
+    def _shapefile_file_url(self):
+        # I noticed that if Socrata displays the shape as a map,
+        # we can usually download through the geospatial API.
+        # When it doesn't display the map,
+        # we can download with /application/zip
+        # This heuristic tends to work,
+        # but a more robust way might be drilling into
+        # metadata['metadata'] and seeing if there's a 'geo' key there
+        # that denotes the geospatial API is enabled.
 
+        blob_url = '{}/download/{}/application/zip'\
+            .format(self.url_prefix(), self.four_by_four)
+        map_url = '{}/api/geospatial/{}?method=export&format=Shapefile'.\
+            format(self.url_prefix(), self.four_by_four)
+        try:
+            display_type = self.metadata['displayType']
+        except KeyError:
+            # No display_type means it's definitely a blob.
+            return blob_url
+        else:
+            # Or maybe we were told it's a blob.
+            return blob_url if display_type == 'blob' else map_url
 
-def get_context_for_new_dataset(url, is_shapefile=False):
-    """
-    :param url:
-    :param is_shapefile: A
-    :return: a tuple (dataset_info, errors)
-    """
-    dataset_info = {}
-    errors = []
-    if url:
-        four_by_four = extract_four_by_four(url)
-        errors = True
-        if four_by_four:
-            parsed = urlparse(url)
-            host = 'https://%s' % parsed.netloc
-            path = 'api/views'
+    def url_prefix(self):
+        parsed = urlparse(self.submitted_url)
+        if not parsed.scheme:
+            raise RuntimeError('URL missing protocol (like https://)')
 
-            dataset_info, errors, status_code = get_socrata_data_info(host, path, four_by_four, is_shapefile)
-            if not errors:
-                dataset_info['submitted_url'] = url
-        if errors:
-            errors = []
-            try:
-                r = requests.get(url, stream=True)
-                status_code = r.status_code
-            except requests.exceptions.InvalidURL:
-                errors.append('Invalid URL')
-            except requests.exceptions.ConnectionError:
-                errors.append('URL can not be reached')
-            if status_code != 200:
-                errors.append('URL returns a %s status code' % status_code)
-            if not errors:
-                dataset_info['submitted_url'] = url
-                dataset_info['source_url'] = url
-                dataset_info['name'] = urlparse(url).path.split('/')[-1]
+        prefix = parsed.scheme + '://' + parsed.netloc
+        return prefix
 
-                # Don't try to read shapefiles like a CSV
-                if is_shapefile:
-                    return dataset_info, errors
+    def derive_description_meta(self):
+        # Grab from correct JSON fields
+        description = self.metadata['description']
+        human_name = self.metadata['name']
+        attribution = self.metadata['attribution']
 
-                inp = StringIO()
-                line_no = 0
+        return DescriptionMeta(description=description,
+                               human_name=human_name,
+                               attribution=attribution)
 
-                for line in r.iter_lines():
-                    try:
-                        inp.write(line + '\n')
-                        line_no += 1
-                        if line_no > 1000:
-                            raise StopIteration
-                    except StopIteration:
-                        break
-                inp.seek(0)
-                reader = UnicodeCSVReader(inp)
-                header = reader.next()
-                col_types = []
-                inp.seek(0)
-                for col in range(len(header)):
-                    col_types.append(iter_column(col, inp)[0])
-                dataset_info['columns'] = []
-                for idx, col in enumerate(col_types):
-                    d = {
-                        'human_name': header[idx],
-                        'data_type': col.__visit_name__.lower()
-                    }
-                    dataset_info['columns'].append(d)
-    else:
-        errors.append('Need a URL')
-    return dataset_info, errors
+    @property
+    def metadata(self):
+        """
+        Dictionary of metadata pulled straight from the Socrata API
+        """
+        if self._metadata:
+            return self._metadata
+
+        # Construct for the first time
+        prefix = self.url_prefix()
+        metadata_endpoint = '{}/api/views/{}'.format(prefix, self.four_by_four)
+        resp = requests.get(metadata_endpoint)
+        self._metadata = resp.json()
+        return self._metadata
+
+    @staticmethod
+    def _extract_four_by_four(url):
+        """
+        Return last string fragment matching Socrata 4x4 pattern
+        :param url: URL from which to extract Socrata 4x4 id.
+        :type url: str
+        :return: 4x4 string like abc1-d2ef if found
+                 else None
+        """
+        url = url.strip(' \t\n\r')  # strip whitespace, tabs, etc
+        matches = re.findall(r'/([a-z0-9]{4}-[a-z0-9]{4})', url)
+        if matches:
+            return matches[-1]
+        else:
+            return None
+
+    @classmethod
+    def is_socrata_url(cls, url):
+        return cls._extract_four_by_four(url) is not None
 
 
 ''' Monitoring and editing point datasets '''
@@ -497,9 +550,13 @@ def get_context_for_new_dataset(url, is_shapefile=False):
 @views.route('/admin/view-datasets')
 @login_required
 def view_datasets():
-    datasets_pending = session.query(MetaTable)\
-        .filter(MetaTable.approved_status != True)\
-        .all()
+    datasets_pending = session.query(MetaTable).\
+        filter(MetaTable.approved_status != True).\
+        all()
+
+    shapes_pending = session.query(ShapeMetadata).\
+        filter(ShapeMetadata.approved_status != True).\
+        all()
 
     try:
         q = text(''' 
@@ -529,6 +586,7 @@ def view_datasets():
 
     return render_template('admin/view-datasets.html',
                            datasets_pending=datasets_pending,
+                           shapes_pending=shapes_pending,
                            datasets=datasets,
                            shape_datasets=shape_datasets)
 
@@ -585,6 +643,54 @@ def dataset_status():
             d['date_done'] = result.date_done.strftime('%B %d, %Y %H:%M'),
         r.append(d)
     return render_template('admin/dataset-status.html', results=r, name=name)
+
+
+class EditShapeForm(Form):
+    human_name = StringField('human_name', validators=[DataRequired()])
+    description = StringField('description', validators=[DataRequired()])
+    attribution = StringField('attribution', validators=[DataRequired()])
+    update_freq = SelectField('update_freq',
+                              choices=[('daily', 'Daily'),
+                                       ('weekly', 'Weekly'),
+                                       ('monthly', 'Monthly'),
+                                       ('yearly', 'Yearly')],
+                              validators=[DataRequired()])
+
+    def validate(self):
+        return Form.validate(self)
+
+
+@views.route('/admin/edit-shape/<dataset_name>', methods=['GET', 'POST'])
+@login_required
+def edit_shape(dataset_name):
+    form = EditShapeForm()
+    meta = session.query(ShapeMetadata).get(dataset_name)
+
+    if form.validate_on_submit():
+        upd = {
+            'human_name': form.human_name.data,
+            'description': form.description.data,
+            'attribution': form.attribution.data,
+            'update_freq': form.update_freq.data,
+        }
+        session.query(ShapeMetadata)\
+            .filter(ShapeMetadata.dataset_name == meta.dataset_name)\
+            .update(upd)
+        session.commit()
+
+        if not meta.approved_status:
+            approve_shape(dataset_name)
+
+        flash('%s updated successfully!' % meta.human_name, 'success')
+        return redirect(url_for('views.view_datasets'))
+    else:
+        pass
+
+    context = {
+        'form': form,
+        'meta': meta,
+    }
+    return render_template('admin/edit-shape.html', **context)
 
 
 class EditDatasetForm(Form):
@@ -718,7 +824,7 @@ def check_update(task_id):
 @views.route('/admin/shape-status/')
 @login_required
 def shape_status():
-    table_name = request.args['table_name']
+    table_name = request.args['dataset_name']
     shape_meta = ShapeMetadata.get_metadata_with_etl_result(table_name)
     return render_template('admin/shape-status.html', shape=shape_meta)
 

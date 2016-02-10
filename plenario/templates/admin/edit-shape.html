@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% block title %}Edit datasets - {{ meta.human_name }}{% endblock %}
+{% block extra_styles %}
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
+{% endblock %}
+{% block content %}
+    <p><a href='{{ url_for('views.view_datasets') }}'>&laquo; view datasets</a></p>
+    <h1>{{ meta.human_name }}</h1>
+
+    {% if meta.approved_status %}
+        <ul class="nav nav-tabs">
+          <li role="presentation" class="active"><a href="{{ url_for('views.edit_shape', dataset_name=meta.dataset_name) }}"><i class='fa fa-edit'></i> Edit metadata</a></li>
+          <li role="presentation"><a href="{{ url_for('views.shape_status', dataset_name=meta.dataset_name) }}"><i class='fa fa-database'></i> ETL status</a></li>
+          <li role="presentation"><a href="/explore#shapeDetail/dataset_name={{meta.dataset_name}}" target='_blank'><i class='fa fa-globe'></i> Public view (Explore)</a></li>
+        </ul>
+    {% endif %}
+    <div class='row'>
+        <div class='col-sm-8'>
+            <table class='table'>
+                <tbody>
+                    <tr>
+                        <td><strong>Source</strong></td>
+                        <td id="source_url">{{ meta.source_url }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Table name</strong></td>
+                        <td>{{ meta.dataset_name }}</td>
+                    </tr>
+                    <tr>
+                    {% if meta.contributor_email %}
+                        <td><strong>Contributor</strong></td>
+                        <td>{{ meta.contributor_name }} (<i>{{ meta.contributor_email }}</i>) / {{ meta.contributor_organization }}</td>
+                    {% else %}
+                        <td><strong>Contributor</td>
+                        <td>No contributor info</strong></td>
+                    {% endif %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h2>Edit metadata</h2>
+    <form role="form" method="POST">
+        {{ form.csrf_token }}
+        <div class="row">
+            <div class="col-sm-6">
+                {% if form.human_name.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_human_name">Human Name</label>
+                    <input type="text" class="form-control" id="id_human_name" name="human_name" value="{{ meta.human_name }}"/>
+                    {% if form.human_name.errors %}
+                        {% for error in form.human_name.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-sm-3">
+                {% if form.attribution.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_attribution">Attribution</label>
+                    <input type="text" class="form-control" id="id_attribution" name="attribution" value="{{ meta.attribution }}"/>
+                    {% if form.attribution.errors %}
+                        {% for error in form.attribution.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-sm-3">
+                {% if form.update_freq.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_update_freq">Update Frequency</label>
+                    <select id="id_update_freq" class="form-control" name="update_freq" autocomplete=off>
+                        {% for value, name in form.update_freq.choices %}
+                            {% if value == meta.update_freq %}
+                                <option selected="selected" value="{{ value }}">{{name}}</option>
+                            {% else %}
+                                <option value="{{ value }}">{{name}}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    {% if form.update_freq.errors %}
+                        {% for error in form.update_freq.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-12">
+                {% if form.description.errors %}
+                <div class="form-group has-error has-feedback">
+                {% else %}
+                <div class="form-group">
+                {% endif %}
+                    <label for="id_description">Description</label>
+                    <textarea rows="5" class="form-control" id="id_description" name="description">{{ meta.description }}</textarea>
+                    {% if form.description.errors %}
+                        {% for error in form.description.errors %}
+                            <span class="help-block"><i class="fa fa-exclamation"> </i> {{error}}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% if not meta.approved_status %}
+            <button type="submit" class="btn btn-success"><i class='fa fa-check'></i> Approve</button>
+        {% else %}
+            <button type="submit" class="btn btn-success">Save</button>
+        {% endif %}
+        <button type="button" data-toggle="modal" data-target="#confirm-modal" class="btn btn-link"><i class='fa fa-times'></i> Delete dataset</button>
+    </form>
+    <div id="confirm-modal" class="modal fade">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+            <h4 class="modal-title">Are you sure you want to delete the dataset {{meta.human_name}} ?</h4>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" data-dismiss="modal" id="delete" data-name="{{meta.dataset_name}}"><i class='fa fa-times'></i> Delete</button>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+  </div><!-- /.modal -->
+{% endblock content %}
+{% block extra_javascript %}
+  <script type="text/javascript">
+        $(document).ready(function(){
+            $('#delete').on('click', function(e){
+                var name = $(this).data('name');
+                console.log(name);
+                $.getJSON('/admin/delete-shape/' + name, {}, function(resp){
+    	            // Slight hack: reload the view-datasets page after waiting for a couple seconds.
+     	            setTimeout( function(){
+                            window.location = "/admin/view-datasets/?" +new Date().getTime();
+                        }, 2500 );
+                })
+            });
+        })
+    </script>
+{% endblock %}

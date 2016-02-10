@@ -1,21 +1,19 @@
-import requests
 import re
 from unicodedata import normalize
-import calendar
 import string
-from datetime import timedelta
 from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
 from flask_mail import Mail, Message
 from plenario.settings import MAIL_DISPLAY_NAME, MAIL_USERNAME, ADMIN_EMAIL
 from smtplib import SMTPAuthenticationError
 import math
+from collections import namedtuple
 
 mail = Mail()
 
 
 def get_size_in_degrees(meters, latitude):
-    earth_circumference = 40041000.0 # meters, average circumference
+    earth_circumference = 40041000.0  # meters, average circumference
     degrees_per_meter = 360.0 / earth_circumference
 
     degrees_at_equator = meters * degrees_per_meter
@@ -26,6 +24,25 @@ def get_size_in_degrees(meters, latitude):
     degrees_y = degrees_at_equator
 
     return degrees_x, degrees_y
+
+ColumnInfo = namedtuple('ColumnInfo', 'name type_ has_nulls')
+
+
+def infer_csv_columns(inp):
+    """
+
+    :param inp: File handle to a CSV dataset
+                that we can throw into a UnicodeCSVReader
+    :return: List of `ColumnInfo`s
+    """
+    reader = UnicodeCSVReader(inp)
+    header = reader.next()
+    inp.seek(0)
+    iter_output = [iter_column(col_idx, inp)
+                   for col_idx in range(len(header))]
+
+    return [ColumnInfo(name, type_, has_nulls)
+            for name, (type_, has_nulls) in zip(header, iter_output)]
 
 
 def iter_column(idx, f):

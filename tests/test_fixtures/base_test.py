@@ -1,29 +1,19 @@
-import json
 import os
-import unittest
-import urllib
-import zipfile
-import csv
-from StringIO import StringIO
 
 import unittest
 
-from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta, flu_path, landmarks_path, \
-    crime_meta, crime_path
+from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta, \
+    flu_path, landmarks_path, crime_meta, crime_path
 from plenario.models import MetaTable
-from plenario.database import session
 from plenario.etl.point import PlenarioETL
 
 from init_db import init_meta
 from plenario import create_app
-from plenario.database import session, app_engine as engine
+from plenario.database import session
 from plenario.etl.shape import ShapeETL
 from plenario.models import ShapeMetadata
-from plenario.utils.shapefile import Shapefile
 
 pwd = os.path.dirname(os.path.realpath(__file__))
-#fixtures_path = os.path.join(pwd, 'test_fixtures')
-#FIXTURE_PATH = os.path.join(pwd, 'test_fixtures')
 
 fixtures_path = pwd
 FIXTURE_PATH = pwd
@@ -43,6 +33,7 @@ def drop_tables(table_names):
     session.execute(command)
     session.commit()
 
+
 class Fixture(object):
     def __init__(self, human_name, file_name):
         self.human_name = human_name
@@ -58,8 +49,11 @@ fixtures = {
     'zips': Fixture(human_name=u'Zip Codes',
                     file_name='chicago_zip_codes.zip'),
     'neighborhoods': Fixture(human_name=u'Chicago Neighborhoods',
-                             file_name='chicago_neighborhoods.zip')
+                             file_name='chicago_neighborhoods.zip'),
+    'changed_neighborhoods': Fixture(human_name=u'Chicago Neighborhoods',
+        file_name='chicago_neighborhoods_changed.zip',)
 }
+
 
 class BasePlenarioTest(unittest.TestCase):
 
@@ -67,8 +61,8 @@ class BasePlenarioTest(unittest.TestCase):
     def setUpClass(cls, shutdown=False):
 
         # Remove tables that we're about to recreate.
-        # This doesn't happen in teardown
-        # because I find it helpful to inspect them in the DB after running the tests.
+        # This doesn't happen in teardown because I find it helpful
+        # to inspect them in the DB after running the tests.
         meta_table_names = ['meta_shape']
         fixture_table_names = [fixture.table_name for key, fixture in fixtures.iteritems()]
 
@@ -86,7 +80,8 @@ class BasePlenarioTest(unittest.TestCase):
         # Add a dummy dataset to the metadata without ingesting a shapefile for it
         cls.dummy_name = ShapeMetadata.add(human_name=u'Dummy Name',
                                            source_url=None,
-                                           update_freq='yearly').dataset_name
+                                           update_freq='yearly',
+                                           approved_status=False).dataset_name
         session.commit()
 
         tables_to_drop = [
@@ -112,9 +107,10 @@ class BasePlenarioTest(unittest.TestCase):
         # Add the fixture to the metadata first
         shape_meta = ShapeMetadata.add(human_name=fixture.human_name,
                                        source_url=None,
-                                       update_freq=fixture.update_freq)
+                                       update_freq=fixture.update_freq,
+                                       approved_status=False)
         session.commit()
         # Bypass the celery task and call on a ShapeETL directly
-        ShapeETL(meta=shape_meta, source_path=fixture.path).ingest()
+        ShapeETL(meta=shape_meta, source_path=fixture.path).add()
         return shape_meta
 

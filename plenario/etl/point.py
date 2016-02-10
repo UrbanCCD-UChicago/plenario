@@ -1,14 +1,12 @@
-from plenario.etl.common import ETLFile
+from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError,\
+    delete_absent_hashes
 from csvkit.unicsv import UnicodeCSVReader
 from sqlalchemy.exc import NoSuchTableError
 from plenario.database import app_engine as engine, session
 from plenario.utils.helpers import iter_column, slugify
-from sqlalchemy import Boolean, Integer, BigInteger, Float, String, Date, TIME,\
-    TIMESTAMP, Text, Table, Column, MetaData
-from sqlalchemy import select, func, text
-from sqlalchemy.sql import column
+from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
+from sqlalchemy import select, func
 from geoalchemy2 import Geometry
-from plenario.etl.common import PlenarioETLError
 
 
 class PlenarioETL(object):
@@ -41,7 +39,7 @@ class PlenarioETL(object):
         existing_table = self.metadata.point_table
         with self.staging_table as s_table:
             staging = s_table.table
-            delete(staging.name, existing_table.name)
+            delete_absent_hashes(staging.name, existing_table.name)
             with Update(staging, self.dataset, existing_table) as new_records:
                 new_records.insert()
         update_meta(self.metadata, existing_table)
@@ -92,7 +90,7 @@ class Staging(object):
             # Grab the handle to build a table from the CSV
             try:
                 self.table = self._make_table(helper.handle)
-                self._add_unique_hash(self.table.name)
+                add_unique_hash(self.table.name)
                 self.table = Table(self.name, MetaData(),
                                    autoload_with=engine, extend_existing=True)
                 return self
@@ -100,7 +98,8 @@ class Staging(object):
                 raise PlenarioETLError(e)
 
     def _drop(self):
-        engine.execute("DROP TABLE IF EXISTS {};".format('s_' + self.dataset.name))
+        engine.execute("DROP TABLE IF EXISTS {};"
+                       .format('s_' + self.dataset.name))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
@@ -125,7 +124,8 @@ class Staging(object):
 
         # Fill in the columns we expect from the CSV.
         names = [c.name for c in self.cols]
-        copy_st = "COPY {t_name} ({cols}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')".\
+        copy_st = "COPY {t_name} ({cols}) FROM STDIN " \
+                  "WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')".\
             format(t_name=self.name, cols=', '.join(names))
 
         # In order to issue a COPY, we need to drop down to the psycopg2 DBAPI.
@@ -135,12 +135,13 @@ class Staging(object):
                 cursor.copy_expert(copy_st, f)
                 conn.commit()
                 return table
-        except Exception as e:  # When the bulk copy fails on _any_ row, roll back the entire operation.
+        except Exception as e:
+            # When the bulk copy fails on _any_ row,
+            # roll back the entire operation.
             raise PlenarioETLError(e)
         finally:
             conn.close()
 
-    @staticmethod
     def _add_unique_hash(table_name):
         """
         Adds an md5 hash column of the preexisting columns
@@ -161,7 +162,8 @@ class Staging(object):
         try:
             engine.execute(add_hash)
         except Exception as e:
-            raise PlenarioETLError(repr(e) + '\n Failed to deduplicate with ' + add_hash)
+            raise PlenarioETLError(repr(e) +
+                                   '\n Failed to deduplicate with ' + add_hash)
 
     '''Utility methods to generate columns
     into which we can dump the CSV data.'''
@@ -173,8 +175,10 @@ class Staging(object):
         """
         ingested_cols = column_info
         # Don't include the geom and point_date columns.
-        # They're derived from the source data and won't be present in the source CSV
-        original_cols = [c for c in ingested_cols if c.name not in ['geom', 'point_date', 'hash']]
+        # They're derived from the source data
+        # and won't be present in the source CSV
+        original_cols = [c for c in ingested_cols
+                         if c.name not in ['geom', 'point_date', 'hash']]
         # Make copies that don't refer to the existing table.
         cols = [_copy_col(c) for c in original_cols]
 
@@ -288,7 +292,8 @@ class Update(object):
         # We'll name it n_table
         self.name = 'n_' + dataset.name
 
-        # This table will only have the business key and the two derived columns for space and time.
+        # This table will only have the hash
+        # and the two derived columns for space and time.
         cols = [Column('hash', String(32), primary_key=True),
                 _make_col('point_date', TIMESTAMP, True),
                 _make_col('geom', Geometry('POINT', srid=4326), True)]
@@ -298,7 +303,8 @@ class Update(object):
     def __enter__(self):
         """
         Add a table (prefixed with n_) to the database
-        with one record for each record found in the staging table with an id not present in the existing table.
+        with one record for each record found in the staging table
+        with a hash not present in the existing table.
         If there are no such records, do nothing.
         """
 
@@ -313,15 +319,18 @@ class Update(object):
 
         # Select the hash and the columns we're deriving from the staging table.
         sel = select(cols_to_insert)
-        # And limit our results to records whose hashes aren't already present in the existing table.
-        sel = sel.select_from(s.outerjoin(e, s.c['hash'] == e.c['hash'])).where(e.c['hash'] == None)
+        # And limit our results to records
+        # whose hashes aren't already present in the existing table.
+        sel = sel.select_from(s.outerjoin(e, s.c['hash'] == e.c['hash'])).\
+            where(e.c['hash'] == None)
 
         # Drop the table first out of healthy paranoia
         self._drop()
         try:
             self.table.create(bind=engine)
         except Exception as e:
-            raise PlenarioETLError(repr(e) + '\nCould not create table n_' + d.name)
+            raise PlenarioETLError(repr(e) +
+                                   '\nCould not create table n_' + d.name)
 
         ins = self.table.insert().from_select(cols_to_insert, sel)
         # Populate it with records from our select statement.
@@ -335,9 +344,11 @@ class Update(object):
 
     def insert(self):
         """
-        Join with the staging table to insert complete records into existing table.
+        Join with the staging table
+        to insert complete records into existing table.
         """
-        derived_cols = [c for c in self.table.c if c.name in {'geom', 'point_date'}]
+        derived_cols = [c for c in self.table.c
+                        if c.name in {'geom', 'point_date'}]
         staging_cols = [c for c in self.staging.c]
         sel_cols = staging_cols + derived_cols
 
@@ -347,11 +358,13 @@ class Update(object):
         try:
             engine.execute(ins)
         except Exception as e:
-            raise PlenarioETLError(repr(e) + '\n Failed on statement: ' + str(ins))
+            raise PlenarioETLError(repr(e) +
+                                   '\n Failed on statement: ' + str(ins))
         try:
             _null_malformed_geoms(self.existing)
         except Exception as e:
-            raise PlenarioETLError(repr(e) + '\n Failed to null out geoms with (0,0) geocoding')
+            raise PlenarioETLError(repr(e) +
+                        '\n Failed to null out geoms with (0,0) geocoding')
 
     def _drop(self):
         engine.execute("DROP TABLE IF EXISTS {};".format(self.name))
@@ -361,8 +374,9 @@ class Update(object):
 
     def _geom_col(self):
         """
-        Derive selectable with a PostGIS point in 4326 (naive lon-lat) projection
-        derived from either the latitude and longitude columns or single location column
+        Derive selectable with a PostGIS point in 4326 projection
+        derived from either the latitude and longitude columns
+        or single location column
         """
         t = self.staging
         d = self.dataset
@@ -373,27 +387,13 @@ class Update(object):
                                        4326).label('geom')
 
         elif d.loc:
-            # Warning: this is really fragile.
             geom_col = func.point_from_loc(t.c[d.loc]).label('geom')
 
         else:
-            raise PlenarioETLError('Staging table does not have geometry information.')
+            msg = 'Staging table does not have geometry information.'
+            raise PlenarioETLError(msg)
 
         return geom_col
-
-
-def delete(staging_name, existing_name):
-    del_ = """DELETE FROM "{existing}"
-                  WHERE hash IN
-                     (SELECT hash FROM "{existing}"
-                        EXCEPT
-                      SELECT hash FROM  "{staging}");""".\
-            format(existing=existing_name, staging=staging_name)
-
-    try:
-        engine.execute(del_)
-    except Exception as e:
-        raise PlenarioETLError(repr(e) + '\n Failed to execute' + del_)
 
 
 def update_meta(metadata, table):
@@ -403,8 +403,10 @@ def update_meta(metadata, table):
     :param table:
     """
     metadata.update_date_added()
-    metadata.obs_from, metadata.obs_to = session.query(func.min(table.c.point_date),
-                                                       func.max(table.c.point_date)).first()
+    metadata.obs_from, metadata.obs_to =\
+        session.query(func.min(table.c.point_date),
+                      func.max(table.c.point_date)).first()
+
     bbox = session.query(func.ST_SetSRID(
                                          func.ST_Envelope(func.ST_Union(table.c.geom)),
                                          4326

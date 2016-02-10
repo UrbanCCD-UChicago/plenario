@@ -1,5 +1,6 @@
 import tempfile
 import requests
+from plenario.database import app_engine as engine
 
 
 class PlenarioETLError(Exception):
@@ -68,10 +69,9 @@ class ETLFile(object):
         """
 
         # The file might be big, so stream it in chunks.
-        # I'd like to enforce a timeout, but some big datasets (like Chicago crimes)
+        # I'd like to enforce a timeout, but some big datasets
         # take more than a minute to start streaming.
         # Maybe add timeout as a parameter.
-        #file_stream_request = requests.get(url, stream=True, timeout=5)
         file_stream_request = requests.get(url, stream=True)
         # Raise an exception if we didn't get a 200
         file_stream_request.raise_for_status()
@@ -84,3 +84,41 @@ class ETLFile(object):
             if chunk:
                 self._handle.write(chunk)
                 self._handle.flush()
+
+
+def add_unique_hash(table_name):
+    """
+    Adds an md5 hash column of the preexisting columns
+    and removes duplicate rows from a table.
+    :param table_name: Name of table to add hash to.
+    """
+    add_hash = '''
+    DROP TABLE IF EXISTS temp;
+    CREATE TABLE temp AS
+      SELECT DISTINCT *,
+             md5(CAST(("{table_name}".*)AS text))
+                AS hash FROM "{table_name}";
+    DROP TABLE "{table_name}";
+    ALTER TABLE temp RENAME TO "{table_name}";
+    ALTER TABLE "{table_name}" ADD PRIMARY KEY (hash);
+    '''.format(table_name=table_name)
+
+    try:
+        engine.execute(add_hash)
+    except Exception as e:
+        raise PlenarioETLError(repr(e) +
+                               '\n Failed to deduplicate with ' + add_hash)
+
+
+def delete_absent_hashes(staging_name, existing_name):
+    del_ = """DELETE FROM "{existing}"
+                  WHERE hash IN
+                     (SELECT hash FROM "{existing}"
+                        EXCEPT
+                      SELECT hash FROM  "{staging}");""".\
+            format(existing=existing_name, staging=staging_name)
+
+    try:
+        engine.execute(del_)
+    except Exception as e:
+        raise PlenarioETLError(repr(e) + '\n Failed to execute' + del_)

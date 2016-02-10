@@ -39,19 +39,15 @@ class ParamValidator(object):
             # SQLAlchemy boolean expressions
             self.conditions = []
 
-            '''TODO: Make this a helper func'''
-            if shape_dataset_name:
+            if shape_dataset_name is not None:
                 self.set_shape(shape_dataset_name)
 
     def set_shape(self, shape_dataset_name):
         shape_table_meta = session.query(ShapeMetadata).get(shape_dataset_name)
         if shape_table_meta:
             shape_table = shape_table_meta.shape_table
-            shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
             self.cols += ['{}.{}'.format(shape_table.name, key) for key in shape_table.columns.keys()]
             self.vals['shape'] = shape_table
-
-
 
     def set_optional(self, name, transform, default):
         """
@@ -97,8 +93,10 @@ class ParamValidator(object):
 
             # This param is neither present in the optional params
             # nor does it specify a field in this dataset.
-            warning = 'Unused parameter value "{}={}"'.format(k, v)
-            self.warnings.append(warning)
+            if k != 'shape':
+                #quick and dirty way to make sure 'shape' is not listed as an unused value
+                warning = 'Unused parameter value "{}={}"'.format(k, v)
+                self.warnings.append(warning)
 
         self._eval_defaults()
 
@@ -129,8 +127,9 @@ class ParamValidator(object):
     }
 
     def _check_shape_condition(self, field):
+        #returns false if the shape column is 
         return self.vals.get('shape') is not None\
-         and '{}.{}'.format(self.vals['shape'], field) not in self.cols
+         and '{}.{}'.format(self.vals['shape'], field) in self.cols
 
     def _make_condition(self, k, v):
         # Generally, we expect the form k = [field]__[op]
@@ -138,7 +137,7 @@ class ParamValidator(object):
         tokens = k.split('__')
         # An attribute of the dataset
         field = tokens[0]
-        if field not in self.cols and self._check_shape_condition(field):
+        if field not in self.cols and not self._check_shape_condition(field):
             # No column matches this key.
             # Rather than return an error here,
             # we'll return None to indicate that this field wasn't present
@@ -493,7 +492,7 @@ def form_detail_sql_query(validator, aggregate_points=False):
     if shape_table != None:
         shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]   
         if aggregate_points: 
-            q = q.from_self(shape_table).filter(dset.c.geom.ST_Intersects(shape_table.c.geom)).group_by('ogc_fid')
+            q = q.from_self(shape_table).filter(dset.c.geom.ST_Intersects(shape_table.c.geom)).group_by(shape_table)
         else:
             q = q.join(shape_table, dset.c.geom.ST_Within(shape_table.c.geom))
             #add columns from shape dataset to the select statement
@@ -616,7 +615,9 @@ def detail_aggregate():
     dataset = MetaTable.get_by_dataset_name(dataset_name)
 
     try:
-        ts = dataset.timeseries_one(agg_unit=agg, start=start_date, end=end_date, geom=geom)
+        ts = dataset.timeseries_one(agg_unit=agg, start=start_date,
+                                    end=end_date, geom=geom,
+                                    column_filters=validator.conditions)
     except Exception as e:
         return internal_error('Failed to construct timeseries', e)
 
@@ -674,7 +675,8 @@ def detail():
     # Part 4: Format response
     to_remove = ['point_date', 'hash']
     if validator.vals.get('shape') is not None:
-        to_remove.append('{}.geom'.format(validator.vals['shape'].name))
+        #to_remove.append('{}.geom'.format(validator.vals['shape'].name))
+        to_remove += ['{}.{}'.format(validator.vals['shape'].name, col) for col in ['geom', 'hash', 'ogc_fid']]
 
     datatype = validator.vals['data_type']
     if datatype == 'json':
