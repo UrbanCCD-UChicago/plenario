@@ -128,6 +128,24 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     return resp
 
 @crossdomain(origin="*")
+def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
+
+    intersect_query = """
+    WITH joined AS
+    (
+        SELECT polys.*
+        FROM "{point_dataset_name}" AS pts, "{polygon_dataset_name}" AS polys
+        WHERE ST_Intersects(pts.geom, polys.geom)
+    )
+    SELECT *
+    FROM (SELECT *, COUNT(*) OVER (PARTITION BY ogc_fid) AS count
+          FROM joined) unused_alias;""".format(
+                point_dataset_name=point_dataset_name,
+                polygon_dataset_name=polygon_dataset_name)
+
+    return export_dataset_to_json_response(polygon_dataset_name, intersect_query)
+
+@crossdomain(origin="*")
 def filter_shape(dataset_name, geojson):
     """
     Given a shape dataset and user-provided geojson,

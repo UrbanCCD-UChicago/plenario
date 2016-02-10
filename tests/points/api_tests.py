@@ -121,7 +121,7 @@ class PointAPITests(BasePlenarioTest):
         self.assertEqual(counts.count(2), 1)
 
     def test_grid_column_filter(self):
-        query = 'v1/api/grid/?obs_date__ge=2013-1-1&obs_date__le=2014-1-1' \
+        query = 'v1/api/grid/?obs_date__ge=2013-1-1&obs_date_le=2014-1-1' \
                 '&dataset_name=flu_shot_clinics&event_type=Church'
 
         resp = self.app.get(query)
@@ -252,5 +252,3 @@ class PointAPITests(BasePlenarioTest):
         resp = self.app.get(query)
         response_data = json.loads(resp.data)
         self.assertTrue("Unused parameter value \"fake_column=fake\"" in response_data['meta']['message'])
-
-

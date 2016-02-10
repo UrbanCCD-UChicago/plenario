@@ -89,6 +89,7 @@ class ShapeTests(BasePlenarioTest):
                           source_url=None,
                           update_freq='yearly',
                           approved_status=False)
+
         session.commit()
 
     ''' /intersections '''
