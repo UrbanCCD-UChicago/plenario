@@ -1085,7 +1085,7 @@
                      query_desc='This endpoint takes no query parameters.',
                      query_params=None,
                      response_desc='A document of shapes from the given dataset that intersect the given geometry.',
-                     examples=[('shapes/filter/chicago_pedestrian_streets/{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.67248630523682,41.86454328565965],[-87.67248630523682,41.872117384500754],[-87.6549768447876,41.872117384500754],[-87.6549768447876,41.86454328565965],[-87.67248630523682,41.86454328565965]]]}}',
+                     examples=[('shapes/filter/pedestrian_streets/{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.67248630523682,41.86454328565965],[-87.67248630523682,41.872117384500754],[-87.6549768447876,41.872117384500754],[-87.6549768447876,41.86454328565965],[-87.67248630523682,41.86454328565965]]]}}',
                                 "Find all of the pedestrian streets in Chicago that intersect a geometry encoded in the given GeoJSON.
                                 (This GeoJSON happens to represent a chunk of Chicago's Little Italy neighborhood.)")]) }}
 
@@ -1104,8 +1104,8 @@
                                    ('offset', 'none', '<p>Used to paginate through results of more than 1000.</p>
                                                        <p><strong>Example:</strong> <code>offset=1000</code> will fetch the second page of results.</p>')],
                      response_desc='A document of polygons from the given dataset and the count of the points that intersect them.',
-                     examples=[('shapes/polygon_filter/individual_landmarks/chicago_wards',
-                                "Count the number of individual landmarks in Chicago in each ward precinct in Chicago, and return these counts.")]) }}
+                     examples=[('shapes/boundaries_neighborhoods/individual_landmarks/?obs_date__ge=1900-09-22&obs_date__le=2015-10-1',
+                                "Count the number of individual landmarks in Chicago in each neighborhood in Chicago, and return these counts.")]) }}
 
       <h2 id='responses'>Response format</h2>
       <p>All JSON API calls return their data in the <code>objects</code> block. Additional information is returned in the <code>meta</code> block:</p>
