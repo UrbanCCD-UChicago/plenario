@@ -164,8 +164,8 @@
 
       {{ panel(endpoint='fields/<dataset_name>',
                      endpoint_id='fields',
-                     short_description='list available fields for a dataset',
-                     long_description='Gives you a listing of all the fields and their data types for the given dataset. This is useful for figuring out how to structure a query against the <code>/v1/api/detail/</code> or <code>/v1/api/detail-aggregate/</code> endpoints.',
+                     short_description='list available fields for a point or shape dataset',
+                     long_description='Gives you a listing of all the fields and their data types for the given dataset. This is useful for figuring out how to structure a query against the <code>/v1/api/detail/</code>, <code>/v1/api/shapes/</code>, or <code>/v1/api/detail-aggregate/</code> endpoints.',
                      query_desc="This API endpoint doesn't take in any query parameters.",
                      query_params=None,
                      response_desc='',
@@ -327,12 +327,17 @@
                                    obs_date_le,
                                    location_geom_within,
                                    data_type,
+                                   ('shape', 'none', '<p>Join to a shape dataset; columns in the shape dataset
+                                                        can also be used as filters with the [dataset_field]*
+                                                        parameter</p>'),
                                    ('offset', 'none', '<p>Used to paginate through results of more than 1000.</p>
                                                        <p><strong>Example:</strong> <code>offset=1000</code> will fetch the second page of results.</p>')],
                      response_desc='The API responds with a list of raw records for the particular dataset. The fields returned will vary per dataset. Response is limited to 1000 results, which can be paginated by using the <code>offset</code> parameter.',
                      response_attrs=[],
                      examples=[('detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110',
-                                "Chicago crime reports since Jan 1st 2014 with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)")]
+                                "Chicago crime reports since Jan 1st 2014 with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)"),
+                                
+                               ('detail/?dataset_name=individual_landmarks&shape=boundaries_neighborhoods&obs_date__ge=1900-1-1&sec_neigh=BRONZEVILLE', "Chicago landmarks within the Bronzeville neighborhood")]
        )}}
 
 
