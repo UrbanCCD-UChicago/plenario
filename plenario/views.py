@@ -500,9 +500,9 @@ class SocrataSuggestion(object):
 
     def derive_description_meta(self):
         # Grab from correct JSON fields
-        description = self.metadata['description']
-        human_name = self.metadata['name']
-        attribution = self.metadata['attribution']
+        description = self.metadata.get('description')
+        human_name = self.metadata.get('name')
+        attribution = self.metadata.get('attribution')
 
         return DescriptionMeta(description=description,
                                human_name=human_name,
