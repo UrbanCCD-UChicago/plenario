@@ -34,37 +34,11 @@ class ShapeTests(BasePlenarioTest):
         # I changed Englewood to Englerwood :P
         self.assertEqual(altered_value, 'Englerwood')
 
-
-
     def test_no_import_when_name_conflict(self):
         # The city fixture should already be ingested
         with self.assertRaises(Exception):
             ShapeTests.ingest_fixture(fixtures['city'])
         session.rollback()
-
-    def test_names_in_shape_list(self):
-        resp = self.app.get('/v1/api/shapes/')
-        response_data = json.loads(resp.data)
-        all_names = [item['dataset_name'] for item in response_data['objects']]
-
-        # Are all the names of the fully ingested fixtures in the response?
-        fixture_names_included = [(fixture.table_name in all_names) for fixture in fixtures.values()]
-        self.assertTrue(all(fixture_names_included))
-
-        # And make sure the name of an uningested shape didn't sneak in.
-        self.assertNotIn(self.dummy_name, all_names)
-
-    def test_num_shapes_in_meta(self):
-        resp = self.app.get('/v1/api/shapes/')
-        response_data = json.loads(resp.data)
-
-        # Expect field called num_shapes for each metadata object
-        # Will throw KeyError if 'num_shapes' not found in each
-        shape_nums = {obj['dataset_name']: obj['num_shapes'] for obj in response_data['objects']}
-
-        self.assertEqual(shape_nums['chicago_city_limits'], 1)
-        self.assertEqual(shape_nums['zip_codes'], 61)
-        self.assertEqual(shape_nums['pedestrian_streets'], 41)
 
     def test_delete_shape(self):
         # Can we remove a shape that's fully ingested?
@@ -92,6 +66,33 @@ class ShapeTests(BasePlenarioTest):
 
         session.commit()
 
+    '''/shapes'''
+
+    def test_names_in_shape_list(self):
+        resp = self.app.get('/v1/api/shapes/')
+        response_data = json.loads(resp.data)
+        all_names = [item['dataset_name'] for item in response_data['objects']]
+
+        # Are all the names of the fully ingested fixtures in the response?
+        fixture_names_included = [(fixture.table_name in all_names) for fixture in fixtures.values()]
+        self.assertTrue(all(fixture_names_included))
+
+        # And make sure the name of an uningested shape didn't sneak in.
+        self.assertNotIn(self.dummy_name, all_names)
+
+    def test_num_shapes_in_meta(self):
+        resp = self.app.get('/v1/api/shapes/')
+        response_data = json.loads(resp.data)
+
+        # Expect field called num_shapes for each metadata object
+        # Will throw KeyError if 'num_shapes' not found in each
+        shape_nums = {obj['dataset_name']: obj['num_shapes'] for obj in response_data['objects']}
+
+        self.assertEqual(shape_nums['chicago_city_limits'], 1)
+        self.assertEqual(shape_nums['zip_codes'], 61)
+        self.assertEqual(shape_nums['pedestrian_streets'], 41)
+
+
     ''' /intersections '''
 
     def test_find_intersecting(self):
@@ -108,6 +109,17 @@ class ShapeTests(BasePlenarioTest):
 
         # By design, the query rectangle should cross 3 zip codes and 2 pedestrian streets
         datasets_to_num_geoms = {obj['dataset_name']: obj['num_geoms'] for obj in response_data['objects']}
+        self.assertEqual(datasets_to_num_geoms[fixtures['zips'].table_name], 3)
+        self.assertEqual(datasets_to_num_geoms[fixtures['streets'].table_name], 2)
+
+        # Moving this functionality to the /shapes endpoint
+        # What shape datasets intersect with the rectangle?
+        resp = self.app.get('/v1/api/shapes/?location_geom_within=' + escaped_query_rect)
+        self.assertEqual(resp.status_code, 200)
+        response_data = json.loads(resp.data)
+
+        # By design, the query rectangle should cross 3 zip codes and 2 pedestrian streets
+        datasets_to_num_geoms = {obj['dataset_name']: obj['num_shapes'] for obj in response_data['objects']}
         self.assertEqual(datasets_to_num_geoms[fixtures['zips'].table_name], 3)
         self.assertEqual(datasets_to_num_geoms[fixtures['streets'].table_name], 2)
 

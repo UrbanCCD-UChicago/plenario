@@ -381,23 +381,52 @@ class ShapeMetadata(Base):
         return list(session.execute(shape_query))
 
     @classmethod
-    def index(cls):
-        result = session.query(cls.dataset_name,
-                               cls.human_name,
-                               cls.date_added,
-                               func.ST_AsGeoJSON(cls.bbox),
-                               cls.num_shapes,
-                               cls.attribution,
-                               cls.description,
-                               cls.update_freq)\
-                                 .filter(cls.is_ingested)
-        field_names = ['dataset_name', 'human_name', 'date_added',
-                       'bounding_box', 'num_shapes', 'attribution',
-                       'description', 'update_freq']
-        listing = [dict(zip(field_names, row)) for row in result]
+    def index(cls, geom=None):
+        # The attributes that we want to pass along as-is
+        as_is_attr_names = ['dataset_name', 'human_name', 'date_added',
+                            'attribution', 'description', 'update_freq',
+                            'view_url', 'source_url', 'num_shapes',
+                            'contributor_name', 'contributor_email',
+                            'contributor_organization']
+
+        as_is_attrs = [getattr(cls, name) for name in as_is_attr_names]
+
+        # We need to apply some processing to the bounding box
+        bbox = func.ST_AsGeoJSON(cls.bbox)
+        attr_names = as_is_attr_names + ['bbox']
+        attrs = as_is_attrs + [bbox]
+
+        result = session.query(*attrs).filter(cls.is_ingested)
+        listing = [dict(zip(attr_names, row)) for row in result]
+
         for dataset in listing:
             dataset['date_added'] = str(dataset['date_added'])
+
+        if geom:
+            listing = cls.add_intersections_to_index(listing, geom)
+
         return listing
+
+    @staticmethod
+    def add_intersections_to_index(listing, geom):
+        # For each dataset_name in the listing,
+        # get a count of intersections
+        # and replace num_geoms
+
+        for row in listing:
+            name = row['dataset_name']
+            num_intersections_query = '''
+            SELECT count(g.geom) as num_geoms
+            FROM "{dataset_name}" as g
+            WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
+            '''.format(dataset_name=name, geojson_fragment=geom)
+
+            num_intersections = session.execute(num_intersections_query)\
+                                       .first().num_geoms
+            row['num_shapes'] = num_intersections
+
+        intersecting_rows = [row for row in listing if row['num_shapes'] > 0]
+        return intersecting_rows
 
     @classmethod
     def get_metadata_with_etl_result(cls, table_name):

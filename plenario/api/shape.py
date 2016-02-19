@@ -13,6 +13,7 @@ from plenario.api.point import ParamValidator, setup_detail_validator, form_deta
 from collections import OrderedDict
 from sqlalchemy import func
 
+
 def export_dataset_to_json_response(dataset_name, query=None):
 
     """
@@ -63,6 +64,9 @@ def export_dataset_to_json_response(dataset_name, query=None):
         if os.path.isfile(export_path):
             os.remove(export_path)
 
+def make_sql_ready_geom(geojson_str):
+    return make_fragment_str(extract_first_geometry_fragment(geojson_str))
+
 @crossdomain(origin="*")
 def get_all_shape_datasets():
     """
@@ -77,7 +81,11 @@ def get_all_shape_datasets():
                 'objects': []
             }
 
-        public_listing = ShapeMetadata.index()
+        geom = request.args.get('location_geom_within')
+        if geom:
+            geom = make_sql_ready_geom(geom)
+
+        public_listing = ShapeMetadata.index(geom)
         response_skeleton['objects'] = public_listing
         status_code = 200
 
@@ -94,6 +102,7 @@ def get_all_shape_datasets():
     resp = make_response(json.dumps(response_skeleton), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
 
 def aggregate_point_data(point_dataset_name, polygon_dataset_name):
 
@@ -127,6 +136,7 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
 
     return resp
 
+
 @crossdomain(origin="*")
 def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
 
@@ -144,6 +154,7 @@ def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
                 polygon_dataset_name=polygon_dataset_name)
 
     return export_dataset_to_json_response(polygon_dataset_name, intersect_query)
+
 
 @crossdomain(origin="*")
 def filter_shape(dataset_name, geojson):
@@ -164,6 +175,7 @@ def filter_shape(dataset_name, geojson):
     '''.format(dataset_name=dataset_name, geojson_fragment=fragment)
 
     return export_dataset_to_json_response(dataset_name, intersect_query)
+
 
 @crossdomain(origin="*")
 def find_intersecting_shapes(geojson):
@@ -223,6 +235,7 @@ def find_intersecting_shapes(geojson):
     resp = make_response(json.dumps(response_skeleton), 200)
     return resp
 
+
 @crossdomain(origin="*")
 def export_shape(dataset_name):
     """
@@ -232,6 +245,7 @@ def export_shape(dataset_name):
     """
     
     return export_dataset_to_json_response(dataset_name)
+
 
 def _shape_format_to_content_header(requested_format):
 

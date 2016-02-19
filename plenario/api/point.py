@@ -16,9 +16,8 @@ import shapely.wkb, shapely.geometry
 from sqlalchemy.types import NullType
 from collections import OrderedDict
 
-from sqlalchemy import func, cast, select, Column, MetaData
-from sqlalchemy import Integer, String
 from plenario.models import ShapeMetadata
+
 
 class ParamValidator(object):
 
@@ -649,7 +648,8 @@ def detail():
 
     validator = setup_detail_validator(dataset_name, raw_query_params)
 
-    # If any optional parameters are malformed, we're better off bailing and telling the user
+    # If any optional parameters are malformed,
+    # we're better off bailing and telling the user
     # than using a default and confusing them.
     err = validator.validate(raw_query_params)
     if err:
