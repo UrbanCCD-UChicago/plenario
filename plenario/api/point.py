@@ -499,7 +499,7 @@ def form_detail_sql_query(validator, aggregate_points=False):
 
     return q
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+#@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def timeseries():
     validator = ParamValidator()\
@@ -538,6 +538,7 @@ def timeseries():
         msg = 'Failed to construct timeseries.'
         return internal_error(msg, e)
 
+    panel = MetaTable.attach_metadata(panel)
     resp = json_response_base(validator, panel)
 
     datatype = validator.vals['data_type']

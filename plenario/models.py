@@ -12,6 +12,7 @@ from flask_bcrypt import Bcrypt
 from itertools import groupby
 import json
 from hashlib import md5
+from operator import itemgetter
 
 from plenario.database import session, Base
 from plenario.utils.helpers import slugify
@@ -151,6 +152,51 @@ class MetaTable(Base):
             self._point_table = Table(self.dataset_name, Base.metadata,
                                       autoload=True, extend_existing=True)
             return self._point_table
+
+    @classmethod
+    def attach_metadata(cls, listing):
+        """
+        Given a list of dicts that include a dataset_name,
+        add metadata about the datasets to each dict.
+        :param listing: List of dict-likes with a dataset_name attribute
+        :return:
+        """
+        dataset_names = [row['dataset_name'] for row in listing]
+
+        as_is_attr_names = ['dataset_name', 'human_name', 'date_added',
+                            'obs_from', 'obs_to', 'last_update',
+                            'attribution', 'description', 'update_freq',
+                            'view_url', 'source_url',
+                            'contributor_name', 'contributor_email',
+                            'contributor_organization']
+        as_is_attrs = [getattr(cls, name) for name in as_is_attr_names]
+
+        # We need to apply some processing to the bounding box
+        bbox = func.ST_AsGeoJSON(cls.bbox)
+        attr_names = as_is_attr_names + ['bbox']
+        attrs = as_is_attrs + [bbox]
+
+        result = session.query(*attrs).\
+            filter(cls.dataset_name.in_(dataset_names))
+        meta_list = [dict(zip(attr_names, row)) for row in result]
+        date_attrs = ['date_added', 'obs_from', 'obs_to']
+        for row in meta_list:
+            row['bbox'] = json.loads(row['bbox'])
+            for attr in date_attrs:
+                row[attr] = str(row[attr])
+
+
+        meta_list = sorted(meta_list, key=itemgetter('dataset_name'))
+        original_list = sorted(listing, key=itemgetter('dataset_name'))
+
+        for original, meta in zip(original_list, meta_list):
+            original.update(meta)
+
+        return original_list
+
+    @staticmethod
+    def meta_dict(dataset_name):
+        pass
 
     # Return a list of [
     # {'dataset_name': 'Foo',
