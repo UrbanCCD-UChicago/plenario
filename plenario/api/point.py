@@ -499,7 +499,7 @@ def form_detail_sql_query(validator, aggregate_points=False):
 
     return q
 
-#@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def timeseries():
     validator = ParamValidator()\
