@@ -154,15 +154,15 @@ class MetaTable(Base):
             return self._point_table
 
     @classmethod
-    def attach_metadata(cls, listing):
+    def attach_metadata(cls, rows):
         """
         Given a list of dicts that include a dataset_name,
         add metadata about the datasets to each dict.
-        :param listing: List of dict-likes with a dataset_name attribute
-        :return:
+        :param rows: List of dict-likes with a dataset_name attribute
         """
-        dataset_names = [row['dataset_name'] for row in listing]
+        dataset_names = [row['dataset_name'] for row in rows]
 
+        # All the metadata attributes that we can pull in unaltered
         as_is_attr_names = ['dataset_name', 'human_name', 'date_added',
                             'obs_from', 'obs_to', 'last_update',
                             'attribution', 'description', 'update_freq',
@@ -171,28 +171,34 @@ class MetaTable(Base):
                             'contributor_organization']
         as_is_attrs = [getattr(cls, name) for name in as_is_attr_names]
 
-        # We need to apply some processing to the bounding box
+        # Bounding box is the exception. We need to process it a bit.
         bbox = func.ST_AsGeoJSON(cls.bbox)
+
+        # Put our as-is and processed attributes together
         attr_names = as_is_attr_names + ['bbox']
         attrs = as_is_attrs + [bbox]
 
+        # Make the DB call
         result = session.query(*attrs).\
             filter(cls.dataset_name.in_(dataset_names))
         meta_list = [dict(zip(attr_names, row)) for row in result]
+
+        # We need to coerce datetimes to strings
         date_attrs = ['date_added', 'obs_from', 'obs_to']
         for row in meta_list:
             row['bbox'] = json.loads(row['bbox'])
             for attr in date_attrs:
                 row[attr] = str(row[attr])
 
-
+        # Align the original list and metadata list...
         meta_list = sorted(meta_list, key=itemgetter('dataset_name'))
-        original_list = sorted(listing, key=itemgetter('dataset_name'))
+        to_coalesce = sorted(rows, key=itemgetter('dataset_name'))
 
-        for original, meta in zip(original_list, meta_list):
+        # and coalesce them.
+        for original, meta in zip(to_coalesce, meta_list):
             original.update(meta)
 
-        return original_list
+        return to_coalesce
 
     @staticmethod
     def meta_dict(dataset_name):
