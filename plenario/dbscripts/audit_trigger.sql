@@ -30,36 +30,29 @@ BEGIN
     END IF;
     --else
 
-    v_sql = 'select * from ' || TG_TABLE_NAME::regclass || '_history';
-    execute v_sql into temp_row;
-    
-    select now() into temp_row.action_tstamp_tx;
-    temp_row.action = SUBSTRING(TG_OP,1,1);
-    IF (TG_OP = 'UPDATE' AND TG_LEVEL = 'ROW') THEN
-        temp_row.row_data = OLD;
+   IF (TG_OP = 'UPDATE' AND TG_LEVEL = 'ROW') THEN
+        temp_row := OLD;
     ELSIF (TG_OP = 'DELETE' AND TG_LEVEL = 'ROW') THEN
-        temp_row.row_data = OLD;
+        temp_row := OLD;
     ELSIF (TG_OP = 'INSERT' AND TG_LEVEL = 'ROW') THEN
-        temp_row.row_data = NEW;
-    --for future if we need some STMT level logging
+        temp_row := NEW;
+    --for future if we need some STMT level logging, handle the case
     --ELSIF (TG_LEVEL = 'STATEMENT' AND TG_OP IN ('INSERT','UPDATE','DELETE','TRUNCATE')) THEN
-    --    temp_row.statement_only = 't';
     ELSE
         RAISE EXCEPTION '[audit.if_modified] - Trigger func added as trigger for unhandled case: %, %',TG_OP, TG_LEVEL;
         RETURN NULL;
     END IF;
-    EXECUTE 'INSERT INTO audit.' || TG_TABLE_NAME::regclass || '_history VALUES (''' || 
-    temp_row.action_tstamp_tx || ''',''' ||
-    temp_row.action  || ''',''' ||
-    temp_row.row_data  || ''')'; 
+
+    EXECUTE format('INSERT INTO audit.%I_history VALUES ($1, $2, $3)', TG_TABLE_NAME::regclass)
+	using now(), SUBSTRING(TG_OP,1,1), temp_row;
+
+    --In case of Update, copy the Revised record as well
     IF (TG_OP = 'UPDATE' AND TG_LEVEL = 'ROW') THEN
-        temp_row.row_data = NEW;
-        EXECUTE 'INSERT INTO ' || TG_TABLE_NAME::regclass || '_history VALUES (''' ||
-    temp_row.action_tstamp_tx || ''',''' ||
-    temp_row.action  || ''',''' ||
-    temp_row.row_data  || ''')';
-    END IF; 
-    
+        temp_row := NEW;
+        EXECUTE format('INSERT INTO audit.%I_history VALUES ($1, $2, $3)', TG_TABLE_NAME::regclass)
+	using now(), SUBSTRING(TG_OP,1,1), temp_row;
+    END IF;
+
     RETURN NULL;
 END;
 $function$
