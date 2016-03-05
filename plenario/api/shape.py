@@ -8,7 +8,9 @@ from plenario.models import ShapeMetadata
 from plenario.database import session, app_engine as engine
 from plenario.utils.ogr2ogr import OgrExport
 from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT
-from plenario.api.point import ParamValidator, setup_detail_validator, form_detail_sql_query, form_geojson_detail_response, bad_request
+from plenario.api.point import ParamValidator, setup_detail_validator,\
+    form_detail_sql_query, form_geojson_detail_response,\
+    form_csv_detail_response, bad_request
 
 from collections import OrderedDict
 from sqlalchemy import func
@@ -107,7 +109,10 @@ def get_all_shape_datasets():
 def aggregate_point_data(point_dataset_name, polygon_dataset_name):
 
     params = request.args.copy()
+    # Doesn't this override the path-derived parameter with a query parameter?
+    # Do we want that?
     if not params.get('shape'):
+        # form_detail_query expects to get info about a shape dataset this way.
         params['shape'] = polygon_dataset_name
 
     validator = setup_detail_validator(point_dataset_name, params)
@@ -116,10 +121,13 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     if err:
         return bad_request(err)
 
+    # Apply standard filters to point dataset
+    # And join each point to the containing shape
     q = form_detail_sql_query(validator, True)
     q = q.add_columns(func.count(validator.dataset.c.hash))
 
     # Page in RESPONSE_LIMIT chunks
+    # This seems contradictory. Don't we want one row per shape, no matter what?
     offset = validator.vals['offset']
     q = q.limit(RESPONSE_LIMIT)
     if offset > 0:
@@ -132,7 +140,10 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     res_cols.append('count')
 
     rows = [OrderedDict(zip(res_cols, res)) for res in q.all()]
-    resp = form_geojson_detail_response([], validator, rows)
+    if params.get('data_type') == 'csv':
+        resp = form_csv_detail_response(['hash'], validator, rows)
+    else:
+        resp = form_geojson_detail_response([], validator, rows)
 
     return resp
 
