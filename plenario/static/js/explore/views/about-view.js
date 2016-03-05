@@ -7,6 +7,7 @@ var AboutView = Backbone.View.extend({
     },
     render: function(){
         $('#list-view').show();
+        $('#shapes-view').show();
         $('#detail-view').hide();
         this.$el.empty();
         this.$el.spin('large');
@@ -50,7 +51,7 @@ var AboutView = Backbone.View.extend({
         })
     },
     detailView: function(e){
-        console.log('about-view detailView');
+        //console.log('about-view detailView');
         var query = {};
         var start = $('#start-date-filter').val();
         var end = $('#end-date-filter').val();

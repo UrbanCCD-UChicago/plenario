@@ -66,6 +66,13 @@ var app = app || {};
 
         if (typeof this.query['location_geom__within'] !== 'undefined'){
             attrs['dataLayer'] = $.parseJSON(this.query['location_geom__within']);
+        } else {
+            new AboutView({el: '#list-view'});
+            shapeView = new app.ShapeView({el: '#shapes-view'});
+            map = new MapView({el: '#map-view', attributes: attrs})
+            _gaq.push(['_trackPageview', ""]);
+            router.navigate("");
+            return;
         }
 
         if (resp) { resp.undelegateEvents(); }
