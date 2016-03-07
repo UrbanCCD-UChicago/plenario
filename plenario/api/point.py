@@ -625,6 +625,7 @@ def detail_aggregate():
     if datatype == 'json':
         time_counts = [{'count': c, 'datetime': d} for c, d in ts[1:]]
         resp = json_response_base(validator, time_counts)
+        resp['count'] = sum([c['count'] for c in time_counts])
         resp = make_response(json.dumps(resp, default=dthandler), 200)
         resp.headers['Content-Type'] = 'application/json'
 
