@@ -200,10 +200,6 @@ class MetaTable(Base):
 
         return to_coalesce
 
-    @staticmethod
-    def meta_dict(dataset_name):
-        pass
-
     # Return a list of [
     # {'dataset_name': 'Foo',
     # 'items': [{'datetime': dt, 'count': int}, ...] } ]
@@ -240,6 +236,8 @@ class MetaTable(Base):
                     'datetime': row.time_bucket.date(),  # UTC time
                     'count':    row.count
                 })
+                # Aggregate top-level count across all time slices.
+                ts_dict['count'] = sum([i['count'] for i in ts_dict['items']])
             panel.append(ts_dict)
 
         return panel
