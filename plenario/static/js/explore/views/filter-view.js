@@ -3,7 +3,6 @@ var FilterView = Backbone.View.extend({
         'click .remove-filter': 'clear'
     },
     initialize: function(){
-        console.log(this.attributes);
         this.filter_dict = this.attributes.filter_dict;
         this.field_options = this.attributes.field_options;
         this.render();

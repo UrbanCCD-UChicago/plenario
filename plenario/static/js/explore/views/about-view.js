@@ -51,7 +51,6 @@ var AboutView = Backbone.View.extend({
         })
     },
     detailView: function(e){
-        //console.log('about-view detailView');
         var query = {};
         var start = $('#start-date-filter').val();
         var end = $('#end-date-filter').val();
