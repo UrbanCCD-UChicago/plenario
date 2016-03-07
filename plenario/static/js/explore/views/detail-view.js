@@ -17,7 +17,7 @@ var DetailView = Backbone.View.extend({
         var obs_from = moment(this.meta.obs_from).format('MM/DD/YYYY');
         var obs_to = moment(this.meta.obs_to).format('MM/DD/YYYY');
 
-        // if the query has dates we use the user-specified start and end dates
+        // if the query has dates we use the user-specified start and end dates for display
         if (this.query) {
             start = moment(this.query.obs_date__ge).format('MM/DD/YYYY');
             end = moment(this.query.obs_date__le).format('MM/DD/YYYY');
@@ -285,8 +285,6 @@ var DetailView = Backbone.View.extend({
         this.undelegateEvents();
         var points_query = this.points_query;
         var attrs = {resp: resp}
-        console.log(attrs)
-
 
         if (typeof points_query['location_geom__within'] !== 'undefined'){
             attrs['dataLayer'] = $.parseJSON(points_query['location_geom__within']);
@@ -296,7 +294,6 @@ var DetailView = Backbone.View.extend({
                 new AboutView({el: '#list-view'});
                 shapeView = new app.ShapeView({el: '#shapes-view'});
                 map = new MapView({el: '#map-view', attributes: attrs})
-                console.log("back to index")
                 _gaq.push(['_trackPageview', ""]);
                 router.navigate("");
                 return;
