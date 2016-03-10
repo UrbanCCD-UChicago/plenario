@@ -787,7 +787,6 @@ def meta():
 
     # What params did the user provide?
     dataset_name = validator.vals['dataset_name']
-    print dataset_name
     geom = validator.get_geom()
     start_date = validator.vals['obs_date__ge']
     end_date = validator.vals['obs_date__le']
@@ -801,10 +800,12 @@ def meta():
         q = q.filter(MetaTable.dataset_name == dataset_name)
     elif should_filter:
         if geom:
-            q = q.filter(sa.func.ST_Intersects(geom, MetaTable.bbox))
+            intersects = sa.func.ST_Intersects(sa.func.ST_GeomFromGeoJSON(geom),
+                                               MetaTable.bbox)
+            q = q.filter(intersects)
         if start_date and end_date:
-            q = q.filter(MetaTable.obs_from < end_date or
-                         MetaTable.obs_to > start_date)
+            q = q.filter(sa.and_(MetaTable.obs_from < end_date,
+                                 MetaTable.obs_to > start_date))
     # Otherwise, just send back all the datasets
 
     metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]

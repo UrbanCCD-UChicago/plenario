@@ -37,6 +37,18 @@ class PointAPITests(BasePlenarioTest):
         self.assertEqual(response_data['objects'][0]['view_url'],
                          "http://data.cityofchicago.org/api/views/ijzp-q8t2/rows")
 
+    def test_metadata_filter(self):
+        escaped_query_rect = get_loop_rect()
+        query = 'v1/api/datasets/?location_geom__within={}' \
+                '&obs_date__ge={}&obs_date__le={}'\
+            .format(escaped_query_rect, '2015-1-1', '2016-1-1')
+
+        resp = self.app.get(query)
+        response_data = json.loads(resp.data)
+
+        self.assertEqual(len(response_data['objects']), 1)
+        dataset_found = response_data['objects'][0]
+        self.assertEqual(dataset_found['dataset_name'], 'crimes')
 
     ''' /detail '''
 
