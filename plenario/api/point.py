@@ -782,7 +782,7 @@ def meta():
                       'source_url', 'view_url',
                       'obs_from', 'obs_to',
                       'date_added', 'last_update', 'update_freq',
-                      'attribution', 'source', 'column_names']
+                      'attribution', 'description', 'column_names']
     col_objects = [getattr(MetaTable, col) for col in cols_to_return]
     q = session.query(*col_objects)
 
