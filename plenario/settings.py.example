@@ -23,8 +23,8 @@ DEFAULT_USER = {
     'password': 'your password'
 }
 
-# Email address for notifying site administrators
-ADMIN_EMAIL = ''
+# Email addresses for notifying site administrators
+ADMIN_EMAILS = []
 
 # For emailing users. ('MAIL_USERNAME' is an email address.)
 MAIL_SERVER = 'smtp.gmail.com'

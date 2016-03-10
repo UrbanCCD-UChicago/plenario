@@ -4,7 +4,7 @@ import string
 from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
 from flask_mail import Mail, Message
-from plenario.settings import MAIL_DISPLAY_NAME, MAIL_USERNAME, ADMIN_EMAIL
+from plenario.settings import MAIL_DISPLAY_NAME, MAIL_USERNAME, ADMIN_EMAILS
 from smtplib import SMTPAuthenticationError
 import math
 from collections import namedtuple
@@ -93,7 +93,7 @@ def slugify(text, delim=u'_'):
 def send_mail(subject, recipient, body):
     msg = Message(subject,
                   sender=(MAIL_DISPLAY_NAME, MAIL_USERNAME),
-                  recipients=[recipient], bcc=[ADMIN_EMAIL])
+                  recipients=[recipient], bcc=ADMIN_EMAILS)
 
     msg.body = body
     msg.html = string.replace(msg.body, '\r\n', '<br />')
