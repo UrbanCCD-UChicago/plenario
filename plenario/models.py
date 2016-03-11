@@ -331,11 +331,15 @@ class MetaTable(Base):
         # inspired this implementation.
         t = self.point_table
 
+        if agg_unit == 'quarter':
+            step = '3 months'
+        else:
+            step = '1 ' + agg_unit
         # Create a CTE to represent every time bucket in the timeseries
         # with a default count of 0
         day_generator = func.generate_series(func.date_trunc(agg_unit, start),
                                              func.date_trunc(agg_unit, end),
-                                             '1 ' + agg_unit)
+                                             step)
         defaults = select([sa.literal_column("0").label('count'),
                            day_generator.label('time_bucket')])\
             .alias('defaults')
