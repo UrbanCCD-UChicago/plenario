@@ -14,7 +14,6 @@ def init_db(args):
     if not any(vars(args).values()):
         # No specific arguments specified. Run it all!
         init_master_meta_user()
-        init_weather()
         init_celery()
         add_functions()
     else:
