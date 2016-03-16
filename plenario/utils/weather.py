@@ -838,9 +838,9 @@ class WeatherETL(object):
                          "precip_1hr","precip_3hr", "precip_6hr", "precip_24hr"]
 
         writer.writerow(self.out_header)
-        row_count = 0
+        #row_count = 0
         for row in metar_codes:
-            row_count += 1
+            #row_count += 1
             row_vals = self._parse_row_metar(row, self.out_header)
 
             # XXX: convert row_dict['weather_types'] from a list of lists (e.g. [[None, None, None, '', 'BR', None]])
@@ -1433,27 +1433,27 @@ class WeatherETL(object):
     # Given that this was the most recent month, year, call this function,
     # which will figure out the most recent hourly weather observation and
     # delete all metars before that datetime.
-    def clear_metars(self, lastYear, lastMonth, weather_stations_list):
+    def clear_metars(self, lastYear, lastMonth):
         # build a datetime and then remove all metars after the max datetime
         date_1st = datetime(year=lastYear, month=lastMonth, day=1)
         date_1st_str = datetime.strftime(date_1st, "%Y-%m-%d %H:%M:%S")        
         conn = engine.contextual_connect()
-        for wban in weather_stations_list:
-            sql = "SELECT wban_code, max (datetime) from dat_weather_observations_hourly where wban_code='%s' AND datetime >= '%s' GROUP BY wban_code" % (wban, date_1st_str)
-            # given this time, delete all from dat_weather_observations_metar
-            #
-            print "executing: ", sql
-            results = conn.execute(sql)
-            res = results.fetchone()
-            if not res:
-                continue
-            res_dt = res[1]
-            res_dt_str = datetime.strftime(res_dt, "%Y-%m-%d %H:%M:%S")        
-            # given this most recent time, delete any metars from before that time
-            sql2 = "DELETE FROM dat_weather_observations_metar WHERE wban_code='%s' AND datetime < '%s'" % (wban, res_dt_str)
-            print "executing: " , sql2
-            results = conn.execute(sql2)
-    
+        #for wban in weather_stations_list:
+        sql = "SELECT wban_code, max (datetime) from dat_weather_observations_hourly where datetime >= '%s' GROUP BY wban_code" % (date_1st_str)
+        # given this time, delete all from dat_weather_observations_metar
+        #
+        print "executing: ", sql
+        results = conn.execute(sql)
+        res = results.fetchone()
+        if not res:
+            return
+        res_dt = res[1]
+        res_dt_str = datetime.strftime(res_dt, "%Y-%m-%d %H:%M:%S")
+        # given this most recent time, delete any metars from before that time
+        sql2 = "DELETE FROM dat_weather_observations_metar WHERE datetime < '%s'" % (res_dt_str)
+        print "executing: " , sql2
+        results = conn.execute(sql2)
+
 class WeatherStationsETL(object):
     """ 
     Download, transform and create table with info about weather stations

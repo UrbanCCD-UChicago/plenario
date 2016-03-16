@@ -10,17 +10,32 @@ var DetailView = Backbone.View.extend({
         this.meta = this.attributes.meta;
         this.filters = this.attributes.filters;
 
+        // set up the start and end date to a 90 day windows from today
         var start = moment().subtract('d', 90).format('MM/DD/YYYY');
         var end = moment().format('MM/DD/YYYY');
 
+        var obs_from = moment(this.meta.obs_from).format('MM/DD/YYYY');
+        var obs_to = moment(this.meta.obs_to).format('MM/DD/YYYY');
+
+        // if the query has dates we use the user-specified start and end dates for display
         if (this.query) {
             start = moment(this.query.obs_date__ge).format('MM/DD/YYYY');
             end = moment(this.query.obs_date__le).format('MM/DD/YYYY');
         }
 
+        // if the user hasn't made a query set the start and end dates to obs_to and 90 days before
+        // to render available data
+        if (typeof this.query['location_geom__within'] == 'undefined') {
+            if (moment(start).isAfter(obs_to) || moment(end).isBefore(obs_from)) {
+                start = moment(obs_to).subtract('d',90).format('MM/DD/YYYY');
+                end = obs_to;
+                this.query.obs_date__ge = moment(obs_to).subtract('d',90).format('YYYY/MM/DD');
+                this.query.obs_date__le = moment(this.meta.obs_to).format('YYYY/MM/DD');
+            }
+        }
+
         if (typeof this.query['agg'] == 'undefined')
             this.query['agg'] = "week";
-
         if (typeof this.query['resolution'] == 'undefined')
             this.query['resolution'] = "500";
         this.points_query = $.extend(true, {}, this.query);
@@ -250,7 +265,6 @@ var DetailView = Backbone.View.extend({
         this.query = query;
         if(valid){
             this.undelegateEvents();
-            // console.log(this.query)
             new DetailView({el: '#map-view', attributes: {query: query, meta: this.meta}})
             var route = 'detail/' + $.param(query)
             _gaq.push(['_trackPageview', route]);
@@ -266,29 +280,36 @@ var DetailView = Backbone.View.extend({
     },
 
     backToExplorer: function(e){
-        //this function needs to get fixed
+
         e.preventDefault();
         this.undelegateEvents();
         var points_query = this.points_query;
+        var attrs = {resp: resp}
 
-        // delete filters and dataset name from query
+        if (typeof points_query['location_geom__within'] !== 'undefined'){
+            attrs['dataLayer'] = $.parseJSON(points_query['location_geom__within']);
+        } else {
+            // if the user hasn't done any filtering go back to index
+            if (_.isEmpty(self.filters)) {
+                new AboutView({el: '#list-view'});
+                shapeView = new app.ShapeView({el: '#shapes-view'});
+                map = new MapView({el: '#map-view', attributes: attrs})
+                _gaq.push(['_trackPageview', ""]);
+                router.navigate("");
+                return;
+            }
+        }
+
+        // clean up query
         delete points_query['dataset_name'];
-
         $.each(self.filters, function(key, val){
             delete points_query[key];
         });
 
-        //if we've made a query go back to that aggregate view
-        if (resp) { resp.undelegateEvents(); }
-        //if not use the initial query to render results which is why it's not rendering all the available datasets
-        resp = new ResponseView({el: '#list-view', attributes: {query: points_query}});
-        var attrs = { resp: resp }
-        if (typeof points_query['location_geom__within'] !== 'undefined'){
-            attrs['dataLayer'] = $.parseJSON(points_query['location_geom__within']);
-        }
-
         if (map) { map.undelegateEvents(); }
         map = new MapView({el: '#map-view', attributes: attrs});
+        if (resp) { resp.undelegateEvents(); }
+        resp = new ResponseView({el: '#list-view', attributes: {query: points_query}});
         var route = "aggregate/" + $.param(points_query);
         _gaq.push(['_trackPageview', route]);
         router.navigate(route);
@@ -317,7 +338,7 @@ var DetailView = Backbone.View.extend({
     getFields: function(){
         var q = this.getQuery()
         return $.ajax({
-            url: ('/v1/api/fields/' + q['dataset_name'])
+            url: '/v1/api/fields/' + q['dataset_name']
         })
     },
     getCutoffs: function(values){

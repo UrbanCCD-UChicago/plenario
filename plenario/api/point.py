@@ -16,9 +16,8 @@ import shapely.wkb, shapely.geometry
 from sqlalchemy.types import NullType
 from collections import OrderedDict
 
-from sqlalchemy import func, cast, select, Column, MetaData
-from sqlalchemy import Integer, String
 from plenario.models import ShapeMetadata
+
 
 class ParamValidator(object):
 
@@ -294,6 +293,9 @@ def time_of_day_validator(hour_str):
     else:
         return num, None
 
+def no_op_validator(foo):
+    return foo, None
+
 class FilterMaker(object):
     """
     Given dictionary of validated arguments and a sqlalchemy table,
@@ -539,6 +541,7 @@ def timeseries():
         msg = 'Failed to construct timeseries.'
         return internal_error(msg, e)
 
+    panel = MetaTable.attach_metadata(panel)
     resp = json_response_base(validator, panel)
 
     datatype = validator.vals['data_type']
@@ -625,6 +628,7 @@ def detail_aggregate():
     if datatype == 'json':
         time_counts = [{'count': c, 'datetime': d} for c, d in ts[1:]]
         resp = json_response_base(validator, time_counts)
+        resp['count'] = sum([c['count'] for c in time_counts])
         resp = make_response(json.dumps(resp, default=dthandler), 200)
         resp.headers['Content-Type'] = 'application/json'
 
@@ -649,7 +653,8 @@ def detail():
 
     validator = setup_detail_validator(dataset_name, raw_query_params)
 
-    # If any optional parameters are malformed, we're better off bailing and telling the user
+    # If any optional parameters are malformed,
+    # we're better off bailing and telling the user
     # than using a default and confusing them.
     err = validator.validate(raw_query_params)
     if err:
@@ -756,43 +761,59 @@ def grid():
               unless=lambda: request.args.get('dataset_name') is not None)
 @crossdomain(origin="*")
 def meta():
-    status_code = 200
+    # Doesn't require a table lookup,
+    # so no params passed on construction
+    validator = ParamValidator()
+    validator.set_optional('dataset_name',
+                           no_op_validator,
+                           None)\
+             .set_optional('location_geom__within',
+                           geom_validator,
+                           None)\
+             .set_optional('obs_date__ge', date_validator, None)\
+             .set_optional('obs_date__le', date_validator, None)
 
-    dataset_name = request.args.get('dataset_name')
+    err = validator.validate(request.args)
+    if err:
+        return bad_request(err)
 
-    q = '''
-        SELECT  m.obs_from, m.location, m.latitude, m.last_update,
-                m.source_url_hash, m.attribution, m.description, m.source_url,
-                m.obs_to, m.date_added, m.view_url,
-                m.longitude, m.observed_date, m.human_name, m.dataset_name,
-                m.update_freq, ST_AsGeoJSON(m.bbox) as bbox
-        FROM meta_master AS m
-        WHERE m.date_added IS NOT NULL
-    '''
+    # Set up base select statement
+    cols_to_return = ['human_name', 'dataset_name',
+                      'source_url', 'view_url',
+                      'obs_from', 'obs_to',
+                      'date_added', 'last_update', 'update_freq',
+                      'attribution', 'description', 'column_names']
+    col_objects = [getattr(MetaTable, col) for col in cols_to_return]
+    q = session.query(*col_objects)
+
+    # What params did the user provide?
+    dataset_name = validator.vals['dataset_name']
+    geom = validator.get_geom()
+    start_date = validator.vals['obs_date__ge']
+    end_date = validator.vals['obs_date__le']
+
+    # Filter over datasets if user provides full date range or geom
+    should_filter = geom or (start_date and end_date)
 
     if dataset_name:
-        response_query = {'dataset_name': dataset_name}
+        # If the user specified a name, don't try any filtering.
+        # Just spit back that dataset's metadata.
+        q = q.filter(MetaTable.dataset_name == dataset_name)
+    elif should_filter:
+        if geom:
+            intersects = sa.func.ST_Intersects(sa.func.ST_GeomFromGeoJSON(geom),
+                                               MetaTable.bbox)
+            q = q.filter(intersects)
+        if start_date and end_date:
+            q = q.filter(sa.and_(MetaTable.obs_from < end_date,
+                                 MetaTable.obs_to > start_date))
+    # Otherwise, just send back all the datasets
 
-        # We need to get the bbox separately so we can request it as json
-        q = text('{0} AND m.dataset_name=:dataset_name'.format(q))
-
-        with engine.begin() as c:
-            metas = list(c.execute(q, dataset_name=dataset_name))
-    else:
-        response_query = None
-        with engine.begin() as c:
-            metas = list(c.execute(q))
-
-    resp = json_response_base(None, [], query=response_query)
-
-    for m in metas:
-        keys = dict(zip(m.keys(), m.values()))
-        # If we have bounding box data, add it
-        if (m['bbox'] is not None):
-            keys['bbox'] = json.loads(m.bbox)
-        resp['objects'].append(keys)
+    metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
+    resp = json_response_base(validator, metadata_records)
 
     resp['meta']['total'] = len(resp['objects'])
+    status_code = 200
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp

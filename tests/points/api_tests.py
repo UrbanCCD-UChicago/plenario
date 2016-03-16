@@ -1,11 +1,3 @@
-import unittest
-from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta, flu_path, landmarks_path, \
-    crime_meta, crime_path
-from plenario.models import MetaTable
-from plenario.database import session
-from plenario.etl.point import PlenarioETL
-from init_db import init_meta
-from plenario import create_app
 import json
 import os
 import urllib
@@ -14,13 +6,18 @@ import csv
 
 from tests.test_fixtures.base_test import BasePlenarioTest, fixtures_path
 
-def get_loop_rect():
+
+def get_escaped_geojson(fname):
     pwd = os.path.dirname(os.path.realpath(__file__))
-    rect_path = os.path.join(pwd, '../test_fixtures', 'loop_rectangle.json')
+    rect_path = os.path.join(pwd, '../test_fixtures', fname)
     with open(rect_path, 'r') as rect_json:
         query_rect = rect_json.read()
     escaped_query_rect = urllib.quote(query_rect)
     return escaped_query_rect
+
+
+def get_loop_rect():
+    return get_escaped_geojson('loop_rectangle.json')
 
 
 class PointAPITests(BasePlenarioTest):
@@ -40,6 +37,18 @@ class PointAPITests(BasePlenarioTest):
         self.assertEqual(response_data['objects'][0]['view_url'],
                          "http://data.cityofchicago.org/api/views/ijzp-q8t2/rows")
 
+    def test_metadata_filter(self):
+        escaped_query_rect = get_loop_rect()
+        query = 'v1/api/datasets/?location_geom__within={}' \
+                '&obs_date__ge={}&obs_date__le={}'\
+            .format(escaped_query_rect, '2015-1-1', '2016-1-1')
+
+        resp = self.app.get(query)
+        response_data = json.loads(resp.data)
+
+        self.assertEqual(len(response_data['objects']), 1)
+        dataset_found = response_data['objects'][0]
+        self.assertEqual(dataset_found['dataset_name'], 'crimes')
 
     ''' /detail '''
 
@@ -99,6 +108,13 @@ class PointAPITests(BasePlenarioTest):
         resp = self.app.get(url)
         response_data = json.loads(resp.data)
         self.assertEqual(response_data['meta']['total'], 53)
+
+    def test_multipolygon(self):
+        multipolygon = get_escaped_geojson('loop_and_near_southeast.json')
+        url = 'v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-01-01&obs_date__le=2013-12-31&location_geom__within=' + multipolygon
+        resp = self.app.get(url)
+        response_data = json.loads(resp.data)
+        self.assertEqual(response_data['meta']['total'], 11)
 
     '''/grid'''
 

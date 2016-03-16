@@ -8,12 +8,19 @@ from plenario.models import ShapeMetadata
 from plenario.database import session, app_engine as engine
 from plenario.utils.ogr2ogr import OgrExport
 from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT
-from plenario.api.point import ParamValidator, setup_detail_validator, form_detail_sql_query, form_geojson_detail_response, bad_request
+from plenario.api.point import ParamValidator, setup_detail_validator,\
+    form_detail_sql_query, form_geojson_detail_response,\
+    form_csv_detail_response, bad_request
 
 from collections import OrderedDict
 from sqlalchemy import func
 
+<<<<<<< HEAD
 def export_dataset_to_response(dataset_name, query=None):
+=======
+
+def export_dataset_to_json_response(dataset_name, query=None):
+>>>>>>> origin/master
 
     """
     :param dataset_name: Name of shape dataset. Expected to be found in meta_shape table.
@@ -63,6 +70,9 @@ def export_dataset_to_response(dataset_name, query=None):
         if os.path.isfile(export_path):
             os.remove(export_path)
 
+def make_sql_ready_geom(geojson_str):
+    return make_fragment_str(extract_first_geometry_fragment(geojson_str))
+
 @crossdomain(origin="*")
 def get_all_shape_datasets():
     """
@@ -77,7 +87,11 @@ def get_all_shape_datasets():
                 'objects': []
             }
 
-        public_listing = ShapeMetadata.index()
+        geom = request.args.get('location_geom_within')
+        if geom:
+            geom = make_sql_ready_geom(geom)
+
+        public_listing = ShapeMetadata.index(geom)
         response_skeleton['objects'] = public_listing
         status_code = 200
 
@@ -95,10 +109,14 @@ def get_all_shape_datasets():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
+
 def aggregate_point_data(point_dataset_name, polygon_dataset_name):
 
     params = request.args.copy()
+    # Doesn't this override the path-derived parameter with a query parameter?
+    # Do we want that?
     if not params.get('shape'):
+        # form_detail_query expects to get info about a shape dataset this way.
         params['shape'] = polygon_dataset_name
 
     validator = setup_detail_validator(point_dataset_name, params)
@@ -107,10 +125,13 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     if err:
         return bad_request(err)
 
+    # Apply standard filters to point dataset
+    # And join each point to the containing shape
     q = form_detail_sql_query(validator, True)
     q = q.add_columns(func.count(validator.dataset.c.hash))
 
     # Page in RESPONSE_LIMIT chunks
+    # This seems contradictory. Don't we want one row per shape, no matter what?
     offset = validator.vals['offset']
     q = q.limit(RESPONSE_LIMIT)
     if offset > 0:
@@ -123,9 +144,13 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     res_cols.append('count')
 
     rows = [OrderedDict(zip(res_cols, res)) for res in q.all()]
-    resp = form_geojson_detail_response([], validator, rows)
+    if params.get('data_type') == 'csv':
+        resp = form_csv_detail_response(['hash'], validator, rows)
+    else:
+        resp = form_geojson_detail_response([], validator, rows)
 
     return resp
+
 
 @crossdomain(origin="*")
 def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
@@ -144,6 +169,7 @@ def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
                 polygon_dataset_name=polygon_dataset_name)
 
     return export_dataset_to_response(polygon_dataset_name, intersect_query)
+
 
 @crossdomain(origin="*")
 def filter_shape(dataset_name, geojson):
@@ -164,6 +190,7 @@ def filter_shape(dataset_name, geojson):
     '''.format(dataset_name=dataset_name, geojson_fragment=fragment)
 
     return export_dataset_to_response(dataset_name, intersect_query)
+
 
 @crossdomain(origin="*")
 def find_intersecting_shapes(geojson):
@@ -223,6 +250,7 @@ def find_intersecting_shapes(geojson):
     resp = make_response(json.dumps(response_skeleton), 200)
     return resp
 
+
 @crossdomain(origin="*")
 def export_shape(dataset_name):
     """
@@ -249,6 +277,7 @@ def export_shape(dataset_name):
     query = '''SELECT {} FROM {} AS g {}'''.format(columns_string, dataset_name, where_string)
 
     return export_dataset_to_response(dataset_name, query)
+
 
 def _shape_format_to_content_header(requested_format):
 

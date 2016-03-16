@@ -12,6 +12,7 @@ from flask_bcrypt import Bcrypt
 from itertools import groupby
 import json
 from hashlib import md5
+from operator import itemgetter
 
 from plenario.database import session, Base
 from plenario.utils.helpers import slugify
@@ -152,6 +153,53 @@ class MetaTable(Base):
                                       autoload=True, extend_existing=True)
             return self._point_table
 
+    @classmethod
+    def attach_metadata(cls, rows):
+        """
+        Given a list of dicts that include a dataset_name,
+        add metadata about the datasets to each dict.
+        :param rows: List of dict-likes with a dataset_name attribute
+        """
+        dataset_names = [row['dataset_name'] for row in rows]
+
+        # All the metadata attributes that we can pull in unaltered
+        as_is_attr_names = ['dataset_name', 'human_name', 'date_added',
+                            'obs_from', 'obs_to', 'last_update',
+                            'attribution', 'description', 'update_freq',
+                            'view_url', 'source_url',
+                            'contributor_name', 'contributor_email',
+                            'contributor_organization']
+        as_is_attrs = [getattr(cls, name) for name in as_is_attr_names]
+
+        # Bounding box is the exception. We need to process it a bit.
+        bbox = func.ST_AsGeoJSON(cls.bbox)
+
+        # Put our as-is and processed attributes together
+        attr_names = as_is_attr_names + ['bbox']
+        attrs = as_is_attrs + [bbox]
+
+        # Make the DB call
+        result = session.query(*attrs).\
+            filter(cls.dataset_name.in_(dataset_names))
+        meta_list = [dict(zip(attr_names, row)) for row in result]
+
+        # We need to coerce datetimes to strings
+        date_attrs = ['date_added', 'obs_from', 'obs_to']
+        for row in meta_list:
+            row['bbox'] = json.loads(row['bbox'])
+            for attr in date_attrs:
+                row[attr] = str(row[attr])
+
+        # Align the original list and metadata list...
+        meta_list = sorted(meta_list, key=itemgetter('dataset_name'))
+        to_coalesce = sorted(rows, key=itemgetter('dataset_name'))
+
+        # and coalesce them.
+        for original, meta in zip(to_coalesce, meta_list):
+            original.update(meta)
+
+        return to_coalesce
+
     # Return a list of [
     # {'dataset_name': 'Foo',
     # 'items': [{'datetime': dt, 'count': int}, ...] } ]
@@ -188,6 +236,8 @@ class MetaTable(Base):
                     'datetime': row.time_bucket.date(),  # UTC time
                     'count':    row.count
                 })
+                # Aggregate top-level count across all time slices.
+                ts_dict['count'] = sum([i['count'] for i in ts_dict['items']])
             panel.append(ts_dict)
 
         return panel
@@ -281,11 +331,15 @@ class MetaTable(Base):
         # inspired this implementation.
         t = self.point_table
 
+        if agg_unit == 'quarter':
+            step = '3 months'
+        else:
+            step = '1 ' + agg_unit
         # Create a CTE to represent every time bucket in the timeseries
         # with a default count of 0
         day_generator = func.generate_series(func.date_trunc(agg_unit, start),
                                              func.date_trunc(agg_unit, end),
-                                             '1 ' + agg_unit)
+                                             step)
         defaults = select([sa.literal_column("0").label('count'),
                            day_generator.label('time_bucket')])\
             .alias('defaults')
@@ -381,23 +435,52 @@ class ShapeMetadata(Base):
         return list(session.execute(shape_query))
 
     @classmethod
-    def index(cls):
-        result = session.query(cls.dataset_name,
-                               cls.human_name,
-                               cls.date_added,
-                               func.ST_AsGeoJSON(cls.bbox),
-                               cls.num_shapes,
-                               cls.attribution,
-                               cls.description,
-                               cls.update_freq)\
-                                 .filter(cls.is_ingested)
-        field_names = ['dataset_name', 'human_name', 'date_added',
-                       'bounding_box', 'num_shapes', 'attribution',
-                       'description', 'update_freq']
-        listing = [dict(zip(field_names, row)) for row in result]
+    def index(cls, geom=None):
+        # The attributes that we want to pass along as-is
+        as_is_attr_names = ['dataset_name', 'human_name', 'date_added',
+                            'attribution', 'description', 'update_freq',
+                            'view_url', 'source_url', 'num_shapes',
+                            'contributor_name', 'contributor_email',
+                            'contributor_organization']
+
+        as_is_attrs = [getattr(cls, name) for name in as_is_attr_names]
+
+        # We need to apply some processing to the bounding box
+        bbox = func.ST_AsGeoJSON(cls.bbox)
+        attr_names = as_is_attr_names + ['bbox']
+        attrs = as_is_attrs + [bbox]
+
+        result = session.query(*attrs).filter(cls.is_ingested)
+        listing = [dict(zip(attr_names, row)) for row in result]
+
         for dataset in listing:
             dataset['date_added'] = str(dataset['date_added'])
+
+        if geom:
+            listing = cls.add_intersections_to_index(listing, geom)
+
         return listing
+
+    @staticmethod
+    def add_intersections_to_index(listing, geom):
+        # For each dataset_name in the listing,
+        # get a count of intersections
+        # and replace num_geoms
+
+        for row in listing:
+            name = row['dataset_name']
+            num_intersections_query = '''
+            SELECT count(g.geom) as num_geoms
+            FROM "{dataset_name}" as g
+            WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
+            '''.format(dataset_name=name, geojson_fragment=geom)
+
+            num_intersections = session.execute(num_intersections_query)\
+                                       .first().num_geoms
+            row['num_shapes'] = num_intersections
+
+        intersecting_rows = [row for row in listing if row['num_shapes'] > 0]
+        return intersecting_rows
 
     @classmethod
     def get_metadata_with_etl_result(cls, table_name):
