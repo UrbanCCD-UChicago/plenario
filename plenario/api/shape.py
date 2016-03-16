@@ -13,11 +13,11 @@ from plenario.api.point import ParamValidator, setup_detail_validator, form_deta
 from collections import OrderedDict
 from sqlalchemy import func
 
-def export_dataset_to_json_response(dataset_name, query=None):
+def export_dataset_to_response(dataset_name, query=None):
 
     """
     :param dataset_name: Name of shape dataset. Expected to be found in meta_shape table.
-    :param query: Optional SQL query to be executed on shape dataset to filer results
+    :param query: Optional SQL query to be executed on shape dataset to filter results
     Expected query parameter: `data_type`. We expect it to be one of 'json', 'kml', or 'shapefile'.
                                 If none of these (or unspecified), return JSON.
     :return: response with geoJSON data and response code
@@ -143,7 +143,7 @@ def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
                 point_dataset_name=point_dataset_name,
                 polygon_dataset_name=polygon_dataset_name)
 
-    return export_dataset_to_json_response(polygon_dataset_name, intersect_query)
+    return export_dataset_to_response(polygon_dataset_name, intersect_query)
 
 @crossdomain(origin="*")
 def filter_shape(dataset_name, geojson):
@@ -163,7 +163,7 @@ def filter_shape(dataset_name, geojson):
     WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
     '''.format(dataset_name=dataset_name, geojson_fragment=fragment)
 
-    return export_dataset_to_json_response(dataset_name, intersect_query)
+    return export_dataset_to_response(dataset_name, intersect_query)
 
 @crossdomain(origin="*")
 def find_intersecting_shapes(geojson):
@@ -230,8 +230,25 @@ def export_shape(dataset_name):
     Expected query parameter: `data_type`. We expect it to be one of 'json', 'kml', or 'shapefile'.
                                 If none of these (or unspecified), return JSON.
     """
-    
-    return export_dataset_to_json_response(dataset_name)
+    '''
+    SELECT *
+    FROM {dataset_name} AS g
+    WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
+    '''
+
+    params = request.args.copy()
+
+    columns_string = "*"
+    where_string = ""
+    #if 'columns' in params.keys() or 'bounding_box' in params.keys():
+    if params.get('columns'):
+        columns_string = params['columns']#",".join(params['columns'])
+    if params.get('bounding_box'):
+        where_string = "WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{}'))".format(params['bounding_box'])
+
+    query = '''SELECT {} FROM {} AS g {}'''.format(columns_string, dataset_name, where_string)
+
+    return export_dataset_to_response(dataset_name, query)
 
 def _shape_format_to_content_header(requested_format):
 

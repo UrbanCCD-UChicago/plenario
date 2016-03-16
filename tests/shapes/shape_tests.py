@@ -227,5 +227,10 @@ class ShapeTests(BasePlenarioTest):
             self.assertGreaterEqual(neighborhood['properties']['count'], 1)
             #print neighborhood['properties']['sec_neigh'], neighborhood['properties']['count']
 
-
+    def test_export_shape_with_specifying_result_columns(self):
+        url = '/v1/api/shapes/chicago_neighborhoods/?columns=sec_neigh'
+        response = self.app.get(url)
+        data = json.loads(response.data)
+        for feature in data['features']:
+            self.assertEqual(feature['properties'].keys(), ['sec_neigh'])
 
