@@ -15,12 +15,7 @@ from plenario.api.point import ParamValidator, setup_detail_validator,\
 from collections import OrderedDict
 from sqlalchemy import func
 
-<<<<<<< HEAD
 def export_dataset_to_response(dataset_name, query=None):
-=======
-
-def export_dataset_to_json_response(dataset_name, query=None):
->>>>>>> origin/master
 
     """
     :param dataset_name: Name of shape dataset. Expected to be found in meta_shape table.
