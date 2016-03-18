@@ -126,10 +126,10 @@ from `settings.py`. Once logged in, go to 'Add a dataset' under the
 
 ### Production Support
 
-Many thanks for the following hosted tools that have given us free academic/open source accounts.
+Many thanks for the following hosted services that have given us free academic/open source accounts.
 
-* [Sentry](https://getsentry.com/welcome/)
-* [Code Climate](https://codeclimate.com/)
+* [Sentry](https://getsentry.com/welcome/) - exception and task monitoring
+* [Code Climate](https://codeclimate.com/) - static analysis
 
 
 ## Team
