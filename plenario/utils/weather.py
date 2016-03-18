@@ -1444,16 +1444,13 @@ class WeatherETL(object):
     # Given that this was the most recent month, year, call this function,
     # which will figure out the most recent hourly weather observation and
     # delete all metars before that datetime.
-    def clear_metars(self, lastYear, lastMonth):
+    def clear_metars(self):
         # build a datetime and then remove all metars after the max datetime
-        date_1st = datetime(year=lastYear, month=lastMonth, day=1)
-        date_1st_str = datetime.strftime(date_1st, "%Y-%m-%d %H:%M:%S")        
-        conn = engine.contextual_connect()
-        #for wban in weather_stations_list:
-        sql = "SELECT wban_code, max (datetime) from dat_weather_observations_hourly where datetime >= '%s' GROUP BY wban_code" % (date_1st_str)
+        sql = "SELECT max (datetime) from dat_weather_observations_hourly;"
         # given this time, delete all from dat_weather_observations_metar
         #
         print "executing: ", sql
+        conn = engine.contextual_connect()
         results = conn.execute(sql)
         res = results.fetchone()
         if not res:
