@@ -90,14 +90,15 @@ def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban
         pass
     
     print "xml_METAR_url: '%s'" % xml_METAR_url
-    #req = grequests.get(xml_METAR_url)
-    #result_list =  grequests.map([req])
-    #xml = result_list[0].text
-    req = requests.get(xml_METAR_url)
+    return raw_metars_from_url(xml_METAR_url)
+
+
+def raw_metars_from_url(url):
+    req = requests.get(url)
     xml = req.text
 
     xml_u = xml.encode('utf-8')
-    
+
     parser = etree.XMLParser(ns_clean=True, recover=True, encoding='utf-8')
     h = fromstring(xml_u, parser=parser)
     #tree = etree.parse(StringIO(xml_u))
@@ -114,16 +115,19 @@ def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban
     print "completed len(metar_raws)= %d" % len(metar_raws)
     return metar_raws
 
-def getAllCurrentWeather():
-    all_calls = all_callSigns()
-    all_metars = []
-    for i in range(0, len(all_calls), 1000):
-        calls_range = all_calls[i:(i+1000)]
-        metars = getCurrentWeather(call_signs=calls_range)
-        all_metars.extend(metars)
 
-    print "getAllCurrentWeather(): total metar collection is length", len(all_metars)
-    return all_metars
+def getAllCurrentWeather():
+    all_metar_url = 'http://aviationweather.gov/adds/dataserver_current/current/metars.cache.xml'
+    return raw_metars_from_url(all_metar_url)
+    # all_calls = all_callSigns()
+    # all_metars = []
+    # for i in range(0, len(all_calls), 1000):
+    #     calls_range = all_calls[i:(i+1000)]
+    #     metars = getCurrentWeather(call_signs=calls_range)
+    #     all_metars.extend(metars)
+    #
+    # print "getAllCurrentWeather(): total metar collection is length", len(all_metars)
+
 
 
 def getWban(obs):
