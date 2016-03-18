@@ -877,12 +877,12 @@ class WeatherETL(object):
 
             # Making sure there is a WBAN code
             if not row_vals[0]:
-                #print row_vals
+                # This will happen for stations outside of the USA.
+                # Discard for now.
                 continue
             added_count += 1
             writer.writerow(row_vals)
 
-        print 'added ', added_count, ' of ', row_count
         return self.clean_observations_metar
 
 

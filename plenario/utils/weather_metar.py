@@ -1,6 +1,7 @@
 from metar.metar import Metar
 from plenario.database import app_engine as engine
 import requests
+import csv
 
 from lxml import etree
 from lxml.etree import fromstring
@@ -9,6 +10,17 @@ from lxml import objectify
 # Example METAR URL: 'https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25&stationString=KORD'
 
 current_METAR_url = 'http://aviationweather.gov/adds/dataserver_current/current/'
+
+
+def _make_call_sign_wban_map():
+    with open('plenario/utils/wban_to_call_sign.csv') as fp:
+        reader = csv.reader(fp)
+        # Discard header
+        reader.next()
+        call_sign_to_wban_map = {row[1]: row[0] for row in reader}
+    return call_sign_to_wban_map
+
+call_sign_wban_map = _make_call_sign_wban_map()
 
 # An example code:
 # - In this example, we have "few clouds at 1500 feet, broken clouds at 4,000 feet w/ cumulonimbus,
@@ -27,19 +39,8 @@ def all_callSigns():
 
 
 def callSign2Wban(call_sign):
-    sql = "SELECT wban_code FROM weather_stations where call_sign='%s'" % call_sign
-    result = engine.execute(sql)
-    #print "result=", result
-    x = result.first()
-    wban = None
-    if x:
-        wban = x[0]
-        #print "wban=", wban
-        #print "found call sign:", call_sign, "wban=", wban
-        return wban
-    else:
-        #print "could not find call sign:", call_sign
-        return None
+    return call_sign_wban_map.get(call_sign)
+
 
 def wban2CallSign(wban_code):
     sql = "SELECT call_sign FROM weather_stations where wban_code='%s'" % wban_code
