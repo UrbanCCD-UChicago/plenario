@@ -794,9 +794,9 @@ def edit_dataset(source_url_hash):
 @views.route('/admin/delete-dataset/<source_url_hash>')
 @login_required
 def delete_dataset(source_url_hash):
-    result = delete_dataset_task.delay(source_url_hash)
+    result = delete_dataset_task(source_url_hash)
     return make_response(json.dumps({'status': 'success',
-                                     'task_id': result.id}))
+                                     'text': result}))
 
 
 @views.route('/update-dataset/<source_url_hash>')
@@ -832,6 +832,6 @@ def shape_status():
 @views.route('/admin/delete-shape/<table_name>')
 @login_required
 def delete_shape(table_name):
-    result = delete_shape_task.delay(table_name)
+    result = delete_shape_task(table_name)
     return make_response(json.dumps({'status': 'success',
-                                     'task_id': result.id}))
+                                     'text': result}))
