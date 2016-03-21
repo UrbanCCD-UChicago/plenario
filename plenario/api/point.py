@@ -784,7 +784,7 @@ def meta():
                       'date_added', 'last_update', 'update_freq',
                       'attribution', 'description', 'column_names']
     col_objects = [getattr(MetaTable, col) for col in cols_to_return]
-    q = session.query(*col_objects)
+    q = session.query(*col_objects).filter(MetaTable.date_added != None)
 
     # What params did the user provide?
     dataset_name = validator.vals['dataset_name']
