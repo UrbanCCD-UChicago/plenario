@@ -93,7 +93,9 @@ def delete_shape(self, table_name):
 def frequency_update(frequency):
     # hourly, daily, weekly, monthly, yearly
     md = session.query(MetaTable)\
-        .filter(MetaTable.update_freq == frequency).all()
+        .filter(MetaTable.update_freq == frequency)\
+        .filter(MetaTable.date_added != None)\
+        .all()
     for m in md:
         update_dataset.delay(m.source_url_hash)
 
