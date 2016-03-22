@@ -15,7 +15,10 @@ import plenario.tasks as tasks
 
 
 def often_update():
-    tasks.update_metar.delay()
+    # Keep METAR updates out of the queue
+    # so that they run right away even when the ETL is chugging through
+    # a big backlog of event dataset updates.
+    tasks.update_metar()
 
 
 def daily_update():
