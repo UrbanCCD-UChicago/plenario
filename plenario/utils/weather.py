@@ -1455,7 +1455,7 @@ class WeatherETL(object):
         res = results.fetchone()
         if not res:
             return
-        res_dt = res[1]
+        res_dt = res[0]
         res_dt_str = datetime.strftime(res_dt, "%Y-%m-%d %H:%M:%S")
         # given this most recent time, delete any metars from before that time
         sql2 = "DELETE FROM dat_weather_observations_metar WHERE datetime < '%s'" % (res_dt_str)
