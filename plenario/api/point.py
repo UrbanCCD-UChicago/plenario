@@ -757,8 +757,6 @@ def grid():
     return resp
 
 
-@cache.cached(timeout=CACHE_TIMEOUT,
-              unless=lambda: request.args.get('dataset_name') is not None)
 @crossdomain(origin="*")
 def meta():
     # Doesn't require a table lookup,
