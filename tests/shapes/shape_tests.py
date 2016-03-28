@@ -114,7 +114,7 @@ class ShapeTests(BasePlenarioTest):
 
         # Moving this functionality to the /shapes endpoint
         # What shape datasets intersect with the rectangle?
-        resp = self.app.get('/v1/api/shapes/?location_geom_within=' + escaped_query_rect)
+        resp = self.app.get('/v1/api/shapes/?location_geom__within=' + escaped_query_rect)
         self.assertEqual(resp.status_code, 200)
         response_data = json.loads(resp.data)
 
