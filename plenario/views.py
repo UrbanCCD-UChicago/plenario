@@ -341,14 +341,10 @@ def _assert_reachable(url):
 
 def is_certainly_html(url):
     head = requests.head(url)
-    if head.status_code != 200:
+    try:
+        return 'text/html' in head.headers['content-type']
+    except KeyError:
         return False
-    else:
-        try:
-            return 'text/html' in head.headers['content-type']
-        except KeyError:
-            # No content-type? Bummer.
-            return False
 
 
 def context_from_suggestion(suggestion):
