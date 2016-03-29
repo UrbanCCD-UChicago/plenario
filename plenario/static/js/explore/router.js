@@ -1,21 +1,29 @@
 var AppRouter = Backbone.Router.extend({
     routes: {
         "": "defaultRoute",
+        "city/:city": "defaultRoute",
         "aggregate/:query": "aggregate",
         "detail/:query": "detail",
         "shapeDetail/:query":"shapeDetail"
     },
-    defaultRoute: function(){
+    defaultRoute: function(city){
+        if (city === undefined) {
+            city = 'chicago';
+        }
+        city = city.toLowerCase();
+
         new AboutView({el: '#list-view'});
         shapeView = new app.ShapeView({el: '#shapes-view'});
-        map = new MapView({el: '#map-view', attributes: {}})
+        map = new MapView({el: '#map-view', attributes: {
+            city: city
+        }})
     },
     aggregate: function(query){
         var q = parseParams(query);
         resp = new ResponseView({el: '#list-view', attributes: {query: q}});
         var attrs = {
             resp: resp
-        }
+        };
         if (typeof q['location_geom__within'] !== 'undefined'){
             attrs['dataLayer'] = $.parseJSON(q['location_geom__within']);
         }

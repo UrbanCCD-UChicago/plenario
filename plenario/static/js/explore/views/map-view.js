@@ -1,3 +1,8 @@
+var cityCoordinates = {
+    'chicago': [41.880517,-87.644061],
+    'bristol': [51.45451, -2.58791]
+};
+
 var MapView = Backbone.View.extend({
     events: {
         'click #submit-query': 'submitForm',
@@ -25,7 +30,8 @@ var MapView = Backbone.View.extend({
             tapTolerance: 30,
             minZoom: 1
         };
-        this.map = L.map('map', map_options).setView([41.880517,-87.644061], 11);
+        var city = this.attributes.city;
+        this.map = L.map('map', map_options).setView(cityCoordinates[city], 11);
         L.tileLayer('https://{s}.tiles.mapbox.com/v3/datamade.hn83a654/{z}/{x}/{y}.png', {
           attribution: '<a href="http://www.mapbox.com/about/maps/" target="_blank">Terms &amp; Feedback</a>'
         }).addTo(this.map);
