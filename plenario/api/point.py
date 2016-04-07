@@ -808,13 +808,21 @@ def meta():
     # Otherwise, just send back all the datasets
 
     metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
+
+    # TODO: Store this data statically in the registry
+    failure_messages = []
     for record in metadata_records:
-        cols = make_field_query(record['dataset_name'])
-        record['columns'] = cols
+        try:
+            cols = make_field_query(record['dataset_name'])
+            record['columns'] = cols
+        except Exception as e:
+            record['columns'] = None
+            failure_messages.append(e.message)
 
     resp = json_response_base(validator, metadata_records)
 
     resp['meta']['total'] = len(resp['objects'])
+    resp['meta']['message'] = failure_messages
     status_code = 200
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
