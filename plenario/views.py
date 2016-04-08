@@ -341,6 +341,9 @@ def _assert_reachable(url):
 
 def is_certainly_html(url):
     head = requests.head(url)
+    if head.status_code == 302:
+        # Edge case with Dropbox redirects.
+        return False
     try:
         return 'text/html' in head.headers['content-type']
     except KeyError:
