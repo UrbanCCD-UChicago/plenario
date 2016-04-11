@@ -757,6 +757,10 @@ def grid():
     return resp
 
 
+# Kludge until we store column data in registry.
+# Only cache response if it is requesting column metadata.
+@cache.cached(timeout=CACHE_TIMEOUT,
+              unless=lambda: request.args.get('include_columns') is None)
 @crossdomain(origin="*")
 def meta():
     # Doesn't require a table lookup,
@@ -809,15 +813,17 @@ def meta():
 
     metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
 
-    # TODO: Store this data statically in the registry
+    # TODO: Store this data statically in the registry,
+    # and remove conditional.
     failure_messages = []
-    for record in metadata_records:
-        try:
-            cols = make_field_query(record['dataset_name'])
-            record['columns'] = cols
-        except Exception as e:
-            record['columns'] = None
-            failure_messages.append(e.message)
+    if request.args.get('include_columns'):
+        for record in metadata_records:
+            try:
+                cols = make_field_query(record['dataset_name'])
+                record['columns'] = cols
+            except Exception as e:
+                record['columns'] = None
+                failure_messages.append(e.message)
 
     resp = json_response_base(validator, metadata_records)
 

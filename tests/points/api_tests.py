@@ -51,7 +51,7 @@ class PointAPITests(BasePlenarioTest):
         self.assertEqual(dataset_found['dataset_name'], 'crimes')
 
     def test_included_fields(self):
-        query = '/v1/api/datasets/?dataset_name=flu_shot_clinics'
+        query = '/v1/api/datasets/?dataset_name=flu_shot_clinics&include_columns=true'
         resp = self.app.get(query)
         response_data = json.loads(resp.data)
         cols = response_data['objects'][0]['columns']
@@ -60,7 +60,7 @@ class PointAPITests(BasePlenarioTest):
     ''' /fields '''
 
     def test_fields(self):
-        query = 'v1/api/fields/flu_shot_clinics'
+        query = 'v1/api/fields/flu_shot_clinics?include_columns=true'
         resp = self.app.get(query)
         response_data = json.loads(resp.data)
 
