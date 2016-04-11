@@ -102,19 +102,9 @@ class ShapeTests(BasePlenarioTest):
             query_rect = rect_json.read()
         escaped_query_rect = urllib.quote(query_rect)
 
-        # What shape datasets intersect with the rectangle?
-        resp = self.app.get('/v1/api/shapes/intersections/' + escaped_query_rect)
-        self.assertEqual(resp.status_code, 200)
-        response_data = json.loads(resp.data)
-
-        # By design, the query rectangle should cross 3 zip codes and 2 pedestrian streets
-        datasets_to_num_geoms = {obj['dataset_name']: obj['num_geoms'] for obj in response_data['objects']}
-        self.assertEqual(datasets_to_num_geoms[fixtures['zips'].table_name], 3)
-        self.assertEqual(datasets_to_num_geoms[fixtures['streets'].table_name], 2)
-
         # Moving this functionality to the /shapes endpoint
         # What shape datasets intersect with the rectangle?
-        resp = self.app.get('/v1/api/shapes/?location_geom_within=' + escaped_query_rect)
+        resp = self.app.get('/v1/api/shapes/?location_geom__within=' + escaped_query_rect)
         self.assertEqual(resp.status_code, 200)
         response_data = json.loads(resp.data)
 
@@ -175,8 +165,10 @@ class ShapeTests(BasePlenarioTest):
         rect_path = os.path.join(FIXTURE_PATH, 'university_village_rectangle.json')
         with open(rect_path, 'r') as rect_json:
             query_rect = rect_json.read()
+        escaped_query_rect = urllib.quote(query_rect)
 
-        url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
+        #url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
+        url = '/v1/api/shapes/pedestrian_streets/?location_geom__within=' + escaped_query_rect
         response = self.app.get(url)
         self.assertEqual(response.status_code, 200)
 
@@ -188,8 +180,10 @@ class ShapeTests(BasePlenarioTest):
         rect_path = os.path.join(FIXTURE_PATH, 'loop_rectangle.json')
         with open(rect_path, 'r') as rect_json:
             query_rect = rect_json.read()
+        escaped_query_rect = urllib.quote(query_rect)
 
-        url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
+        #url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
+        url = '/v1/api/shapes/pedestrian_streets/?location_geom__within=' + escaped_query_rect
         response = self.app.get(url)
         self.assertEqual(response.status_code, 200)
 
@@ -251,7 +245,6 @@ class ShapeTests(BasePlenarioTest):
         response = self.app.get(url)
         data = json.loads(response.data)
         for feature in data['features']:
-            print feature
             self.assertEqual(feature['properties'].keys(), ['shape_area', 'sec_neigh'])
 
     def test_export_shape_with_invalid_columns(self):

@@ -75,7 +75,7 @@ def export_dataset_to_response(dataset_name, query=None):
             os.remove(export_path)
 
 def make_sql_ready_geom(geojson_str):
-    return make_fragment_str(extract_first_geometry_fragment(geojson_str))
+    return make_fragment_str(extract_first_geometry_fragment(geojson_str))    
 
 @crossdomain(origin="*")
 def get_all_shape_datasets():
@@ -91,7 +91,7 @@ def get_all_shape_datasets():
                 'objects': []
             }
 
-        geom = request.args.get('location_geom_within')
+        geom = request.args.get('location_geom__within')
         if geom:
             geom = make_sql_ready_geom(geom)
 
@@ -174,86 +174,6 @@ def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
 
     return export_dataset_to_response(polygon_dataset_name, intersect_query)
 
-
-@crossdomain(origin="*")
-def filter_shape(dataset_name, geojson):
-    """
-    Given a shape dataset and user-provided geojson,
-    return all shapes from the dataset that intersect the geojson.
-
-    :param dataset_name: Name of shape dataset
-    :param geojson: URL encoded goejson
-    :return:
-    """
-    fragment = make_fragment_str(extract_first_geometry_fragment(geojson))
-
-    intersect_query = '''
-    SELECT *
-    FROM {dataset_name} AS g
-    WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
-    '''.format(dataset_name=dataset_name, geojson_fragment=fragment)
-
-    return export_dataset_to_response(dataset_name, intersect_query)
-
-
-@crossdomain(origin="*")
-def find_intersecting_shapes(geojson):
-    """
-    Respond with all shape datasets that intersect with the geojson provided.
-    Also include how many geom rows of the dataset intersect.
-    :param geojson: URL encoded geojson.
-    """
-    fragment = make_fragment_str(extract_first_geometry_fragment(geojson))
-
-    try:
-        # First, do a bounding box check on all shape datasets.
-        query = '''
-        SELECT m.dataset_name
-        FROM meta_shape as m
-        WHERE m.bbox &&
-            (SELECT ST_GeomFromGeoJSON('{geojson_fragment}'));
-        '''.format(geojson_fragment=fragment)
-
-        intersecting_datasets = engine.execute(query)
-        bounding_box_intersection_names = [dataset.dataset_name for dataset in intersecting_datasets]
-    except Exception as e:
-        print 'Error finding candidates'
-        raise e
-
-    try:
-        # Then, for the candidates, get a count of the rows that intersect.
-        response_objects = []
-        for dataset_name in bounding_box_intersection_names:
-            num_intersections_query = '''
-            SELECT count(g.geom) as num_geoms
-            FROM {dataset_name} as g
-            WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
-            '''.format(dataset_name=dataset_name, geojson_fragment=fragment)
-
-            num_intersections = engine.execute(num_intersections_query)\
-                                      .first().num_geoms
-
-            if num_intersections > 0:
-                response_objects.append({
-                    'dataset_name': dataset_name,
-                    'num_geoms': num_intersections
-                })
-
-    except Exception as e:
-        print 'Error narrowing candidates'
-        raise e
-
-    response_skeleton = {
-                'meta': {
-                    'status': 'ok',
-                    'message': '',
-                },
-                'objects': response_objects
-            }
-
-    resp = make_response(json.dumps(response_skeleton), 200)
-    return resp
-    
 @crossdomain(origin="*")
 def export_shape(dataset_name):
     """
@@ -271,11 +191,12 @@ def export_shape(dataset_name):
         columns_string = params['columns']
         if not validate_sql_string(columns_string):
             return bad_request("Invalid column specification")
-    if params.get('bounding_box'):
-        where_string = "WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{}'))".format(params['bounding_box'])
+
+    if params.get('location_geom__within'):
+        fragment = make_fragment_str(extract_first_geometry_fragment(params['location_geom__within']))
+        where_string = "WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{}'))".format(fragment)
 
     query = '''SELECT {} FROM {} AS g {}'''.format(columns_string, dataset_name, where_string)
-
     return export_dataset_to_response(dataset_name, query)
 
 
