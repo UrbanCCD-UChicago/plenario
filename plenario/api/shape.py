@@ -1,6 +1,7 @@
 import os
 import json
 import tempfile
+import re
 
 from flask import make_response, request
 
@@ -14,6 +15,14 @@ from plenario.api.point import ParamValidator, setup_detail_validator,\
 
 from collections import OrderedDict
 from sqlalchemy import func
+
+#if columns are specified by the user's shape query, check that the column
+#names include only valid characters (ie alphanumeric characters and underscores)
+def validate_sql_string(sql_string):
+    for char in sql_string:
+        if not re.match('[\w,]', char):
+            return False
+    return True
 
 def export_dataset_to_response(dataset_name, query=None):
 
@@ -244,8 +253,7 @@ def find_intersecting_shapes(geojson):
 
     resp = make_response(json.dumps(response_skeleton), 200)
     return resp
-
-
+    
 @crossdomain(origin="*")
 def export_shape(dataset_name):
     """
@@ -253,19 +261,16 @@ def export_shape(dataset_name):
     Expected query parameter: `data_type`. We expect it to be one of 'json', 'kml', or 'shapefile'.
                                 If none of these (or unspecified), return JSON.
     """
-    '''
-    SELECT *
-    FROM {dataset_name} AS g
-    WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
-    '''
 
     params = request.args.copy()
 
     columns_string = "*"
     where_string = ""
-    #if 'columns' in params.keys() or 'bounding_box' in params.keys():
+
     if params.get('columns'):
-        columns_string = params['columns']#",".join(params['columns'])
+        columns_string = params['columns']
+        if not validate_sql_string(columns_string):
+            return bad_request("Invalid column specification")
     if params.get('bounding_box'):
         where_string = "WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{}'))".format(params['bounding_box'])
 

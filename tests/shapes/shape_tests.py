@@ -246,3 +246,15 @@ class ShapeTests(BasePlenarioTest):
         for feature in data['features']:
             self.assertEqual(feature['properties'].keys(), ['sec_neigh'])
 
+    def test_export_shape_with_specifying_multiple_result_columns(self):
+        url = '/v1/api/shapes/chicago_neighborhoods/?columns=sec_neigh,shape_area'
+        response = self.app.get(url)
+        data = json.loads(response.data)
+        for feature in data['features']:
+            print feature
+            self.assertEqual(feature['properties'].keys(), ['shape_area', 'sec_neigh'])
+
+    def test_export_shape_with_invalid_columns(self):
+        url = '/v1/api/shapes/chicago_neighborhoods/?columns=;DROP TABLE *;--'
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 400)
