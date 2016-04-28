@@ -149,9 +149,9 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
 
     rows = [OrderedDict(zip(res_cols, res)) for res in q.all()]
     if params.get('data_type') == 'csv':
-        resp = form_csv_detail_response(['hash'], validator, rows)
+        resp = form_csv_detail_response(['hash', 'ogc_fid'], validator, rows)
     else:
-        resp = form_geojson_detail_response([], validator, rows)
+        resp = form_geojson_detail_response(['hash', 'ogc_fid'], validator, rows)
 
     return resp
 

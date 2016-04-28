@@ -233,6 +233,23 @@ class ShapeTests(BasePlenarioTest):
             self.assertGreaterEqual(neighborhood['properties']['count'], 1)
             #print neighborhood['properties']['sec_neigh'], neighborhood['properties']['count']
 
+    def test_export_shape_with_location_filtering(self):
+        rect_path = os.path.join(FIXTURE_PATH, 'loop_rectangle.json')
+        with open(rect_path, 'r') as rect_json:
+            query_rect = rect_json.read()
+        escaped_query_rect = urllib.quote(query_rect)
+        unfiltered_url = '/v1/api/shapes/chicago_neighborhoods/'#?location_geom__within=' + escaped_query_rect
+        filtered_url = '/v1/api/shapes/chicago_neighborhoods/?location_geom__within=' + escaped_query_rect
+        
+        unfiltered_response = self.app.get(unfiltered_url)
+        unfiltered_data = json.loads(unfiltered_response.data)
+        unfiltered_neighborhoods = unfiltered_data['features']
+
+        filtered_response = self.app.get(filtered_url)
+        filtered_data = json.loads(filtered_response.data)
+        filtered_neighborhoods = filtered_data['features']
+        self.assertGreater(len(unfiltered_neighborhoods), len(filtered_neighborhoods))
+
     def test_export_shape_with_specifying_result_columns(self):
         url = '/v1/api/shapes/chicago_neighborhoods/?columns=sec_neigh'
         response = self.app.get(url)
@@ -251,3 +268,13 @@ class ShapeTests(BasePlenarioTest):
         url = '/v1/api/shapes/chicago_neighborhoods/?columns=;DROP TABLE *;--'
         response = self.app.get(url)
         self.assertEqual(response.status_code, 400)
+
+    def test_verify_result_columns(self):
+        url = '/v1/api/shapes/chicago_neighborhoods/landmarks/?obs_date__ge=1900-09-22&obs_date__le=2013-10-1'
+        response = self.app.get(url)
+        data = json.loads(response.data)
+        for feature in data['features']:
+            self.assertFalse(feature['properties'].get('hash'))
+            self.assertFalse(feature['properties'].get('ogc_fid'))
+            self.assertTrue(feature['properties'].get('count'))
+
