@@ -1,51 +1,77 @@
-{% extends 'base.html' %}
-{% block title %}Data Explorer - Plenar.io{% endblock %}
-{% block extra_styles %}
-    <link href="{{ url_for('static', filename='css/leaflet.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/leaflet.draw.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/leaflet.label.css') }}" rel="stylesheet">
-    <link href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css" rel="stylesheet">
-{% endblock %}
-{% block content %}
-    <div class="row">
-        <div class="col-md-12">
-            <div id="map-view"></div>
-        </div>
-        <div class="col-md-12">
-            <div id="list-view"></div>
-            <div id="shapes-view"></div>
-            <div id="detail-view"></div>
-        </div>
-    </div>
-    <div class="modal fade" id="errorModal" tabindex="-1" role="dialog" aria-labelledby="error" aria-hidden="true"></div>
-{% endblock %}
-{% block extra_javascript %}
-    <script src="{{ url_for('static', filename='js/jquery-ui.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/jenks.js') }}" type="text/javascript"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/underscore-min.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/backbone-min.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/spin.min.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.spin.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/leaflet.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/leaflet.draw.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/leaflet.label.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/moment.min.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.dataTables.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/highcharts.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/chart_helper.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/helpers.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/router.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/about-view.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/map-view.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/response-view.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/detail-view.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/filter-view.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/response-view.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/shape-view.js') }}"></script>
+<!DOCTYPE html>
+<html lang="en" style="height: 100%;">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/shape-detail-view.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/models/shape.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/collections/shapes.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/views/error-view.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/explore/app.js') }}"></script>
-{% endblock %}
+    <title>Plenario Explorer</title>
+
+    <base href="/explore" />
+    <link href="http://ember-prototype.s3-website-us-east-1.amazonaws.com/assets/vendor.css" rel="stylesheet">
+    <link href="http://ember-prototype.s3-website-us-east-1.amazonaws.com/assets/plenario-explorer.css" rel="stylesheet">
+    <!--link href="{{ url_for('static', filename='js/explorer-dist/assets/plenario-explorer.css') }}" rel="stylesheet"-->
+
+  </head>
+
+  <body style="height: 100%" id="top">
+    <div class="navbar navbar-default navbar-static-top" role="navigation">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="/"><img id="plenario-logo" src="/static/images/logo.png" height="22px" width="22px"/>Plenar.io</a>
+        </div>
+        <div class="navbar-collapse collapse pull-right">
+          <ul class="nav navbar-nav">
+          	<li class="{% if request.path == '/' %}active{% endif %}"><a href="{{ url_for('views.index') }}">Home</a></li>
+            <li class="{% if request.path == '/explore' %}active{% endif %}"><a href="{{ url_for('views.explore_view') }}">Explore</a></li>
+            <li class="{% if request.path == '/api-docs' %}active{% endif %}"><a href="{{ url_for('views.api_docs_view') }}">API</a></li>
+            <li class="{% if request.path == '/examples' %}active{% endif %}"><a href="{{ url_for('views.examples_view') }}">Examples</a></li>
+            <li class="{% if request.path == '/contribute' %}active{% endif %}"><a href="{{ url_for('views.user_add_dataset') }}">Add data</a></li>
+            <li class="{% if request.path == '/about' %}active{% endif %}"><a href="{{ url_for('views.about_view') }}">About</a></li>
+            {% if session.get('user_id') %}
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                        Admin <span class="caret"></span>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a href="{{ url_for('views.view_datasets') }}">View datasets</a></li>
+                        <li><a href="{{ url_for('views.admin_add_dataset') }}">Add a dataset</a></li>
+                        <li><a href="{{ url_for('auth.add_user') }}">Add a user</a></li>
+                        <li><a href="{{ url_for('auth.reset_password') }}">Reset my password</a></li>
+                    </ul>
+                </li>
+                <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
+            {% else %}
+                <li><a href="{{ url_for('auth.login') }}">Login</a></li>
+            {% endif %}
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </div>
+
+    <div class="container-fluid">
+      <div id="ember-app"> </div>
+    </div>
+
+    <div class='container-fluid'>
+      <div class="footer">
+        <ul>
+          <li><a href="{{ url_for('views.terms_view') }}">Terms</a></li>
+          <li>Built by <a href='https://urbanccd.org/'>UrbanCCD</a>/<a href='http://www.uchicago.edu/'>University of Chicago</a> and <a href='http://datamade.us'>DataMade</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <script type="text/javascript" src="http://ember-prototype.s3-website-us-east-1.amazonaws.com/assets/vendor.js"></script>
+    <script type="text/javascript" src="http://ember-prototype.s3-website-us-east-1.amazonaws.com/assets/plenario-explorer.js"></script>
+    <!--script type="text/javascript" src="{{ url_for('static', filename='js/explorer-dist/assets/vendor.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/explorer-dist/assets/plenario-explorer.js') }}"></script-->
+
+  </body>
+</html>
