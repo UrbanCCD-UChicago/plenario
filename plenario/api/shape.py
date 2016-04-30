@@ -174,6 +174,7 @@ def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
 
     return export_dataset_to_response(polygon_dataset_name, intersect_query)
 
+
 @crossdomain(origin="*")
 def export_shape(dataset_name):
     """

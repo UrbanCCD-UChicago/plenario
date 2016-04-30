@@ -24,6 +24,7 @@ from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float, \
 from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
 from uuid import uuid4
+from metar.metar import ParserError
 
 from weather_metar import getMetar, getMetarVals, getAllCurrentWeather, getCurrentWeather
 
@@ -838,22 +839,27 @@ class WeatherETL(object):
                          "precip_1hr","precip_3hr", "precip_6hr", "precip_24hr"]
 
         writer.writerow(self.out_header)
-        #row_count = 0
+        row_count = 0
+        added_count = 0
         for row in metar_codes:
-            #row_count += 1
+            row_count += 1
             row_vals = self._parse_row_metar(row, self.out_header)
 
             # XXX: convert row_dict['weather_types'] from a list of lists (e.g. [[None, None, None, '', 'BR', None]])
             # to a string that looks like: "{{None, None, None, '', 'BR', None}}"
 
-            weather_types_str = str(row_vals[self.out_header.index('weather_types')])
+            try:
+                weather_types_str = str(row_vals[self.out_header.index('weather_types')])
+            except IndexError:
+                print 'the offending row is', row_vals
+                continue
             #print "weather_types_str = '%s'" % weather_types_str
             # literally just change '[' to '{' and ']' to '}'
             weather_types_str = weather_types_str.replace('[', '{')
             weather_types_str = weather_types_str.replace(']', '}')
             row_vals[self.out_header.index('weather_types')] = weather_types_str
             #print "_transform_metars(): changed row_vals[self.out_header.index('weather_types')] to ", weather_types_str
-            
+
             if (not row_vals):
                 continue
             row_dict = dict(zip(self.out_header, row_vals))
@@ -862,12 +868,19 @@ class WeatherETL(object):
                 # Only include observations from the specified list of wban_code values
                 if (row_dict['wban_code'] not in weather_stations_list):
                     continue
-                    
+
             if (banned_weather_stations_list is not None):
                 if (row_dict['wban_code'] in banned_weather_stations_list):
                     continue
             if (self.debug==True):
                 print "_transform_metars(): WRITING row_vals: '%s'"  % str(row_vals)
+
+            # Making sure there is a WBAN code
+            if not row_vals[0]:
+                # This will happen for stations outside of the USA.
+                # Discard for now.
+                continue
+            added_count += 1
             writer.writerow(row_vals)
 
         return self.clean_observations_metar
@@ -875,11 +888,9 @@ class WeatherETL(object):
 
 
     def _parse_row_metar(self, row, header):
-        import metar
-
         try:
             m = getMetar(row)
-        except metar.ParserError:
+        except ParserError:
             return []
         
         vals = getMetarVals(m)
@@ -1433,21 +1444,18 @@ class WeatherETL(object):
     # Given that this was the most recent month, year, call this function,
     # which will figure out the most recent hourly weather observation and
     # delete all metars before that datetime.
-    def clear_metars(self, lastYear, lastMonth):
+    def clear_metars(self):
         # build a datetime and then remove all metars after the max datetime
-        date_1st = datetime(year=lastYear, month=lastMonth, day=1)
-        date_1st_str = datetime.strftime(date_1st, "%Y-%m-%d %H:%M:%S")        
-        conn = engine.contextual_connect()
-        #for wban in weather_stations_list:
-        sql = "SELECT wban_code, max (datetime) from dat_weather_observations_hourly where datetime >= '%s' GROUP BY wban_code" % (date_1st_str)
+        sql = "SELECT max (datetime) from dat_weather_observations_hourly;"
         # given this time, delete all from dat_weather_observations_metar
         #
         print "executing: ", sql
+        conn = engine.contextual_connect()
         results = conn.execute(sql)
         res = results.fetchone()
         if not res:
             return
-        res_dt = res[1]
+        res_dt = res[0]
         res_dt_str = datetime.strftime(res_dt, "%Y-%m-%d %H:%M:%S")
         # given this most recent time, delete any metars from before that time
         sql2 = "DELETE FROM dat_weather_observations_metar WHERE datetime < '%s'" % (res_dt_str)

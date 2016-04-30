@@ -109,8 +109,9 @@ the homepage, click 'Login' to log in with the username and password
 from `settings.py`. Once logged in, go to 'Add a dataset' under the
 'Admin' menu to add your own datasets.
 
-# Dependencies
-We use the following open source tools:
+# Open source tools:
+
+### Application Dependencies
 
 * [PostgreSQL](http://www.postgresql.org/) - database version 9.3 or greater
 * [PostGIS](http://postgis.net/) - spatial database for PostgreSQL
@@ -118,8 +119,17 @@ We use the following open source tools:
 * [SQL Alchemy](http://www.sqlalchemy.org/) - Python SQL toolkit and Object Relational Mapper
 * [psycopg2](http://initd.org/psycopg/) - PostgreSQL adapter for the Python
 * [GeoAlchemy 2](http://geoalchemy-2.readthedocs.org/en/0.2.4/) - provides extensions to SQLAlchemy for working with spatial databases
+* [GDAL](http://www.gdal.org/) - geospatial data mungeing
 * [Celery](http://www.celeryproject.org/) - asynchronous task queue
 * [Redis](http://redis.io/) - key-value cache
+* [Gunicorn](http://gunicorn.org/) - WSGI server
+
+### Production Support
+
+Many thanks for the following hosted services that have given us free academic/open source accounts.
+
+* [Sentry](https://getsentry.com/welcome/) - exception and task monitoring
+* [Code Climate](https://codeclimate.com/) - static analysis
 
 
 ## Team

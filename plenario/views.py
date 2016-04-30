@@ -36,6 +36,11 @@ def index():
 def explore_view():
     return render_template('explore.html')
 
+# If the user requests a nested URL within the Ember app,
+# we still just need to render the Ember app.
+@views.route('/explore/<path:path>')
+def explore_kludge(path):
+    return render_template('explore.html')
 
 @views.route('/api-docs')
 def api_docs_view():
@@ -341,14 +346,13 @@ def _assert_reachable(url):
 
 def is_certainly_html(url):
     head = requests.head(url)
-    if head.status_code != 200:
+    if head.status_code == 302:
+        # Edge case with Dropbox redirects.
         return False
-    else:
-        try:
-            return 'text/html' in head.headers['content-type']
-        except KeyError:
-            # No content-type? Bummer.
-            return False
+    try:
+        return 'text/html' in head.headers['content-type']
+    except KeyError:
+        return False
 
 
 def context_from_suggestion(suggestion):
@@ -794,9 +798,9 @@ def edit_dataset(source_url_hash):
 @views.route('/admin/delete-dataset/<source_url_hash>')
 @login_required
 def delete_dataset(source_url_hash):
-    result = delete_dataset_task.delay(source_url_hash)
+    result = delete_dataset_task(source_url_hash)
     return make_response(json.dumps({'status': 'success',
-                                     'task_id': result.id}))
+                                     'text': result}))
 
 
 @views.route('/update-dataset/<source_url_hash>')
@@ -832,6 +836,6 @@ def shape_status():
 @views.route('/admin/delete-shape/<table_name>')
 @login_required
 def delete_shape(table_name):
-    result = delete_shape_task.delay(table_name)
+    result = delete_shape_task(table_name)
     return make_response(json.dumps({'status': 'success',
-                                     'task_id': result.id}))
+                                     'text': result}))

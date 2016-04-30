@@ -50,6 +50,24 @@ class PointAPITests(BasePlenarioTest):
         dataset_found = response_data['objects'][0]
         self.assertEqual(dataset_found['dataset_name'], 'crimes')
 
+    def test_included_fields(self):
+        query = '/v1/api/datasets/?dataset_name=flu_shot_clinics&include_columns=true'
+        resp = self.app.get(query)
+        response_data = json.loads(resp.data)
+        cols = response_data['objects'][0]['columns']
+        self.assertEqual(len(cols), 17)
+
+    ''' /fields '''
+
+    def test_fields(self):
+        query = 'v1/api/fields/flu_shot_clinics?include_columns=true'
+        resp = self.app.get(query)
+        response_data = json.loads(resp.data)
+
+        # Should be the same length
+        # as the number of columns in the source dataset
+        self.assertEqual(len(response_data['objects']), 17)
+
     ''' /detail '''
 
     def test_time_filter(self):

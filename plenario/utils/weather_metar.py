@@ -1,6 +1,7 @@
 from metar.metar import Metar
 from plenario.database import app_engine as engine
 import requests
+import csv
 
 from lxml import etree
 from lxml.etree import fromstring
@@ -9,6 +10,17 @@ from lxml import objectify
 # Example METAR URL: 'https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25&stationString=KORD'
 
 current_METAR_url = 'http://aviationweather.gov/adds/dataserver_current/current/'
+
+
+def _make_call_sign_wban_map():
+    with open('plenario/utils/wban_to_call_sign.csv') as fp:
+        reader = csv.reader(fp)
+        # Discard header
+        reader.next()
+        call_sign_to_wban_map = {row[1]: row[0] for row in reader}
+    return call_sign_to_wban_map
+
+call_sign_wban_map = _make_call_sign_wban_map()
 
 # An example code:
 # - In this example, we have "few clouds at 1500 feet, broken clouds at 4,000 feet w/ cumulonimbus,
@@ -27,19 +39,8 @@ def all_callSigns():
 
 
 def callSign2Wban(call_sign):
-    sql = "SELECT wban_code FROM weather_stations where call_sign='%s'" % call_sign
-    result = engine.execute(sql)
-    #print "result=", result
-    x = result.first()
-    wban = None
-    if x:
-        wban = x[0]
-        #print "wban=", wban
-        #print "found call sign:", call_sign, "wban=", wban
-        return wban
-    else:
-        #print "could not find call sign:", call_sign
-        return None
+    return call_sign_wban_map.get(call_sign)
+
 
 def wban2CallSign(wban_code):
     sql = "SELECT call_sign FROM weather_stations where wban_code='%s'" % wban_code
@@ -90,14 +91,15 @@ def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban
         pass
     
     print "xml_METAR_url: '%s'" % xml_METAR_url
-    #req = grequests.get(xml_METAR_url)
-    #result_list =  grequests.map([req])
-    #xml = result_list[0].text
-    req = requests.get(xml_METAR_url)
+    return raw_metars_from_url(xml_METAR_url)
+
+
+def raw_metars_from_url(url):
+    req = requests.get(url)
     xml = req.text
 
     xml_u = xml.encode('utf-8')
-    
+
     parser = etree.XMLParser(ns_clean=True, recover=True, encoding='utf-8')
     h = fromstring(xml_u, parser=parser)
     #tree = etree.parse(StringIO(xml_u))
@@ -114,16 +116,19 @@ def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban
     print "completed len(metar_raws)= %d" % len(metar_raws)
     return metar_raws
 
-def getAllCurrentWeather():
-    all_calls = all_callSigns()
-    all_metars = []
-    for i in range(0, len(all_calls), 1000):
-        calls_range = all_calls[i:(i+1000)]
-        metars = getCurrentWeather(call_signs=calls_range)
-        all_metars.extend(metars)
 
-    print "getAllCurrentWeather(): total metar collection is length", len(all_metars)
-    return all_metars
+def getAllCurrentWeather():
+    all_metar_url = 'http://aviationweather.gov/adds/dataserver_current/current/metars.cache.xml'
+    return raw_metars_from_url(all_metar_url)
+    # all_calls = all_callSigns()
+    # all_metars = []
+    # for i in range(0, len(all_calls), 1000):
+    #     calls_range = all_calls[i:(i+1000)]
+    #     metars = getCurrentWeather(call_signs=calls_range)
+    #     all_metars.extend(metars)
+    #
+    # print "getAllCurrentWeather(): total metar collection is length", len(all_metars)
+
 
 
 def getWban(obs):

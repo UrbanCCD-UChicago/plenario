@@ -257,7 +257,7 @@ body {
 
 .legend i {
     width: 18px;
-    height: 18px;
+    height: 17px;
     float: left;
     margin-right: 8px;
     opacity: 0.7;
@@ -277,13 +277,6 @@ body {
 
 .navbar-brand:hover img {
 	opacity: 1;
-}
-
-.navbar-brand .alpha {
-  font-size: 0.5em;
-  position: relative;
-  top: 5px;
-  left: 1px;
 }
 
 /* examples page */

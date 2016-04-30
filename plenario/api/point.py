@@ -757,8 +757,10 @@ def grid():
     return resp
 
 
+# Kludge until we store column data in registry.
+# Only cache response if it is requesting column metadata.
 @cache.cached(timeout=CACHE_TIMEOUT,
-              unless=lambda: request.args.get('dataset_name') is not None)
+              unless=lambda: request.args.get('include_columns') is None)
 @crossdomain(origin="*")
 def meta():
     # Doesn't require a table lookup,
@@ -782,9 +784,9 @@ def meta():
                       'source_url', 'view_url',
                       'obs_from', 'obs_to',
                       'date_added', 'last_update', 'update_freq',
-                      'attribution', 'description', 'column_names']
+                      'attribution', 'description']
     col_objects = [getattr(MetaTable, col) for col in cols_to_return]
-    q = session.query(*col_objects)
+    q = session.query(*col_objects).filter(MetaTable.date_added != None)
 
     # What params did the user provide?
     dataset_name = validator.vals['dataset_name']
@@ -810,9 +812,23 @@ def meta():
     # Otherwise, just send back all the datasets
 
     metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
+
+    # TODO: Store this data statically in the registry,
+    # and remove conditional.
+    failure_messages = []
+    if request.args.get('include_columns'):
+        for record in metadata_records:
+            try:
+                cols = make_field_query(record['dataset_name'])
+                record['columns'] = cols
+            except Exception as e:
+                record['columns'] = None
+                failure_messages.append(e.message)
+
     resp = json_response_base(validator, metadata_records)
 
     resp['meta']['total'] = len(resp['objects'])
+    resp['meta']['message'] = failure_messages
     status_code = 200
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
@@ -823,22 +839,10 @@ def meta():
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
     try:
-        table = Table(dataset_name, Base.metadata,
-                      autoload=True, autoload_with=engine,
-                      extend_existing=True)
-
-        resp = json_response_base(None, [], query={'dataset_name': dataset_name})
+        resp = json_response_base(None, [],
+                                  query={'dataset_name': dataset_name})
         status_code = 200
-        for col in table.columns:
-            if not isinstance(col.type, NullType):
-                # Don't report our bookkeeping columns
-                if col.name in {'geom', 'point_date'}:
-                    continue
-                    
-                d = {}
-                d['field_name'] = col.name
-                d['field_type'] = str(col.type)
-                resp['objects'].append(d)
+        resp['objects'] = make_field_query(dataset_name)
         resp = make_response(json.dumps(resp), status_code)
 
     except NoSuchTableError:
@@ -847,3 +851,23 @@ def dataset_fields(dataset_name):
 
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
+
+def make_field_query(dataset_name):
+    table = Table(dataset_name, Base.metadata,
+                      autoload=True, autoload_with=engine,
+                      extend_existing=True)
+
+    cols = []
+    for col in table.columns:
+        if not isinstance(col.type, NullType):
+            # Don't report our bookkeeping columns
+            if col.name in {'geom', 'point_date', 'hash'}:
+                continue
+
+            d = {}
+            d['field_name'] = col.name
+            d['field_type'] = str(col.type)
+            cols.append(d)
+
+    return cols
