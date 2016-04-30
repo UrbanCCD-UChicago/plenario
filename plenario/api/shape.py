@@ -6,23 +6,16 @@ import re
 from flask import make_response, request
 
 from plenario.models import ShapeMetadata
-from plenario.database import session, app_engine as engine
+from plenario.database import session
 from plenario.utils.ogr2ogr import OgrExport
 from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT
-from plenario.api.point import ParamValidator, setup_detail_validator,\
+from plenario.api.point import setup_detail_validator,\
     form_detail_sql_query, form_geojson_detail_response,\
     form_csv_detail_response, bad_request
 
 from collections import OrderedDict
 from sqlalchemy import func
 
-#if columns are specified by the user's shape query, check that the column
-#names include only valid characters (ie alphanumeric characters and underscores)
-def validate_sql_string(sql_string):
-    for char in sql_string:
-        if not re.match('[\w,]', char):
-            return False
-    return True
 
 def export_dataset_to_response(dataset_name, query=None):
 
@@ -74,8 +67,10 @@ def export_dataset_to_response(dataset_name, query=None):
         if os.path.isfile(export_path):
             os.remove(export_path)
 
+
 def make_sql_ready_geom(geojson_str):
     return make_fragment_str(extract_first_geometry_fragment(geojson_str))    
+
 
 @crossdomain(origin="*")
 def get_all_shape_datasets():
@@ -157,25 +152,6 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
 
 
 @crossdomain(origin="*")
-def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
-
-    intersect_query = """
-    WITH joined AS
-    (
-        SELECT polys.*
-        FROM "{point_dataset_name}" AS pts, "{polygon_dataset_name}" AS polys
-        WHERE ST_Intersects(pts.geom, polys.geom)
-    )
-    SELECT *
-    FROM (SELECT *, COUNT(*) OVER (PARTITION BY ogc_fid) AS count
-          FROM joined) unused_alias;""".format(
-                point_dataset_name=point_dataset_name,
-                polygon_dataset_name=polygon_dataset_name)
-
-    return export_dataset_to_response(polygon_dataset_name, intersect_query)
-
-
-@crossdomain(origin="*")
 def export_shape(dataset_name):
     """
     :param dataset_name: Name of shape dataset. Expected to be found in meta_shape table.
@@ -185,19 +161,13 @@ def export_shape(dataset_name):
 
     params = request.args.copy()
 
-    columns_string = "*"
     where_string = ""
-
-    if params.get('columns'):
-        columns_string = params['columns']
-        if not validate_sql_string(columns_string):
-            return bad_request("Invalid column specification")
 
     if params.get('location_geom__within'):
         fragment = make_fragment_str(extract_first_geometry_fragment(params['location_geom__within']))
         where_string = "WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{}'))".format(fragment)
 
-    query = '''SELECT {} FROM {} AS g {}'''.format(columns_string, dataset_name, where_string)
+    query = '''SELECT * FROM {} AS g {}'''.format(dataset_name, where_string)
     return export_dataset_to_response(dataset_name, query)
 
 

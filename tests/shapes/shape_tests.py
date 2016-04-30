@@ -250,25 +250,6 @@ class ShapeTests(BasePlenarioTest):
         filtered_neighborhoods = filtered_data['features']
         self.assertGreater(len(unfiltered_neighborhoods), len(filtered_neighborhoods))
 
-    def test_export_shape_with_specifying_result_columns(self):
-        url = '/v1/api/shapes/chicago_neighborhoods/?columns=sec_neigh'
-        response = self.app.get(url)
-        data = json.loads(response.data)
-        for feature in data['features']:
-            self.assertEqual(feature['properties'].keys(), ['sec_neigh'])
-
-    def test_export_shape_with_specifying_multiple_result_columns(self):
-        url = '/v1/api/shapes/chicago_neighborhoods/?columns=sec_neigh,shape_area'
-        response = self.app.get(url)
-        data = json.loads(response.data)
-        for feature in data['features']:
-            self.assertEqual(feature['properties'].keys(), ['shape_area', 'sec_neigh'])
-
-    def test_export_shape_with_invalid_columns(self):
-        url = '/v1/api/shapes/chicago_neighborhoods/?columns=;DROP TABLE *;--'
-        response = self.app.get(url)
-        self.assertEqual(response.status_code, 400)
-
     def test_verify_result_columns(self):
         url = '/v1/api/shapes/chicago_neighborhoods/landmarks/?obs_date__ge=1900-09-22&obs_date__le=2013-10-1'
         response = self.app.get(url)
