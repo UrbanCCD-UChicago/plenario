@@ -164,8 +164,8 @@
 
       {{ panel(endpoint='fields/<dataset_name>',
                      endpoint_id='fields',
-                     short_description='list available fields for a dataset',
-                     long_description='Gives you a listing of all the fields and their data types for the given dataset. This is useful for figuring out how to structure a query against the <code>/v1/api/detail/</code> or <code>/v1/api/detail-aggregate/</code> endpoints.',
+                     short_description='list available fields for a point or shape dataset',
+                     long_description='Gives you a listing of all the fields and their data types for the given dataset. This is useful for figuring out how to structure a query against the <code>/v1/api/detail/</code>, <code>/v1/api/shapes/</code>, or <code>/v1/api/detail-aggregate/</code> endpoints.',
                      query_desc="This API endpoint doesn't take in any query parameters.",
                      query_params=None,
                      response_desc='',
@@ -327,12 +327,17 @@
                                    obs_date_le,
                                    location_geom_within,
                                    data_type,
+                                   ('shape', 'none', '<p>Join to a shape dataset; columns in the shape dataset
+                                                        can also be used as filters with the [dataset_field]*
+                                                        parameter</p>'),
                                    ('offset', 'none', '<p>Used to paginate through results of more than 1000.</p>
                                                        <p><strong>Example:</strong> <code>offset=1000</code> will fetch the second page of results.</p>')],
                      response_desc='The API responds with a list of raw records for the particular dataset. The fields returned will vary per dataset. Response is limited to 1000 results, which can be paginated by using the <code>offset</code> parameter.',
                      response_attrs=[],
                      examples=[('detail/?dataset_name=crimes_2001_to_present&obs_date__ge=2014-1-1&iucr=0110',
-                                "Chicago crime reports since Jan 1st 2014 with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)")]
+                                "Chicago crime reports since Jan 1st 2014 with <a href='http://gis.chicagopolice.org/clearmap_crime_sums/crime_types.html'>IUCR code</a> of '0110' (homicide)"),
+                                
+                               ('detail/?dataset_name=individual_landmarks&shape=boundaries_neighborhoods&obs_date__ge=1900-1-1&sec_neigh=BRONZEVILLE', "Chicago landmarks within the Bronzeville neighborhood")]
        )}}
 
 
@@ -1033,79 +1038,63 @@
         </div>
       </div>
 
-      <h3>Shape data - <em>Experimental</em></h3>
+      <h3>Shape data</h3>
       {{ panel(endpoint='shapes',
                      endpoint_id='shapes',
                      short_description='list metadata about available shape datasets',
                      long_description='This endpoint contains a record for each shape dataset in Plenario.',
-                     query_desc='This endpoint takes no query parameters.',
-                     query_params=None,
+                     query_desc='Specify <code>location_geom__within</code> to only view metadata
+                     about shape datasets in a particular area.',
+                     query_params=[location_geom_within],
                      response_desc='One record per shape dataset.',
-                     response_attrs=[('dataset_name', 'the name by which you can query the shape dataset'),
+                     response_attrs=[('description', 'Verbose, official description of the dataset.'),
+                                     ('source_url', 'If available, the URL where the data was originally sourced.'),
+                                     ('update_freq', 'Update frequency.'),
+                                     ('dataset_name', 'the name by which you can query the shape dataset'),
                                      ('human_name', 'a nicer name to refer to the shape dataset in user interfaces'),
-                                     ('date_added', 'the date the shape dataset was added to Plenario'),
-                                     ('bounding_box','a GeoJSON document that describes an area that contains all shapes in the dataset')],
+                                     ('date_added', 'the date the shape dataset was added to Plenario')],
                      examples=[('shapes/', 'Information about every shape dataset.')] )}}
 
       {{ panel(endpoint='shapes/<dataset_name>',
                      endpoint_id='shapes_raw',
                      short_description='get a single shape dataset',
-                     long_description='Download this shape dataset in the format of your choosing.',
+                     long_description='Download this shape dataset in the format of your choosing.
+                                       Optionally, provide
+                                       <code>location_geom__within</code>
+                                       to only download the subset of the shape
+                                       dataset that intersects with your
+                                       spatial filter.',
                      query_desc=None,
                      query_params=[('data_type', 'json', '<code>json</code> for GeoJSON,
                                                           <code>shapefile</code> for ESRI Shapefile,
-                                                          or <code>kml</code> for KML')],
-                     response_desc='A document with the entire shape dataset.',
+                                                          or <code>kml</code> for KML'),
+                                  location_geom_within],
+                     response_desc='A document with the shape dataset.',
                      response_attrs=None,
                      examples=[('shapes/chicago_pedestrian_streets?data_type=json',
                                 "Get a GeoJSON document with Chicago's streets that are reserved for pedestrian traffic."),
                                 ('shapes/chicago_city_limits?data_type=shapefile',
                                  "Get an ESRI Shapefile with the boundaries of the city of Chicago.")]) }}
 
-      {{ panel(endpoint='shapes/intersections/<geojson>',
-                     endpoint_id='shape_intersections',
-                     short_description='find how many shapes in a datasect intersect with a geometry',
-                     long_description="Given a geometry encoded in GeoJSON,
-                                       find how many shapes in each of Plenario's shape datasets in Plenario intersect it.",
-                     query_desc='This endpoint takes no query parameters.',
-                     query_params=None,
-                     response_desc='A document of shapes from a given shape dataset that intersect with a given geometry',
-                     response_attrs=[('dataset_name', 'The name of a dataset that intersects the query geometry.'),
-                                     ('num_intersections', 'A count of how many shapes in that dataset intersect with the query geometry.')],
-                     examples=[('shapes/intersections/{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.67248630523682,41.86454328565965],[-87.67248630523682,41.872117384500754],[-87.6549768447876,41.872117384500754],[-87.6549768447876,41.86454328565965],[-87.67248630523682,41.86454328565965]]]}}',
-                                "For each shape dataset in Plenario,
-                                get a count of the shapes that intersect a geometry encoded in the given GeoJSON.
-                                (This GeoJSON happens to represent a chunk of Chicago's Little Italy neighborhood.)")]) }}
-
-      {{ panel(endpoint='shapes/filter/<dataset_name>/<geojson>',
-                     endpoint_id='shape_filter',
-                     short_description='find the shapes in a dataset that intersect with a geometry',
-                     long_description="Given a shape dataset and a geometry encoded in GeoJSON,
-                                       return a GeoJSON document of all the shapes in the dataset that intersect with the given geometry.",
-                     query_desc='This endpoint takes no query parameters.',
-                     query_params=None,
-                     response_desc='A document of shapes from the given dataset that intersect the given geometry.',
-                     examples=[('shapes/filter/pedestrian_streets/{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.67248630523682,41.86454328565965],[-87.67248630523682,41.872117384500754],[-87.6549768447876,41.872117384500754],[-87.6549768447876,41.86454328565965],[-87.67248630523682,41.86454328565965]]]}}',
-                                "Find all of the pedestrian streets in Chicago that intersect a geometry encoded in the given GeoJSON.
-                                (This GeoJSON happens to represent a chunk of Chicago's Little Italy neighborhood.)")]) }}
-
       {{ panel(endpoint='shapes/<polygon_dataset_name>/<point_dataset_name>',
                      endpoint_id='polygon_filter',
-                     short_description='aggregate points by polygon',
-                     long_description="Given a point dataset and a polygon dataset,
-                                       return a JSON document of all of the polygons in the polygon dataset together with the counts of the
+                     short_description='aggregate points by polygon (experimental)',
+                     long_description=" <em>Experimental endpoint. Could change without warning.</em>
+                                        <br/><br/>
+                                        Given a point dataset and a polygon dataset,
+                                       return a document of all of the polygons
+                                       in the polygon dataset together with the counts of the
                                        points that intersect them",
-                     query_desc="All query parameters are optional except for <code>dataset_name</code>.",
+                     query_desc=None,
                      query_params=[dataset_field,
                                    obs_date_ge,
                                    obs_date_le,
                                    location_geom_within,
-                                   data_type,
-                                   ('offset', 'none', '<p>Used to paginate through results of more than 1000.</p>
-                                                       <p><strong>Example:</strong> <code>offset=1000</code> will fetch the second page of results.</p>')],
-                     response_desc='A document of polygons from the given dataset and the count of the points that intersect them.',
+                                   data_type],
+                     response_desc='A document of polygons from the given dataset
+                                    and the count of the points that intersect them.',
                      examples=[('shapes/boundaries_neighborhoods/individual_landmarks/?obs_date__ge=1900-09-22&obs_date__le=2015-10-1',
-                                "Count the number of individual landmarks in Chicago in each neighborhood in Chicago, and return these counts.")]) }}
+                                "Count the number of historical landmarks in each Chicago neighborhood.")]) }}
 
       <h2 id='responses'>Response format</h2>
       <p>All JSON API calls return their data in the <code>objects</code> block. Additional information is returned in the <code>meta</code> block:</p>

@@ -155,6 +155,10 @@ Join our community to hear about platform updates, new features and discuss the 
 
 [Join our Google Group](https://groups.google.com/forum/#!forum/plenariodataportal)
 
+## Testing
+
+The plenario/tests folder includes a suite of API tests split across the /points and /shapes directories. To run the tests using with nose, use the command 'nosetests tests' from the /plenario directory
+
 ## Errors / Bugs
 
 If something is not behaving intuitively, it is a bug, and should be reported.
