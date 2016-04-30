@@ -24,7 +24,6 @@ api.add_url_rule(prefix + '/weather-stations/', 'weather_stations', weather_stat
 
 api.add_url_rule(prefix + '/shapes/', 'shape_index', get_all_shape_datasets)
 api.add_url_rule(prefix + '/shapes/<dataset_name>', 'shape_export', export_shape)
-
 api.add_url_rule(prefix + '/shapes/<polygon_dataset_name>/<point_dataset_name>', 'aggregate', aggregate_point_data)
 
 
