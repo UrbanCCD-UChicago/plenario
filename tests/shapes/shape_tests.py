@@ -102,16 +102,6 @@ class ShapeTests(BasePlenarioTest):
             query_rect = rect_json.read()
         escaped_query_rect = urllib.quote(query_rect)
 
-        # What shape datasets intersect with the rectangle?
-        resp = self.app.get('/v1/api/shapes/intersections/' + escaped_query_rect)
-        self.assertEqual(resp.status_code, 200)
-        response_data = json.loads(resp.data)
-
-        # By design, the query rectangle should cross 3 zip codes and 2 pedestrian streets
-        datasets_to_num_geoms = {obj['dataset_name']: obj['num_geoms'] for obj in response_data['objects']}
-        self.assertEqual(datasets_to_num_geoms[fixtures['zips'].table_name], 3)
-        self.assertEqual(datasets_to_num_geoms[fixtures['streets'].table_name], 2)
-
         # Moving this functionality to the /shapes endpoint
         # What shape datasets intersect with the rectangle?
         resp = self.app.get('/v1/api/shapes/?location_geom__within=' + escaped_query_rect)
@@ -175,8 +165,10 @@ class ShapeTests(BasePlenarioTest):
         rect_path = os.path.join(FIXTURE_PATH, 'university_village_rectangle.json')
         with open(rect_path, 'r') as rect_json:
             query_rect = rect_json.read()
+        escaped_query_rect = urllib.quote(query_rect)
 
-        url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
+        #url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
+        url = '/v1/api/shapes/pedestrian_streets/?location_geom__within=' + escaped_query_rect
         response = self.app.get(url)
         self.assertEqual(response.status_code, 200)
 
@@ -188,8 +180,10 @@ class ShapeTests(BasePlenarioTest):
         rect_path = os.path.join(FIXTURE_PATH, 'loop_rectangle.json')
         with open(rect_path, 'r') as rect_json:
             query_rect = rect_json.read()
+        escaped_query_rect = urllib.quote(query_rect)
 
-        url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
+        #url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
+        url = '/v1/api/shapes/pedestrian_streets/?location_geom__within=' + escaped_query_rect
         response = self.app.get(url)
         self.assertEqual(response.status_code, 200)
 
@@ -239,5 +233,29 @@ class ShapeTests(BasePlenarioTest):
             self.assertGreaterEqual(neighborhood['properties']['count'], 1)
             #print neighborhood['properties']['sec_neigh'], neighborhood['properties']['count']
 
+    def test_export_shape_with_location_filtering(self):
+        rect_path = os.path.join(FIXTURE_PATH, 'loop_rectangle.json')
+        with open(rect_path, 'r') as rect_json:
+            query_rect = rect_json.read()
+        escaped_query_rect = urllib.quote(query_rect)
+        unfiltered_url = '/v1/api/shapes/chicago_neighborhoods/'#?location_geom__within=' + escaped_query_rect
+        filtered_url = '/v1/api/shapes/chicago_neighborhoods/?location_geom__within=' + escaped_query_rect
+        
+        unfiltered_response = self.app.get(unfiltered_url)
+        unfiltered_data = json.loads(unfiltered_response.data)
+        unfiltered_neighborhoods = unfiltered_data['features']
 
+        filtered_response = self.app.get(filtered_url)
+        filtered_data = json.loads(filtered_response.data)
+        filtered_neighborhoods = filtered_data['features']
+        self.assertGreater(len(unfiltered_neighborhoods), len(filtered_neighborhoods))
+
+    def test_verify_result_columns(self):
+        url = '/v1/api/shapes/chicago_neighborhoods/landmarks/?obs_date__ge=1900-09-22&obs_date__le=2013-10-1'
+        response = self.app.get(url)
+        data = json.loads(response.data)
+        for feature in data['features']:
+            self.assertFalse(feature['properties'].get('hash'))
+            self.assertFalse(feature['properties'].get('ogc_fid'))
+            self.assertTrue(feature['properties'].get('count'))
 

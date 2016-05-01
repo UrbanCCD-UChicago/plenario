@@ -1,14 +1,15 @@
 import os
 import json
 import tempfile
+import re
 
 from flask import make_response, request
 
 from plenario.models import ShapeMetadata
-from plenario.database import session, app_engine as engine
+from plenario.database import session
 from plenario.utils.ogr2ogr import OgrExport
 from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT
-from plenario.api.point import ParamValidator, setup_detail_validator,\
+from plenario.api.point import setup_detail_validator,\
     form_detail_sql_query, form_geojson_detail_response,\
     form_csv_detail_response, bad_request
 
@@ -16,11 +17,11 @@ from collections import OrderedDict
 from sqlalchemy import func
 
 
-def export_dataset_to_json_response(dataset_name, query=None):
+def export_dataset_to_response(dataset_name, query=None):
 
     """
     :param dataset_name: Name of shape dataset. Expected to be found in meta_shape table.
-    :param query: Optional SQL query to be executed on shape dataset to filer results
+    :param query: Optional SQL query to be executed on shape dataset to filter results
     Expected query parameter: `data_type`. We expect it to be one of 'json', 'kml', or 'shapefile'.
                                 If none of these (or unspecified), return JSON.
     :return: response with geoJSON data and response code
@@ -66,8 +67,10 @@ def export_dataset_to_json_response(dataset_name, query=None):
         if os.path.isfile(export_path):
             os.remove(export_path)
 
+
 def make_sql_ready_geom(geojson_str):
-    return make_fragment_str(extract_first_geometry_fragment(geojson_str))
+    return make_fragment_str(extract_first_geometry_fragment(geojson_str))    
+
 
 @crossdomain(origin="*")
 def get_all_shape_datasets():
@@ -141,109 +144,10 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
 
     rows = [OrderedDict(zip(res_cols, res)) for res in q.all()]
     if params.get('data_type') == 'csv':
-        resp = form_csv_detail_response(['hash'], validator, rows)
+        resp = form_csv_detail_response(['hash', 'ogc_fid'], validator, rows)
     else:
-        resp = form_geojson_detail_response([], validator, rows)
+        resp = form_geojson_detail_response(['hash', 'ogc_fid'], validator, rows)
 
-    return resp
-
-
-# @crossdomain(origin="*")
-# def filter_point_data_with_polygons(point_dataset_name, polygon_dataset_name):
-#
-#     intersect_query = """
-#     WITH joined AS
-#     (
-#         SELECT polys.*
-#         FROM "{point_dataset_name}" AS pts, "{polygon_dataset_name}" AS polys
-#         WHERE ST_Intersects(pts.geom, polys.geom)
-#     )
-#     SELECT *
-#     FROM (SELECT *, COUNT(*) OVER (PARTITION BY ogc_fid) AS count
-#           FROM joined) unused_alias;""".format(
-#                 point_dataset_name=point_dataset_name,
-#                 polygon_dataset_name=polygon_dataset_name)
-#
-#     return export_dataset_to_json_response(polygon_dataset_name, intersect_query)
-
-
-@crossdomain(origin="*")
-def filter_shape(dataset_name, geojson):
-    """
-    Given a shape dataset and user-provided geojson,
-    return all shapes from the dataset that intersect the geojson.
-
-    :param dataset_name: Name of shape dataset
-    :param geojson: URL encoded goejson
-    :return:
-    """
-    fragment = make_fragment_str(extract_first_geometry_fragment(geojson))
-
-    intersect_query = '''
-    SELECT *
-    FROM {dataset_name} AS g
-    WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
-    '''.format(dataset_name=dataset_name, geojson_fragment=fragment)
-
-    return export_dataset_to_json_response(dataset_name, intersect_query)
-
-
-@crossdomain(origin="*")
-def find_intersecting_shapes(geojson):
-    """
-    Respond with all shape datasets that intersect with the geojson provided.
-    Also include how many geom rows of the dataset intersect.
-    :param geojson: URL encoded geojson.
-    """
-    fragment = make_fragment_str(extract_first_geometry_fragment(geojson))
-
-    try:
-        # First, do a bounding box check on all shape datasets.
-        query = '''
-        SELECT m.dataset_name
-        FROM meta_shape as m
-        WHERE m.bbox &&
-            (SELECT ST_GeomFromGeoJSON('{geojson_fragment}'));
-        '''.format(geojson_fragment=fragment)
-
-        intersecting_datasets = engine.execute(query)
-        bounding_box_intersection_names = [dataset.dataset_name for dataset in intersecting_datasets]
-    except Exception as e:
-        print 'Error finding candidates'
-        raise e
-
-    try:
-        # Then, for the candidates, get a count of the rows that intersect.
-        response_objects = []
-        for dataset_name in bounding_box_intersection_names:
-            num_intersections_query = '''
-            SELECT count(g.geom) as num_geoms
-            FROM {dataset_name} as g
-            WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
-            '''.format(dataset_name=dataset_name, geojson_fragment=fragment)
-
-            num_intersections = engine.execute(num_intersections_query)\
-                                      .first().num_geoms
-
-            if num_intersections > 0:
-                response_objects.append({
-                    'dataset_name': dataset_name,
-                    'num_geoms': num_intersections
-                })
-
-    except Exception as e:
-        print 'Error narrowing candidates'
-        raise e
-
-    response_skeleton = {
-                'meta': {
-                    'status': 'ok',
-                    'message': '',
-                },
-                'objects': response_objects
-            }
-
-    resp = make_response(json.dumps(response_skeleton), 200)
     return resp
 
 
@@ -254,8 +158,17 @@ def export_shape(dataset_name):
     Expected query parameter: `data_type`. We expect it to be one of 'json', 'kml', or 'shapefile'.
                                 If none of these (or unspecified), return JSON.
     """
-    
-    return export_dataset_to_json_response(dataset_name)
+
+    params = request.args.copy()
+
+    where_string = ""
+
+    if params.get('location_geom__within'):
+        fragment = make_fragment_str(extract_first_geometry_fragment(params['location_geom__within']))
+        where_string = "WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{}'))".format(fragment)
+
+    query = '''SELECT * FROM {} AS g {}'''.format(dataset_name, where_string)
+    return export_dataset_to_response(dataset_name, query)
 
 
 def _shape_format_to_content_header(requested_format):

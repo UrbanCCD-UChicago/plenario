@@ -439,9 +439,7 @@ class ShapeMetadata(Base):
         # The attributes that we want to pass along as-is
         as_is_attr_names = ['dataset_name', 'human_name', 'date_added',
                             'attribution', 'description', 'update_freq',
-                            'view_url', 'source_url', 'num_shapes',
-                            'contributor_name', 'contributor_email',
-                            'contributor_organization']
+                            'view_url', 'source_url', 'num_shapes']
 
         as_is_attrs = [getattr(cls, name) for name in as_is_attr_names]
 
