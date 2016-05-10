@@ -1,7 +1,7 @@
 import json
 from flask import make_response, Blueprint
 from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate
-from common import cache
+from common import cache, make_cache_key
 from shape import get_all_shape_datasets,\
                     export_shape, aggregate_point_data
 from time import sleep
@@ -36,6 +36,7 @@ def flush_cache():
 
 
 @api.route(prefix + '/slow')
+@cache.cached(timeout=60*60*6, key_prefix=make_cache_key)
 def slow():
     sleep(5)
     return "I feel well rested"
