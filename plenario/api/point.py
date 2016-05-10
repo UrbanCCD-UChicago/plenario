@@ -779,13 +779,19 @@ def meta():
     if err:
         return bad_request(err)
 
-    # Set up base select statement
+    # Columns to select as-is
     cols_to_return = ['human_name', 'dataset_name',
                       'source_url', 'view_url',
-                      'obs_from', 'obs_to',
                       'date_added', 'last_update', 'update_freq',
-                      'attribution', 'description']
+                      'attribution', 'description',
+                      'obs_from', 'obs_to']
     col_objects = [getattr(MetaTable, col) for col in cols_to_return]
+
+    # Columns that need pre-processing
+    col_objects.append(sa.func.ST_AsGeoJSON(MetaTable.bbox))
+    cols_to_return.append('bbox')
+
+    # Only return datasets that have been successfully ingested
     q = session.query(*col_objects).filter(MetaTable.date_added != None)
 
     # What params did the user provide?
@@ -812,6 +818,12 @@ def meta():
     # Otherwise, just send back all the datasets
 
     metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
+    # Serialize bounding box geometry to string
+    for record in metadata_records:
+        if record.get('bbox') is not None:
+            print record['bbox']
+            record['bbox'] = json.loads(record['bbox'])
+
 
     # TODO: Store this data statically in the registry,
     # and remove conditional.

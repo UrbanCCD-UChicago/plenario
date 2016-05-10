@@ -36,6 +36,11 @@ def index():
 def explore_view():
     return render_template('explore.html')
 
+# If the user requests a nested URL within the Ember app,
+# we still just need to render the Ember app.
+@views.route('/explore/<path:path>')
+def explore_kludge(path):
+    return render_template('explore.html')
 
 @views.route('/api-docs')
 def api_docs_view():
