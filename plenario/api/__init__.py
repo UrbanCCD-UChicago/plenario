@@ -4,7 +4,7 @@ from point import timeseries, detail, meta, dataset_fields, grid, detail_aggrega
 from common import cache
 from shape import get_all_shape_datasets,\
                     export_shape, aggregate_point_data
-
+from time import sleep
 from sensor import weather_stations, weather
 
 API_VERSION = '/v1'
@@ -33,3 +33,9 @@ def flush_cache():
     resp = make_response(json.dumps({'status': 'ok', 'message': 'cache flushed!'}))
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
+
+@api.route(prefix + '/slow')
+def slow():
+    sleep(5)
+    return "I feel well rested"
