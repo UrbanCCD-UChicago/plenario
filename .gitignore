@@ -7,7 +7,6 @@ Icon?
 celerybeat-schedule
 data/
 notebooks/
-celery_settings.py
 .env
 *~
 #.*#
