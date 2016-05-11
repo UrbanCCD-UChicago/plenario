@@ -1,5 +1,6 @@
 from flask import Flask, abort
 import plenario.tasks as tasks
+from plenario.tasks import celery_app
 
 
 """
@@ -21,6 +22,13 @@ def create_worker():
             dispatch[frequency]()
         except KeyError:
             abort(400)
+
+    @app.route('/health')
+    def check_health():
+        if celery_app.control.ping():
+            return "Someone is listening."
+        else:
+            abort(503)
 
     return app
 
