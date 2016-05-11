@@ -1,0 +1,17 @@
+version: 1
+cron:
+ - name: "often"
+   url: "/update/often"
+   schedule: "*/15 * * * *"
+ - name: "daily"
+   url: "/update/daily"
+   schedule: "0 8 * * *"
+ - name: "weekly"
+   url: "/update/weekly"
+   schedule: "0 0 * * sun"
+ - name: "monthly"
+   url: "/update/monthly"
+   schedule: "0 0 1 * *"
+ - name: "yearly"
+   url: "/update/yearly"
+   schedule: "0 0 2 4 *"
