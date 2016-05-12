@@ -20,6 +20,7 @@ def create_worker():
     def update(frequency):
         try:
             dispatch[frequency]()
+            return "Sent update request"
         except KeyError:
             abort(400)
 
