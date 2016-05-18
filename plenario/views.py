@@ -613,7 +613,7 @@ def dataset_status():
         UNNEST(m.result_ids) AS ids 
         LEFT JOIN celery_taskmeta AS c 
           ON c.task_id = ids
-        WHERE c.date_done IS NOT NULL 
+        WHERE c.date_done IS NOT NULL
     '''
 
     if source_url_hash:
@@ -622,7 +622,7 @@ def dataset_status():
     else:
         name = None
 
-    q = q + " ORDER BY c.id DESC"
+    q = q + " ORDER BY c.id DESC LIMIT 1000"
 
     with engine.begin() as c:
         results = list(c.execute(text(q), source_url_hash=source_url_hash))
