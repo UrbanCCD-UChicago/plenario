@@ -25,14 +25,16 @@ CACHE_CONFIG = {
     'CACHE_KEY_PREFIX': get('CACHE_KEY_PREFIX', 'plenario_app')
 }
 
-# Dict with attributes for a default web admin
-# Uncomment for local testing.
-DEFAULT_USER = {}
-# DEFAULT_USER = {
-#     'name': 'plenario_user',
-#     'email': 'youremail@example.com',
-#     'password': 'your password'
-# }
+# Load a default admin if we're running locally.
+if get('DEBUG'):
+    DEFAULT_USER = {
+        'name': 'plenario_user',
+        'email': 'youremail@example.com',
+        'password': 'your password'
+}
+else:
+    DEFAULT_USER = {}
+
 
 AWS_ACCESS_KEY = get('AWS_ACCESS_KEY', '')
 AWS_SECRET_KEY = get('AWS_SECRET_KEY', '')
