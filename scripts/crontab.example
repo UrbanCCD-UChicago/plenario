@@ -1,5 +1,0 @@
-*/15 * * * * urbanccd bash /path/to/script/plenario_update.sh often
-0 8 * * * urbanccd bash /path/to/script/plenario_update.sh daily
-0 0 * * sun urbanccd bash /path/to/script/plenario_update.sh weekly
-0 0 1 * * urbanccd bash /path/to/script/plenario_update.sh monthly
-0 0 2 4 * urbanccd bash /path/to/script/plenario_update.sh yearly

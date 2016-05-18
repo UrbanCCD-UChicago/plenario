@@ -821,7 +821,6 @@ def meta():
     # Serialize bounding box geometry to string
     for record in metadata_records:
         if record.get('bbox') is not None:
-            print record['bbox']
             record['bbox'] = json.loads(record['bbox'])
 
 
