@@ -11,4 +11,5 @@ else:
     application = create_app()
 
 if __name__ == "__main__":
-    application.run(debug=True)
+    should_run_debug = os.environ.get('DEBUG') is not None
+    application.run(debug=should_run_debug)
