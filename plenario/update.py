@@ -1,6 +1,7 @@
 from flask import Flask, abort
 import plenario.tasks as tasks
 from plenario.tasks import celery_app
+from multiprocessing import Process
 
 
 """
@@ -15,6 +16,11 @@ def create_worker():
     app = Flask(__name__)
     app.config.from_object('plenario.settings')
     app.url_map.strict_slashes = False
+
+    @app.route('/update/weather', methods=['POST'])
+    def weather():
+        tasks.update_weather.delay()
+        return "Sent off weather task"
 
     @app.route('/update/<frequency>', methods=['POST'])
     def update(frequency):
@@ -38,7 +44,10 @@ def often_update():
     # Keep METAR updates out of the queue
     # so that they run right away even when the ETL is chugging through
     # a big backlog of event dataset updates.
-    tasks.update_metar()
+
+    # Run METAR update in new thread
+    # so we can return right away to indicate the request was received
+    Process(target=tasks.update_metar).start()
 
 
 def daily_update():
