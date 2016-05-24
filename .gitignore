@@ -11,6 +11,7 @@ notebooks/
 *~
 #.*#
 # Elastic Beanstalk Files
+.ebextensions/celery.config
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
