@@ -39,6 +39,7 @@ else:
 AWS_ACCESS_KEY = get('AWS_ACCESS_KEY', '')
 AWS_SECRET_KEY = get('AWS_SECRET_KEY', '')
 S3_BUCKET = get('S3_BUCKET', '')
+AWS_REGION_NAME = get('AWS_REGION_NAME', 'us-east-1')
 
 # Email address for notifying site administrators
 # Expect comma-delimited list of emails.

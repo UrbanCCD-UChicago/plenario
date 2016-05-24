@@ -5,7 +5,7 @@ from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
 import boto3
 from plenario.settings import MAIL_USERNAME, ADMIN_EMAILS, \
-    AWS_ACCESS_KEY, AWS_SECRET_KEY
+    AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME
 import math
 from collections import namedtuple
 
@@ -95,7 +95,8 @@ def send_mail(subject, recipient, body):
         ses_client = boto3.client(
             'ses',
             aws_access_key_id=AWS_ACCESS_KEY,
-            aws_secret_access_key=AWS_SECRET_KEY
+            aws_secret_access_key=AWS_SECRET_KEY,
+            region_name=AWS_REGION_NAME
         )
     except Exception as e:
         print e.message, 'Failed to connect to AWS SES. Email aborted.'
