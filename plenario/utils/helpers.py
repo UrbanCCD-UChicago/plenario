@@ -3,14 +3,11 @@ from unicodedata import normalize
 import string
 from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
-from flask_mail import Mail, Message
 import boto3
 from plenario.settings import MAIL_USERNAME, ADMIN_EMAILS, \
     AWS_ACCESS_KEY, AWS_SECRET_KEY
 import math
 from collections import namedtuple
-
-mail = Mail()
 
 
 def get_size_in_degrees(meters, latitude):
