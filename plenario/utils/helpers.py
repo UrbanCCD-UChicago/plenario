@@ -4,8 +4,9 @@ import string
 from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
 from flask_mail import Mail, Message
-from plenario.settings import MAIL_DISPLAY_NAME, MAIL_USERNAME, ADMIN_EMAILS
-from smtplib import SMTPAuthenticationError
+import boto3
+from plenario.settings import MAIL_USERNAME, ADMIN_EMAILS, \
+    AWS_ACCESS_KEY, AWS_SECRET_KEY
 import math
 from collections import namedtuple
 
@@ -91,13 +92,41 @@ def slugify(text, delim=u'_'):
 
 
 def send_mail(subject, recipient, body):
-    msg = Message(subject,
-                  sender=(MAIL_DISPLAY_NAME, MAIL_USERNAME),
-                  recipients=[recipient], bcc=ADMIN_EMAILS)
 
-    msg.body = body
-    msg.html = string.replace(msg.body, '\r\n', '<br />')
-    try: 
-        mail.send(msg)
-    except SMTPAuthenticationError, e:
-        print "error sending email"
+    # Connect to AWS Simple Email Service
+    try:
+        ses_client = boto3.client(
+            'ses',
+            aws_access_key_id=AWS_ACCESS_KEY,
+            aws_secret_access_key=AWS_SECRET_KEY
+        )
+    except Exception as e:
+        print e.message, 'Failed to connect to AWS SES. Email aborted.'
+        return
+
+    destination = {
+        'ToAddresses': [recipient],
+        'BccAddresses': ADMIN_EMAILS
+    }
+
+    message = {
+        'Subject': {'Data': subject},
+        'Body': {
+            'Text': {
+                'Data': body
+            },
+            'Html': {
+                'Data': string.replace(body, '\r\n', '<br />')
+            }
+        }
+    }
+
+    # Send email from MAIL_USERNAME
+    try:
+        ses_client.send_email(
+            Source=MAIL_USERNAME,
+            Destination=destination,
+            Message=message
+        )
+    except Exception as e:
+        print e.message, "Failed to send email through AWS SES."
