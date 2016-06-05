@@ -30,10 +30,10 @@ class ParamValidator(object):
         # Let the caller know which params we ignored.
         self.warnings = []
 
-        if dataset_name:
+        if dataset_name:  #
             # Throws NoSuchTableError. Should be caught by caller.
-            self.dataset = Table(dataset_name, Base.metadata, autoload=True,
-                                 autoload_with=engine, extend_existing=True)
+            self.dataset = Table(dataset_name, Base.metadata, autoload=True,  #
+                                 autoload_with=engine, extend_existing=True)  #
             self.cols = self.dataset.columns.keys()
             # SQLAlchemy boolean expressions
             self.conditions = []
@@ -217,15 +217,15 @@ def setup_detail_validator(dataset_name, params):
 
     return validator
 
-def agg_validator(agg_str):
-    VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
+def agg_validator(agg_str):  #
+    VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']  #
 
-    if agg_str in VALID_AGG:
-        return agg_str, None
+    if agg_str in VALID_AGG:  #
+        return agg_str, None  #
     else:
         error_msg = '{} is not a valid unit of aggregation. Plenario accepts {}'\
-                    .format(agg_str, ','.join(VALID_AGG))
-        return None, error_msg
+                    .format(agg_str, ','.join(VALID_AGG))  #
+        return None, error_msg  #
 
 
 def date_validator(date_str):
@@ -299,7 +299,7 @@ def no_op_validator(foo):
 class FilterMaker(object):
     """
     Given dictionary of validated arguments and a sqlalchemy table,
-    generate binary consitions on that table restricting time and geography.
+    generate binary conditions on that table restricting time and geography.
     Can also create a postgres-formatted geography for further filtering
     with just a dict of arguments.
     """
