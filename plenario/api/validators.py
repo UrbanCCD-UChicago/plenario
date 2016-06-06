@@ -141,6 +141,11 @@ class ParamValidator(object):
 
         col = self.dataset.columns.get(field)
 
+        # removal of these two lines causes test_filter_point_data_with_landmarks_in_one_neighborhood to fail
+        # ---------------------------------------------------------------------------------------------------
+        # if col is None and self.vals.get('shape') is not None:
+        #    col = self.vals['shape'].columns.get(field)
+
         if len(tokens) == 1:
             # One token? Then it's an equality operation of the form k=v
             # col == v creates a SQLAlchemy boolean expression
