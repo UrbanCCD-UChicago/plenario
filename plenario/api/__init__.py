@@ -2,8 +2,7 @@ import json
 from flask import make_response, Blueprint
 from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate
 from common import cache, make_cache_key
-from shape import get_all_shape_datasets,\
-                    export_shape, aggregate_point_data
+from shape import get_all_shape_datasets, export_shape, aggregate_point_data
 from time import sleep
 from sensor import weather_stations, weather
 

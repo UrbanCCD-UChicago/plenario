@@ -1,5 +1,5 @@
 from unittest import TestCase
-from api.validators import validators
+from api.alt_validators import validators
 
 
 class TestValidators(TestCase):
