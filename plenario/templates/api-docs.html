@@ -225,9 +225,7 @@
                      response_desc='The API responds with a list of datasets with a dense matrix of counts grouped by temporal aggregation.',
                      response_attrs=[('dataset_name', 'Machine version of the dataset name'),
                                      ('items', timeseries_item)],
-                     examples=[('timeseries/?agg=year&dataset_name=crimes_2001_to_present&obs_date__ge=2015-1-1',
-                                'Count of all Chicago crime reports since Jan 1st 2015, aggregated by year'),
-                                ('timeseries/?obs_date__ge=2007-11-12&obs_date__le=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day',
+                     examples=[('timeseries/?obs_date__ge=2007-11-12&obs_date__le=2008-11-12&dataset_name__in=crimes_2001_to_present,cdph_environmental_complaints&agg=day',
                                  'Count of crime and environmental complaints that were observed after November 12, 2007 but before November 12, 2008, aggregated by day'),
                                 ('timeseries/?obs_date__le=2014%2F08%2F20&obs_date__ge=2014%2F02%2F21&agg=week&data_type=csv',
                                  'Count available datasets from Feb 21, 2014 to Aug 20, 2014, aggregated by week in CSV format. You could also call this a <strong>time series matrix</strong>.')]
