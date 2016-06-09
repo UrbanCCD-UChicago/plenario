@@ -1,19 +1,21 @@
-from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError,\
-    delete_absent_hashes
+import json
+
 from csvkit.unicsv import UnicodeCSVReader
-from sqlalchemy.exc import NoSuchTableError
-from plenario.database import app_engine as engine, session
-from plenario.utils.helpers import iter_column, slugify
+from geoalchemy2 import Geometry
 from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
 from sqlalchemy import select, func
-from geoalchemy2 import Geometry
+from sqlalchemy.exc import NoSuchTableError
+
+from plenario.database import app_engine as engine, session
+from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError, delete_absent_hashes
+from plenario.utils.helpers import iter_column, slugify
 
 
 class PlenarioETL(object):
     def __init__(self, metadata, source_path=None):
         """
         :param metadata: MetaTable instance of dataset being ETL'd.
-        :param source_path: If provided, get source CSV ftom local filesystem
+        :param source_path: If provided, get source CSV from local filesystem
                             instead of URL in metadata.
         """
         self.metadata = metadata
@@ -66,6 +68,11 @@ class Staging(object):
         try:
             # Can we just grab columns from an existing table?
             self.cols = self._from_ingested(meta.column_info())
+            # if we can, update the corresponding meta table with these column names and types
+            # we expect column names to be filled in by users, but helpful in test cases/backend submission
+            if meta.column_names is None:
+                cols = {col.name: str(col.type) for col in self.cols if col.name not in {u'geom', u'point_date', u'hash'}}
+                meta.column_names = json.dumps(cols)
         except NoSuchTableError:
             self.cols = None
 
@@ -177,8 +184,7 @@ class Staging(object):
         # Don't include the geom and point_date columns.
         # They're derived from the source data
         # and won't be present in the source CSV
-        original_cols = [c for c in ingested_cols
-                         if c.name not in ['geom', 'point_date', 'hash']]
+        original_cols = [c for c in ingested_cols if c.name not in ['geom', 'point_date', 'hash']]
         # Make copies that don't refer to the existing table.
         cols = [_copy_col(c) for c in original_cols]
 
@@ -396,23 +402,32 @@ class Update(object):
         return geom_col
 
 
-def update_meta(metadata, table):
+def update_meta(metatable, table):
     """
-    After ingest/update, update the metadata registry to reflect
-    :param metadata:
-    :param table:
-    """
-    metadata.update_date_added()
-    metadata.obs_from, metadata.obs_to =\
-        session.query(func.min(table.c.point_date),
-                      func.max(table.c.point_date)).first()
+    After ingest/update, update the metatable registry to reflect table information.
 
-    bbox = session.query(func.ST_SetSRID(
-                                         func.ST_Envelope(func.ST_Union(table.c.geom)),
-                                         4326
-                                         )).first()[0]
-    metadata.bbox = bbox
-    session.add(metadata)
+    :param metatable: MetaTable instance to update.
+    :param table: Table instance to update from.
+
+    :returns: None
+    """
+
+    metatable.update_date_added()
+
+    metatable.obs_from, metatable.obs_to = session.query(
+        func.min(table.c.point_date),
+        func.max(table.c.point_date)
+    ).first()
+
+    metatable.bbox = session.query(
+        func.ST_SetSRID(
+            func.ST_Envelope(func.ST_Union(table.c.geom)),
+            4326
+        )
+    ).first()[0]
+
+    session.add(metatable)
+
     try:
         session.commit()
     except:

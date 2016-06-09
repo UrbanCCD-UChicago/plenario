@@ -12,15 +12,6 @@ from lxml import objectify
 current_METAR_url = 'http://aviationweather.gov/adds/dataserver_current/current/'
 
 
-def _make_call_sign_wban_map():
-    with open('plenario/utils/wban_to_call_sign.csv') as fp:
-        reader = csv.reader(fp)
-        # Discard header
-        reader.next()
-        call_sign_to_wban_map = {row[1]: row[0] for row in reader}
-    return call_sign_to_wban_map
-
-call_sign_wban_map = _make_call_sign_wban_map()
 
 # An example code:
 # - In this example, we have "few clouds at 1500 feet, broken clouds at 4,000 feet w/ cumulonimbus,

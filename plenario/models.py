@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import Column, String, Boolean, Date, DateTime, \
     Text, func, Table, select, Integer
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from geoalchemy2 import Geometry
 from sqlalchemy.orm import synonym
 import sqlalchemy as sa
@@ -51,7 +51,7 @@ class MetaTable(Base):
     contributor_organization = Column(String)
     contributor_email = Column(String)
     result_ids = Column(ARRAY(String))
-    column_names = Column(ARRAY(String))
+    column_names = Column(JSONB)  # storage format {'<COLUMN_NAME>': '<COLUMN_TYPE>'}
 
     def __init__(self, url, human_name, observed_date,
                  approved_status=False, update_freq='yearly',
