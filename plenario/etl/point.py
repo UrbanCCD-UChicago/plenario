@@ -68,11 +68,6 @@ class Staging(object):
         try:
             # Can we just grab columns from an existing table?
             self.cols = self._from_ingested(meta.column_info())
-            # if we can, update the corresponding meta table with these column names and types
-            # we expect column names to be filled in by users, but helpful in test cases/backend submission
-            if meta.column_names is None:
-                cols = {col.name: str(col.type) for col in self.cols if col.name not in {u'geom', u'point_date', u'hash'}}
-                meta.column_names = json.dumps(cols)
         except NoSuchTableError:
             self.cols = None
 
