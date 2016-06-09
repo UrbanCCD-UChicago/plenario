@@ -18,7 +18,12 @@ flu_shot_meta = {
     'contributor_email': u'foo@bar.edu',
     'contributed_data_types': None,
     'approved_status': 'true',
-    'is_socrata_source': False
+    'is_socrata_source': False,
+    'column_names': {"date": "DATE", "start_time": "VARCHAR", "end_time": "VARCHAR", "facility_name": "VARCHAR",
+                     "facility_type": "VARCHAR", "street_1": "VARCHAR", "city": "VARCHAR", "state": "VARCHAR",
+                     "zip": "INTEGER", "phone": "VARCHAR", "latitude": "DOUBLE PRECISION",
+                     "longitude": "DOUBLE PRECISION", "day": "VARCHAR", "event": "VARCHAR", "event_type": "VARCHAR",
+                     "ward": "INTEGER", "location": "VARCHAR"}
 }
 
 landmarks_url = 'https://data.cityofchicago.org/api/views/tdab-kixi/rows.csv?accessType=DOWNLOAD'
@@ -41,7 +46,8 @@ landmarks_meta = {
     'contributor_email': u'foo@bar.edu',
     'contributed_data_types': None,
     'approved_status': 'true',
-    'is_socrata_source': False
+    'is_socrata_source': False,
+    'column_names': {"foo": "bar"}
 }
 
 crime_url = 'http://data.cityofchicago.org/api/views/ijzp-q8t2/rows.csv?accessType=DOWNLOAD'
@@ -64,5 +70,6 @@ crime_meta = {
     'contributor_email': u'foo@bar.edu',
     'contributed_data_types': None,
     'approved_status': 'true',
-    'is_socrata_source': False
+    'is_socrata_source': False,
+    'column_names': {"foo": "bar"}
 }
