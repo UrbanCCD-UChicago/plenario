@@ -421,6 +421,11 @@ def update_meta(metatable, table):
         )
     ).first()[0]
 
+    metatable.column_names = {
+        c.name: str(c.type) for c in metatable.column_info()
+        if c.name not in {u'geom', u'point_date', u'hash'}
+    }
+
     session.add(metatable)
 
     try:

@@ -304,11 +304,6 @@ def point_meta_from_submit_form(form, is_approved):
         column_names=None
     )
 
-    cols = {col.name: str(col.type) for col in metatable.column_info()
-            if col.name not in {u'geom', u'point_date', u'hash'}}
-
-    metatable.column_names = json.dumps(cols)
-
     session.add(metatable)
     session.commit()
     return metatable
