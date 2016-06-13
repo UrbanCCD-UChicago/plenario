@@ -12,6 +12,9 @@ def main():
     engine = create_engine(DATABASE_CONN, convert_unicode=True)
     session = sessionmaker(bind=engine)()
 
+    engine.execute("ALTER TABLE meta_master DROP COLUMN column_names;")
+    engine.execute("ALTER TABLE meta_master ADD COLUMN column_names jsonb;")
+
     # grab the MetaTable records
     query = session.query(MetaTable)
 
