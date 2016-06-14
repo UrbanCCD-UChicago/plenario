@@ -431,7 +431,5 @@ def update_meta(metatable, table):
         session.commit()
 
     except:
-        raise
-
-    finally:
         session.rollback()
+        raise
