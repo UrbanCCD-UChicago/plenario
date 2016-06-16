@@ -249,13 +249,15 @@ def form_columns(form):
     """
 
     labels = {}
+    columns = []
     for k, v in form.iteritems():
         if k.startswith('col_name_'):
             # key_type_observed_date
             key = k.replace("col_name_", "")
+            columns.append(key)
             # e.g labels['observed_date'] = 'date'
             labels[v] = key
-    return labels
+    return columns, labels
 
 
 def csv_already_submitted(url):
@@ -282,7 +284,7 @@ def contrib_thankyou():
 
 
 def point_meta_from_submit_form(form, is_approved):
-    labels = form_columns(form)
+    columns, labels = form_columns(form)
     name = slugify(form['dataset_name'], delim=u'_')[:50]
 
     metatable = MetaTable(
@@ -301,7 +303,7 @@ def point_meta_from_submit_form(form, is_approved):
         latitude=labels.get('latitude', None),
         longitude=labels.get('longitude', None),
         location=labels.get('location', None),
-        column_names=None
+        column_names=columns
     )
 
     session.add(metatable)
