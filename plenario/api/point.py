@@ -1,26 +1,26 @@
-from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, make_cache_key, \
-    dthandler, make_csv, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT, \
-    unknownObjectHandler
-from flask import request, make_response
 import dateutil.parser
+import json
+import shapely.geometry
+import shapely.wkb
+import sqlalchemy
+
+from collections import OrderedDict
 from datetime import timedelta, datetime
-from plenario.models import MetaTable
+from flask import request, make_response
 from itertools import groupby
 from operator import itemgetter
-import json
-from sqlalchemy import Table, text
-import sqlalchemy as sa
+from sqlalchemy import Table
 from sqlalchemy.exc import NoSuchTableError
-from plenario.database import session, Base, app_engine as engine
-import shapely.wkb, shapely.geometry
-from sqlalchemy.types import NullType
-from collections import OrderedDict
 
-from plenario.models import ShapeMetadata
+from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, make_csv
+from plenario.api.common import extract_first_geometry_fragment
+from plenario.api.common import make_cache_key, dthandler, make_fragment_str
+from plenario.api.common import RESPONSE_LIMIT, unknownObjectHandler
+from plenario.database import session, Base, app_engine as engine
+from plenario.models import MetaTable, ShapeMetadata
 
 
 class ParamValidator(object):
-
     def __init__(self, dataset_name=None, shape_dataset_name=None):
         # Maps param keys to functions that validate and transform its string value.
         # Each transform returns (transformed_value, error_string)
@@ -88,12 +88,12 @@ class ParamValidator(object):
                 elif err:
                     # Valid field was specified, but operator was malformed
                     return err
-                # else k wasn't an attempt at setting a condition
+                    # else k wasn't an attempt at setting a condition
 
             # This param is neither present in the optional params
             # nor does it specify a field in this dataset.
             if k != 'shape':
-                #quick and dirty way to make sure 'shape' is not listed as an unused value
+                # quick and dirty way to make sure 'shape' is not listed as an unused value
                 warning = 'Unused parameter value "{}={}"'.format(k, v)
                 self.warnings.append(warning)
 
@@ -126,9 +126,9 @@ class ParamValidator(object):
     }
 
     def _check_shape_condition(self, field):
-        #returns false if the shape column is 
-        return self.vals.get('shape') is not None\
-         and '{}.{}'.format(self.vals['shape'], field) in self.cols
+        # returns false if the shape column is
+        return self.vals.get('shape') is not None \
+               and '{}.{}'.format(self.vals['shape'], field) in self.cols
 
     def _make_condition(self, k, v):
         # Generally, we expect the form k = [field]__[op]
@@ -141,7 +141,7 @@ class ParamValidator(object):
             # Rather than return an error here,
             # we'll return None to indicate that this field wasn't present
             # and let the calling function send a warning to the client.
-            
+
             return None, None
 
         col = self.dataset.columns.get(field)
@@ -158,7 +158,7 @@ class ParamValidator(object):
             valid_op_codes = self.field_ops.keys() + ['in']
             if op_code not in valid_op_codes:
                 error_msg = "Invalid dataset field operator:" \
-                                " {} called in {}={}".format(op_code, k, v)
+                            " {} called in {}={}".format(op_code, k, v)
                 return None, error_msg
             else:
                 cond = self._make_condition_with_operator(col, op_code, v)
@@ -173,13 +173,14 @@ class ParamValidator(object):
         if op_code == 'in':
             cond = col.in_(target_value.split(','))
             return cond
-        else:   # Any other op code
+        else:  # Any other op code
             op_func = self.field_ops[op_code]
             # op_func is the name of a method bound to the SQLAlchemy column object.
             # Get the method and call it to create a binary condition (like name != 'Roy')
             # on the value the user specified.
             cond = getattr(col, op_func)(target_value)
             return cond
+
 
 '''
     Validator transformations.
@@ -188,8 +189,8 @@ class ParamValidator(object):
     where error_message is non-None only when the transformation could not produce an object of the expected type.
 '''
 
+
 def setup_detail_validator(dataset_name, params):
-    
     try:
         if 'shape' in params:
             shape = params['shape']
@@ -199,17 +200,17 @@ def setup_detail_validator(dataset_name, params):
     except NoSuchTableError:
         return bad_request("Cannot find dataset named {}".format(dataset_name))
 
-    validator\
+    validator \
         .set_optional('obs_date__ge',
                       date_validator,
-                      datetime.now() - timedelta(days=90))\
-        .set_optional('obs_date__le', date_validator, datetime.now())\
-        .set_optional('location_geom__within', geom_validator, None)\
-        .set_optional('offset', int_validator, 0)\
+                      datetime.now() - timedelta(days=90)) \
+        .set_optional('obs_date__le', date_validator, datetime.now()) \
+        .set_optional('location_geom__within', geom_validator, None) \
+        .set_optional('offset', int_validator, 0) \
         .set_optional('data_type',
                       make_format_validator(['json', 'csv', 'geojson']),
-                      'json')\
-        .set_optional('date__time_of_day_ge', time_of_day_validator, 0)\
+                      'json') \
+        .set_optional('date__time_of_day_ge', time_of_day_validator, 0) \
         .set_optional('date__time_of_day_le', time_of_day_validator, 23)
 
     '''create another validator to check if shape dataset is in meta_shape, then return
@@ -217,14 +218,15 @@ def setup_detail_validator(dataset_name, params):
 
     return validator
 
+
 def agg_validator(agg_str):
     VALID_AGG = ['day', 'week', 'month', 'quarter', 'year']
 
     if agg_str in VALID_AGG:
         return agg_str, None
     else:
-        error_msg = '{} is not a valid unit of aggregation. Plenario accepts {}'\
-                    .format(agg_str, ','.join(VALID_AGG))
+        error_msg = '{} is not a valid unit of aggregation. Plenario accepts {}' \
+            .format(agg_str, ','.join(VALID_AGG))
         return None, error_msg
 
 
@@ -256,8 +258,8 @@ def make_format_validator(valid_formats):
         if format_str in valid_formats:
             return format_str, None
         else:
-            error_msg = '{} is not a valid output format. Plenario accepts {}'\
-                        .format(format_str, ','.join(valid_formats))
+            error_msg = '{} is not a valid output format. Plenario accepts {}' \
+                .format(format_str, ','.join(valid_formats))
             return error_msg, None
 
     return format_validator
@@ -276,7 +278,7 @@ def geom_validator(geojson_str):
 def int_validator(int_str):
     try:
         num = int(int_str)
-        assert(num >= 0)
+        assert (num >= 0)
         return num, None
     except (ValueError, AssertionError):
         error_message = "Could not parse as non-negative integer: {}".format(int_str)
@@ -293,8 +295,10 @@ def time_of_day_validator(hour_str):
     else:
         return num, None
 
+
 def no_op_validator(foo):
     return foo, None
+
 
 class FilterMaker(object):
     """
@@ -333,7 +337,7 @@ class FilterMaker(object):
         try:
             start_hour = self.args['date__time_of_day_ge']
             if start_hour != 0:
-                lower_bound = sa.func.date_part('hour', d.c.point_date).__ge__(start_hour)
+                lower_bound = sqlalchemy.func.date_part('hour', d.c.point_date).__ge__(start_hour)
                 filters.append(lower_bound)
         except KeyError:
             pass
@@ -341,7 +345,7 @@ class FilterMaker(object):
         try:
             end_hour = self.args['date__time_of_day_le']
             if end_hour != 23:
-                upper_bound = sa.func.date_part('hour', d.c.point_date).__ge__(end_hour)
+                upper_bound = sqlalchemy.func.date_part('hour', d.c.point_date).__ge__(end_hour)
                 filters.append(upper_bound)
         except KeyError:
             pass
@@ -354,7 +358,7 @@ class FilterMaker(object):
         :return: geographic filter based on location_geom__within and buffer parameters
         """
         # Demeter weeps
-        return self.dataset.c.geom.ST_Within(sa.func.ST_GeomFromGeoJSON(geom_str))
+        return self.dataset.c.geom.ST_Within(sqlalchemy.func.ST_GeomFromGeoJSON(geom_str))
 
 
 def sql_ready_geom(validated_geom, buff):
@@ -387,10 +391,12 @@ def internal_error(context_msg, exception):
     msg = context_msg + '\nDebug:\n' + repr(exception)
     return make_error(msg, 500)
 
+
 def remove_columns_from_dict(rows, col_names):
     for row in rows:
         for name in col_names:
             del row[name]
+
 
 def json_response_base(validator, objects, query=''):
     meta = {
@@ -408,11 +414,13 @@ def json_response_base(validator, objects, query=''):
         'objects': objects,
     }
 
+
 def geojson_response_base():
     return {
         "type": "FeatureCollection",
         "features": []
     }
+
 
 def add_geojson_feature(geojson_response, feature_geom, feature_properties):
     new_feature = {
@@ -421,6 +429,7 @@ def add_geojson_feature(geojson_response, feature_geom, feature_properties):
         "properties": feature_properties
     }
     geojson_response['features'].append(new_feature)
+
 
 def form_json_detail_response(to_remove, validator, rows):
     to_remove.append('geom')
@@ -432,6 +441,7 @@ def form_json_detail_response(to_remove, validator, rows):
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
+
 def form_csv_detail_response(to_remove, validator, rows):
     to_remove.append('geom')
     remove_columns_from_dict(rows, to_remove)
@@ -440,13 +450,14 @@ def form_csv_detail_response(to_remove, validator, rows):
     # then the values from all the others
     csv_resp = [rows[0].keys()] + [row.values() for row in rows]
     resp = make_response(make_csv(csv_resp), 200)
-    dname = validator.dataset.name #dataset_name
+    dname = validator.dataset.name  # dataset_name
     filedate = datetime.now().strftime('%Y-%m-%d')
     resp.headers['Content-Type'] = 'text/csv'
     resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
     return resp
 
-def form_geojson_detail_response(to_remove, validator, rows):
+
+def form_geojson_detail_response(to_remove, rows):
     geojson_resp = geojson_response_base()
     # We want the geom this time.
     remove_columns_from_dict(rows, to_remove)
@@ -466,6 +477,7 @@ def form_geojson_detail_response(to_remove, validator, rows):
     resp = make_response(json.dumps(geojson_resp, default=dthandler), 200)
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
 
 def form_detail_sql_query(validator, aggregate_points=False):
     dset = validator.dataset
@@ -489,69 +501,64 @@ def form_detail_sql_query(validator, aggregate_points=False):
     except Exception as e:
         return internal_error('Failed to construct time and geometry filters.', e)
 
-    #if the query specified a shape dataset, add a join to the sql query with that dataset
+    # if the query specified a shape dataset, add a join to the sql query with that dataset
     shape_table = validator.vals.get('shape')
-    if shape_table != None:
-        shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]   
-        if aggregate_points: 
+    if shape_table is not None:
+        shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
+        if aggregate_points:
             q = q.from_self(shape_table).filter(dset.c.geom.ST_Intersects(shape_table.c.geom)).group_by(shape_table)
         else:
             q = q.join(shape_table, dset.c.geom.ST_Within(shape_table.c.geom))
-            #add columns from shape dataset to the select statement
+            # add columns from shape dataset to the select statement
             q = q.add_columns(*shape_columns)
 
     return q
 
+
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def timeseries():
-
     return _timeseries(request.args.to_dict())
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail_aggregate():
-
     return _detail_aggregate(request.args.to_dict())
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail():
-
     return _detail(request.args.to_dict())
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def grid():
-
     return _grid(request.args.to_dict())
 
 
-@cache.cached(timeout=CACHE_TIMEOUT)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
-
     return _fields(dataset_name)
 
 
-@cache.cached(timeout=CACHE_TIMEOUT)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def meta():
-
     return _meta(request.args.to_dict())
 
 
 def _timeseries(request_args):
-    validator = ParamValidator()\
-        .set_optional('agg', agg_validator, 'week')\
-        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json')\
-        .set_optional('dataset_name__in', list_of_datasets_validator, MetaTable.index)\
-        .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
-        .set_optional('obs_date__le', date_validator, datetime.now())\
-        .set_optional('location_geom__within', geom_validator, None)\
+    validator = ParamValidator() \
+        .set_optional('agg', agg_validator, 'week') \
+        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json') \
+        .set_optional('dataset_name__in', list_of_datasets_validator, MetaTable.index) \
+        .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90)) \
+        .set_optional('obs_date__le', date_validator, datetime.now()) \
+        .set_optional('location_geom__within', geom_validator, None) \
         .set_optional('buffer', int_validator, 100)
 
     err = validator.validate(request_args)
@@ -601,7 +608,7 @@ def _timeseries(request_args):
 
         csv_resp = []
         i = 0
-        for k,g in groupby(resp['objects'], key=itemgetter('dataset_name')):
+        for k, g in groupby(resp['objects'], key=itemgetter('dataset_name')):
             l_g = list(g)[0]
 
             j = 0
@@ -636,11 +643,11 @@ def _detail_aggregate(request_args):
     except NoSuchTableError:
         return bad_request("Cannot find dataset named {}".format(dataset_name))
 
-    validator\
-        .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
-        .set_optional('obs_date__le', date_validator, datetime.now())\
-        .set_optional('location_geom__within', geom_validator, None)\
-        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json')\
+    validator \
+        .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90)) \
+        .set_optional('obs_date__le', date_validator, datetime.now()) \
+        .set_optional('location_geom__within', geom_validator, None) \
+        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json') \
         .set_optional('agg', agg_validator, 'week')
 
     # If any optional parameters are malformed, we're better off bailing and telling the user
@@ -662,62 +669,7 @@ def _detail_aggregate(request_args):
     except Exception as e:
         return internal_error('Failed to construct timeseries', e)
 
-    datatype = validator.vals['data_type']
-    if datatype == 'json':
-        time_counts = [{'count': c, 'datetime': d} for c, d in ts[1:]]
-        resp = json_response_base(validator, time_counts)
-        resp['count'] = sum([c['count'] for c in time_counts])
-        resp = make_response(json.dumps(resp, default=dthandler), 200)
-        resp.headers['Content-Type'] = 'application/json'
-
-    elif datatype == 'csv':
-        resp = make_csv(ts)
-        resp.headers['Content-Type'] = 'text/csv'
-        filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
-
-    return resp
-
-
-def _detail_aggregate(request_args):
-    raw_query_params = request_args
-    # First, make sure name of dataset was provided...
-    try:
-        dataset_name = raw_query_params.pop('dataset_name')
-    except KeyError:
-        return bad_request("'dataset_name' is required")
-
-    # and that we have that dataset.
-    try:
-        validator = ParamValidator(dataset_name)
-    except NoSuchTableError:
-        return bad_request("Cannot find dataset named {}".format(dataset_name))
-
-    validator\
-        .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
-        .set_optional('obs_date__le', date_validator, datetime.now())\
-        .set_optional('location_geom__within', geom_validator, None)\
-        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json')\
-        .set_optional('agg', agg_validator, 'week')
-
-    # If any optional parameters are malformed, we're better off bailing and telling the user
-    # than using a default and confusing them.
-    err = validator.validate(raw_query_params)
-    if err:
-        return bad_request(err)
-
-    start_date = validator.vals['obs_date__ge']
-    end_date = validator.vals['obs_date__le']
-    agg = validator.vals['agg']
-    geom = validator.get_geom()
-    dataset = MetaTable.get_by_dataset_name(dataset_name)
-
-    try:
-        ts = dataset.timeseries_one(agg_unit=agg, start=start_date,
-                                    end=end_date, geom=geom,
-                                    column_filters=validator.conditions)
-    except Exception as e:
-        return internal_error('Failed to construct timeseries', e)
+    resp = None
 
     datatype = validator.vals['data_type']
     if datatype == 'json':
@@ -754,9 +706,9 @@ def _detail(request_args):
     if err:
         return bad_request(err)
 
-    #Part 2: Form SQL query from parameters stored in 'validator' object
+    # Part 2: Form SQL query from parameters stored in 'validator' object
     q = form_detail_sql_query(validator)
-    
+
     # Page in RESPONSE_LIMIT chunks
     offset = validator.vals['offset']
     q = q.limit(RESPONSE_LIMIT)
@@ -774,20 +726,18 @@ def _detail(request_args):
     # Part 4: Format response
     to_remove = ['point_date', 'hash']
     if validator.vals.get('shape') is not None:
-        #to_remove.append('{}.geom'.format(validator.vals['shape'].name))
+        # to_remove.append('{}.geom'.format(validator.vals['shape'].name))
         to_remove += ['{}.{}'.format(validator.vals['shape'].name, col) for col in ['geom', 'hash', 'ogc_fid']]
 
     datatype = validator.vals['data_type']
     if datatype == 'json':
-        resp = form_json_detail_response(to_remove, validator, rows)
+        return form_json_detail_response(to_remove, validator, rows)
 
     elif datatype == 'csv':
-        resp = form_csv_detail_response(to_remove, validator, rows)
+        return form_csv_detail_response(to_remove, validator, rows)
 
     elif datatype == 'geojson':
-        resp = form_geojson_detail_response(to_remove, validator, rows)
-    
-    return resp
+        return form_geojson_detail_response(to_remove, validator, rows)
 
 
 def _grid(request_args):
@@ -804,11 +754,11 @@ def _grid(request_args):
     except NoSuchTableError:
         return bad_request("Could not find dataset named {}.".format(dataset_name))
 
-    validator.set_optional('buffer', int_validator, 100)\
-             .set_optional('resolution', int_validator, 500)\
-             .set_optional('location_geom__within', geom_validator, None)\
-             .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
-             .set_optional('obs_date__le', date_validator, datetime.now())\
+    validator.set_optional('buffer', int_validator, 100) \
+        .set_optional('resolution', int_validator, 500) \
+        .set_optional('location_geom__within', geom_validator, None) \
+        .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90)) \
+        .set_optional('obs_date__le', date_validator, datetime.now())
 
     err = validator.validate(raw_query_params)
     if err:
@@ -836,12 +786,12 @@ def _grid(request_args):
     for value in grid_rows:
         if value[1]:
             pt = shapely.wkb.loads(value[1].decode('hex'))
-            south, west = (pt.x - (size_x / 2)), (pt.y - (size_y /2))
+            south, west = (pt.x - (size_x / 2)), (pt.y - (size_y / 2))
             north, east = (pt.x + (size_x / 2)), (pt.y + (size_y / 2))
             new_geom = shapely.geometry.box(south, west, north, east).__geo_interface__
         else:
             new_geom = None
-        new_property = {'count': value[0],}
+        new_property = {'count': value[0], }
         add_geojson_feature(resp, new_geom, new_property)
 
     resp = make_response(json.dumps(resp, default=dthandler), 200)
@@ -868,20 +818,17 @@ def _meta(request_args):
 
     :returns: response dictionary"""
 
-    print "_meta.request_args"
-    print request_args
-
     # Doesn't require a table lookup,
     # so no params passed on construction
     validator = ParamValidator()
     validator.set_optional('dataset_name',
                            no_op_validator,
-                           None)\
-             .set_optional('location_geom__within',
-                           geom_validator,
-                           None)\
-             .set_optional('obs_date__ge', date_validator, None)\
-             .set_optional('obs_date__le', date_validator, None)
+                           None) \
+        .set_optional('location_geom__within',
+                      geom_validator,
+                      None) \
+        .set_optional('obs_date__ge', date_validator, None) \
+        .set_optional('obs_date__le', date_validator, None)
 
     err = validator.validate(request_args)
     if err:
@@ -894,7 +841,7 @@ def _meta(request_args):
     col_objects = [getattr(MetaTable, col) for col in cols_to_return]
 
     # Columns that need pre-processing
-    col_objects.append(sa.func.ST_AsGeoJSON(MetaTable.bbox))
+    col_objects.append(sqlalchemy.func.ST_AsGeoJSON(MetaTable.bbox))
     cols_to_return.append('bbox')
 
     # Only return datasets that have been successfully ingested
@@ -915,14 +862,20 @@ def _meta(request_args):
         q = q.filter(MetaTable.dataset_name == dataset_name)
     elif should_filter:
         if geom:
-            intersects = sa.func.ST_Intersects(sa.func.ST_GeomFromGeoJSON(geom),
-                                               MetaTable.bbox)
+            intersects = sqlalchemy.func.ST_Intersects(
+                sqlalchemy.func.ST_GeomFromGeoJSON(geom),
+                MetaTable.bbox
+            )
             q = q.filter(intersects)
         if start_date and end_date:
-            q = q.filter(sa.and_(MetaTable.obs_from < end_date,
-                                 MetaTable.obs_to > start_date))
-    # Otherwise, just send back all the datasets
+            q = q.filter(
+                sqlalchemy.and_(
+                    MetaTable.obs_from < end_date,
+                    MetaTable.obs_to > start_date
+                )
+            )
 
+    # Otherwise, just send back all the datasets
     failure_messages = []
 
     metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
