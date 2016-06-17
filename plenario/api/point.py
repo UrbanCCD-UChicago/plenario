@@ -757,7 +757,7 @@ def grid():
     return resp
 
 
-@cache.cached(timeout=CACHE_TIMEOUT)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def meta():
     # Doesn't require a table lookup,
@@ -839,7 +839,7 @@ def meta():
     return resp
 
 
-@cache.cached(timeout=CACHE_TIMEOUT)
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
     try:
