@@ -760,6 +760,18 @@ def grid():
 @cache.cached(timeout=CACHE_TIMEOUT)
 @crossdomain(origin="*")
 def meta():
+
+    request_args = request.args.to_dict()
+    return _meta(request_args)
+
+
+def _meta(request_args):
+    """Generate meta information about table(s) with records from MetaTable.
+    
+    :param request_args: dictionary of request arguments (?foo=bar)
+
+    :returns: response dictionary"""
+
     # Doesn't require a table lookup,
     # so no params passed on construction
     validator = ParamValidator()
@@ -772,7 +784,7 @@ def meta():
              .set_optional('obs_date__ge', date_validator, None)\
              .set_optional('obs_date__le', date_validator, None)
 
-    err = validator.validate(request.args)
+    err = validator.validate(request_args)
     if err:
         return bad_request(err)
 
@@ -842,24 +854,12 @@ def meta():
 @cache.cached(timeout=CACHE_TIMEOUT)
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
-    try:
-        resp = json_response_base(None, [], query={'dataset_name': dataset_name})
-        status_code = 200
 
-        # get json and convert it to a dictionary
-        columns = session.query(MetaTable.column_names)\
-                         .filter(MetaTable.dataset_name == dataset_name)\
-                         .first()[0]
+    return _fields(dataset_name)
 
-        # return formatted list of column information
-        resp['objects'] = [{'field_name': key, 'field_type': value}
-                           for key, value in columns.items()]
 
-        resp = make_response(json.dumps(resp), status_code)
+def _fields(dataset_name):
 
-    except NoSuchTableError:
-        error_msg = "'%s' is not a valid table name" % dataset_name
-        resp = bad_request(error_msg)
-
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
+    request_args = request.args.to_dict()
+    request_args['dataset_name'] = dataset_name
+    return _meta(request_args)
