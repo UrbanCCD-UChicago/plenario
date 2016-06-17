@@ -16,6 +16,7 @@ from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, make_csv
 from plenario.api.common import extract_first_geometry_fragment
 from plenario.api.common import make_cache_key, dthandler, make_fragment_str
 from plenario.api.common import RESPONSE_LIMIT, unknownObjectHandler
+from plenario.api.validator import validate
 from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, ShapeMetadata
 
@@ -407,7 +408,7 @@ def json_response_base(validator, objects, query=''):
 
     if validator:
         meta['message'] = validator.warnings
-        meta['query'] = validator.vals
+        meta['query'] = query
 
     return {
         'meta': meta,
@@ -457,7 +458,7 @@ def form_csv_detail_response(to_remove, validator, rows):
     return resp
 
 
-def form_geojson_detail_response(to_remove, rows):
+def form_geojson_detail_response(to_remove, validator, rows):
     geojson_resp = geojson_response_base()
     # We want the geom this time.
     remove_columns_from_dict(rows, to_remove)
@@ -552,24 +553,19 @@ def meta():
 
 
 def _timeseries(request_args):
-    validator = ParamValidator() \
-        .set_optional('agg', agg_validator, 'week') \
-        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json') \
-        .set_optional('dataset_name__in', list_of_datasets_validator, MetaTable.index) \
-        .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90)) \
-        .set_optional('obs_date__le', date_validator, datetime.now()) \
-        .set_optional('location_geom__within', geom_validator, None) \
-        .set_optional('buffer', int_validator, 100)
 
-    err = validator.validate(request_args)
-    if err:
-        return bad_request(err)
+    validation = validate(request_args)
+    if validation.errors:
+        return bad_request(validation.errors)
 
-    geom = validator.get_geom()
-    table_names = validator.vals['dataset_name__in']
-    start_date = validator.vals['obs_date__ge']
-    end_date = validator.vals['obs_date__le']
-    agg = validator.vals['agg']
+    geom = None
+    if validation.data['geom']:
+        geom = make_fragment_str(validation.data['geom'], validation.data['buffer'])
+
+    table_names = validation.data['dataset_name__in']
+    start_date = validation.data['obs_date__ge']
+    end_date = validation.data['obs_date__le']
+    agg = validation.data['agg']
 
     # Only examine tables that have a chance of containing records within the date and space boundaries.
     try:
@@ -579,19 +575,17 @@ def _timeseries(request_args):
         return internal_error(msg, e)
 
     try:
-        panel = MetaTable.timeseries_all(table_names=table_names,
-                                         agg_unit=agg,
-                                         start=start_date,
-                                         end=end_date,
-                                         geom=geom)
+        panel = MetaTable.timeseries_all(
+            table_names, agg, start_date, end_date, geom
+        )
     except Exception as e:
         msg = 'Failed to construct timeseries.'
         return internal_error(msg, e)
 
     panel = MetaTable.attach_metadata(panel)
-    resp = json_response_base(validator, panel)
+    resp = json_response_base(validation, panel, request.args)
 
-    datatype = validator.vals['data_type']
+    datatype = validation.data['data_type']
     if datatype == 'json':
         resp = make_response(json.dumps(resp, default=dthandler), 200)
         resp.headers['Content-Type'] = 'application/json'
@@ -630,51 +624,33 @@ def _timeseries(request_args):
 
 
 def _detail_aggregate(request_args):
-    raw_query_params = request_args
-    # First, make sure name of dataset was provided...
-    try:
-        dataset_name = raw_query_params.pop('dataset_name')
-    except KeyError:
+
+    validation = validate(request_args)
+
+    if validation.data['dataset'] is None:
         return bad_request("'dataset_name' is required")
+    if validation.errors:
+        return bad_request(validation.errors)
 
-    # and that we have that dataset.
-    try:
-        validator = ParamValidator(dataset_name)
-    except NoSuchTableError:
-        return bad_request("Cannot find dataset named {}".format(dataset_name))
-
-    validator \
-        .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90)) \
-        .set_optional('obs_date__le', date_validator, datetime.now()) \
-        .set_optional('location_geom__within', geom_validator, None) \
-        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json') \
-        .set_optional('agg', agg_validator, 'week')
-
-    # If any optional parameters are malformed, we're better off bailing and telling the user
-    # than using a default and confusing them.
-    err = validator.validate(raw_query_params)
-    if err:
-        return bad_request(err)
-
-    start_date = validator.vals['obs_date__ge']
-    end_date = validator.vals['obs_date__le']
-    agg = validator.vals['agg']
-    geom = validator.get_geom()
-    dataset = MetaTable.get_by_dataset_name(dataset_name)
+    start_date = validation.data['obs_date__ge']
+    end_date = validation.data['obs_date__le']
+    agg = validation.data['agg']
+    geom = validation.data['geom']
+    dataset = validation.data['dataset']
 
     try:
-        ts = dataset.timeseries_one(agg_unit=agg, start=start_date,
-                                    end=end_date, geom=geom,
-                                    column_filters=validator.conditions)
+        ts = dataset.timeseries_one(
+            agg, start_date, end_date, geom, None  # TODO: We need conditions!
+        )
     except Exception as e:
         return internal_error('Failed to construct timeseries', e)
 
     resp = None
 
-    datatype = validator.vals['data_type']
+    datatype = validation.data['data_type']
     if datatype == 'json':
         time_counts = [{'count': c, 'datetime': d} for c, d in ts[1:]]
-        resp = json_response_base(validator, time_counts)
+        resp = json_response_base(validation, time_counts)
         resp['count'] = sum([c['count'] for c in time_counts])
         resp = make_response(json.dumps(resp, default=dthandler), 200)
         resp.headers['Content-Type'] = 'application/json'
@@ -901,3 +877,5 @@ def _meta(request_args):
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
+
