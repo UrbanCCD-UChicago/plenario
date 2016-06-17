@@ -60,13 +60,14 @@ class PointAPITests(BasePlenarioTest):
     ''' /fields '''
 
     def test_fields(self):
-        query = 'v1/api/fields/flu_shot_clinics?include_columns=true'
+        query = 'v1/api/fields/flu_shot_clinics'
         resp = self.app.get(query)
         response_data = json.loads(resp.data)
 
         # Should be the same length
         # as the number of columns in the source dataset
-        self.assertEqual(len(response_data['objects']), 17)
+        self.assertEqual(len(response_data['objects']), 1)
+        self.assertEqual(len(response_data['objects'][0]['columns']), 17)
 
     ''' /detail '''
 
