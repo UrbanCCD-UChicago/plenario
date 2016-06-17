@@ -14,16 +14,9 @@ print "\n"
 app = create_app()
 test = create_app().test_client()
 
-with app.test_request_context('/v1/api/datasets?dataset_name=crimes'):
+print len(json.loads(test.get('/v1/api/datasets?dataset_name=crimes').data)['objects'])
+print len(json.loads(test.get('/v1/api/datasets/?dataset_name=crimes').data)['objects'])
 
-    request_args = request.args.to_dict()
-    datasets_response = _meta(request_args)
-    datasets = json.loads(datasets_response.data)
-
-fields_response = test.get('/v1/api/fields/crimes')
-fields = json.loads(fields_response.data)
-
-print fields == datasets
 
 print "\n"
 print "========================================"

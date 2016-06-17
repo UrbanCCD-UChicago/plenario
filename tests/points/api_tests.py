@@ -29,7 +29,7 @@ class PointAPITests(BasePlenarioTest):
     ''' /datasets '''
 
     def test_metadata_single(self):
-        query = '/v1/api/datasets/?dataset_name=crimes'
+        query = '/v1/api/datasets?dataset_name=crimes'
         resp = self.app.get(query)
         response_data = json.loads(resp.data)
 
@@ -39,7 +39,7 @@ class PointAPITests(BasePlenarioTest):
 
     def test_metadata_filter(self):
         escaped_query_rect = get_loop_rect()
-        query = 'v1/api/datasets/?location_geom__within={}' \
+        query = 'v1/api/datasets?location_geom__within={}' \
                 '&obs_date__ge={}&obs_date__le={}'\
             .format(escaped_query_rect, '2015-1-1', '2016-1-1')
 

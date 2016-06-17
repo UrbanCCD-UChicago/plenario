@@ -505,6 +505,46 @@ def form_detail_sql_query(validator, aggregate_points=False):
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def timeseries():
+
+    return _timeseries(request.args.to_dict())
+
+
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def detail_aggregate():
+
+    return _detail_aggregate(request.args.to_dict())
+
+
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def detail():
+
+    return _detail(request.args.to_dict())
+
+
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def grid():
+
+    return _grid(request.args.to_dict())
+
+
+@cache.cached(timeout=CACHE_TIMEOUT)
+@crossdomain(origin="*")
+def dataset_fields(dataset_name):
+
+    return _fields(dataset_name)
+
+
+@cache.cached(timeout=CACHE_TIMEOUT)
+@crossdomain(origin="*")
+def meta():
+
+    return _meta(request.args.to_dict())
+
+
+def _timeseries(request_args):
     validator = ParamValidator()\
         .set_optional('agg', agg_validator, 'week')\
         .set_optional('data_type', make_format_validator(['json', 'csv']), 'json')\
@@ -514,7 +554,7 @@ def timeseries():
         .set_optional('location_geom__within', geom_validator, None)\
         .set_optional('buffer', int_validator, 100)
 
-    err = validator.validate(request.args)
+    err = validator.validate(request_args)
     if err:
         return bad_request(err)
 
@@ -582,10 +622,8 @@ def timeseries():
     return resp
 
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin="*")
-def detail_aggregate():
-    raw_query_params = request.args.copy()
+def _detail_aggregate(request_args):
+    raw_query_params = request_args
     # First, make sure name of dataset was provided...
     try:
         dataset_name = raw_query_params.pop('dataset_name')
@@ -640,11 +678,67 @@ def detail_aggregate():
 
     return resp
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin="*")
-def detail():
+
+def _detail_aggregate(request_args):
+    raw_query_params = request_args
+    # First, make sure name of dataset was provided...
+    try:
+        dataset_name = raw_query_params.pop('dataset_name')
+    except KeyError:
+        return bad_request("'dataset_name' is required")
+
+    # and that we have that dataset.
+    try:
+        validator = ParamValidator(dataset_name)
+    except NoSuchTableError:
+        return bad_request("Cannot find dataset named {}".format(dataset_name))
+
+    validator\
+        .set_optional('obs_date__ge', date_validator, datetime.now() - timedelta(days=90))\
+        .set_optional('obs_date__le', date_validator, datetime.now())\
+        .set_optional('location_geom__within', geom_validator, None)\
+        .set_optional('data_type', make_format_validator(['json', 'csv']), 'json')\
+        .set_optional('agg', agg_validator, 'week')
+
+    # If any optional parameters are malformed, we're better off bailing and telling the user
+    # than using a default and confusing them.
+    err = validator.validate(raw_query_params)
+    if err:
+        return bad_request(err)
+
+    start_date = validator.vals['obs_date__ge']
+    end_date = validator.vals['obs_date__le']
+    agg = validator.vals['agg']
+    geom = validator.get_geom()
+    dataset = MetaTable.get_by_dataset_name(dataset_name)
+
+    try:
+        ts = dataset.timeseries_one(agg_unit=agg, start=start_date,
+                                    end=end_date, geom=geom,
+                                    column_filters=validator.conditions)
+    except Exception as e:
+        return internal_error('Failed to construct timeseries', e)
+
+    datatype = validator.vals['data_type']
+    if datatype == 'json':
+        time_counts = [{'count': c, 'datetime': d} for c, d in ts[1:]]
+        resp = json_response_base(validator, time_counts)
+        resp['count'] = sum([c['count'] for c in time_counts])
+        resp = make_response(json.dumps(resp, default=dthandler), 200)
+        resp.headers['Content-Type'] = 'application/json'
+
+    elif datatype == 'csv':
+        resp = make_csv(ts)
+        resp.headers['Content-Type'] = 'text/csv'
+        filedate = datetime.now().strftime('%Y-%m-%d')
+        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
+
+    return resp
+
+
+def _detail(request_args):
     # Part 1: validate parameters
-    raw_query_params = request.args.copy()
+    raw_query_params = request_args
     # First, make sure name of dataset was provided...
     try:
         dataset_name = raw_query_params.pop('dataset_name')
@@ -696,10 +790,8 @@ def detail():
     return resp
 
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin="*")
-def grid():
-    raw_query_params = request.args.copy()
+def _grid(request_args):
+    raw_query_params = request_args
 
     # First, make sure name of dataset was provided...
     try:
@@ -757,11 +849,15 @@ def grid():
     return resp
 
 
-@cache.cached(timeout=CACHE_TIMEOUT)
-@crossdomain(origin="*")
-def meta():
+def _fields(dataset_name):
+    """Generate meta information about a single table. Uses _meta().
+    
+    :param dataset_name: table name, grabbed from /v1/api/fields/<NAME>/
+    
+    :returns: response dictionary"""
 
     request_args = request.args.to_dict()
+    request_args['dataset_name'] = dataset_name
     return _meta(request_args)
 
 
@@ -771,6 +867,9 @@ def _meta(request_args):
     :param request_args: dictionary of request arguments (?foo=bar)
 
     :returns: response dictionary"""
+
+    print "_meta.request_args"
+    print request_args
 
     # Doesn't require a table lookup,
     # so no params passed on construction
@@ -849,17 +948,3 @@ def _meta(request_args):
     resp = make_response(json.dumps(resp, default=dthandler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
-
-
-@cache.cached(timeout=CACHE_TIMEOUT)
-@crossdomain(origin="*")
-def dataset_fields(dataset_name):
-
-    return _fields(dataset_name)
-
-
-def _fields(dataset_name):
-
-    request_args = request.args.to_dict()
-    request_args['dataset_name'] = dataset_name
-    return _meta(request_args)
