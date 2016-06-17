@@ -266,7 +266,7 @@ class PointAPITests(BasePlenarioTest):
 
     def test_aggregate_column_filter(self):
         query = 'v1/api/detail-aggregate/' \
-                '?obs_date__ge=2013-1-1&obs_date_le=2014-1-1' \
+                '?obs_date__ge=2013-1-1&obs_date__le=2014-1-1' \
                 '&dataset_name=flu_shot_clinics&event_type=Church&agg=year'
 
         resp = self.app.get(query)
