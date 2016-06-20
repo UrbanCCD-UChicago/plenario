@@ -1,7 +1,7 @@
 import json
 from flask.ext.cache import Cache
 from plenario.settings import CACHE_CONFIG
-from datetime import timedelta, date
+from datetime import timedelta, date, datetime
 from functools import update_wrapper
 from flask import make_response, request, current_app
 import csv
@@ -15,14 +15,18 @@ cache = Cache(config=CACHE_CONFIG)
 RESPONSE_LIMIT = 1000
 CACHE_TIMEOUT = 60*60*6
 
+
 def unknownObjectHandler(obj):
     #convert Plenario objects into json for response; currently handles geoms and dates
     if type(obj) == Table:
         return obj.name
     elif isinstance(obj, date):
         return obj.isoformat()
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
     else:
         raise ValueError
+
 
 def dthandler(obj):
     if isinstance(obj, date):
