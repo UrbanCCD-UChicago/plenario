@@ -15,55 +15,11 @@ from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, make_csv
 from plenario.api.common import extract_first_geometry_fragment
 from plenario.api.common import make_cache_key, dthandler, make_fragment_str
 from plenario.api.common import RESPONSE_LIMIT, unknownObjectHandler
-from plenario.api.condition_builder import field_ops
+from plenario.api.condition_builder import ConditionBuilder
 from plenario.api.response import *  # TODO: Correct your laziness.
 from plenario.api.validator import Validator, DatasetRequiredValidator, validate
 from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, ShapeMetadata
-
-
-def _make_condition(table, k, v):
-    # Generally, we expect the form k = [field]__[op]
-    # Can also be just [field] in the case of simple equality
-    tokens = k.split('__')
-    # An attribute of the dataset
-    field = tokens[0]
-
-    col = table.columns.get(field)
-
-    if len(tokens) == 1:
-        # One token? Then it's an equality operation of the form k=v
-        # col == v creates a SQLAlchemy boolean expression
-        return (col == v), None
-    elif len(tokens) == 2:
-        # Two tokens? Then it's of the form [field]__[op_code]=v
-        op_code = tokens[1]
-        valid_op_codes = field_ops.keys() + ['in']
-        if op_code not in valid_op_codes:
-            error_msg = "Invalid dataset field operator:" \
-                        " {} called in {}={}".format(op_code, k, v)
-            return None, error_msg
-        else:
-            cond = _make_condition_with_operator(col, op_code, v)
-            return cond, None
-
-    else:
-        error_msg = "Too many arguments on dataset field {}={}" \
-                    "\n Expected [field]__[operator]=value".format(k, v)
-        return None, error_msg
-
-
-def _make_condition_with_operator(col, op_code, target_value):
-    if op_code == 'in':
-        cond = col.in_(target_value.split(','))
-        return cond
-    else:  # Any other op code
-        op_func = field_ops[op_code]
-        # op_func is the name of a method bound to the SQLAlchemy column object.
-        # Get the method and call it to create a binary condition (like name != 'Roy')
-        # on the value the user specified.
-        cond = getattr(col, op_func)(target_value)
-        return cond
 
 
 def setup_detail_validator(dataset_name, params):
@@ -71,110 +27,34 @@ def setup_detail_validator(dataset_name, params):
     return DatasetRequiredValidator()
 
 
-class FilterMaker(object):
-    """
-    Given dictionary of validated arguments and a sqlalchemy table,
-    generate binary consitions on that table restricting time and geography.
-    Can also create a postgres-formatted geography for further filtering
-    with just a dict of arguments.
-    """
+def form_detail_sql_query(args, aggregate_points=False):
 
-    def __init__(self, args, dataset=None):
-        """
-        :param args: dict mapping arguments to values as taken from a Validator
-        :param dataset: table object of particular dataset being queried, if available
-        """
-        self.args = args
-        self.dataset = dataset
+    point_table = args.data['dataset']
+    conditions = []
 
-    def time_filters(self):
-        """
-        :return: SQLAlchemy conditions derived from time arguments on :dataset:
-        """
-        filters = []
-        d = self.dataset
-        try:
-            lower_bound = d.c.point_date >= self.args['obs_date__ge']
-            filters.append(lower_bound)
-        except KeyError:
-            pass
-
-        try:
-            upper_bound = d.c.point_date <= self.args['obs_date__le']
-            filters.append(upper_bound)
-        except KeyError:
-            pass
-
-        try:
-            start_hour = self.args['date__time_of_day_ge']
-            if start_hour != 0:
-                lower_bound = sqlalchemy.func.date_part('hour', d.c.point_date).__ge__(start_hour)
-                filters.append(lower_bound)
-        except KeyError:
-            pass
-
-        try:
-            end_hour = self.args['date__time_of_day_le']
-            if end_hour != 23:
-                upper_bound = sqlalchemy.func.date_part('hour', d.c.point_date).__ge__(end_hour)
-                filters.append(upper_bound)
-        except KeyError:
-            pass
-
-        return filters
-
-    def geom_filter(self, geom_str):
-        """
-        :param geom_str: geoJSON string from Validator ready to throw into postgres
-        :return: geographic filter based on location_geom__within and buffer parameters
-        """
-        # Demeter weeps
-        return self.dataset.c.geom.ST_Within(sqlalchemy.func.ST_GeomFromGeoJSON(geom_str))
-
-    def column_filter(self, column_str):
-        column, value = column_str.split("=")
-        return _make_condition(self.dataset, column, value)
-
-
-def sql_ready_geom(validated_geom, buff):
-    """
-    :param validated_geom: geoJSON fragment as extracted from geom_validator
-    :param buff: int representing lenth of buffer around geometry if geometry is a linestring
-    :return: Geometry string suitable for postgres query
-    """
-    return make_fragment_str(validated_geom, buff)
-
-
-def form_detail_sql_query(validator, aggregate_points=False):
-    dset = validator.data['dataset']
-    try:
-        q = session.query(dset.name)
-        if validator.filters:
-            q = q.filter(*validator.filters)
-    except Exception as e:
-        return internal_error('Failed to construct column filters.', e)
+    for field, value in args.data.items():
+        if value is not None:
+            condition = ConditionBuilder.parse_general(point_table, field, value)
+            if condition is not None:
+                conditions.append(condition)
 
     try:
-        # Add time filters
-        maker = FilterMaker(validator.data, dataset=dset)
-        q = q.filter(*maker.time_filters())
-
-        # Add geom filter, if provided
-        geom = validator.data['geom']
-        if geom is not None:
-            geom_filter = maker.geom_filter(geom)
-            q = q.filter(geom_filter)
+        q = session.query(point_table)
+        if conditions:
+            q = q.filter(*conditions)
     except Exception as e:
-        return internal_error('Failed to construct time and geometry filters.', e)
+        return internal_error('Failed to construct filters.', e)
 
     # if the query specified a shape dataset, add a join to the sql query with that dataset
-    shape_table = validator.data.get('shape')
+    shape_table = args.data.get('shape')
     if shape_table is not None:
         shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
         if aggregate_points:
-            q = q.from_self(shape_table).filter(dset.c.geom.ST_Intersects(shape_table.c.geom)).group_by(shape_table)
+            q = q.from_self(shape_table)\
+                .filter(point_table.c.geom.ST_Intersects(shape_table.c.geom))\
+                .group_by(shape_table)
         else:
-            q = q.join(shape_table, dset.c.geom.ST_Within(shape_table.c.geom))
+            q = q.join(shape_table, point_table.c.geom.ST_Within(shape_table.c.geom))
             # add columns from shape dataset to the select statement
             q = q.add_columns(*shape_columns)
 
@@ -372,7 +252,8 @@ def _detail(args):
     # (Could explicitly not request point_date and geom here
     #  to transfer less data)
     try:
-        rows = [OrderedDict(zip(args.data['dataset'].columns, res)) for res in q.all()]
+        columns = [col.name for col in args.data['dataset'].columns]
+        rows = [OrderedDict(zip(columns, res)) for res in q.all()]
     except Exception as e:
         return internal_error('Failed to fetch records.', e)
 

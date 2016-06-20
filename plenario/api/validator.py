@@ -6,7 +6,7 @@ from dateutil import parser
 from marshmallow import fields, Schema, ValidationError
 from marshmallow.validate import Range, Length, OneOf
 
-from plenario.api.common import extract_first_geometry_fragment
+from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
 from plenario.database import session
 from plenario.models import MetaTable, ShapeMetadata
 
@@ -35,7 +35,7 @@ class DatasetRequiredValidator(Validator):
     dataset_name = fields.Str(default=None, validate=OneOf(MetaTable.index()), dump_to='dataset', required=True)
 
 
-ValidatorResult = namedtuple('ValidatorResult', 'data errors warnings filters')
+ValidatorResult = namedtuple('ValidatorResult', 'data errors warnings')
 
 converters = {
     'buffer': int,
@@ -47,7 +47,7 @@ converters = {
     'obs_date__le': parser.parse,
     'offset': int,
     'resolution': int,
-    'geom': lambda x: extract_first_geometry_fragment(x),
+    'geom': lambda x: make_fragment_str(extract_first_geometry_fragment(x)),
     'shape': lambda x: get_shape_table(x)
 }
 
@@ -95,15 +95,11 @@ def validate(validator_cls, request_args, *consider):
     if result.data['dataset'] is not None:
         dataset = result.data['dataset'].point_table
 
+    # check that the param is meant to be used as a column condition
     warnings = []
-    filters = []
-
-    # determine if the unused parameter applies to a dataset column
     for param in unused_params:
-        column_val_str = '"{}={}"'.format(param, request_args[param])
-        if dataset is not None and param in dataset.columns:
-            filters.append(column_val_str)
-        else:
-            warnings.append("Unused parameter value {}".format(column_val_str))
+        if dataset is None or param not in dataset.columns:
+            warnings.append('Unused parameter value "{}={}"'.
+                            format(param, request_args[param]))
 
-    return ValidatorResult(result.data, result.errors, warnings, filters)
+    return ValidatorResult(result.data, result.errors, warnings)
