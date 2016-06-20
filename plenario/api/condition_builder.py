@@ -41,8 +41,8 @@ class ConditionBuilder(object):
     def parse_general(table, field, value):
 
         # straigtforward time and geom filters
-        if field in filters:
-            return filters[field](table, value)
+        if field in general_filters:
+            return general_filters[field](table, value)
 
         field_tokens = field.split("__")
         column = table.columns.get(field_tokens[0])
@@ -53,7 +53,7 @@ class ConditionBuilder(object):
 
         # comparison filters based on table columns
         elif len(field_tokens) == 2 and column is not None:
-            op = table.columns.get(field_tokens[1])
+            op = field_tokens[1]
 
             if op in field_ops:
                 return ConditionBuilder._operator_to_condition(column, op, value)
@@ -119,7 +119,7 @@ class ConditionBuilder(object):
             return getattr(column, field_ops[operator])(operand)
 
 
-filters = {
+general_filters = {
     'obs_date__ge':
         lambda table, value:  table.c.point_date >= value,
     'obs_date__le':

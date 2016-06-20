@@ -1,4 +1,5 @@
 import json
+import logging
 
 from collections import namedtuple
 from datetime import datetime, timedelta
@@ -28,11 +29,18 @@ class Validator(Schema):
     obs_date__le = fields.Date(default=datetime.now())
     offset = fields.Integer(default=0, validate=Range(0))
     resolution = fields.Integer(default=500, validate=Range(0))
+    shape = fields.Str(default=None, validate=OneOf(ShapeMetadata.index()))
 
 
 class DatasetRequiredValidator(Validator):
 
     dataset_name = fields.Str(default=None, validate=OneOf(MetaTable.index()), dump_to='dataset', required=True)
+
+
+class NoDefaultDatesValidator(Validator):
+
+    obs_date__ge = fields.Date(default=None)
+    obs_date__le = fields.Date(default=None)
 
 
 ValidatorResult = namedtuple('ValidatorResult', 'data errors warnings')
@@ -43,8 +51,8 @@ converters = {
     'dataset_name__in': lambda x: x.split(','),
     'date__time_of_day_ge': int,
     'date__time_of_day_le': int,
-    'obs_date__ge': parser.parse,
-    'obs_date__le': parser.parse,
+    'obs_date__ge': lambda x: parser.parse(x).date(),
+    'obs_date__le': lambda x: parser.parse(x).date(),
     'offset': int,
     'resolution': int,
     'geom': lambda x: make_fragment_str(extract_first_geometry_fragment(x)),
@@ -54,8 +62,8 @@ converters = {
 
 # TODO: Get rid of this eventually, only here because ShapeMetadata lacks this method.
 def get_shape_table(shtable_name):
-    return session.query(shtable_name)\
-        .filter(shtable_name.dataset_name == shtable_name)\
+    return session.query(ShapeMetadata)\
+        .filter(ShapeMetadata.dataset_name == shtable_name)\
         .first()\
         .shape_table
 
@@ -65,41 +73,54 @@ def convert(request_args):
         try:
             request_args[key] = converters[key](value)
         except:
-            pass
+            # Failed transactions, which we do expect, can cause
+            # a DatabaseError with Postgres. Failing to rollback
+            # prevents further queries from being carried out.
+            session.rollback()
 
 
-def validate(validator_cls, request_args, *consider):
+def validate(validator_cls, request_args, defaults=True):
 
-    # create instance of the kind of validator we're using
-    if consider:
-        validator = validator_cls(only=consider)
-    else:
+    if defaults:
+        # this validator will return results/defaults for all fields
         validator = validator_cls()
+    else:
+        # this validator will return results/defaults for only the fields
+        # provided in the request
+        validator = validator_cls(only=request_args.keys())
 
-    # convert the request argument strings into correct types
+    # convert string values to corresponding types so the validator can work
     convert(request_args)
-
-    # validate the request arguments (converts arguments back to strings)
+    # returns validated parameters as strings
     result = validator.dump(request_args)
-
-    # determine unused parameters provided in the request
-    validator_attrs = validator.fields.keys()
-    request_attrs = request_args.keys()
-    unused_params = set(request_attrs) - set(validator_attrs)
-
-    # convert string values in data back to correct types
+    # convert strings back to correct types
     convert(result.data)
 
-    # determine if a specific dataset is provided
-    dataset = None
-    if result.data['dataset'] is not None:
-        dataset = result.data['dataset'].point_table
+    # determine unchecked parameters provided in the request
+    unchecked = set(request_args.keys()) - set(validator.fields.keys())
 
-    # check that the param is meant to be used as a column condition
+    # determine if a dataset was provided to grab the column names
+    columns = []
+    if 'dataset_name' in request_args:
+        # this little bit of result formatting helps make things easier, but I
+        # eventually need to find a better place for it
+        result.data['metatable'] = result.data['dataset']
+        result.data['dataset'] = result.data['dataset'].point_table
+        columns += result.data['dataset'].columns.keys()
+    if 'shape' in request_args:
+        columns += result.data['shape'].columns.keys()
+
     warnings = []
-    for param in unused_params:
-        if dataset is None or param not in dataset.columns:
-            warnings.append('Unused parameter value "{}={}"'.
-                            format(param, request_args[param]))
+    # parameters that have yet to be checked could still possibly apply to
+    # a table column
+    for param in unchecked:
+        tokens = param.split('__')
+        # if it is a column, pass it through for use in the condition builder
+        if tokens[0] in columns:
+            result.data[param] = request_args[param]
+        # otherwise mark it down with a warning, let them know that we ignored it
+        else:
+            warnings.append('Unused parameter value "{}={}"'
+                            .format(param, request_args[param]))
 
     return ValidatorResult(result.data, result.errors, warnings)

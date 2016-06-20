@@ -8,6 +8,7 @@ import csv
 from shapely.geometry import asShape
 from cStringIO import StringIO
 from plenario.utils.helpers import get_size_in_degrees
+from plenario.models import MetaTable
 from sqlalchemy.sql.schema import Table
 
 cache = Cache(config=CACHE_CONFIG)
@@ -24,6 +25,8 @@ def unknownObjectHandler(obj):
         return obj.isoformat()
     elif isinstance(obj, datetime):
         return obj.isoformat()
+    elif isinstance(obj, MetaTable):
+        return obj.__tablename__
     else:
         raise ValueError
 
