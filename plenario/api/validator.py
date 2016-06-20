@@ -98,8 +98,11 @@ def validate(validator_cls, request_args, *consider):
     # check that the param is meant to be used as a column condition
     warnings = []
     for param in unused_params:
-        if dataset is None or param not in dataset.columns:
+        tokens = param.split('__')  # have to consider operators!
+        if dataset is None or tokens[0] not in dataset.columns:
             warnings.append('Unused parameter value "{}={}"'.
                             format(param, request_args[param]))
+        else:
+            result.data[param] = request_args[param]
 
     return ValidatorResult(result.data, result.errors, warnings)

@@ -15,7 +15,7 @@ from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, make_csv
 from plenario.api.common import extract_first_geometry_fragment
 from plenario.api.common import make_cache_key, dthandler, make_fragment_str
 from plenario.api.common import RESPONSE_LIMIT, unknownObjectHandler
-from plenario.api.condition_builder import ConditionBuilder
+from plenario.api.condition_builder import ConditionBuilder, general_filters
 from plenario.api.response import *  # TODO: Correct your laziness.
 from plenario.api.validator import Validator, DatasetRequiredValidator, validate
 from plenario.database import session, Base, app_engine as engine
@@ -105,7 +105,7 @@ def grid():
 @crossdomain(origin="*")
 def dataset_fields(dataset_name):
     request_args = request.args.to_dict()
-    request_args['dataset'] = dataset_name
+    request_args['dataset_name'] = dataset_name
     validated_args = validate(DatasetRequiredValidator, request_args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
@@ -200,17 +200,19 @@ def _detail_aggregate(args):
     dataset = args.data['dataset']
 
     conditions = []
-    for str_pair in args.filters:
-        key, value = str_pair.split('=')
-        condition, error = _make_condition(dataset.point_table, key, value)
-        if condition is not None:
-            conditions.append(condition)
+    for key, value in args.data.items():
+        # These conditions are only meant to address columns, so let's ignore
+        # date and geom filters.
+        if key in general_filters:
+            pass
         else:
-            raise bad_request(error)
+            condition = ConditionBuilder.parse_general(dataset.point_table, key, value)
+            if condition is not None:
+                conditions.append(condition)
 
     try:
         ts = dataset.timeseries_one(
-            agg, start_date, end_date, geom, conditions  # TODO: We need conditions!
+            agg, start_date, end_date, geom, conditions
         )
     except Exception as e:
         return internal_error('Failed to construct timeseries', e)
@@ -268,7 +270,7 @@ def _detail(args):
         return form_json_detail_response(to_remove, args, rows)
 
     elif datatype == 'csv':
-        return form_csv_detail_response(to_remove, args, rows)
+        return form_csv_detail_response(to_remove, rows)
 
     elif datatype == 'geojson':
         return form_geojson_detail_response(to_remove, args, rows)
@@ -276,20 +278,22 @@ def _detail(args):
 
 def _grid(args):
 
-    # construct SQL query
-    try:
-        maker = FilterMaker(args.data, args.data['dataset'])
-        # Get time filters
-        time_filters = maker.time_filters()
-        # From user params, wither get None or requested geometry
-        geom = args.data['geom']
-    except Exception as e:
-        return internal_error('Could not make time and geometry filters.', e)
-
+    meta_table = args.data['dataset']
+    point_table = meta_table.point_table
+    geom = args.data['geom']
     resolution = args.data['resolution']
+
+    # construct SQL filters
+    conditions = []
+    for field, value in args.data.items():
+        if value is not None:
+            condition = ConditionBuilder.parse_general(point_table, field, value)
+            if condition is not None:
+                conditions.append(condition)
+
     try:
-        registry_row = MetaTable.get_by_dataset_name(args.data['dataset'])
-        grid_rows, size_x, size_y = registry_row.make_grid(resolution, geom, args.conditions + time_filters)
+        registry_row = meta_table
+        grid_rows, size_x, size_y = registry_row.make_grid(resolution, geom, conditions)
     except Exception as e:
         return internal_error('Could not make grid aggregation.', e)
 
@@ -331,18 +335,20 @@ def _meta(args):
     q = session.query(*col_objects).filter(MetaTable.date_added.isnot(None))
 
     # What params did the user provide?
-    dataset_name = args.vals['dataset_name']
-    geom = args.get_geom()
-    start_date = args.vals['obs_date__ge']
-    end_date = args.vals['obs_date__le']
+    dataset = args.data['dataset']
+    geom = args.data['geom']
+    start_date = args.data['obs_date__ge']
+    end_date = args.data['obs_date__le']
 
     # Filter over datasets if user provides full date range or geom
     should_filter = geom or (start_date and end_date)
 
-    if dataset_name:
+    if dataset:
         # If the user specified a name, don't try any filtering.
         # Just spit back that dataset's metadata.
-        q = q.filter(MetaTable.dataset_name == dataset_name)
+        q = q.filter(MetaTable.dataset_name == dataset.point_table.name)
+
+    # Otherwise, just send back all the (filtered) datasets
     elif should_filter:
         if geom:
             intersects = sqlalchemy.func.ST_Intersects(
@@ -358,7 +364,6 @@ def _meta(args):
                 )
             )
 
-    # Otherwise, just send back all the datasets
     failure_messages = []
 
     metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
