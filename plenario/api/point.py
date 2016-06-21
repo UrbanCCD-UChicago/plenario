@@ -15,11 +15,6 @@ from plenario.database import session
 from plenario.models import MetaTable
 
 
-def setup_detail_validator(dataset_name, params):
-
-    return DatasetRequiredValidator()
-
-
 def run_condition_builder(args):
 
     point_table = args.data.get('dataset')

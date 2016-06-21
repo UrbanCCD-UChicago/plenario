@@ -5,13 +5,12 @@ import re
 
 from flask import make_response, request
 
-from plenario.models import ShapeMetadata
+from plenario.models import ShapeMetadata, MetaTable
 from plenario.database import session
 from plenario.utils.ogr2ogr import OgrExport
 from plenario.api.validator import DatasetRequiredValidator, validate
 from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT
-from plenario.api.point import setup_detail_validator,\
-    form_detail_sql_query, form_geojson_detail_response,\
+from plenario.api.point import form_detail_sql_query, form_geojson_detail_response,\
     form_csv_detail_response, bad_request
 
 from collections import OrderedDict
@@ -118,34 +117,49 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     if not params.get('shape'):
         # form_detail_query expects to get info about a shape dataset this way.
         params['shape'] = polygon_dataset_name
+    params['dataset_name'] = point_dataset_name
 
     args = validate(DatasetRequiredValidator, params)
     if args.errors:
         return bad_request(args.errors)
 
+    args.data['dataset'] = args.data['dataset'].point_table
+
     # Apply standard filters to point dataset
     # And join each point to the containing shape
     q = form_detail_sql_query(args, True)
-    q = q.add_columns(func.count(args.data['dataset'].point_table.c.hash))
+    q = q.add_columns(func.count(args.data['dataset'].c.hash))
+
+    # Apply a bounding box filter in case a geom was provided
+    geom = args.data['geom']
+    if geom:
+        intersection = func.ST_Intersects(
+            func.ST_GeomFromGeoJSON(geom),
+            args.data['dataset'].bbox
+        )
+        q = q.filter(intersection)
 
     # Page in RESPONSE_LIMIT chunks
     # This seems contradictory. Don't we want one row per shape, no matter what?
-    offset = validator.vals['offset']
+    offset = args.data['offset']
     q = q.limit(RESPONSE_LIMIT)
     if offset > 0:
         q = q.offset(offset)
 
     res_cols = []
-    for col in validator.cols:
-        if col[:len(polygon_dataset_name)] == polygon_dataset_name:
-            res_cols.append(col[len(polygon_dataset_name)+1:])
+    columns = [str(col) for col in args.data['dataset'].columns]
+    columns += [str(col) for col in args.data['shape'].columns]
+    for col in columns:
+        col = col.split('.')
+        if col[0] == polygon_dataset_name:
+            res_cols.append(col[1])
     res_cols.append('count')
 
     rows = [OrderedDict(zip(res_cols, res)) for res in q.all()]
     if params.get('data_type') == 'csv':
-        resp = form_csv_detail_response(['hash', 'ogc_fid'], validator, rows)
+        resp = form_csv_detail_response(['hash', 'ogc_fid'], rows)
     else:
-        resp = form_geojson_detail_response(['hash', 'ogc_fid'], validator, rows)
+        resp = form_geojson_detail_response(['hash', 'ogc_fid'], args, rows)
 
     return resp
 
