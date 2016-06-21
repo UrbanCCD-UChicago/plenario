@@ -1,4 +1,5 @@
 import json
+import logging
 
 from collections import namedtuple
 from datetime import datetime, timedelta
@@ -28,6 +29,7 @@ class Validator(Schema):
     obs_date__le = fields.Date(default=datetime.now())
     offset = fields.Integer(default=0, validate=Range(0))
     resolution = fields.Integer(default=500, validate=Range(0))
+    shape = fields.Str(default=None, validate=OneOf(ShapeMetadata.index()))
 
 
 class DatasetRequiredValidator(Validator):
@@ -54,8 +56,8 @@ converters = {
 
 # TODO: Get rid of this eventually, only here because ShapeMetadata lacks this method.
 def get_shape_table(shtable_name):
-    return session.query(shtable_name)\
-        .filter(shtable_name.dataset_name == shtable_name)\
+    return session.query(ShapeMetadata)\
+        .filter(ShapeMetadata.dataset_name == shtable_name)\
         .first()\
         .shape_table
 
@@ -65,7 +67,10 @@ def convert(request_args):
         try:
             request_args[key] = converters[key](value)
         except:
-            pass
+            # Failed transactions, which we do expect, can cause
+            # a DatabaseError with Postgres. Failing to rollback
+            # prevents further queries from being carried out.
+            session.rollback()
 
 
 def validate(validator_cls, request_args, *consider):

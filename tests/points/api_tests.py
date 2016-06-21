@@ -256,7 +256,10 @@ class PointAPITests(BasePlenarioTest):
         self.assertEqual(response_data['meta']['total'], 5)
 
     def test_filter_point_data_with_landmarks_in_one_neighborhood(self):
-        url = '/v1/api/detail/?dataset_name=landmarks&obs_date__ge=1900-09-22&obs_date__le=2013-10-1&shape=chicago_neighborhoods&sec_neigh__in=BRONZEVILLE'
+        url = '/v1/api/detail/?dataset_name=landmarks' \
+              '&obs_date__ge=1900-09-22&obs_date__le=2013-10-1' \
+              '&shape=chicago_neighborhoods&sec_neigh__in=BRONZEVILLE'
+
         response = self.app.get(url)
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)

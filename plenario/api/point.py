@@ -127,9 +127,7 @@ def meta():
 
 def _timeseries(args):
 
-    geom = None
-    if args.data['geom']:
-        geom = make_fragment_str(args.data['geom'], args.data['buffer'])
+    geom = args.data['geom']
     table_names = args.data['dataset_name__in']
     start_date = args.data['obs_date__ge']
     end_date = args.data['obs_date__le']
@@ -255,6 +253,7 @@ def _detail(args):
     #  to transfer less data)
     try:
         columns = [col.name for col in args.data['dataset'].columns]
+        columns += [str(col) for col in args.data['shape'].columns]
         rows = [OrderedDict(zip(columns, res)) for res in q.all()]
     except Exception as e:
         return internal_error('Failed to fetch records.', e)
