@@ -107,7 +107,10 @@ def validate(validator_cls, request_args, *consider):
     warnings = []
     for param in unused_params:
         tokens = param.split('__')  # have to consider operators!
-        if dataset is None or tokens[0] not in dataset.columns.keys() + shapeset.columns.keys():
+        columns = dataset.columns.keys()
+        if shapeset is not None:
+            columns += shapeset.columns.keys()
+        if dataset is None or tokens[0] not in columns:
             warnings.append('Unused parameter value "{}={}"'.
                             format(param, request_args[param]))
         else:

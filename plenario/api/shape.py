@@ -8,6 +8,7 @@ from flask import make_response, request
 from plenario.models import ShapeMetadata
 from plenario.database import session
 from plenario.utils.ogr2ogr import OgrExport
+from plenario.api.validator import DatasetRequiredValidator, validate
 from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT
 from plenario.api.point import setup_detail_validator,\
     form_detail_sql_query, form_geojson_detail_response,\
@@ -118,16 +119,14 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
         # form_detail_query expects to get info about a shape dataset this way.
         params['shape'] = polygon_dataset_name
 
-    validator = setup_detail_validator(point_dataset_name, params)
-
-    err = validator.validate(params)
-    if err:
-        return bad_request(err)
+    args = validate(DatasetRequiredValidator, params)
+    if args.errors:
+        return bad_request(args.errors)
 
     # Apply standard filters to point dataset
     # And join each point to the containing shape
-    q = form_detail_sql_query(validator, True)
-    q = q.add_columns(func.count(validator.dataset.c.hash))
+    q = form_detail_sql_query(args, True)
+    q = q.add_columns(func.count(args.data['dataset'].point_table.c.hash))
 
     # Page in RESPONSE_LIMIT chunks
     # This seems contradictory. Don't we want one row per shape, no matter what?

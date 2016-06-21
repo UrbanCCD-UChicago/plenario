@@ -20,7 +20,7 @@ def setup_detail_validator(dataset_name, params):
     return DatasetRequiredValidator()
 
 
-def form_detail_sql_query(args, aggregate_points=False):
+def run_condition_builder(args):
 
     point_table = args.data.get('dataset')
     shape_table = args.data.get('shape')
@@ -32,13 +32,25 @@ def form_detail_sql_query(args, aggregate_points=False):
         if value is not None:
             condition = None
 
-            if field.split('__')[0] in shape_columns:
+            if shape_columns and field.split('__')[0] in shape_columns:
                 condition = ConditionBuilder.parse_general(shape_table, field, value)
             else:
                 condition = ConditionBuilder.parse_general(point_table, field, value)
 
             if condition is not None:
                 conditions.append(condition)
+
+    return conditions
+
+
+def form_detail_sql_query(args, aggregate_points=False):
+
+    point_table = args.data.get('dataset')
+    shape_table = args.data.get('shape')
+    point_columns = point_table.columns.keys()
+    shape_columns = shape_table.columns.keys() if shape_table is not None else None
+
+    conditions = run_condition_builder(args)
 
     try:
         q = session.query(point_table)
@@ -254,7 +266,8 @@ def _detail(args):
     #  to transfer less data)
     try:
         columns = [col.name for col in args.data['dataset'].columns]
-        columns += [str(col) for col in args.data['shape'].columns]
+        if args.data['shape'] is not None:
+            columns += [str(col) for col in args.data['shape'].columns]
         rows = [OrderedDict(zip(columns, res)) for res in q.all()]
     except Exception as e:
         return internal_error('Failed to fetch records.', e)
