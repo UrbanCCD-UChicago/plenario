@@ -15,14 +15,14 @@ from plenario.database import session
 from plenario.models import MetaTable
 
 
-def run_condition_builder(args):
+def form_detail_sql_query(args, aggregate_points=False):
 
     point_table = args.data.get('dataset')
     shape_table = args.data.get('shape')
     point_columns = point_table.columns.keys()
     shape_columns = shape_table.columns.keys() if shape_table is not None else None
-    conditions = []
 
+    conditions = []
     for field, value in args.data.items():
         if value is not None:
             condition = None
@@ -34,18 +34,6 @@ def run_condition_builder(args):
 
             if condition is not None:
                 conditions.append(condition)
-
-    return conditions
-
-
-def form_detail_sql_query(args, aggregate_points=False):
-
-    point_table = args.data.get('dataset')
-    shape_table = args.data.get('shape')
-    point_columns = point_table.columns.keys()
-    shape_columns = shape_table.columns.keys() if shape_table is not None else None
-
-    conditions = run_condition_builder(args)
 
     try:
         q = session.query(point_table)

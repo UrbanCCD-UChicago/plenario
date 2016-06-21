@@ -132,10 +132,10 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
 
     # Apply a bounding box filter in case a geom was provided
     geom = args.data['geom']
+    dataset = args.data['dataset']
     if geom:
-        intersection = func.ST_Intersects(
-            func.ST_GeomFromGeoJSON(geom),
-            args.data['dataset'].bbox
+        intersection = dataset.c.geom.ST_Within(
+            func.ST_GeomFromGeoJSON(geom)
         )
         q = q.filter(intersection)
 
