@@ -97,14 +97,17 @@ def validate(validator_cls, request_args, *consider):
 
     # determine if a specific dataset is provided
     dataset = None
+    shapeset = None
     if result.data['dataset'] is not None:
         dataset = result.data['dataset'].point_table
+    if result.data['shape'] is not None:
+        shapeset = result.data['shape']
 
     # check that the param is meant to be used as a column condition
     warnings = []
     for param in unused_params:
         tokens = param.split('__')  # have to consider operators!
-        if dataset is None or tokens[0] not in dataset.columns:
+        if dataset is None or tokens[0] not in dataset.columns.keys() + shapeset.columns.keys():
             warnings.append('Unused parameter value "{}={}"'.
                             format(param, request_args[param]))
         else:

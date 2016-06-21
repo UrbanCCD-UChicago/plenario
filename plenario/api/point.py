@@ -1,25 +1,18 @@
-import dateutil.parser
-import json
 import shapely.geometry
 import shapely.wkb
 import sqlalchemy
 
 from collections import OrderedDict
-from datetime import timedelta, datetime
-from flask import request, make_response
 from itertools import groupby
 from operator import itemgetter
-from sqlalchemy.exc import NoSuchTableError
 
-from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, make_csv
-from plenario.api.common import extract_first_geometry_fragment
-from plenario.api.common import make_cache_key, dthandler, make_fragment_str
-from plenario.api.common import RESPONSE_LIMIT, unknownObjectHandler
+from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, RESPONSE_LIMIT
+from plenario.api.common import make_cache_key
 from plenario.api.condition_builder import ConditionBuilder, general_filters
 from plenario.api.response import *  # TODO: Correct your laziness.
 from plenario.api.validator import Validator, DatasetRequiredValidator, validate
-from plenario.database import session, Base, app_engine as engine
-from plenario.models import MetaTable, ShapeMetadata
+from plenario.database import session
+from plenario.models import MetaTable
 
 
 def setup_detail_validator(dataset_name, params):
@@ -29,12 +22,21 @@ def setup_detail_validator(dataset_name, params):
 
 def form_detail_sql_query(args, aggregate_points=False):
 
-    point_table = args.data['dataset']
+    point_table = args.data.get('dataset')
+    shape_table = args.data.get('shape')
+    point_columns = point_table.columns.keys()
+    shape_columns = shape_table.columns.keys() if shape_table is not None else None
     conditions = []
 
     for field, value in args.data.items():
         if value is not None:
-            condition = ConditionBuilder.parse_general(point_table, field, value)
+            condition = None
+
+            if field.split('__')[0] in shape_columns:
+                condition = ConditionBuilder.parse_general(shape_table, field, value)
+            else:
+                condition = ConditionBuilder.parse_general(point_table, field, value)
+
             if condition is not None:
                 conditions.append(condition)
 
@@ -46,7 +48,6 @@ def form_detail_sql_query(args, aggregate_points=False):
         return internal_error('Failed to construct filters.', e)
 
     # if the query specified a shape dataset, add a join to the sql query with that dataset
-    shape_table = args.data.get('shape')
     if shape_table is not None:
         shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
         if aggregate_points:
