@@ -197,7 +197,8 @@ def _timeseries(args):
         resp = make_response(csv_resp, 200)
         resp.headers['Content-Type'] = 'text/csv'
         filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
+        resp.headers['Content-Disposit""ion'] = 'attachment; filename=%s.csv' % filedate
+
     return resp
 
 
@@ -275,6 +276,7 @@ def _detail(args):
         to_remove += ['{}.{}'.format(args.data['shape'].name, col) for col in ['geom', 'hash', 'ogc_fid']]
 
     datatype = args.data['data_type']
+    del args.data['dataset_name__in']
 
     if datatype == 'json':
         return form_json_detail_response(to_remove, args, rows)

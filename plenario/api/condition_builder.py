@@ -1,7 +1,10 @@
 from sqlalchemy import and_, or_, func
 
 
+# field_ops
+# =========
 # Map codes we accept in API docs to SQLAlchemy function names
+
 field_ops = {
     'gt': '__gt__',
     'ge': '__ge__',
@@ -39,6 +42,13 @@ class ConditionBuilder(object):
 
     @staticmethod
     def parse_general(table, field, value):
+        """To parse the non-tree style way of providing arguments.
+
+        :param table: SQLAlchemy table objects
+        :param field: specified column/table attribute
+        :param value: target value to build a condition against
+
+        :returns: table condition (SQL WHERE clause)"""
 
         # straigtforward time and geom filters
         if field in general_filters:
@@ -119,6 +129,12 @@ class ConditionBuilder(object):
             return getattr(column, field_ops[operator])(operand)
 
 
+# general_filters
+# ===============
+# Filters which apply to all the tables, but whose columns are not directly
+# specified by an argument key. ex: 'obs_date__ge' translates into a condition
+# that needs to be made for a table's 'point_date' column.
+
 general_filters = {
     'obs_date__ge':
         lambda table, value:  table.c.point_date >= value,
@@ -134,5 +150,13 @@ general_filters = {
 
 
 def date__time_of_day_filter(table, op, val):
+    """Because I couldn't fit it into a one line lambda.
+
+    :param table: SQLAlchemy table object
+    :param op: string op code
+    :param val: target value to be compared against
+
+    :returns: table condition for just the hour"""
+
     column = func.date_part('hour', table.c.point_date)
     return getattr(column, field_ops[op])(val)
