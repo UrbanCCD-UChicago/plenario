@@ -125,17 +125,32 @@ def meta():
 def _timeseries(args):
 
     geom = args.data['geom']
+    dataset = args.data.get('dataset')
     table_names = args.data['dataset_name__in']
     start_date = args.data['obs_date__ge']
     end_date = args.data['obs_date__le']
     agg = args.data['agg']
 
-    # Only examine tables that have a chance of containing records within the date and space boundaries.
+    # if a single dataset was provided, it's the only thing we need to consider
+    if dataset is not None:
+        table_names = [dataset.name]
+        # for the query's meta information, so that it doesn't show the index
+        del args.data['dataset_name__in']
+
+    # remove table names which wouldn't return anything for the query, given
+    # the time and geom constraints
     try:
         table_names = MetaTable.narrow_candidates(table_names, start_date, end_date, geom)
     except Exception as e:
         msg = 'Failed to gather candidate tables.'
         return internal_error(msg, e)
+
+    # If there aren't any table names, it causes an error down the code. Better
+    # to return and inform them that the request wouldn't have found anything.
+    if not table_names:
+        return bad_request("Your request doesn't return any results. Try "
+                           "adjusting your time constraint or location "
+                           "parameters.")
 
     try:
         panel = MetaTable.timeseries_all(
@@ -150,7 +165,7 @@ def _timeseries(args):
 
     datatype = args.data['data_type']
     if datatype == 'json':
-        resp = make_response(json.dumps(resp, default=date_json_handler), 200)
+        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
         resp.headers['Content-Type'] = 'application/json'
     elif datatype == 'csv':
 
@@ -218,7 +233,7 @@ def _detail_aggregate(args):
     datatype = args.data['data_type']
     if datatype == 'json':
         time_counts = [{'count': c, 'datetime': d} for c, d in ts[1:]]
-        resp = json_response_base(args, time_counts, args.data)
+        resp = json_response_base(args, time_counts, request.args)
         resp['count'] = sum([c['count'] for c in time_counts])
         resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
         resp.headers['Content-Type'] = 'application/json'
@@ -360,6 +375,7 @@ def _meta(args):
             )
 
     failure_messages = []
+    failure_messages.append(args.warnings)
 
     metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
     for record in metadata_records:
@@ -376,7 +392,7 @@ def _meta(args):
         # clear column_names off the json, users don't need to see it
         del record['column_names']
 
-    resp = json_response_base(args, metadata_records, args.data)
+    resp = json_response_base(args, metadata_records, request.args)
 
     resp['meta']['total'] = len(resp['objects'])
     resp['meta']['message'] = failure_messages

@@ -187,7 +187,9 @@ class PointAPITests(BasePlenarioTest):
         # And they were far enough apart to each get their own square.
         self.assertEqual(len(response_data['features']), 6)
 
-    '''/timeseries'''
+    # ===========
+    # /timeseries
+    # ===========
 
     def flu_agg(self, agg_type, expected_counts):
         # Always query from 9-22 to 10-1
@@ -260,10 +262,10 @@ class PointAPITests(BasePlenarioTest):
 
     '''/detail-aggregate'''
 
-    def test_detail_aggregate_with_just_dataset_name(self):
+    def test_detail_aggregate_with_just_lower_time_bound(self):
 
-        resp = self.get_api_response('detail-aggregate?dataset_name=crimes')
-        print resp
+        resp = self.get_api_response('detail-aggregate?dataset_name=crimes&obs_date__ge=2015-01-01')
+        self.assertEqual(resp['count'], 7)
 
     def test_aggregate(self):
         # Use same params as for timeseries
