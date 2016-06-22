@@ -20,113 +20,50 @@ field_ops = {
 }
 
 
-class ConditionBuilder(object):
-    """Provided a dataset, parse the corresponding url filter arguments into
-    conditions with which to query results."""
+def parse_general(table, field, value):
+    """To parse the non-tree style way of providing arguments.
 
-    @staticmethod
-    def parse_tree(table, condition_tree):
-        """Parse nested conditions provided as a dict for a single table. Wraps
-        _parse_condition_tree and raises a ValueError if it fails.
+    :param table: SQLAlchemy table objects
+    :param field: specified column/table attribute
+    :param value: target value to build a condition against
 
-        :param table: table object whose columns are being used in the conditions
-        :param condition_tree: dictionary of conditions created from JSON
+    :returns: table condition (SQL WHERE clause)"""
 
-        :returns SQLAlchemy conditions for querying the table with"""
+    # straigtforward time and geom filters
+    if field in general_filters:
+        return general_filters[field](table, value)
 
-        try:
-            return ConditionBuilder._parse_condition_tree(table, condition_tree)
-        except Exception as ex:
-            raise ValueError('[{}] caused parse to fail for table {} with args {}'
-                             .format(ex, table, condition_tree))
+    field_tokens = field.split("__")
+    column = table.columns.get(field_tokens[0])
 
-    @staticmethod
-    def parse_general(table, field, value):
-        """To parse the non-tree style way of providing arguments.
+    # equality filters based on table columns
+    if len(field_tokens) == 1 and column is not None:
+        return _operator_to_condition(column, 'eq', value)
 
-        :param table: SQLAlchemy table objects
-        :param field: specified column/table attribute
-        :param value: target value to build a condition against
+    # comparison filters based on table columns
+    elif len(field_tokens) == 2 and column is not None:
+        op = field_tokens[1]
 
-        :returns: table condition (SQL WHERE clause)"""
+        if op in field_ops:
+            return _operator_to_condition(column, op, value)
 
-        # straigtforward time and geom filters
-        if field in general_filters:
-            return general_filters[field](table, value)
 
-        field_tokens = field.split("__")
-        column = table.columns.get(field_tokens[0])
+def _operator_to_condition(column, operator, operand):
+    """Convert an operation into a SQLAlchemy condition. Operators
+    are mapped to SQLAlchemy methods with the field_ops dictionary.
 
-        # equality filters based on table columns
-        if len(field_tokens) == 1 and column is not None:
-            return ConditionBuilder._operator_to_condition(column, 'eq', value)
+    :param column: column object from the table to build condition for
+    :param operator: string name of the desired operator
+    :param operand: some target value or parameter
 
-        # comparison filters based on table columns
-        elif len(field_tokens) == 2 and column is not None:
-            op = field_tokens[1]
+    :returns a string SQLAlchemy condition"""
 
-            if op in field_ops:
-                return ConditionBuilder._operator_to_condition(column, op, value)
-
-    @staticmethod
-    def _parse_condition_tree(table, condition_tree):
-        """Parse nested conditions provided as a dict for a single table.
-
-        :param table: table object whose columns are being used in the conditions
-        :param condition_tree: dictionary of conditions created from JSON
-
-        :returns SQLAlchemy conditions for querying the table with"""
-
-        op = condition_tree.keys()[0].lower()
-
-        if op == "and":
-            # A non-leaf node, values are *iterable*! Takes the form:
-            # {'and', [{'<STMT>': ('<COLUMN>', 'TARGET_VALUE')}, ... ]
-            # Or if a nested query is desired:
-            # {'and': [{'and', [{'<STMT>': ('<COLUMN>', '<TARGET_VALUE>')}, ... ]}
-
-            return and_(
-                ConditionBuilder._parse_condition_tree(table, child)
-                for child in condition_tree['and']
-            )
-
-        elif op == "or":
-            # See 'and'.
-
-            return or_(
-                ConditionBuilder._parse_condition_tree(table, child)
-                for child in condition_tree['or']
-            )
-
-        elif op in field_ops:
-            # At this point we are at a leaf. Leaves take the form:
-            # {'<STMT>': ('<COLUMN>': '<TARGET_VALUE>')}
-
-            value = condition_tree[op]
-            column = value[0]
-            target = value[1]
-
-            return ConditionBuilder._operator_to_condition(
-                getattr(table, 'columns')[column], op, target
-            )
-
-    @staticmethod
-    def _operator_to_condition(column, operator, operand):
-        """Convert an operation into a SQLAlchemy condition. Operators
-        are mapped to SQLAlchemy methods with the field_ops dictionary.
-
-        :param column: column object from the table to build condition for
-        :param operator: string name of the desired operator
-        :param operand: some target value or parameter
-
-        :returns a string SQLAlchemy condition"""
-
-        if operator == 'in':
-            return column.in_(operand.split(','))
-        elif operator == 'eq':
-            return column == operand
-        else:
-            return getattr(column, field_ops[operator])(operand)
+    if operator == 'in':
+        return column.in_(operand.split(','))
+    elif operator == 'eq':
+        return column == operand
+    else:
+        return getattr(column, field_ops[operator])(operand)
 
 
 # general_filters

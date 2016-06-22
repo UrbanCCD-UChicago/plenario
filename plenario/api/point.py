@@ -11,7 +11,7 @@ from operator import itemgetter
 
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, RESPONSE_LIMIT
 from plenario.api.common import make_cache_key, date_json_handler, unknown_object_json_handler
-from plenario.api.condition_builder import ConditionBuilder, general_filters
+from plenario.api.condition_builder import parse_general, general_filters
 from plenario.api.response import internal_error, bad_request, json_response_base, make_csv
 from plenario.api.response import geojson_response_base, form_csv_detail_response, form_json_detail_response
 from plenario.api.response import form_geojson_detail_response, add_geojson_feature
@@ -34,9 +34,9 @@ def form_detail_sql_query(args, aggregate_points=False):
             condition = None
 
             if shape_columns and field.split('__')[0] in shape_columns:
-                condition = ConditionBuilder.parse_general(shape_table, field, value)
+                condition = parse_general(shape_table, field, value)
             else:
-                condition = ConditionBuilder.parse_general(point_table, field, value)
+                condition = parse_general(point_table, field, value)
 
             if condition is not None:
                 conditions.append(condition)
@@ -223,7 +223,7 @@ def _detail_aggregate(args):
         if key in general_filters:
             pass
         else:
-            condition = ConditionBuilder.parse_general(dataset, key, value)
+            condition = parse_general(dataset, key, value)
             if condition is not None:
                 conditions.append(condition)
 
@@ -304,7 +304,7 @@ def _grid(args):
     conditions = []
     for field, value in args.data.items():
         if value is not None:
-            condition = ConditionBuilder.parse_general(point_table, field, value)
+            condition = parse_general(point_table, field, value)
             if condition is not None:
                 conditions.append(condition)
 
