@@ -26,28 +26,50 @@ class PointAPITests(BasePlenarioTest):
     def setUpClass(cls):
         super(PointAPITests, cls).setUpClass()
 
-    ''' /datasets '''
+    def get_api_response(self, query_string):
+        """This bit of code seems to be repeated alot."""
+        query = '/v1/api/' + query_string
+        response = self.app.get(query)
+        return json.loads(response.data)
 
-    def test_metadata_single(self):
-        query = '/v1/api/datasets?dataset_name=crimes'
-        resp = self.app.get(query)
-        response_data = json.loads(resp.data)
+    # ========
+    # datasets
+    # ========
 
-        self.assertEqual(len(response_data['objects']), 1)
-        self.assertEqual(response_data['objects'][0]['view_url'],
+    def test_metadata_no_args(self):
+        r = self.get_api_response('datasets')
+        self.assertEqual(len(r), 2)
+        self.assertEqual(len(r['objects']), 3)
+
+    def test_metadata_big_lower_bound(self):
+        r = self.get_api_response('datasets?obs_date__ge=1000-01-01')
+        self.assertEqual(len(r), 2)
+        self.assertEqual(len(r['objects']), 3)
+
+    def test_metadata_big_upper_bound(self):
+        r = self.get_api_response('datasets?obs_date__le=2016-01-01')
+        self.assertEqual(len(r), 2)
+        self.assertEqual(len(r['objects']), 3)
+
+    def test_metadata_both_bounds(self):
+        r = self.get_api_response('datasets?obs_date__le=2016-01-01&obs_date__ge=2000-01-01')
+        self.assertEqual(len(r), 2)
+        self.assertEqual(len(r['objects']), 3)
+
+    def test_metadata_single_dataset(self):
+        r = self.get_api_response('datasets?dataset_name=crimes')
+        self.assertEqual(len(r['objects']), 1)
+        self.assertEqual(r['objects'][0]['view_url'],
                          "http://data.cityofchicago.org/api/views/ijzp-q8t2/rows")
 
     def test_metadata_filter(self):
         escaped_query_rect = get_loop_rect()
-        query = 'v1/api/datasets?location_geom__within={}' \
+        query = 'datasets?location_geom__within={}'\
                 '&obs_date__ge={}&obs_date__le={}'\
             .format(escaped_query_rect, '2015-1-1', '2016-1-1')
-
-        resp = self.app.get(query)
-        response_data = json.loads(resp.data)
-
-        self.assertEqual(len(response_data['objects']), 1)
-        dataset_found = response_data['objects'][0]
+        r = self.get_api_response(query)
+        self.assertEqual(len(r['objects']), 1)
+        dataset_found = r['objects'][0]
         self.assertEqual(dataset_found['dataset_name'], 'crimes')
 
     def test_included_fields(self):

@@ -123,8 +123,6 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     if args.errors:
         return bad_request(args.errors)
 
-    args.data['dataset'] = args.data['dataset'].point_table
-
     # Apply standard filters to point dataset
     # And join each point to the containing shape
     q = form_detail_sql_query(args, True)

@@ -10,7 +10,8 @@ from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, RESPONSE_LIMI
 from plenario.api.common import make_cache_key
 from plenario.api.condition_builder import ConditionBuilder, general_filters
 from plenario.api.response import *  # TODO: Correct your laziness.
-from plenario.api.validator import Validator, DatasetRequiredValidator, validate
+from plenario.api.validator import Validator, DatasetRequiredValidator
+from plenario.api.validator import NoDefaultDatesValidator, validate
 from plenario.database import session
 from plenario.models import MetaTable
 
@@ -111,7 +112,7 @@ def dataset_fields(dataset_name):
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def meta():
-    validated_args = validate(Validator, request.args.to_dict())
+    validated_args = validate(NoDefaultDatesValidator, request.args.to_dict())
     if validated_args.errors:
         return bad_request(validated_args.errors)
     return _meta(validated_args)
@@ -191,6 +192,7 @@ def _detail_aggregate(args):
     end_date = args.data['obs_date__le']
     agg = args.data['agg']
     geom = args.data['geom']
+    metatable = args.data['metatable']
     dataset = args.data['dataset']
 
     conditions = []
@@ -200,12 +202,12 @@ def _detail_aggregate(args):
         if key in general_filters:
             pass
         else:
-            condition = ConditionBuilder.parse_general(dataset.point_table, key, value)
+            condition = ConditionBuilder.parse_general(dataset, key, value)
             if condition is not None:
                 conditions.append(condition)
 
     try:
-        ts = dataset.timeseries_one(
+        ts = metatable.timeseries_one(
             agg, start_date, end_date, geom, conditions
         )
     except Exception as e:
@@ -231,9 +233,6 @@ def _detail_aggregate(args):
 
 
 def _detail(args):
-
-    # Need this for detail.
-    args.data['dataset'] = args.data['dataset'].point_table
 
     # Part 2: Form SQL query from parameters stored in 'validator' object
     q = form_detail_sql_query(args)
@@ -274,8 +273,8 @@ def _detail(args):
 
 def _grid(args):
 
-    meta_table = args.data['dataset']
-    point_table = meta_table.point_table
+    meta_table = args.data['metatable']
+    point_table = args.data['dataset']
     geom = args.data['geom']
     resolution = args.data['resolution']
 
@@ -339,10 +338,10 @@ def _meta(args):
     # Filter over datasets if user provides full date range or geom
     should_filter = geom or (start_date and end_date)
 
-    if dataset:
+    if dataset is not None:
         # If the user specified a name, don't try any filtering.
         # Just spit back that dataset's metadata.
-        q = q.filter(MetaTable.dataset_name == dataset.point_table.name)
+        q = q.filter(MetaTable.dataset_name == dataset.name)
 
     # Otherwise, just send back all the (filtered) datasets
     elif should_filter:
