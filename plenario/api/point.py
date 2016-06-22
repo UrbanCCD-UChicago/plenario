@@ -1,15 +1,20 @@
+import json
 import shapely.geometry
 import shapely.wkb
 import sqlalchemy
 
 from collections import OrderedDict
+from datetime import datetime
+from flask import request, make_response
 from itertools import groupby
 from operator import itemgetter
 
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, RESPONSE_LIMIT
-from plenario.api.common import make_cache_key
+from plenario.api.common import make_cache_key, date_json_handler, unknown_object_json_handler
 from plenario.api.condition_builder import ConditionBuilder, general_filters
-from plenario.api.response import *  # TODO: Correct your laziness.
+from plenario.api.response import internal_error, bad_request, json_response_base, make_csv
+from plenario.api.response import geojson_response_base, form_csv_detail_response, form_json_detail_response
+from plenario.api.response import form_geojson_detail_response, add_geojson_feature
 from plenario.api.validator import Validator, DatasetRequiredValidator
 from plenario.api.validator import NoDefaultDatesValidator, validate
 from plenario.database import session
@@ -125,17 +130,32 @@ def meta():
 def _timeseries(args):
 
     geom = args.data['geom']
+    dataset = args.data.get('dataset')
     table_names = args.data['dataset_name__in']
     start_date = args.data['obs_date__ge']
     end_date = args.data['obs_date__le']
     agg = args.data['agg']
 
-    # Only examine tables that have a chance of containing records within the date and space boundaries.
+    # if a single dataset was provided, it's the only thing we need to consider
+    if dataset is not None:
+        table_names = [dataset.name]
+        # for the query's meta information, so that it doesn't show the index
+        del args.data['dataset_name__in']
+
+    # remove table names which wouldn't return anything for the query, given
+    # the time and geom constraints
     try:
         table_names = MetaTable.narrow_candidates(table_names, start_date, end_date, geom)
     except Exception as e:
         msg = 'Failed to gather candidate tables.'
         return internal_error(msg, e)
+
+    # If there aren't any table names, it causes an error down the code. Better
+    # to return and inform them that the request wouldn't have found anything.
+    if not table_names:
+        return bad_request("Your request doesn't return any results. Try "
+                           "adjusting your time constraint or location "
+                           "parameters.")
 
     try:
         panel = MetaTable.timeseries_all(
@@ -146,11 +166,11 @@ def _timeseries(args):
         return internal_error(msg, e)
 
     panel = MetaTable.attach_metadata(panel)
-    resp = json_response_base(args, panel, request.args)
+    resp = json_response_base(args, panel, args.data)
 
     datatype = args.data['data_type']
     if datatype == 'json':
-        resp = make_response(json.dumps(resp, default=dthandler), 200)
+        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
         resp.headers['Content-Type'] = 'application/json'
     elif datatype == 'csv':
 
@@ -182,7 +202,8 @@ def _timeseries(args):
         resp = make_response(csv_resp, 200)
         resp.headers['Content-Type'] = 'text/csv'
         filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
+        resp.headers['Content-Disposit""ion'] = 'attachment; filename=%s.csv' % filedate
+
     return resp
 
 
@@ -218,9 +239,9 @@ def _detail_aggregate(args):
     datatype = args.data['data_type']
     if datatype == 'json':
         time_counts = [{'count': c, 'datetime': d} for c, d in ts[1:]]
-        resp = json_response_base(args, time_counts)
+        resp = json_response_base(args, time_counts, request.args)
         resp['count'] = sum([c['count'] for c in time_counts])
-        resp = make_response(json.dumps(resp, default=dthandler), 200)
+        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
         resp.headers['Content-Type'] = 'application/json'
 
     elif datatype == 'csv':
@@ -260,6 +281,7 @@ def _detail(args):
         to_remove += ['{}.{}'.format(args.data['shape'].name, col) for col in ['geom', 'hash', 'ogc_fid']]
 
     datatype = args.data['data_type']
+    del args.data['dataset_name__in']
 
     if datatype == 'json':
         return form_json_detail_response(to_remove, args, rows)
@@ -304,7 +326,7 @@ def _grid(args):
         new_property = {'count': value[0], }
         add_geojson_feature(resp, new_geom, new_property)
 
-    resp = make_response(json.dumps(resp, default=dthandler), 200)
+    resp = make_response(json.dumps(resp, default=date_json_handler), 200)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
@@ -360,6 +382,7 @@ def _meta(args):
             )
 
     failure_messages = []
+    failure_messages.append(args.warnings)
 
     metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
     for record in metadata_records:
@@ -376,11 +399,11 @@ def _meta(args):
         # clear column_names off the json, users don't need to see it
         del record['column_names']
 
-    resp = json_response_base(args, metadata_records)
+    resp = json_response_base(args, metadata_records, request.args)
 
     resp['meta']['total'] = len(resp['objects'])
     resp['meta']['message'] = failure_messages
     status_code = 200
-    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp

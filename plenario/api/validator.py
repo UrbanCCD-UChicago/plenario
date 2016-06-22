@@ -1,10 +1,7 @@
-import json
-import logging
-
 from collections import namedtuple
 from datetime import datetime, timedelta
 from dateutil import parser
-from marshmallow import fields, Schema, ValidationError
+from marshmallow import fields, Schema
 from marshmallow.validate import Range, Length, OneOf
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
@@ -13,6 +10,18 @@ from plenario.models import MetaTable, ShapeMetadata
 
 
 class Validator(Schema):
+    """Base validator object using Marshmallow. Don't be intimidated! As scary
+    as the following block of code looks it's quite simple, and saves us from
+    writing validators. Let's break it down...
+
+    <FIELD_NAME> = fields.<TYPE>(default=<DEFAULT_VALUE>, validate=<VALIDATOR FN>)
+
+    The validator, when instanciated, has a method called 'dump'.which expects a
+    dictionary of arguments, where keys correspond to <FIELD_NAME>. The validator
+    has a default <TYPE> checker, that along with extra <VALIDATOR FN>s will
+    accept or reject the value associated with the key. If the value is missing
+    or rejected, the validator will substitue it with the value specified by
+    <DEFAULT_VALUE>."""
 
     valid_aggs = {'day', 'week', 'month', 'quarter', 'year'}
     valid_formats = {'csv', 'geojson', 'json'}
@@ -20,7 +29,7 @@ class Validator(Schema):
     agg = fields.Str(default='week', validate=OneOf(valid_aggs))
     buffer = fields.Integer(default=100, validate=Range(0))
     dataset_name = fields.Str(default=None, validate=OneOf(MetaTable.index()), dump_to='dataset')
-    dataset_name__in = fields.List(fields.Str(), default=MetaTable.index(), validate=Length(1))  # TODO: Improve.
+    dataset_name__in = fields.List(fields.Str(), default=MetaTable.index(), validate=Length(1))
     date__time_of_day_ge = fields.Integer(default=0, validate=Range(0, 23))
     date__time_of_day_le = fields.Integer(default=23, validate=Range(0, 23))
     data_type = fields.Str(default='json', validate=OneOf(valid_formats))
@@ -33,17 +42,32 @@ class Validator(Schema):
 
 
 class DatasetRequiredValidator(Validator):
+    """Some endpoints, like /detail-aggregate, should not be allowed to recieve
+    requests that do not specify a 'dataset_name' in the query string."""
 
     dataset_name = fields.Str(default=None, validate=OneOf(MetaTable.index()), dump_to='dataset', required=True)
 
 
 class NoDefaultDatesValidator(Validator):
+    """Some endpoints, specifically /datasets, will not return results with
+    the original default dates (because the time window is so small)."""
 
     obs_date__ge = fields.Date(default=None)
     obs_date__le = fields.Date(default=None)
 
 
+# ValidatorResult
+# ===============
+# Since much of the old code, formatting results into json, expected data as
+# attributes to the old ParamValidator object, it was convenient to use a named
+# tuple here that made a validator result compatible with response code.
+
 ValidatorResult = namedtuple('ValidatorResult', 'data errors warnings')
+
+
+# converters
+# ==========
+# Callables which are used to convert request arguments to their correct types.
 
 converters = {
     'buffer': int,
@@ -60,8 +84,15 @@ converters = {
 }
 
 
-# TODO: Get rid of this eventually, only here because ShapeMetadata lacks this method.
 def get_shape_table(shtable_name):
+    """A simple helper method to get a table that corresponds to a ShapeMetadata
+    record. This exists because while MetaTable.point_table exists, ShapeMetadata
+    doesn't have an analogous function.
+
+    :param shtable_name: name of shape table
+
+    :returns: table instance corresponding to ShapeMetadata record"""
+
     return session.query(ShapeMetadata)\
         .filter(ShapeMetadata.dataset_name == shtable_name)\
         .first()\
@@ -69,6 +100,14 @@ def get_shape_table(shtable_name):
 
 
 def convert(request_args):
+    """Convert a dictionary of arguments from strings to their types. How the
+    values are converted are specified by the converters dictionary defined
+    above.
+
+    :param request_args: dictionary of request arguments
+
+    :returns: converted dictionary"""
+
     for key, value in request_args.items():
         try:
             request_args[key] = converters[key](value)
@@ -80,6 +119,14 @@ def convert(request_args):
 
 
 def validate(validator_cls, request_args, defaults=True):
+    """Validate a dictionary of arguments. Substitute all missing fields with
+    defaults if not explicitly told to do otherwise.
+
+    :param validator_cls: what kind of validator to use
+    :param request_args: dictionary of arguments from a request object
+    :param defaults: if false, only substitute default values for provided args
+
+    :returns: ValidatorResult namedtuple"""
 
     if defaults:
         # this validator will return results/defaults for all fields

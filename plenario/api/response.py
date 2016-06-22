@@ -2,7 +2,7 @@ import json
 import shapely.wkb
 from datetime import datetime
 from flask import make_response, request
-from plenario.api.common import dthandler, make_csv, unknownObjectHandler
+from plenario.api.common import make_csv, unknown_object_json_handler
 
 
 def make_error(msg, status_code):
@@ -76,7 +76,7 @@ def form_json_detail_response(to_remove, validator, rows):
     resp['meta']['total'] = len(resp['objects'])
     resp['meta']['query'] = validator.data
     resp = make_response(
-        json.dumps(resp, default=unknownObjectHandler),
+        json.dumps(resp, default=unknown_object_json_handler),
         200
     )
     resp.headers['Content-Type'] = 'application/json'
@@ -115,6 +115,6 @@ def form_geojson_detail_response(to_remove, validator, rows):
         else:
             add_geojson_feature(geojson_resp, geom, row)
 
-    resp = make_response(json.dumps(geojson_resp, default=dthandler), 200)
+    resp = make_response(json.dumps(geojson_resp, default=unknown_object_json_handler), 200)
     resp.headers['Content-Type'] = 'application/json'
     return resp

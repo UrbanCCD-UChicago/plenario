@@ -17,8 +17,14 @@ RESPONSE_LIMIT = 1000
 CACHE_TIMEOUT = 60*60*6
 
 
-def unknownObjectHandler(obj):
-    #convert Plenario objects into json for response; currently handles geoms and dates
+def unknown_object_json_handler(obj):
+    """When trying to dump values into JSON, sometimes the json.dumps() method
+    finds values that it cannot serialize. This converts those objects from
+    a non-serializable format to a serializable one.
+
+    :param obj: object that json is trying to convert
+    :returns: converted object"""
+
     if type(obj) == Table:
         return obj.name
     elif isinstance(obj, date):
@@ -31,7 +37,13 @@ def unknownObjectHandler(obj):
         raise ValueError
 
 
-def dthandler(obj):
+def date_json_handler(obj):
+    """Like the unknown_object_json_handler, this only manipulates dates to work
+    with json.dumps().
+
+    :param obj: date object that json is trying to convert
+    :returns: converted object"""
+
     if isinstance(obj, date):
         return obj.isoformat()
     else:
