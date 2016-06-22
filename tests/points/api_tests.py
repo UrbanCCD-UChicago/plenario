@@ -260,6 +260,11 @@ class PointAPITests(BasePlenarioTest):
 
     '''/detail-aggregate'''
 
+    def test_detail_aggregate_with_just_dataset_name(self):
+
+        resp = self.get_api_response('detail-aggregate?dataset_name=crimes')
+        print resp
+
     def test_aggregate(self):
         # Use same params as for timeseries
         query = '/v1/api/detail-aggregate/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&agg=week'

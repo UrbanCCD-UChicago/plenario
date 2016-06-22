@@ -7,7 +7,7 @@ from itertools import groupby
 from operator import itemgetter
 
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, RESPONSE_LIMIT
-from plenario.api.common import make_cache_key
+from plenario.api.common import make_cache_key, date_json_handler, unknown_object_json_handler
 from plenario.api.condition_builder import ConditionBuilder, general_filters
 from plenario.api.response import *  # TODO: Correct your laziness.
 from plenario.api.validator import Validator, DatasetRequiredValidator
@@ -146,11 +146,11 @@ def _timeseries(args):
         return internal_error(msg, e)
 
     panel = MetaTable.attach_metadata(panel)
-    resp = json_response_base(args, panel, request.args)
+    resp = json_response_base(args, panel, args.data)
 
     datatype = args.data['data_type']
     if datatype == 'json':
-        resp = make_response(json.dumps(resp, default=dthandler), 200)
+        resp = make_response(json.dumps(resp, default=date_json_handler), 200)
         resp.headers['Content-Type'] = 'application/json'
     elif datatype == 'csv':
 
@@ -218,9 +218,9 @@ def _detail_aggregate(args):
     datatype = args.data['data_type']
     if datatype == 'json':
         time_counts = [{'count': c, 'datetime': d} for c, d in ts[1:]]
-        resp = json_response_base(args, time_counts)
+        resp = json_response_base(args, time_counts, args.data)
         resp['count'] = sum([c['count'] for c in time_counts])
-        resp = make_response(json.dumps(resp, default=dthandler), 200)
+        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
         resp.headers['Content-Type'] = 'application/json'
 
     elif datatype == 'csv':
@@ -304,7 +304,7 @@ def _grid(args):
         new_property = {'count': value[0], }
         add_geojson_feature(resp, new_geom, new_property)
 
-    resp = make_response(json.dumps(resp, default=dthandler), 200)
+    resp = make_response(json.dumps(resp, default=date_json_handler), 200)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
@@ -376,11 +376,11 @@ def _meta(args):
         # clear column_names off the json, users don't need to see it
         del record['column_names']
 
-    resp = json_response_base(args, metadata_records)
+    resp = json_response_base(args, metadata_records, args.data)
 
     resp['meta']['total'] = len(resp['objects'])
     resp['meta']['message'] = failure_messages
     status_code = 200
-    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
