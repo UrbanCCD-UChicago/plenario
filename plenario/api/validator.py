@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from dateutil import parser
 from marshmallow import fields, Schema
 from marshmallow.validate import Range, Length, OneOf
+from sqlalchemy.exc import DatabaseError, ProgrammingError
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
 from plenario.database import session
@@ -48,6 +49,20 @@ class DatasetRequiredValidator(Validator):
     dataset_name = fields.Str(default=None, validate=OneOf(MetaTable.index()), dump_to='dataset', required=True)
 
 
+class NoGeoJSONValidator(Validator):
+    """Some endpoints, like /timeseries, should not allow GeoJSON as a valid
+    response format."""
+
+    valid_formats = {'csv', 'json'}
+
+
+class NoGeoJSONDatasetRequiredValidator(DatasetRequiredValidator):
+    """Some endpoints, like /detail-aggregate, should not allow GeoJSON as a valid
+    response format and require a dataset."""
+
+    valid_formats = {'csv', 'json'}
+
+
 class NoDefaultDatesValidator(Validator):
     """Some endpoints, specifically /datasets, will not return results with
     the original default dates (because the time window is so small)."""
@@ -58,9 +73,9 @@ class NoDefaultDatesValidator(Validator):
 
 # ValidatorResult
 # ===============
-# Since much of the old code, formatting results into json, expected data as
-# attributes to the old ParamValidator object, it was convenient to use a named
-# tuple here that made a validator result compatible with response code.
+# Many methods in response.py rely on information that used to be provided
+# by the old ParamValidator attributes. This namedtuple carries that same
+# info around, and allows me to not have to rewrite any response code.
 
 ValidatorResult = namedtuple('ValidatorResult', 'data errors warnings')
 
@@ -72,6 +87,7 @@ ValidatorResult = namedtuple('ValidatorResult', 'data errors warnings')
 converters = {
     'buffer': int,
     'dataset': lambda x: MetaTable.get_by_dataset_name(x),
+    'shape': lambda x: ShapeMetadata.get_by_dataset_name(x).shape_table,
     'dataset_name__in': lambda x: x.split(','),
     'date__time_of_day_ge': int,
     'date__time_of_day_le': int,
@@ -80,23 +96,7 @@ converters = {
     'offset': int,
     'resolution': int,
     'geom': lambda x: make_fragment_str(extract_first_geometry_fragment(x)),
-    'shape': lambda x: get_shape_table(x)
 }
-
-
-def get_shape_table(shtable_name):
-    """A simple helper method to get a table that corresponds to a ShapeMetadata
-    record. This exists because while MetaTable.point_table exists, ShapeMetadata
-    doesn't have an analogous function.
-
-    :param shtable_name: name of shape table
-
-    :returns: table instance corresponding to ShapeMetadata record"""
-
-    return session.query(ShapeMetadata)\
-        .filter(ShapeMetadata.dataset_name == shtable_name)\
-        .first()\
-        .shape_table
 
 
 def convert(request_args):
@@ -111,40 +111,35 @@ def convert(request_args):
     for key, value in request_args.items():
         try:
             request_args[key] = converters[key](value)
-        except:
+        except (KeyError, TypeError, AttributeError):
+            pass
+        except (DatabaseError, ProgrammingError):
             # Failed transactions, which we do expect, can cause
             # a DatabaseError with Postgres. Failing to rollback
             # prevents further queries from being carried out.
             session.rollback()
 
 
-def validate(validator_cls, request_args, defaults=True):
+def validate(validator, request_args):
     """Validate a dictionary of arguments. Substitute all missing fields with
     defaults if not explicitly told to do otherwise.
 
-    :param validator_cls: what kind of validator to use
+    :param validator: what kind of validator to use
     :param request_args: dictionary of arguments from a request object
-    :param defaults: if false, only substitute default values for provided args
 
     :returns: ValidatorResult namedtuple"""
 
-    if defaults:
-        # this validator will return results/defaults for all fields
-        validator = validator_cls()
-    else:
-        # this validator will return results/defaults for only the fields
-        # provided in the request
-        validator = validator_cls(only=request_args.keys())
+    args = request_args.copy()
 
     # convert string values to corresponding types so the validator can work
-    convert(request_args)
+    convert(args)
     # returns validated parameters as strings
-    result = validator.dump(request_args)
-    # convert strings back to correct types
+    result = validator.dump(args)
+    # convert any remaining strings in args to the right type
     convert(result.data)
 
     # determine unchecked parameters provided in the request
-    unchecked = set(request_args.keys()) - set(validator.fields.keys())
+    unchecked = set(args.keys()) - set(validator.fields.keys())
 
     # determine if a dataset was provided to grab the column names
     columns = []
@@ -154,8 +149,6 @@ def validate(validator_cls, request_args, defaults=True):
         result.data['metatable'] = result.data['dataset']
         result.data['dataset'] = result.data['dataset'].point_table
         columns += result.data['dataset'].columns.keys()
-    if 'shape' in request_args:
-        columns += result.data['shape'].columns.keys()
 
     warnings = []
     # parameters that have yet to be checked could still possibly apply to

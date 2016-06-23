@@ -119,7 +119,7 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
         params['shape'] = polygon_dataset_name
     params['dataset_name'] = point_dataset_name
 
-    args = validate(DatasetRequiredValidator, params)
+    args = validate(DatasetRequiredValidator(), params)
     if args.errors:
         return bad_request(args.errors)
 

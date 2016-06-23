@@ -420,6 +420,11 @@ class ShapeMetadata(Base):
     celery_task_id = Column(String)
 
     @classmethod
+    def get_by_dataset_name(cls, name):
+        shape_metatable = session.query(cls).filter(cls.dataset_name == name).first()
+        return shape_metatable
+
+    @classmethod
     def get_all_with_etl_status(cls):
         """
         :return: Every row of meta_shape joined with celery task status.

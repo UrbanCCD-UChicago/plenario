@@ -15,8 +15,8 @@ from plenario.api.condition_builder import parse_general, general_filters
 from plenario.api.response import internal_error, bad_request, json_response_base, make_csv
 from plenario.api.response import geojson_response_base, form_csv_detail_response, form_json_detail_response
 from plenario.api.response import form_geojson_detail_response, add_geojson_feature
-from plenario.api.validator import Validator, DatasetRequiredValidator
-from plenario.api.validator import NoDefaultDatesValidator, validate
+from plenario.api.validator import Validator, DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
+from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator
 from plenario.database import session
 from plenario.models import MetaTable
 
@@ -70,16 +70,23 @@ def form_detail_sql_query(args, aggregate_points=False):
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def timeseries():
-    validated_args = validate(Validator, request.args.to_dict())
+    fields = ('location_geom__within', 'dataset_name', 'dataset_name__in',
+              'agg', 'obs_date__ge', 'obs_date__le', 'data_type')
+    validator = NoGeoJSONValidator(only=fields)
+    validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
         return bad_request(validated_args)
+
     return _timeseries(validated_args)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail_aggregate():
-    validated_args = validate(DatasetRequiredValidator, request.args.to_dict())
+    fields = ('location_geom__within', 'dataset_name', 'agg', 'obs_date__ge',
+              'obs_date__le', 'data_type')
+    validator = NoGeoJSONDatasetRequiredValidator(only=fields)
+    validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
         return bad_request(validated_args)
     return _detail_aggregate(validated_args)
@@ -88,18 +95,25 @@ def detail_aggregate():
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail():
-    validated_args = validate(DatasetRequiredValidator, request.args.to_dict())
+    fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
+              'obs_date__le', 'data_type', 'offset')
+    validator = NoGeoJSONDatasetRequiredValidator(only=fields)
+    validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
         return bad_request(validated_args)
+
     return _detail(validated_args)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def grid():
-    validated_args = validate(DatasetRequiredValidator, request.args.to_dict())
+    fields = ('dataset_name', 'resolution', 'buffer', 'obs_date__le', 'obs_date__ge',
+              'location_geom__within')
+    validated_args = validate(DatasetRequiredValidator(), request.args.to_dict())
     if validated_args.errors:
         return bad_request(validated_args)
+
     return _grid(validated_args)
 
 
@@ -108,18 +122,23 @@ def grid():
 def dataset_fields(dataset_name):
     request_args = request.args.to_dict()
     request_args['dataset_name'] = dataset_name
-    validated_args = validate(DatasetRequiredValidator, request_args)
+    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name')
+    validator = DatasetRequiredValidator(only=fields)
+    validated_args = validate(validator, request_args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
+
     return _meta(validated_args)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def meta():
-    validated_args = validate(NoDefaultDatesValidator, request.args.to_dict())
+    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name', 'location_geom__within')
+    validated_args = validate(NoDefaultDatesValidator(only=fields), request.args.to_dict())
     if validated_args.errors:
         return bad_request(validated_args.errors)
+
     return _meta(validated_args)
 
 
@@ -202,7 +221,7 @@ def _timeseries(args):
         resp = make_response(csv_resp, 200)
         resp.headers['Content-Type'] = 'text/csv'
         filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Disposit""ion'] = 'attachment; filename=%s.csv' % filedate
+        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
 
     return resp
 
@@ -281,7 +300,6 @@ def _detail(args):
         to_remove += ['{}.{}'.format(args.data['shape'].name, col) for col in ['geom', 'hash', 'ogc_fid']]
 
     datatype = args.data['data_type']
-    del args.data['dataset_name__in']
 
     if datatype == 'json':
         return form_json_detail_response(to_remove, args, rows)
@@ -353,7 +371,7 @@ def _meta(args):
 
     # What params did the user provide?
     dataset = args.data['dataset']
-    geom = args.data['geom']
+    geom = args.data.get('geom')
     start_date = args.data['obs_date__ge']
     end_date = args.data['obs_date__le']
 
