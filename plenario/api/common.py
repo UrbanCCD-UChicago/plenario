@@ -1,13 +1,14 @@
 import json
 from flask.ext.cache import Cache
 from plenario.settings import CACHE_CONFIG
-from datetime import timedelta, date
+from datetime import timedelta, date, datetime
 from functools import update_wrapper
 from flask import make_response, request, current_app
 import csv
 from shapely.geometry import asShape
 from cStringIO import StringIO
 from plenario.utils.helpers import get_size_in_degrees
+from plenario.models import MetaTable
 from sqlalchemy.sql.schema import Table
 
 cache = Cache(config=CACHE_CONFIG)
@@ -15,16 +16,34 @@ cache = Cache(config=CACHE_CONFIG)
 RESPONSE_LIMIT = 1000
 CACHE_TIMEOUT = 60*60*6
 
-def unknownObjectHandler(obj):
-    #convert Plenario objects into json for response; currently handles geoms and dates
+
+def unknown_object_json_handler(obj):
+    """When trying to dump values into JSON, sometimes the json.dumps() method
+    finds values that it cannot serialize. This converts those objects from
+    a non-serializable format to a serializable one.
+
+    :param obj: object that json is trying to convert
+    :returns: converted object"""
+
     if type(obj) == Table:
         return obj.name
     elif isinstance(obj, date):
         return obj.isoformat()
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, MetaTable):
+        return obj.__tablename__
     else:
         raise ValueError
 
-def dthandler(obj):
+
+def date_json_handler(obj):
+    """Like the unknown_object_json_handler, this only manipulates dates to work
+    with json.dumps().
+
+    :param obj: date object that json is trying to convert
+    :returns: converted object"""
+
     if isinstance(obj, date):
         return obj.isoformat()
     else:

@@ -1,4 +1,4 @@
-from plenario.api.common import cache, CACHE_TIMEOUT, make_cache_key, crossdomain, dthandler, RESPONSE_LIMIT
+from plenario.api.common import cache, CACHE_TIMEOUT, make_cache_key, crossdomain, date_json_handler, RESPONSE_LIMIT
 from plenario.utils.helpers import get_size_in_degrees
 from plenario.database import session, app_engine as engine, Base
 from flask import request, make_response
@@ -30,7 +30,7 @@ def weather_stations():
             d['location'] = shapely.wkb.loads(loc.decode('hex')).__geo_interface__
             resp['objects'].append(d)
     resp['meta']['query'] = raw_query_params
-    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp = make_response(json.dumps(resp, default=date_json_handler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
@@ -83,7 +83,7 @@ def weather(table):
             resp['objects'].append(d)
         resp['meta']['total'] = sum([len(r['observations']) for r in resp['objects']])
     resp['meta']['query'] = raw_query_params
-    resp = make_response(json.dumps(resp, default=dthandler), status_code)
+    resp = make_response(json.dumps(resp, default=date_json_handler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
