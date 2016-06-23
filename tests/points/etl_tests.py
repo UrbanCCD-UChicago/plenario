@@ -207,6 +207,21 @@ class StagingTableTests(TestCase):
         bbox = MetaTable.get_by_dataset_name('community_radio_events').bbox
         self.assertIsNotNone(bbox)
 
+    def test_new_table_has_correct_column_names_in_meta(self):
+        drop_if_exists(self.unloaded_meta.dataset_name)
+
+        etl = PlenarioETL(self.unloaded_meta, source_path=self.radio_path)
+        new_table = etl.add()
+
+        columns = session.query(MetaTable.column_names)
+        columns = columns.filter(MetaTable.dataset_name == self.unloaded_meta.dataset_name)
+        columns = columns.first()[0]
+
+        self.assertEqual(len(columns), 4)
+
+        session.close()
+        new_table.drop(app_engine, checkfirst=True)
+
     def test_location_col_add(self):
         drop_if_exists(self.opera_meta.dataset_name)
 

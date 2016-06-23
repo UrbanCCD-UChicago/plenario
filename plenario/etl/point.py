@@ -68,11 +68,6 @@ class Staging(object):
         try:
             # Can we just grab columns from an existing table?
             self.cols = self._from_ingested(meta.column_info())
-            # if we can, update the corresponding meta table with these column names and types
-            # we expect column names to be filled in by users, but helpful in test cases/backend submission
-            if meta.column_names is None:
-                cols = {col.name: str(col.type) for col in self.cols if col.name not in {u'geom', u'point_date', u'hash'}}
-                meta.column_names = json.dumps(cols)
         except NoSuchTableError:
             self.cols = None
 
@@ -412,24 +407,29 @@ def update_meta(metatable, table):
     :returns: None
     """
 
-    metatable.update_date_added()
-
-    metatable.obs_from, metatable.obs_to = session.query(
-        func.min(table.c.point_date),
-        func.max(table.c.point_date)
-    ).first()
-
-    metatable.bbox = session.query(
-        func.ST_SetSRID(
-            func.ST_Envelope(func.ST_Union(table.c.geom)),
-            4326
-        )
-    ).first()[0]
-
-    session.add(metatable)
-
     try:
+        metatable.update_date_added()
+
+        metatable.obs_from, metatable.obs_to = session.query(
+            func.min(table.c.point_date),
+            func.max(table.c.point_date)
+        ).first()
+
+        metatable.bbox = session.query(
+            func.ST_SetSRID(
+                func.ST_Envelope(func.ST_Union(table.c.geom)),
+                4326
+            )
+        ).first()[0]
+
+        metatable.column_names = {
+            c.name: str(c.type) for c in metatable.column_info()
+            if c.name not in {u'geom', u'point_date', u'hash'}
+        }
+
+        session.add(metatable)
         session.commit()
+
     except:
         session.rollback()
         raise

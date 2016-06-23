@@ -284,10 +284,10 @@ def contrib_thankyou():
 
 
 def point_meta_from_submit_form(form, is_approved):
-    column_names, labels = form_columns(form)
+    columns, labels = form_columns(form)
     name = slugify(form['dataset_name'], delim=u'_')[:50]
 
-    md = MetaTable(
+    metatable = MetaTable(
         url=form['file_url'],
         view_url=form.get('view_url'),
         dataset_name=name,
@@ -303,11 +303,12 @@ def point_meta_from_submit_form(form, is_approved):
         latitude=labels.get('latitude', None),
         longitude=labels.get('longitude', None),
         location=labels.get('location', None),
-        column_names=column_names
+        column_names=columns
     )
-    session.add(md)
+
+    session.add(metatable)
     session.commit()
-    return md
+    return metatable
 
 
 def shape_meta_from_submit_form(form, is_approved):
