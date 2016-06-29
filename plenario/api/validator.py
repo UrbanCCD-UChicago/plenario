@@ -1,11 +1,14 @@
+import json
+
 from collections import namedtuple
 from datetime import datetime, timedelta
 from dateutil import parser
 from marshmallow import fields, Schema
 from marshmallow.validate import Range, Length, OneOf
-from sqlalchemy.exc import DatabaseError, ProgrammingError
+from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
+from plenario.api.condition_builder import field_ops
 from plenario.database import session
 from plenario.models import MetaTable, ShapeMetadata
 
@@ -85,14 +88,17 @@ ValidatorResult = namedtuple('ValidatorResult', 'data errors warnings')
 # Callables which are used to convert request arguments to their correct types.
 
 converters = {
+    'agg': str,
     'buffer': int,
-    'dataset': lambda x: MetaTable.get_by_dataset_name(x),
+    'dataset': lambda x: MetaTable.get_by_dataset_name(x).point_table,
+    'data_type': str,
     'shape': lambda x: ShapeMetadata.get_by_dataset_name(x).shape_table,
     'dataset_name__in': lambda x: x.split(','),
     'date__time_of_day_ge': int,
     'date__time_of_day_le': int,
     'obs_date__ge': lambda x: parser.parse(x).date(),
     'obs_date__le': lambda x: parser.parse(x).date(),
+    'point_date': lambda x: parser.parse(x),
     'offset': int,
     'resolution': int,
     'geom': lambda x: make_fragment_str(extract_first_geometry_fragment(x)),
@@ -131,36 +137,169 @@ def validate(validator, request_args):
 
     args = request_args.copy()
 
-    # convert string values to corresponding types so the validator can work
+    # This first validation step covers conditions that are dataset
+    # agnostic. These are values can be used to apply to all datasets
+    # (ex. obs_date), or concern the format of the response (ex. limit,
+    # datatype, offset).
+
+    # Convert arguments from strings to corresponding types to work with
+    # the marshmallow validator.
     convert(args)
-    # returns validated parameters as strings
+    # Get the validation results, default values are substituted
+    # for arguments whose values were missing or invalid.
     result = validator.dump(args)
-    # convert any remaining strings in args to the right type
+    # Certain values will be dumped as strings. This extra conversion
+    # returns them to their original type. (ex. DateTime, Table)
     convert(result.data)
 
-    # determine unchecked parameters provided in the request
+    # Holds messages concerning unnecessary parameters. These can be either
+    # junk parameters, or redundant column parameters if a tree filter was
+    # used.
+    warnings = []
+
+    # At this point validation splits. We can either validate tree-style column
+    # arguments or validate them individually. We don't do both.
+
+    # Determine unchecked parameters provided in the request.
     unchecked = set(args.keys()) - set(validator.fields.keys())
 
-    # determine if a dataset was provided to grab the column names
-    columns = []
-    if 'dataset_name' in request_args:
-        # this little bit of result formatting helps make things easier, but I
-        # eventually need to find a better place for it
-        result.data['metatable'] = result.data['dataset']
-        result.data['dataset'] = result.data['dataset'].point_table
-        columns += result.data['dataset'].columns.keys()
+    # If tree filters were provided, ignore ALL unchecked parameters that are
+    # not tree filters or response format information.
+    if has_tree_filters(request_args):
 
-    warnings = []
-    # parameters that have yet to be checked could still possibly apply to
-    # a table column
-    for param in unchecked:
-        tokens = param.split('__')
-        # if it is a column, pass it through for use in the condition builder
-        if tokens[0] in columns:
-            result.data[param] = request_args[param]
-        # otherwise mark it down with a warning, let them know that we ignored it
-        else:
-            warnings.append('Unused parameter value "{}={}"'
-                            .format(param, request_args[param]))
+        for key in request_args:
+            value = args[key]
+            if 'filter' in key:
+                t_name = key.split('__')[0]
 
+                # Report a filter which specifies a non-existent tree.
+                try:
+                    # Can sometimes resolve to None.point_table, which causes the AttributeError.
+                    table = MetaTable.get_by_dataset_name(t_name).point_table
+                except (AttributeError, NoSuchTableError) as err:
+                    result.errors[t_name] = "Table name {} could not be found.".format(t_name)
+                    return result
+
+                # Report a tree which causes the JSON parser to fail.
+                # Or a tree whose value is not valid.
+                try:
+                    cond_tree = json.loads(value)
+                    if valid_tree(table, cond_tree):
+                        result.data[key] = cond_tree
+                except ValueError as err:
+                    result.errors[t_name] = "Tree {} causes error {}.".format(value, err)
+                    return result
+
+            # These keys just have to do with the formatting of the JSON response.
+            # We keep these values around even if they have no effect on a condition
+            # tree.
+            elif key in {'geom', 'offset', 'limit'}:
+                pass
+
+            # If the key is not a filter, and not used to format JSON, report
+            # that we ignored it.
+            else:
+                warnings.append("Unused parameter {}, you cannot specify both "
+                                "column and filter arguments.".format(key))
+
+    # If no tree filters were provided, see if any of the unchecked parameters
+    # are usable as column conditions.
+    else:
+        table = result.data.get('dataset')
+        for param in unchecked:
+            field = param.split('__')[0]
+            if table is not None:
+                try:
+                    valid_column_condition(table, field, args[param])
+                    result.data[param] = args[param]
+                except ValueError as err:
+                    warnings.append('Unused parameter value "{}={}"'.format(param, args[param]))
+                    warnings.append('{} is not a valid column for {}'.format(param, table))
+            else:
+                warnings.append('Unused parameter value "{}={}"'.format(param, args[param]))
+                warnings.append('No table provided for {}'.format(param))
+
+    # ValidatorResult(dict, dict, list)
     return ValidatorResult(result.data, result.errors, warnings)
+
+
+def validate_tree_conditions(args):
+    """One of the two styles of validations. Given a dictionary of arguments,
+    it expects every key-value pair to represent a table and condition tree.
+
+    :param args: dictionary of arguments
+
+    :returns: ValidatorResult namedtuple"""
+
+    result = ValidatorResult({}, [], [])
+
+    for tablename, tree in args.items():
+        name = tablename.split('__')[0]
+        table = MetaTable.get_by_dataset_name(name).point_table
+        tree = json.loads(tree)
+        if valid_tree(table, tree):
+            result.data[tablename] = tree
+        else:
+            result.warnings.append("{} condition tree invalid.".format(tablename))
+    return result
+
+
+def valid_tree(table, tree):
+    """Given a dictionary containing a condition tree, validate all conditions
+    nestled in the tree.
+
+    :param table: table to build conditions for, need it for the columns
+    :param tree: condition_tree
+
+    :returns: boolean value, true if the tree is valid"""
+
+    if not tree.keys():
+        raise ValueError("Empty or malformed tree.")
+
+    op = tree.keys()[0]
+
+    if op == "and" or op == "or":
+        return all([valid_tree(table, subtree) for subtree in tree[op]])
+
+    elif op in field_ops:
+        column = tree[op][0]
+        target = tree[op][1]
+        return valid_column_condition(table, column, target)
+
+
+def valid_column_condition(table, column_name, value):
+    """Establish whether or not a set of components is able to make a valid
+    condition for the provided table.
+
+    :param table: SQLAlchemy table object
+    :param column_name: Name of the column
+    :param value: target value"""
+
+    # This is mostly to deal with what a pain datetime is.
+    # I can't just use its type to cast a string. :(
+    condition = {column_name: value}
+    convert(condition)
+    value = condition[column_name]
+
+    try:
+        column = table.columns[column_name]
+    except KeyError:
+        raise ValueError("Invalid column name {}".format(column_name))
+
+    try:
+        if type(value) != column.type.python_type:
+            column.type.python_type(value)  # Blessed Python.
+    except (ValueError, TypeError):
+        raise ValueError("Invalid value type for {}. Was expecting {}"
+                         .format(value, column.type.python_type))
+
+    return True
+
+
+def has_tree_filters(request_args):
+    """See if there are any <DATASET>__filter parameters.
+
+    :param request_args: dictionary of request arguments
+    :returns: boolean, true if there's a filter argument"""
+
+    return any('filter' in key for key in request_args.keys())
