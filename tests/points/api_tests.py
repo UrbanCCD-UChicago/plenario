@@ -88,10 +88,58 @@ class PointAPITests(BasePlenarioTest):
 
         # Should be the same length
         # as the number of columns in the source dataset
-        self.assertEqual(len(response_data['objects']), 1)
-        self.assertEqual(len(response_data['objects'][0]['columns']), 17)
+        self.assertEqual(len(response_data['objects']), 17)
 
-    ''' /detail '''
+    # ======
+    # detail
+    # ======
+
+    def test_tree_filter_time(self):
+        crimes_filter = '{"ge": ["point_date", "2014-12-12"]}'
+        response = self.get_api_response('detail?crimes__filter=' + crimes_filter)
+        self.assertEqual(len(response['objects']), 7)
+
+    def test_validator_ignores_extra_filters(self):
+        crimes_filter = '{"ge": ["point_date", "2014-12-12"]}'
+        time_filter = '&obs_date__ge=2020-01-01'
+        junk_filter = '&foo=bar'
+        response = self.get_api_response('detail?crimes__filter=' +
+                                         crimes_filter +
+                                         time_filter +
+                                         junk_filter)
+
+        self.assertEqual(len(response['meta']['message']), 2)
+        self.assertNotEquals(len(response['objects']), 0)
+
+    def test_multiple_condition_trees(self):
+        crimes_filter = '{"eq": ["description", "CREDIT CARD FRAUD"]}'
+        flu_filter = '{"and":[{"ge":["point_date","2013-09-22"]},{"le":["point_date","2013-10-01"]}]}'
+
+        response = self.get_api_response('detail?crimes__filter=' + crimes_filter +
+                                         '&flu_shot_clinics__filter=' + flu_filter)
+
+        # 2 from crimes, 5 from flu
+        self.assertEquals(len(response['objects']), 7)
+
+    def test_empty_condition_trees(self):
+        response = self.get_api_response('detail?crimes__filter={}&flu_shot_clinics__filter={}')
+        self.assertEquals(response['meta']['status'], 'error')
+
+    def test_bad_condition_tree(self):
+        response = self.get_api_response('detail?crimes__filter={"foo": "bar"})')
+        self.assertEquals(response['meta']['status'], 'error')
+
+    def test_malformed_condition_tree(self):
+        response = self.get_api_response('detail?crimes__filter={"eq"": ["description", "CREDIT CARD FRAUD"]}')
+        self.assertEquals(response['meta']['status'], 'error')
+
+    def test_nonexistant_dataset(self):
+        response = self.get_api_response('detail?foo__filter={"eq": ["id", 1]}')
+        self.assertEquals(response['meta']['status'], 'error')
+
+    def test_blank_dataset(self):
+        response = self.get_api_response('detail?__filter={"eq": ["id", 1]}')
+        self.assertEquals(response['meta']['status'], 'error')
 
     def test_time_filter(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'
@@ -260,7 +308,16 @@ class PointAPITests(BasePlenarioTest):
         counts = [time_unit['count'] for time_unit in timeseries['items']]
         self.assertEqual([5], counts)
 
-    '''/detail-aggregate'''
+    def test_timeseries_with_condition_tree(self):
+        r = self.get_api_response('timeseries?'
+                                  'crimes__filter={"eq": ["description", "CREDIT CARD FRAUD"]}'
+                                  '&agg=year'
+                                  '&obs_date__ge=2007')
+        self.assertEqual(len(r['objects']), 1)
+
+    # =================
+    # /detail-aggregate
+    # =================
 
     def test_detail_aggregate_with_just_lower_time_bound(self):
 
@@ -293,6 +350,26 @@ class PointAPITests(BasePlenarioTest):
         response_data = json.loads(resp.data)
         # 6 Church-led flu shot clinics.
         self.assertEqual(response_data['objects'][0]['count'], 6)
+
+    def test_aggregate_column_filter_tree(self):
+        flu_filter = '{"eq": ["event_type", "Church"]}'
+        response = self.get_api_response('detail-aggregate?obs_date__ge=2013&obs_date__le=2014'
+                                         '&agg=year&flu_shot_clinics__filter=' +
+                                         flu_filter)
+
+        # 6 Church-led flu shot clinics.
+        self.assertEqual(response['objects'][0]['count'], 6)
+
+    def test_two_condition_trees(self):
+        flu_filter = '{"eq": ["event_type", "Church"]}'
+        crime_filter = '{"eq": ["description", "CREDIT CARD FRAUD"]}'
+        response = self.get_api_response('detail-aggregate?'
+                                         'flu_shot_clinics__filter=' + flu_filter +
+                                         '&crimes__filter=' + crime_filter +
+                                         '&agg=year&obs_date__ge=2012-01-01')
+
+        # 6 from flu, 2 from crimes
+        self.assertEqual(response['count'], 8)
 
     def test_bad_column_condition(self):
         query = 'v1/api/detail/?dataset_name=flu_shot_clinics&fake_column=fake'
