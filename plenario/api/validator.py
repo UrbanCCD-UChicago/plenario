@@ -193,7 +193,7 @@ def validate(validator, request_args):
             # These keys just have to do with the formatting of the JSON response.
             # We keep these values around even if they have no effect on a condition
             # tree.
-            elif key in {'geom', 'offset', 'limit'}:
+            elif key in {'geom', 'offset', 'limit', 'agg'}:
                 pass
 
             # If the key is not a filter, and not used to format JSON, report

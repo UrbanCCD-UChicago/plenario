@@ -209,7 +209,6 @@ class MetaTable(Base):
 
             # If we have condition trees specified, apply them.
             ctree = ctrees[name] if ctrees else None
-            print "timeseries_all CTREE: {}".format(ctree)
             table = cls.get_by_dataset_name(name)
             ts_select = table.timeseries(agg_unit, start, end, geom, ctree)
             selects.append(ts_select)

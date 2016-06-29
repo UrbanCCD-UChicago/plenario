@@ -170,7 +170,6 @@ def _timeseries(args):
     # If a single dataset was provided, it's the only thing we need to consider.
     # If we provided dataset_filters, same deal.
     if ctrees or dataset is not None:
-        print "_timeseries CTREES: {}".format(ctrees)
         if dataset is not None:
             table_names = [dataset.name]
         elif ctrees:
@@ -270,7 +269,7 @@ def _detail_aggregate(args):
         tablename = tablename.split('__')[0]
         table = MetaTable.get_by_dataset_name(tablename).point_table
         try:
-            conditions = [parse_tree(table, condition_tree)]
+            conditions = parse_tree(table, condition_tree)
         except ValueError:  # Catches empty condition tree.
             conditions = None
 
