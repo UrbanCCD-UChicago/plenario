@@ -501,7 +501,7 @@ def request_args_to_condition_tree(request_args, ignore=list()):
     # If the key wasn't convertable, it meant that it was a column key.
     columns = {k: v for k, v in args.items() if k not in ignored}
 
-    condition_tree = {"and": []}
+    ctree = {"op": "and", "val": []}
 
     # Add AND conditions based on query string parameters.
     for k, v in columns.items():
@@ -513,9 +513,8 @@ def request_args_to_condition_tree(request_args, ignore=list()):
             k[1] = 'le' if 'le' in k[1] else 'ge'
 
         if len(k) == 1:
-            condition_tree['and'].append({'eq': [k[0], v]})
+            ctree['val'].append({"op": "eq", "col": k[0], "val": v})
         elif len(k) == 2:
-            op = k[1]
-            condition_tree['and'].append({op: [k[0], v]})
+            ctree['val'].append({"op": k[1], "col": k[0], "val": v})
 
-    return condition_tree
+    return ctree

@@ -61,9 +61,14 @@ def _parse_condition_tree(table, ctree):
     elif op in field_ops:
         col = ctree['col']
         val = ctree['val']
-        return _operator_to_condition(
-            getattr(table, 'columns')[col], op, val
-        )
+        try:
+            return _operator_to_condition(
+                getattr(table, 'columns')[col], op, val
+            )
+
+        # Exists for date__time_of_day. Since it doesn't come
+        except KeyError:
+            return getattr(col, field_ops[op])(val)
 
 
 def parse_general(table, field, value):
