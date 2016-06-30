@@ -118,9 +118,9 @@ class PointAPITests(BasePlenarioTest):
         # as the number of columns in the source dataset
         self.assertEqual(len(response_data['objects']), 17)
 
-    # ======
-    # detail
-    # ======
+    # ====================
+    # /detail tree filters
+    # ====================
 
     def test_detail_with_simple_flu_filter(self):
         r = self.get_api_response('detail?' + FLU_BASE + FLU_FILTER_SIMPLE)
@@ -137,6 +137,10 @@ class PointAPITests(BasePlenarioTest):
     def test_detail_with_nested_flu_filters(self):
         r = self.get_api_response('detail?' + FLU_BASE + FLU_FILTER_NESTED)
         self.assertEqual(r['meta']['total'], 4)
+
+    # ============================
+    # /detail query string filters
+    # ============================
 
     def test_time_filter(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'
@@ -202,7 +206,14 @@ class PointAPITests(BasePlenarioTest):
         response_data = json.loads(resp.data)
         self.assertEqual(response_data['meta']['total'], 11)
 
-    '''/grid'''
+    # ==================
+    # /grid tree filters
+    # ==================
+
+    def test_grid_with_simple_tree_filter(self):
+        filter_ = 'crimes__filters={"op": "eq", "col": "description", "val": "CREDIT CARD FRAUD"}'
+        r = self.get_api_response('grid?{}'.format(filter_))
+        self.assertEqual(len(r['features']), 2)
 
     def test_space_and_time(self):
         escaped_query_rect = get_loop_rect()

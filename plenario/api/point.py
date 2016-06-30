@@ -388,8 +388,9 @@ def _grid(args):
         conditions = parse_tree(table, condition_tree)
 
         try:
-            registry_row = MetaTable.get_by_dataset_name(point_table.name)
-            grid_rows, size_x, size_y = registry_row.make_grid(resolution, geom, conditions)
+            registry_row = MetaTable.get_by_dataset_name(table.name)
+            # make_grid expects conditions to be iterable.
+            grid_rows, size_x, size_y = registry_row.make_grid(resolution, geom, [conditions])
             result_rows += grid_rows
         except Exception as e:
             return internal_error('Could not make grid aggregation.', e)
