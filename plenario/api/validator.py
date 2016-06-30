@@ -98,6 +98,7 @@ converters = {
     'date__time_of_day_le': int,
     'obs_date__ge': lambda x: parser.parse(x).date(),
     'obs_date__le': lambda x: parser.parse(x).date(),
+    'date': lambda x: parser.parse(x).date(),
     'point_date': lambda x: parser.parse(x),
     'offset': int,
     'resolution': int,

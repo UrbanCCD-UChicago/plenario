@@ -17,13 +17,22 @@ FLU_FILTER_SIMPLE = '{"op": "eq", "col": "zip", "val": 60620}'
 # Returns 10 rows.
 FLU_FILTER_SIMPLE2 = '{"op": "eq", "col": "day", "val": "Wednesday"}'
 # Returns 1 row.
-FLU_FILTER_COMPOUND_AND = FLU_BASE + '{"op": "and", "val": [' +\
-                          FLU_FILTER_SIMPLE + ', ' +\
+FLU_FILTER_COMPOUND_AND = FLU_BASE + '{"op": "and", "val": [' + \
+                          FLU_FILTER_SIMPLE + ', ' + \
                           FLU_FILTER_SIMPLE2 + ']}'
 # Returns 13 rows.
 FLU_FILTER_COMPOUND_OR = FLU_BASE + '{"op": "or", "val": [' + \
                           FLU_FILTER_SIMPLE + ', ' + \
                           FLU_FILTER_SIMPLE2 + ']}'
+# Returns 4 rows.
+FLU_FILTER_NESTED = '{"op": "and", "val": [' \
+                    '   {"op": "ge", "col": "date", "val": "2013-11-01"},' \
+                    '   {"op": "or", "val": [' + \
+                            FLU_FILTER_SIMPLE + ', ' + \
+                            FLU_FILTER_SIMPLE2 + \
+                    '       ]' \
+                    '   }' \
+                    ']}'
 
 
 def get_escaped_geojson(fname):
@@ -171,6 +180,10 @@ class PointAPITests(BasePlenarioTest):
     def test_detail_with_compound_flu_filters_or(self):
         r = self.get_api_response('detail?' + FLU_FILTER_COMPOUND_OR)
         self.assertEqual(r['meta']['total'], 13)
+
+    def test_detail_with_nested_flu_filters(self):
+        r = self.get_api_response('detail?' + FLU_BASE + FLU_FILTER_NESTED)
+        self.assertEqual(r['meta']['total'], 4)
 
     def test_time_filter(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'
