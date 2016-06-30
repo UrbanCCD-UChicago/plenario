@@ -6,6 +6,14 @@ import csv
 
 from tests.test_fixtures.base_test import BasePlenarioTest, fixtures_path
 
+# Filters
+# =======
+# Constants holding query string values, helps to have them all in one place.
+
+FLU_BASE = 'flu_shot_clinics__filter='
+# Returns 4 rows for this condition.
+FLU_FILTER_SIMPLE = FLU_BASE + '{"op": "eq", "col": "zip", "val": 60620}'
+
 
 def get_escaped_geojson(fname):
     pwd = os.path.dirname(os.path.realpath(__file__))
@@ -140,6 +148,10 @@ class PointAPITests(BasePlenarioTest):
     def test_blank_dataset(self):
         response = self.get_api_response('detail?__filter={"eq": ["id", 1]}')
         self.assertEquals(response['meta']['status'], 'error')
+
+    def test_detail_with_simple_flu_filter(self):
+        resp = self.get_api_response('detail?{}'.format(FLU_FILTER_SIMPLE))
+        self.assertEqual(resp['meta']['total'], 4)
 
     def test_time_filter(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'
