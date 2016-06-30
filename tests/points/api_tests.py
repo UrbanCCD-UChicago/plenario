@@ -9,10 +9,21 @@ from tests.test_fixtures.base_test import BasePlenarioTest, fixtures_path
 # Filters
 # =======
 # Constants holding query string values, helps to have them all in one place.
+# The row counts come from executing equivalents of these queries on posgres.
 
 FLU_BASE = 'flu_shot_clinics__filter='
 # Returns 4 rows for this condition.
-FLU_FILTER_SIMPLE = FLU_BASE + '{"op": "eq", "col": "zip", "val": 60620}'
+FLU_FILTER_SIMPLE = '{"op": "eq", "col": "zip", "val": 60620}'
+# Returns 10 rows.
+FLU_FILTER_SIMPLE2 = '{"op": "eq", "col": "day", "val": "Wednesday"}'
+# Returns 1 row.
+FLU_FILTER_COMPOUND_AND = FLU_BASE + '{"op": "and", "val": [' +\
+                          FLU_FILTER_SIMPLE + ', ' +\
+                          FLU_FILTER_SIMPLE2 + ']}'
+# Returns 13 rows.
+FLU_FILTER_COMPOUND_OR = FLU_BASE + '{"op": "or", "val": [' + \
+                          FLU_FILTER_SIMPLE + ', ' + \
+                          FLU_FILTER_SIMPLE2 + ']}'
 
 
 def get_escaped_geojson(fname):
@@ -150,8 +161,16 @@ class PointAPITests(BasePlenarioTest):
         self.assertEquals(response['meta']['status'], 'error')
 
     def test_detail_with_simple_flu_filter(self):
-        resp = self.get_api_response('detail?{}'.format(FLU_FILTER_SIMPLE))
-        self.assertEqual(resp['meta']['total'], 4)
+        r = self.get_api_response('detail?' + FLU_BASE + FLU_FILTER_SIMPLE)
+        self.assertEqual(r['meta']['total'], 4)
+
+    def test_detail_with_compound_flu_filters_and(self):
+        r = self.get_api_response('detail?' + FLU_FILTER_COMPOUND_AND)
+        self.assertEqual(r['meta']['total'], 1)
+
+    def test_detail_with_compound_flu_filters_or(self):
+        r = self.get_api_response('detail?' + FLU_FILTER_COMPOUND_OR)
+        self.assertEqual(r['meta']['total'], 13)
 
     def test_time_filter(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'
