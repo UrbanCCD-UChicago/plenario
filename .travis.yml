@@ -8,7 +8,6 @@ python:
 #- postgresql"
 #- redis-server
 #sudo: required
-cache: 
 ### test dependencies ###
 #install:
 #- pip install celery
