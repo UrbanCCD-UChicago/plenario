@@ -88,8 +88,7 @@ class PointAPITests(BasePlenarioTest):
 
         # Should be the same length
         # as the number of columns in the source dataset
-        self.assertEqual(len(response_data['objects']), 1)
-        self.assertEqual(len(response_data['objects'][0]['columns']), 17)
+        self.assertEqual(len(response_data['objects']), 17)
 
     ''' /detail '''
 

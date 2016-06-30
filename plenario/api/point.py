@@ -128,7 +128,13 @@ def dataset_fields(dataset_name):
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
-    return _meta(validated_args)
+    response = _meta(validated_args)
+
+    # API defines column values to be in the 'objects' list.
+    resp_dict = json.loads(response.data)
+    resp_dict['objects'] = resp_dict['objects'][0]['columns']
+    response.data = json.dumps(resp_dict)
+    return response
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
