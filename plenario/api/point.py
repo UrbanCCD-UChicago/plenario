@@ -166,6 +166,9 @@ def _timeseries(args):
                 metarecord = MetaTable.get_by_dataset_name(field.split('__')[0])
                 dataset = metarecord.point_table
                 ctrees[dataset.name] = parse_tree(dataset, value)
+        # Just cleanliness, since we don't use this argument. Doesn't have
+        # to show up in the JSON response.
+        del args.data['dataset']
 
     # If a single dataset was provided, it's the only thing we need to consider.
     # If we provided dataset_filters, same deal.
