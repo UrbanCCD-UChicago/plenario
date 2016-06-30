@@ -224,27 +224,6 @@ def validate(validator, request_args):
     return ValidatorResult(result.data, result.errors, warnings)
 
 
-def validate_tree_conditions(args):
-    """One of the two styles of validations. Given a dictionary of arguments,
-    it expects every key-value pair to represent a table and condition tree.
-
-    :param args: dictionary of arguments
-
-    :returns: ValidatorResult namedtuple"""
-
-    result = ValidatorResult({}, [], [])
-
-    for tablename, tree in args.items():
-        name = tablename.split('__')[0]
-        table = MetaTable.get_by_dataset_name(name).point_table
-        tree = json.loads(tree)
-        if valid_tree(table, tree):
-            result.data[tablename] = tree
-        else:
-            result.warnings.append("{} condition tree invalid.".format(tablename))
-    return result
-
-
 def valid_tree(table, tree):
     """Given a dictionary containing a condition tree, validate all conditions
     nestled in the tree.
@@ -278,6 +257,7 @@ def valid_column_condition(table, column_name, value):
 
     # This is mostly to deal with what a pain datetime is.
     # I can't just use its type to cast a string. :(
+
     condition = {column_name: value}
     convert(condition)
     value = condition[column_name]
