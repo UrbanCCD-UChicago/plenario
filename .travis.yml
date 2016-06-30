@@ -1,0 +1,47 @@
+language: python
+python:
+- '2.7'
+### test dependencies ###
+#addons:
+#  postgresql: "9.4"
+#services:
+#- postgresql"
+#- redis-server
+#sudo: required
+### test dependencies ###
+#install:
+#- pip install celery
+#- celery -A plenario.celery_app worker --loglevel=info &
+#- sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
+#- sudo -u postgres psql -c "CREATE DATABASE plenario_test;"
+#- sudo -u postgres psql -c "CREATE EXTENSION postgis;" plenario_test
+#- pip install -r requirements.txt
+#- python init_db.py
+#- python runserver.py &
+script:
+- echo "<<insert test suite here>>"
+### testing ###
+#- curl localhost:5000/v1/api/datasets
+#- python -m unittest tests.points.api_tests
+#- python -m unittest tests.shape.api_tests
+deploy:
+  - provider: elasticbeanstalk
+    access_key_id:
+      secure: XIxPDezOPK2PJHtujfJPi7E8lGo0Otw1OCn/0koan0UrMp29H12pVF/ZV4dJbxLF8kPy7anvbchuUTWgKrU6b2l54CNhuLni7rvRTo68RImNeEczn3SRvyTaPXaG+5etw1eQ/8p7AawuSCan1cChcls3r0kPz4O7vULkB6Gr8V1J69xdgQ7Xep1dGPQNLrD4ryZg+QKH0W27WRXCYb2Dzt59moo61G2/dF+gaimNGxURwEa33ukwkLkHxyGGp5/jQOtpvBrLR9cXnyMpKU+o6+DQJTIhtSwXbmwZxVtBQc/k9y3Ago6ZM7IGYd+YWFGPQqDgnhxFeswzfRt7sTrAzmFY4zHk6kg6NyHUkd1Li8b/HSNZMXGtVCMOFBl+gSesNMTfej2fiS+qrtttzqpl/ox2sTiBBRQqri3k6tMivTQ2g4Sv36Esg+rQQGcby49nHoWe6CJgUUsyxRtZ/byu0B8JcNdLiWorgLdH0P1tnUgkX3dZL/fN61ZoAcMRHb/hcSTBzzXVMGLgkWwMRJh0hU/KN3QNKwGeLeZ5B7hnW23eyNM9KPr6Bt6DOOXbPJ8vU41WrHqn/xsvafvvAxEiziGkgguwEIVcH/IQpEX+bFXL+pp2Z0usiMM6+IySJsBwEG+0EiRZcBklSZphAy7L8glu4bJarNR22ugBFl92OZ8=
+    secret_access_key:
+      secure: I8usvD6xTI0zZOYjMI7WjRRtBEBXR+7ir2uGhGgnP72iCAkKJdgEQ58ziOo1EhNPkZu960kOljnZ0ehfrqFBELr3wURInta1hbdxLJsUXCNTFs14QcIBylH2Kj+PsfUoRu5sxWOmNZqVLqF4nBAKEYoI/IATj0zDaHbcHOK+dvCAWhvXnsAKTVGdE+ogSadHv0UwZKlV3Fqdqjbg0QwMFXYcKBl5KqKW763XxQ0VpvvRmTmaXYd4P1kDjK0kapl6dd1QtGZuwHjqaKh7MXr8vbzbtJKZcMcWWBmXo7BWLBybWFRERxO/unclCgGaPcrjvy3LxH3tPQxANVl1hOnxI0xdrKP6XTD2Kb4R6lOScEUEBdJKCswnfYmuPTn1su8o87Z6h7qJz4bm3Yu1TLvLEnr/Bf0MjkpVGoYSrWtKu9pxTJcrBS6x53dRC5U+zLT/RkPuenASi51rm2ncSv8IIK8Dw46ajZ1+7kIwRuAWA9k2x/GDLVjUgK+haHgPcvnYsfXGluW0aEuGONdAb/fSCC9ChHr4tA57q5QAZa7KvxYlpCNVwQ9IVLd0xGg6xtrraLRbliPNd5UQUD9NFDOHnwqZGwXyRWqjFTEO4ojsHecle8BAf6+c9mDAZF3OWC5lESy5ZWH+Iv20++51lcYky4sdKO/2gt3NOUhtBlgW6eM=
+    region: us-east-1
+    #Modify to the desired app and env names.
+    app: plenario-zarniwoop-application
+    env: plenario-app-plenario-zarniwoop
+    bucket_name: elasticbeanstalk-us-east-1-031052761859
+  - provider: elasticbeanstalk
+    access_key_id:
+      secure: XIxPDezOPK2PJHtujfJPi7E8lGo0Otw1OCn/0koan0UrMp29H12pVF/ZV4dJbxLF8kPy7anvbchuUTWgKrU6b2l54CNhuLni7rvRTo68RImNeEczn3SRvyTaPXaG+5etw1eQ/8p7AawuSCan1cChcls3r0kPz4O7vULkB6Gr8V1J69xdgQ7Xep1dGPQNLrD4ryZg+QKH0W27WRXCYb2Dzt59moo61G2/dF+gaimNGxURwEa33ukwkLkHxyGGp5/jQOtpvBrLR9cXnyMpKU+o6+DQJTIhtSwXbmwZxVtBQc/k9y3Ago6ZM7IGYd+YWFGPQqDgnhxFeswzfRt7sTrAzmFY4zHk6kg6NyHUkd1Li8b/HSNZMXGtVCMOFBl+gSesNMTfej2fiS+qrtttzqpl/ox2sTiBBRQqri3k6tMivTQ2g4Sv36Esg+rQQGcby49nHoWe6CJgUUsyxRtZ/byu0B8JcNdLiWorgLdH0P1tnUgkX3dZL/fN61ZoAcMRHb/hcSTBzzXVMGLgkWwMRJh0hU/KN3QNKwGeLeZ5B7hnW23eyNM9KPr6Bt6DOOXbPJ8vU41WrHqn/xsvafvvAxEiziGkgguwEIVcH/IQpEX+bFXL+pp2Z0usiMM6+IySJsBwEG+0EiRZcBklSZphAy7L8glu4bJarNR22ugBFl92OZ8=
+    secret_access_key:
+      secure: I8usvD6xTI0zZOYjMI7WjRRtBEBXR+7ir2uGhGgnP72iCAkKJdgEQ58ziOo1EhNPkZu960kOljnZ0ehfrqFBELr3wURInta1hbdxLJsUXCNTFs14QcIBylH2Kj+PsfUoRu5sxWOmNZqVLqF4nBAKEYoI/IATj0zDaHbcHOK+dvCAWhvXnsAKTVGdE+ogSadHv0UwZKlV3Fqdqjbg0QwMFXYcKBl5KqKW763XxQ0VpvvRmTmaXYd4P1kDjK0kapl6dd1QtGZuwHjqaKh7MXr8vbzbtJKZcMcWWBmXo7BWLBybWFRERxO/unclCgGaPcrjvy3LxH3tPQxANVl1hOnxI0xdrKP6XTD2Kb4R6lOScEUEBdJKCswnfYmuPTn1su8o87Z6h7qJz4bm3Yu1TLvLEnr/Bf0MjkpVGoYSrWtKu9pxTJcrBS6x53dRC5U+zLT/RkPuenASi51rm2ncSv8IIK8Dw46ajZ1+7kIwRuAWA9k2x/GDLVjUgK+haHgPcvnYsfXGluW0aEuGONdAb/fSCC9ChHr4tA57q5QAZa7KvxYlpCNVwQ9IVLd0xGg6xtrraLRbliPNd5UQUD9NFDOHnwqZGwXyRWqjFTEO4ojsHecle8BAf6+c9mDAZF3OWC5lESy5ZWH+Iv20++51lcYky4sdKO/2gt3NOUhtBlgW6eM=
+    region: us-east-1
+    #Modify to the desired app and env names.
+    app: plenario-zarniwoop-application
+    env: plenario-worker-plenario-zarniwoop
+    bucket_name: elasticbeanstalk-us-east-1-031052761859
