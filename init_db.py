@@ -36,27 +36,31 @@ def init_master_meta_user():
 
 
 def init_meta():
-    #non_meta_tables = [table for table in Base.metadata.sorted_tables
-    #                   if table.name not in
-    #                   {'meta_master', 'meta_shape', 'plenario_user'}]
-    #for t in non_meta_tables:
-    #    Base.metadata.remove(t)
+    #Reset concept of a metadata table
+    non_meta_tables = [table for table in Base.metadata.sorted_tables
+                       if table.name not in
+                       {'meta_master', 'meta_shape', 'plenario_user'}]
+    for t in non_meta_tables:
+        Base.metadata.remove(t)
     
     #Create databases (if they don't exist)
     Base.metadata.create_all(bind=app_engine)
 
 def init_user():
-    print 'creating default user %s' % DEFAULT_USER['name']
-    if session.query(plenario.models.User).count() > 0:
-        print 'Users already exist. Skipping this step.'
-        return
-    user = plenario.models.User(**DEFAULT_USER)
-    session.add(user)
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        print "Problem while creating default user: ", e
+    if DEFAULT_USER['name']:
+        print 'Creating default user %s' % DEFAULT_USER['name']
+        if session.query(plenario.models.User).count() > 0:
+            print 'Users already exist. Skipping this step.'
+            return
+        user = plenario.models.User(**DEFAULT_USER)
+        session.add(user)
+        try:
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            print "Problem while creating default user: ", e
+    else:
+        print 'No default user specified. Skipping this step.'
 
 
 def init_weather():
@@ -76,8 +80,8 @@ def init_weather():
 
 def add_functions():
     def add_function(script_path):
-        args = ['PGPASSWORD='+DB_PASSWORD+'psql', '-h', DB_HOST, '-U', DB_USER, '-d', DB_NAME, '-f', script_path]
-        subprocess.check_call(args, shell=True)
+        args = 'PGPASSWORD='+DB_PASSWORD+' psql -h '+DB_HOST+' -U '+DB_USER+' -d '+DB_NAME+' -f '+script_path
+        subprocess.check_output(args, shell=True)
         #Using shell=True otherwise it seems that aws doesn't have the proper paths.
 
     add_function("./plenario/dbscripts/audit_trigger.sql")
