@@ -256,15 +256,15 @@ def valid_tree(table, tree):
     if not tree.keys():
         raise ValueError("Empty or malformed tree.")
 
-    op = tree.keys()[0]
+    op = tree['op']
 
     if op == "and" or op == "or":
-        return all([valid_tree(table, subtree) for subtree in tree[op]])
+        return all([valid_tree(table, subtree) for subtree in tree['val']])
 
     elif op in field_ops:
-        column = tree[op][0]
-        target = tree[op][1]
-        return valid_column_condition(table, column, target)
+        col = tree['col']
+        val = tree['val']
+        return valid_column_condition(table, col, val)
 
 
 def valid_column_condition(table, column_name, value):

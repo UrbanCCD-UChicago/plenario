@@ -36,56 +36,34 @@ def parse_tree(table, condition_tree):
                          .format(ex, table, condition_tree))
 
 
-def _parse_condition_tree(table, condition_tree):
+def _parse_condition_tree(table, ctree):
     """Parse nested conditions provided as a dict for a single table.
 
     :param table: table object whose columns are being used in the conditions
-    :param condition_tree: dictionary of conditions created from JSON
+    :param ctree: dictionary of conditions created from JSON
 
     :returns SQLAlchemy conditions for querying the table with"""
 
-    op = condition_tree.keys()[0].lower()
+    op = ctree['op']
 
-    if len(condition_tree[op]) >= 1:
+    if op == "and":
+        return and_(
+            _parse_condition_tree(table, child)
+            for child in ctree['val']
+        )
 
-        if op == "and":
-            # A non-leaf node, values are *iterable*! Takes the form:
-            # {'and', [{'<STMT>': ('<COLUMN>', 'TARGET_VALUE')}, ... ]
-            # Or if a nested query is desired:
-            # {'and': [{'and', [{'<STMT>': ('<COLUMN>', '<TARGET_VALUE>')}, ... ]}
+    elif op == "or":
+        return or_(
+            _parse_condition_tree(table, child)
+            for child in ctree['val']
+        )
 
-            return and_(
-                _parse_condition_tree(table, child)
-                for child in condition_tree['and']
-            )
-
-        elif op == "or":
-            # See 'and'.
-
-            return or_(
-                _parse_condition_tree(table, child)
-                for child in condition_tree['or']
-            )
-
-        elif op in field_ops:
-            # At this point we are at a leaf. Leaves take the form:
-            # {'<STMT>': ('<COLUMN>': '<TARGET_VALUE>')}
-
-            value = condition_tree[op]
-            column = value[0]
-            target = value[1]
-
-            try:
-                return _operator_to_condition(
-                    getattr(table, 'columns')[column], op, target
-                )
-
-            # This pretty much exists solely for date__time_of_day.
-            except KeyError:
-                return getattr(column, field_ops[op])(target)
-
-    else:
-        raise ValueError("Incorrect number of arguments provided.")
+    elif op in field_ops:
+        col = ctree['col']
+        val = ctree['val']
+        return _operator_to_condition(
+            getattr(table, 'columns')[col], op, val
+        )
 
 
 def parse_general(table, field, value):
