@@ -466,6 +466,10 @@ class ShapeMetadata(Base):
 
         return listing
 
+    @classmethod
+    def tablenames(cls):
+        return [x.dataset_name for x in session.query(ShapeMetadata.dataset_name).all()]
+
     @staticmethod
     def add_intersections_to_index(listing, geom):
         # For each dataset_name in the listing,

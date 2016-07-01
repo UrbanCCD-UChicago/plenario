@@ -50,13 +50,13 @@ def _parse_condition_tree(table, ctree, literally=False):
 
     if op == "and":
         return and_(
-            _parse_condition_tree(table, child)
+            _parse_condition_tree(table, child, literally)
             for child in ctree['val']
         )
 
     elif op == "or":
         return or_(
-            _parse_condition_tree(table, child)
+            _parse_condition_tree(table, child, literally)
             for child in ctree['val']
         )
 

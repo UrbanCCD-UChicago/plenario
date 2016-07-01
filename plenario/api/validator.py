@@ -33,6 +33,7 @@ class Validator(Schema):
     agg = fields.Str(default='week', validate=OneOf(valid_aggs))
     buffer = fields.Integer(default=100, validate=Range(0))
     dataset_name = fields.Str(default=None, validate=OneOf(MetaTable.index()), dump_to='dataset')
+    shapeset_name = fields.Str(default=None, validate=OneOf(ShapeMetadata.tablenames()), dump_to='shapeset')
     dataset_name__in = fields.List(fields.Str(), default=MetaTable.index(), validate=Length(1))
     date__time_of_day_ge = fields.Integer(default=0, validate=Range(0, 23))
     date__time_of_day_le = fields.Integer(default=23, validate=Range(0, 23))
@@ -91,6 +92,7 @@ converters = {
     'agg': str,
     'buffer': int,
     'dataset': lambda x: MetaTable.get_by_dataset_name(x).point_table,
+    'shapeset': lambda x: ShapeMetadata.get_by_dataset_name(x).shape_table,
     'data_type': str,
     'shape': lambda x: ShapeMetadata.get_by_dataset_name(x).shape_table,
     'dataset_name__in': lambda x: x.split(','),
@@ -118,7 +120,7 @@ def convert(request_args):
     for key, value in request_args.items():
         try:
             request_args[key] = converters[key](value)
-        except (KeyError, TypeError, AttributeError):
+        except (KeyError, TypeError, AttributeError, NoSuchTableError):
             pass
         except (DatabaseError, ProgrammingError):
             # Failed transactions, which we do expect, can cause
@@ -175,13 +177,13 @@ def validate(validator, request_args):
 
                 # Report a filter which specifies a non-existent tree.
                 try:
-                    # Can sometimes resolve to None.point_table, which causes the AttributeError.
                     table = MetaTable.get_by_dataset_name(t_name).point_table
                 except (AttributeError, NoSuchTableError):
-                    table = ShapeMetadata.get_by_dataset_name(t_name).shape_table
-                else:
-                    result.errors[t_name] = "Table name {} could not be found.".format(t_name)
-                    return result
+                    try:
+                        table = ShapeMetadata.get_by_dataset_name(t_name).shape_table
+                    except (AttributeError, NoSuchTableError):
+                        result.errors[t_name] = "Table name {} could not be found.".format(t_name)
+                        return result
 
                 # Report a tree which causes the JSON parser to fail.
                 # Or a tree whose value is not valid.
@@ -211,7 +213,7 @@ def validate(validator, request_args):
         try:
             table = result.data['dataset']
         except KeyError:
-            table = result.data.get('shape')
+            table = result.data.get('shapeset')
         for param in unchecked:
             field = param.split('__')[0]
             if table is not None:

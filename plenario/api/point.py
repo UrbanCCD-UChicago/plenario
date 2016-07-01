@@ -21,45 +21,6 @@ from plenario.database import session
 from plenario.models import MetaTable
 
 
-def form_detail_sql_query(args, aggregate_points=False):
-
-    point_table = args.data.get('dataset')
-    shape_table = args.data.get('shape')
-    shape_columns = shape_table.columns.keys() if shape_table is not None else None
-
-    conditions = []
-    for field, value in args.data.items():
-        if value is not None:
-            if shape_columns and field.split('__')[0] in shape_columns:
-                condition = parse_general(shape_table, field, value)
-            else:
-                condition = parse_general(point_table, field, value)
-
-            if condition is not None:
-                conditions.append(condition)
-
-    try:
-        q = session.query(point_table)
-        if conditions:
-            q = q.filter(*conditions)
-    except Exception as e:
-        return internal_error('Failed to construct filters.', e)
-
-    # if the query specified a shape dataset, add a join to the sql query with that dataset
-    if shape_table is not None:
-        shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
-        if aggregate_points:
-            q = q.from_self(shape_table)\
-                .filter(point_table.c.geom.ST_Intersects(shape_table.c.geom))\
-                .group_by(shape_table)
-        else:
-            q = q.join(shape_table, point_table.c.geom.ST_Within(shape_table.c.geom))
-            # add columns from shape dataset to the select statement
-            q = q.add_columns(*shape_columns)
-
-    return q
-
-
 # ======
 # routes
 # ======
@@ -305,49 +266,20 @@ def _detail_aggregate(args):
 
 def _detail(args):
 
-    meta_params = ('dataset', 'data_type', 'geom', 'offset', 'limit')
+    meta_params = ('dataset', 'shapeset', 'data_type')
     meta_vals = (args.data.get(k) for k in meta_params)
-    dataset, data_type, geom, offset, limit = meta_vals
+    dataset, shapeset, data_type = meta_vals
 
-    result_rows = []
+    q = _detail_query(args)
 
-    # If there aren't tree filters provided, a little formatting is needed
-    # to make the general filters into an 'and' tree.
-    if not has_tree_filters(args.data):
-
-        # Creates an AND condition tree and adds it to args.
-        args.data[dataset.name + '__filter'] = request_args_to_condition_tree(
-            request_args=args.data,
-            ignore=['shape']
-        )
-
-    # We only build conditions from values with a key containing 'filter'.
-    # Therefore we only build dataset conditions from condition trees.
-    dataset_conditions = {k: v for k, v in args.data.items() if 'filter' in k}
-    for tablename, condition_tree in dataset_conditions.items():
-
-        tablename = tablename.split('__')[0]
-        table = MetaTable.get_by_dataset_name(tablename).point_table
-        conditions = parse_tree(table, condition_tree)
-
-        # Query the table, filter results by condition build from a tree.
-        q = session.query(table).filter(conditions)
-        # If the user specified a geom, filter out data that does not intersect.
-        if geom:
-            q = q.filter(table.c.geom.ST_Within(
-                sqlalchemy.func.ST_GeomFromGeoJSON(geom)
-            ))
-        # If the user did not specify a limit, use the default value of 1000.
-        q = q.limit(limit) if limit else q.limit(RESPONSE_LIMIT)
-        # If the user did not specift an offset, do nothing.
-        q = q.offset(offset) if offset else q
-
-        try:
-            columns = [c.name for c in table.columns]
-            result_rows += [OrderedDict(zip(columns, row)) for row in q.all()]
-        except Exception as ex:
-            session.rollback()
-            return internal_error("Failed to fetch records.", ex)
+    try:
+        columns = [c.name for c in dataset.columns]
+        if shapeset:
+            columns += [c.name for c in shapeset.columns]
+        result_rows = [OrderedDict(zip(columns, row)) for row in q.all()]
+    except Exception as ex:
+        session.rollback()
+        return internal_error("Failed to fetch records.", ex)
 
     to_remove = ['point_date', 'hash']
 
@@ -359,6 +291,67 @@ def _detail(args):
 
     elif data_type == 'geojson':
         return form_geojson_detail_response(to_remove, args, result_rows)
+
+
+def _detail_query(args, aggregate=False):
+
+    meta_params = ('dataset', 'shapeset', 'data_type', 'geom', 'offset', 'limit')
+    meta_vals = (args.data.get(k) for k in meta_params)
+    dataset, shapeset, data_type, geom, offset, limit = meta_vals
+
+    result_rows = []
+
+    # If there aren't tree filters provided, a little formatting is needed
+    # to make the general filters into an 'and' tree.
+    if not has_tree_filters(args.data):
+        # Creates an AND condition tree and adds it to args.
+        args.data[dataset.name + '__filter'] = request_args_to_condition_tree(
+            request_args=args.data,
+            ignore=['shapeset']
+        )
+
+    # Sort out the filter conditions from the rest of the user arguments.
+    filters = {k: v for k, v in args.data.items() if 'filter' in k}
+
+    # Get upset if they specify more than a dataset and shapeset filter.
+    if len(filters) > 2:
+        return bad_request("Too many table filters provided.")
+
+    # Query the point dataset.
+    q = session.query(dataset)
+
+    # If the user specified a geom, filter results to those within its shape.
+    if geom:
+        q = q.filter(dataset.c.geom.ST_Within(
+            sqlalchemy.func.ST_GeomFromGeoJSON(geom)
+        ))
+
+    # Retrieve the filters and build conditions from them if they exist.
+    point_ctree = filters.get(dataset.name + '__filter')
+
+    # If the user specified point dataset filters, parse and apply them.
+    if point_ctree:
+        point_conditions = parse_tree(dataset, point_ctree)
+        q = q.filter(point_conditions)
+
+    # If a user specified a shape dataset, it was either through the /shapes
+    # enpoint, which uses the aggregate result, or through the /detail endpoint
+    # which uses the joined result.
+    if shapeset is not None:
+        if aggregate:
+            q = q.from_self(shapeset).filter(dataset.c.geom.ST_Intersects(shapeset.c.geom)).group_by(shapeset)
+        else:
+            shape_columns = ['{}.{} as {}'.format(shapeset.name, col.name, col.name) for col in shapeset.c]
+            q = q.join(shapeset, dataset.c.geom.ST_Within(shapeset.c.geom))
+            q = q.add_columns(*shape_columns)
+
+        # If there's a filter specified for the shape dataset, apply those conditions.
+        shape_ctree = filters.get(shapeset.name + '__filter')
+        if shape_ctree:
+            shape_conditions = parse_tree(shapeset, shape_ctree)
+            q = q.filter(shape_conditions)
+
+    return q
 
 
 def _grid(args):

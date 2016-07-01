@@ -6,14 +6,17 @@ import re
 
 from collections import OrderedDict
 from flask import make_response, request
-from sqlalchemy import func
+from sqlalchemy import func, and_
+from sqlalchemy.exc import NoSuchTableError
 
 from plenario.api.common import crossdomain, extract_first_geometry_fragment
 from plenario.api.common import make_fragment_str, RESPONSE_LIMIT
 from plenario.api.condition_builder import parse_tree
-from plenario.api.point import form_detail_sql_query, form_csv_detail_response
-from plenario.api.point import form_geojson_detail_response, bad_request
+from plenario.api.point import _detail_query, form_csv_detail_response
+from plenario.api.point import form_geojson_detail_response, bad_request, request_args_to_condition_tree
+from plenario.api.response import make_error
 from plenario.api.validator import DatasetRequiredValidator, validate, has_tree_filters
+from plenario.api.validator import Validator
 from plenario.database import session
 from plenario.models import ShapeMetadata, MetaTable
 from plenario.utils.ogr2ogr import OgrExport
@@ -112,55 +115,49 @@ def get_all_shape_datasets():
 
 def aggregate_point_data(point_dataset_name, polygon_dataset_name):
 
-    params = request.args.copy()
-    # Doesn't this override the path-derived parameter with a query parameter?
-    # Do we want that?
-    if not params.get('shape'):
-        # form_detail_query expects to get info about a shape dataset this way.
-        params['shape'] = polygon_dataset_name
-    params['dataset_name'] = point_dataset_name
+    consider = ('dataset_name', 'shapeset_name', 'obs_date__ge', 'obs_date__le',
+                'data_type', 'location_geom__within')
 
-    args = validate(DatasetRequiredValidator(), params)
-    if args.errors:
-        return bad_request(args.errors)
+    request_args = request.args.to_dict()
+    request_args['dataset_name'] = point_dataset_name
+    request_args['shapeset_name'] = polygon_dataset_name
 
-    # Apply standard filters to point dataset
-    # And join each point to the containing shape
-    q = form_detail_sql_query(args, True)
-    q = q.add_columns(func.count(args.data['dataset'].c.hash))
+    validated_args = validate(Validator(only=consider), request_args)
 
-    # Apply a bounding box filter in case a geom was provided
-    geom = args.data['geom']
-    dataset = args.data['dataset']
-    if geom:
-        intersection = dataset.c.geom.ST_Within(
-            func.ST_GeomFromGeoJSON(geom)
-        )
-        q = q.filter(intersection)
+    if validated_args.errors:
+        return bad_request(validated_args.errors)
 
-    # Page in RESPONSE_LIMIT chunks
-    # This seems contradictory. Don't we want one row per shape, no matter what?
-    offset = args.data['offset']
-    q = q.limit(RESPONSE_LIMIT)
-    if offset > 0:
-        q = q.offset(offset)
+    return _aggregate_point_data(validated_args)
 
+
+def _aggregate_point_data(args):
+
+    # TODO: Perform _detail's query.
+    # TODO: Format response.
+    # TODO: Output response.
+
+    meta_params = ('dataset', 'shapeset', 'data_type', 'geom', 'offset', 'limit')
+    meta_vals = (args.data.get(k) for k in meta_params)
+    dataset, shapeset, data_type, geom, offset, limit = meta_vals
+
+    q = _detail_query(args, aggregate=True)
+    q = q.add_columns(func.count(dataset.c.hash))
+
+    # TODO: Take a good hard look at this.
     res_cols = []
-    columns = [str(col) for col in args.data['dataset'].columns]
-    columns += [str(col) for col in args.data['shape'].columns]
+    columns = [str(col) for col in dataset.columns]
+    columns += [str(col) for col in shapeset.columns]
     for col in columns:
         col = col.split('.')
-        if col[0] == polygon_dataset_name:
+        if col[0] == shapeset.name:
             res_cols.append(col[1])
     res_cols.append('count')
 
     rows = [OrderedDict(zip(res_cols, res)) for res in q.all()]
-    if params.get('data_type') == 'csv':
-        resp = form_csv_detail_response(['hash', 'ogc_fid'], rows)
+    if data_type == 'csv':
+        return form_csv_detail_response(['hash', 'ogc_fid'], rows)
     else:
-        resp = form_geojson_detail_response(['hash', 'ogc_fid'], args, rows)
-
-    return resp
+        return form_geojson_detail_response(['hash', 'ogc_fid'], args, rows)
 
 
 @crossdomain(origin="*")
@@ -172,12 +169,18 @@ def export_shape(dataset_name):
 
     :returns: response object result of _export_shape"""
 
-    request_args = request.args.to_dict()
+    # Find a way to work these into the validator, they shouldn't be out here.
+    if dataset_name not in ShapeMetadata.tablenames():
+        return make_error(dataset_name + ' not found.', 404)
+    try:
+        ShapeMetadata.get_by_dataset_name(dataset_name).shape_table
+    except NoSuchTableError:
+        return make_error(dataset_name + ' has yet to be ingested.', 404)
 
-    # Using the 'shape' key triggers the correct converter in validator.
+    request_args = request.args.to_dict()
+    # Using the 'shape' key triggers the correct converter.
     request_args['shape'] = dataset_name
-    validated_args = validate(
-        DatasetRequiredValidator(only=request_args.keys()), request_args)
+    validated_args = validate(Validator(only=request_args.keys()), request_args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
     return _export_shape(validated_args)
@@ -199,8 +202,9 @@ def _export_shape(request_):
     conditions = ""
 
     if has_tree_filters(request_args):
+        # A string literal is required for ogr2ogr to function correctly.
         ctree = request_args[shapeset.name + '__filter']
-        conditions = parse_tree(shapeset, ctree, literally=True)
+        conditions = str(parse_tree(shapeset, ctree, literally=True))
 
     if geojson:
         if conditions:

@@ -113,7 +113,9 @@ class ShapeTests(BasePlenarioTest):
         self.assertEqual(datasets_to_num_geoms[fixtures['zips'].table_name], 3)
         self.assertEqual(datasets_to_num_geoms[fixtures['streets'].table_name], 2)
 
-    ''' /shapes/<shape_name> '''
+    # =================================
+    # /shapes/<shape_name> tree filters
+    # =================================
 
     def test_shapes_with_simple_filter(self):
         url = '/v1/api/shapes/pedestrian_streets?pedestrian_streets__filter=' \
@@ -121,6 +123,29 @@ class ShapeTests(BasePlenarioTest):
         resp = self.app.get(url)
         data = json.loads(resp.data)
         self.assertEqual(len(data['features']), 21)
+
+    def test_shapes_with_compound_filter(self):
+        url = '/v1/api/shapes/pedestrian_streets?pedestrian_streets__filter=' \
+              '{"op": "or", "val": [' \
+                   '{"op": "ge", "col": "ogc_fid", "val": 20},' \
+                   '{"op": "eq", "col": "name", "val": "PEDESTRIAN STREET"}' \
+              ']}'
+        resp = self.app.get(url)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['features']), 33)
+
+    def test_shapes_with_nested_compound_filter(self):
+        url = '/v1/api/shapes/pedestrian_streets?pedestrian_streets__filter=' \
+              '{"op": "or", "val": [' \
+                  '{"op": "le", "col": "ogc_fid", "val": 10},' \
+                  '{"op": "and", "val": [' \
+                      '{"op": "ge", "col": "ogc_fid", "val": 20},' \
+                      '{"op": "eq", "col": "name", "val": "PEDESTRIAN STREET"}' \
+                  ']}' \
+              ']}'
+        resp = self.app.get(url)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['features']), 20)
 
     def test_export_geojson(self):
         # Do we at least get some json back?
