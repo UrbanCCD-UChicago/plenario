@@ -115,6 +115,13 @@ class ShapeTests(BasePlenarioTest):
 
     ''' /shapes/<shape_name> '''
 
+    def test_shapes_with_simple_filter(self):
+        url = '/v1/api/shapes/pedestrian_streets?pedestrian_streets__filter=' \
+              '{"op": "eq", "col": "name", "val": "PEDESTRIAN STREET"}'
+        resp = self.app.get(url)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['features']), 21)
+
     def test_export_geojson(self):
         # Do we at least get some json back?
         resp = self.app.get('/v1/api/shapes/{}?data_type=json'.format(fixtures['city'].table_name))

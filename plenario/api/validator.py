@@ -177,7 +177,9 @@ def validate(validator, request_args):
                 try:
                     # Can sometimes resolve to None.point_table, which causes the AttributeError.
                     table = MetaTable.get_by_dataset_name(t_name).point_table
-                except (AttributeError, NoSuchTableError) as err:
+                except (AttributeError, NoSuchTableError):
+                    table = ShapeMetadata.get_by_dataset_name(t_name).shape_table
+                else:
                     result.errors[t_name] = "Table name {} could not be found.".format(t_name)
                     return result
 
@@ -206,7 +208,10 @@ def validate(validator, request_args):
     # If no tree filters were provided, see if any of the unchecked parameters
     # are usable as column conditions.
     else:
-        table = result.data.get('dataset')
+        try:
+            table = result.data['dataset']
+        except KeyError:
+            table = result.data.get('shape')
         for param in unchecked:
             field = param.split('__')[0]
             if table is not None:

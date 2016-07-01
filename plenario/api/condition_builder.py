@@ -1,3 +1,4 @@
+import re
 from sqlalchemy import and_, or_, func
 
 
@@ -20,23 +21,24 @@ field_ops = {
 }
 
 
-def parse_tree(table, condition_tree):
+def parse_tree(table, condition_tree, literally=False):
     """Parse nested conditions provided as a dict for a single table. Wraps
     _parse_condition_tree and raises a ValueError if it fails.
 
     :param table: table object whose columns are being used in the conditions
     :param condition_tree: dictionary of conditions created from JSON
+    :param literally: whether or not to create conditions as literal strings
 
     :returns SQLAlchemy conditions for querying the table with"""
 
     try:
-        return _parse_condition_tree(table, condition_tree)
+        return _parse_condition_tree(table, condition_tree, literally)
     except Exception as ex:
         raise ValueError('{} caused parse to fail for table {} with args {}'
                          .format(ex, table, condition_tree))
 
 
-def _parse_condition_tree(table, ctree):
+def _parse_condition_tree(table, ctree, literally=False):
     """Parse nested conditions provided as a dict for a single table.
 
     :param table: table object whose columns are being used in the conditions
@@ -63,7 +65,7 @@ def _parse_condition_tree(table, ctree):
         val = ctree['val']
         try:
             return _operator_to_condition(
-                getattr(table, 'columns')[col], op, val
+                getattr(table, 'columns')[col], op, val, literally
             )
 
         # Exists for date__time_of_day. Since it doesn't come
@@ -99,22 +101,29 @@ def parse_general(table, field, value):
             return _operator_to_condition(column, op, value)
 
 
-def _operator_to_condition(column, operator, operand):
+def _operator_to_condition(column, operator, operand, literally=False):
     """Convert an operation into a SQLAlchemy condition. Operators
     are mapped to SQLAlchemy methods with the field_ops dictionary.
 
     :param column: column object from the table to build condition for
     :param operator: string name of the desired operator
     :param operand: some target value or parameter
+    :param literally: return condition as a string literal
 
-    :returns a string SQLAlchemy condition"""
+    :returns: SQLAlchemy condition or string"""
 
     if operator == 'in':
-        return column.in_(operand.split(','))
+        condition = column.in_(operand.split(','))
     elif operator == 'eq':
-        return column == operand
+        condition = column == operand
     else:
-        return getattr(column, field_ops[operator])(operand)
+        condition = getattr(column, field_ops[operator])(operand)
+
+    if literally:
+        operand = "'{}'".format(operand)
+        condition = re.sub(r":\w*", operand, str(condition))
+
+    return condition
 
 
 # general_filters

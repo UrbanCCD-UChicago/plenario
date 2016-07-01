@@ -1,20 +1,22 @@
+import csv
 import os
 import json
 import tempfile
 import re
 
-from flask import make_response, request
-
-from plenario.models import ShapeMetadata, MetaTable
-from plenario.database import session
-from plenario.utils.ogr2ogr import OgrExport
-from plenario.api.validator import DatasetRequiredValidator, validate
-from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str, RESPONSE_LIMIT
-from plenario.api.point import form_detail_sql_query, form_geojson_detail_response,\
-    form_csv_detail_response, bad_request
-
 from collections import OrderedDict
+from flask import make_response, request
 from sqlalchemy import func
+
+from plenario.api.common import crossdomain, extract_first_geometry_fragment
+from plenario.api.common import make_fragment_str, RESPONSE_LIMIT
+from plenario.api.condition_builder import parse_tree
+from plenario.api.point import form_detail_sql_query, form_csv_detail_response
+from plenario.api.point import form_geojson_detail_response, bad_request
+from plenario.api.validator import DatasetRequiredValidator, validate, has_tree_filters
+from plenario.database import session
+from plenario.models import ShapeMetadata, MetaTable
+from plenario.utils.ogr2ogr import OgrExport
 
 
 def export_dataset_to_response(dataset_name, query=None):
@@ -47,8 +49,7 @@ def export_dataset_to_response(dataset_name, query=None):
 
     try:
         # Write to that filename
-        OgrExport(export_format=export_format, table_name=dataset_name, export_path=export_path, query=query).write_file()
-        # Dump it in the response
+        OgrExport(export_format=export_format, table_name=dataset_name, export_path=export_path, query=query).write_file()        # Dump it in the response
         with open(export_path, 'r') as to_export:
             resp = make_response(to_export.read(), 200)
 
@@ -164,22 +165,53 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
 
 @crossdomain(origin="*")
 def export_shape(dataset_name):
-    """
-    :param dataset_name: Name of shape dataset. Expected to be found in meta_shape table.
-    Expected query parameter: `data_type`. We expect it to be one of 'json', 'kml', or 'shapefile'.
-                                If none of these (or unspecified), return JSON.
-    """
+    """Route for /shapes/<shapeset>/ endpoint. Requires a dataset argument
+    and can apply column specific filters to it.
 
-    params = request.args.copy()
+    :param dataset_name: user provided name of target shapeset
 
-    where_string = ""
+    :returns: response object result of _export_shape"""
 
-    if params.get('location_geom__within'):
-        fragment = make_fragment_str(extract_first_geometry_fragment(params['location_geom__within']))
-        where_string = "WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{}'))".format(fragment)
+    request_args = request.args.to_dict()
 
-    query = '''SELECT * FROM {} AS g {}'''.format(dataset_name, where_string)
-    return export_dataset_to_response(dataset_name, query)
+    # Using the 'shape' key triggers the correct converter in validator.
+    request_args['shape'] = dataset_name
+    validated_args = validate(
+        DatasetRequiredValidator(only=request_args.keys()), request_args)
+    if validated_args.errors:
+        return bad_request(validated_args.errors)
+    return _export_shape(validated_args)
+
+
+def _export_shape(request_):
+    """Route logic for /shapes/<shapeset>/ endpoint. Returns records for a
+    single specified shape dataset.
+
+    :param request_: ValidatorResult of user provided arguments
+
+    :returns: response object"""
+
+    request_args = request_.data
+    shapeset = request_args.get('shape')
+    geojson = request_args.get('geom')
+
+    query = "SELECT * FROM {}".format(shapeset.name)
+    conditions = ""
+
+    if has_tree_filters(request_args):
+        ctree = request_args[shapeset.name + '__filter']
+        conditions = parse_tree(shapeset, ctree, literally=True)
+
+    if geojson:
+        if conditions:
+            conditions += "AND "
+        conditions += "ST_Intersects({}.geom, ST_GeomFromGeoJSON('{}'))".format(
+            shapeset.name, geojson)
+
+    if conditions:
+        query += " WHERE " + conditions
+
+    return export_dataset_to_response(shapeset.name, query)
 
 
 def _shape_format_to_content_header(requested_format):
