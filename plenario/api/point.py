@@ -9,9 +9,9 @@ from flask import request, make_response
 from itertools import groupby
 from operator import itemgetter
 
-from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, RESPONSE_LIMIT
+from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
 from plenario.api.common import make_cache_key, date_json_handler, unknown_object_json_handler
-from plenario.api.condition_builder import parse_general, parse_tree
+from plenario.api.condition_builder import parse_tree
 from plenario.api.response import internal_error, bad_request, json_response_base, make_csv
 from plenario.api.response import geojson_response_base, form_csv_detail_response, form_json_detail_response
 from plenario.api.response import form_geojson_detail_response, add_geojson_feature
@@ -270,7 +270,7 @@ def _detail(args):
     meta_vals = (args.data.get(k) for k in meta_params)
     dataset, shapeset, data_type = meta_vals
 
-    q = _detail_query(args)
+    q = detail_query(args)
 
     try:
         columns = [c.name for c in dataset.columns]
@@ -293,13 +293,11 @@ def _detail(args):
         return form_geojson_detail_response(to_remove, args, result_rows)
 
 
-def _detail_query(args, aggregate=False):
+def detail_query(args, aggregate=False):
 
     meta_params = ('dataset', 'shapeset', 'data_type', 'geom', 'offset', 'limit')
     meta_vals = (args.data.get(k) for k in meta_params)
     dataset, shapeset, data_type, geom, offset, limit = meta_vals
-
-    result_rows = []
 
     # If there aren't tree filters provided, a little formatting is needed
     # to make the general filters into an 'and' tree.

@@ -73,34 +73,6 @@ def _parse_condition_tree(table, ctree, literally=False):
             return getattr(col, field_ops[op])(val)
 
 
-def parse_general(table, field, value):
-    """To parse the non-tree style way of providing arguments.
-
-    :param table: SQLAlchemy table objects
-    :param field: specified column/table attribute
-    :param value: target value to build a condition against
-
-    :returns: table condition (SQL WHERE clause)"""
-
-    # straigtforward time and geom filters
-    if field in general_filters:
-        return general_filters[field](table, value)
-
-    field_tokens = field.split("__")
-    column = table.columns.get(field_tokens[0])
-
-    # equality filters based on table columns
-    if len(field_tokens) == 1 and column is not None:
-        return _operator_to_condition(column, 'eq', value)
-
-    # comparison filters based on table columns
-    elif len(field_tokens) == 2 and column is not None:
-        op = field_tokens[1]
-
-        if op in field_ops:
-            return _operator_to_condition(column, op, value)
-
-
 def _operator_to_condition(column, operator, operand, literally=False):
     """Convert an operation into a SQLAlchemy condition. Operators
     are mapped to SQLAlchemy methods with the field_ops dictionary.
