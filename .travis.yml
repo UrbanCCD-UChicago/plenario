@@ -1,47 +1,45 @@
 language: python
 python:
 - '2.7'
-### test dependencies ###
-#addons:
-#  postgresql: "9.4"
-#services:
-#- postgresql"
-#- redis-server
-#sudo: required
-### test dependencies ###
-#install:
-#- pip install celery
-#- celery -A plenario.celery_app worker --loglevel=info &
-#- sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
-#- sudo -u postgres psql -c "CREATE DATABASE plenario_test;"
-#- sudo -u postgres psql -c "CREATE EXTENSION postgis;" plenario_test
-#- pip install -r requirements.txt
-#- python init_db.py
-#- python runserver.py &
+addons:
+  postgresql: "9.4"
+  apt:
+    packages:
+    - gdal-bin
+    - postgresql-9.4-postgis-2.2
+services:
+- postgresql
+- redis-server
+sudo: required
+dist: trusty
+cache: pip
+before_install:
+- pip install celery
+- pip install -r requirements.txt
+install:
+- sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
+- sudo -u postgres psql -c "CREATE DATABASE plenario_test;"
+- sudo -u postgres psql -c "CREATE EXTENSION postgis;" plenario_test
+- celery -A plenario.celery_app worker --loglevel=info &
+- python init_db.py
 script:
-- echo "<<insert test suite here>>"
-### testing ###
-#- curl localhost:5000/v1/api/datasets
-#- python -m unittest tests.points.api_tests
-#- python -m unittest tests.shape.api_tests
+- nosetests tests/points/ tests/shapes/ tests/submission/ -v
 deploy:
   - provider: elasticbeanstalk
     access_key_id:
-      secure: "K06U3sSVHyu9ye5JuKtalmyGhnzADJmM8IX9zNYUxoV7HO7wm77oRtbLI5ahLy56HRRgzphbnmhpPwxldCkcYJ7YgYzwhi1KKwMQreHpWf6wWZTaqwPRWTzrha3UYZi7SQtiNSsHifW2r79WwQyWdkOcZD3Kk1guWpSYRAJGIW0="
+      secure: "KUWS26l/RxjM7Fn5zy9fSVpF3kQzSmtkJQ7gGLwEqQ/QtrWnAWVyo6S1cnqNx57SChOTzxU15TcAncDQU3Ciy0m7rkVPQnXmfD9UVt4lZraMMDIk+oXh4i4l6yXFjei5LhxoHmtidinH+gl4R05Doh5ptli3sVHX1CaITjAKNSg="
     secret_access_key:
-      secure: "RVdkRcAxaIfzxQ4XcMTX202O+tIPnxdeK7Z79Xc59jtGBpXdZh/a9ax7hEezspCBZQdHx7TlnYzpplHndPU5nCldhnr//9hNwsilByh+lcu3Ifdt+DmiRbm9UzCekh2xvjZ/Y4rlcVGbA3CSoFY4pGi4c8tAQFjgJsUEL7u0jFM="
+      secure: "OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ="
     region: us-east-1
-    #Modify to the desired app and env names.
     app: plenario-zarniwoop-application
     env: plenario-app-plenario-zarniwoop
     bucket_name: elasticbeanstalk-us-east-1-031052761859
   - provider: elasticbeanstalk
     access_key_id:
-      secure: "K06U3sSVHyu9ye5JuKtalmyGhnzADJmM8IX9zNYUxoV7HO7wm77oRtbLI5ahLy56HRRgzphbnmhpPwxldCkcYJ7YgYzwhi1KKwMQreHpWf6wWZTaqwPRWTzrha3UYZi7SQtiNSsHifW2r79WwQyWdkOcZD3Kk1guWpSYRAJGIW0="
+      secure: "KUWS26l/RxjM7Fn5zy9fSVpF3kQzSmtkJQ7gGLwEqQ/QtrWnAWVyo6S1cnqNx57SChOTzxU15TcAncDQU3Ciy0m7rkVPQnXmfD9UVt4lZraMMDIk+oXh4i4l6yXFjei5LhxoHmtidinH+gl4R05Doh5ptli3sVHX1CaITjAKNSg="
     secret_access_key:
-      secure: "RVdkRcAxaIfzxQ4XcMTX202O+tIPnxdeK7Z79Xc59jtGBpXdZh/a9ax7hEezspCBZQdHx7TlnYzpplHndPU5nCldhnr//9hNwsilByh+lcu3Ifdt+DmiRbm9UzCekh2xvjZ/Y4rlcVGbA3CSoFY4pGi4c8tAQFjgJsUEL7u0jFM="
+      secure: "OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ="
     region: us-east-1
-    #Modify to the desired app and env names.
     app: plenario-zarniwoop-application
     env: plenario-worker-plenario-zarniwoop
     bucket_name: elasticbeanstalk-us-east-1-031052761859
