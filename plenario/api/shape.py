@@ -13,7 +13,7 @@ from plenario.api.condition_builder import parse_tree
 from plenario.api.point import detail_query, form_csv_detail_response
 from plenario.api.point import form_geojson_detail_response, bad_request
 from plenario.api.response import make_error
-from plenario.api.validator import validate, has_tree_filters, Validator
+from plenario.api.validator import validate, has_tree_filters, Validator, ExportFormatsValidator
 from plenario.models import ShapeMetadata
 from plenario.utils.ogr2ogr import OgrExport
 
@@ -60,7 +60,7 @@ def get_all_shape_datasets():
 
         geom = request.args.get('location_geom__within')
         if geom:
-            make_fragment_str(
+            geom = make_fragment_str(
                 extract_first_geometry_fragment(geom)
             )
 
@@ -85,12 +85,12 @@ def get_all_shape_datasets():
 
 @crossdomain(origin="*")
 def aggregate_point_data(point_dataset_name, polygon_dataset_name):
-    consider = ('dataset_name', 'shapeset_name', 'obs_date__ge', 'obs_date__le',
+    consider = ('dataset_name', 'shape', 'obs_date__ge', 'obs_date__le',
                 'data_type', 'location_geom__within')
 
     request_args = request.args.to_dict()
     request_args['dataset_name'] = point_dataset_name
-    request_args['shapeset_name'] = polygon_dataset_name
+    request_args['shape'] = polygon_dataset_name
 
     validated_args = validate(Validator(only=consider), request_args)
 
@@ -117,12 +117,12 @@ def export_shape(dataset_name):
     except NoSuchTableError:
         return make_error(dataset_name + ' has yet to be ingested.', 404)
 
-    meta_params = ('shapeset_name', 'data_type', 'location_geom__within')
+    meta_params = ('shape', 'data_type', 'location_geom__within')
     request_args = request.args.to_dict()
 
-    # Using the 'shapeset_name' key triggers the correct validator.
-    request_args['shapeset_name'] = dataset_name
-    validated_args = validate(Validator(only=meta_params), request_args)
+    # Using the 'shape' key triggers the correct validator.
+    request_args['shape'] = dataset_name
+    validated_args = validate(ExportFormatsValidator(only=meta_params), request_args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
     return _export_shape(validated_args)
@@ -168,9 +168,8 @@ def _export_shape(args):
     meta_vals = (args.data.get(k) for k in meta_params)
     shapeset, data_type, geom = meta_vals
 
-    # TODO: This is the validator's job.
     if shapeset is None:
-        error_message = 'Could not find shape dataset {}'.format(request.args['shapeset_name'])
+        error_message = 'Could not find shape dataset {}'.format(request.args['shape'])
         return make_response(error_message, 404)
 
     query = "SELECT * FROM {}".format(shapeset.name)

@@ -33,7 +33,7 @@ def timeseries():
     validator = NoGeoJSONValidator(only=fields)
     validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
-        return bad_request(validated_args)
+        return bad_request(validated_args.errors)
 
     return _timeseries(validated_args)
 
@@ -46,7 +46,7 @@ def detail_aggregate():
     validator = NoGeoJSONDatasetRequiredValidator(only=fields)
     validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
-        return bad_request(validated_args)
+        return bad_request(validated_args.errors)
     return _detail_aggregate(validated_args)
 
 
@@ -56,10 +56,10 @@ def detail():
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
               'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
               'date__time_of_day_le')
-    validator = NoGeoJSONDatasetRequiredValidator(only=fields)
+    validator = DatasetRequiredValidator(only=fields)
     validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
-        return bad_request(validated_args)
+        return bad_request(validated_args.errors)
 
     return _detail(validated_args)
 
@@ -71,7 +71,7 @@ def grid():
               'location_geom__within')
     validated_args = validate(DatasetRequiredValidator(only=fields), request.args.to_dict())
     if validated_args.errors:
-        return bad_request(validated_args)
+        return bad_request(validated_args.errors)
 
     return _grid(validated_args)
 
@@ -125,19 +125,16 @@ def _timeseries(args):
         for field, value in args.data.items():
             if 'filter' in field:
                 metarecord = MetaTable.get_by_dataset_name(field.split('__')[0])
-                dataset = metarecord.point_table
-                ctrees[dataset.name] = parse_tree(dataset, value)
+                pt = metarecord.point_table
+                ctrees[pt.name] = parse_tree(pt, value)
         # Just cleanliness, since we don't use this argument. Doesn't have
         # to show up in the JSON response.
         del args.data['dataset']
 
     # If a single dataset was provided, it's the only thing we need to consider.
-    # If we provided dataset_filters, same deal.
     if ctrees or dataset is not None:
         if dataset is not None:
             table_names = [dataset.name]
-        elif ctrees:
-            table_names = ctrees.keys()
         del args.data['dataset_name__in']
 
     # remove table names which wouldn't return anything for the query, given
@@ -266,7 +263,7 @@ def _detail_aggregate(args):
 
 def _detail(args):
 
-    meta_params = ('dataset', 'shapeset', 'data_type')
+    meta_params = ('dataset', 'shape', 'data_type')
     meta_vals = (args.data.get(k) for k in meta_params)
     dataset, shapeset, data_type = meta_vals
 
@@ -487,7 +484,7 @@ def request_args_to_condition_tree(request_args, ignore=list()):
 
     :returns: condition tree"""
 
-    ignored = {'agg', 'data_type', 'dataset', 'geom', 'limit', 'offset'}
+    ignored = {'agg', 'data_type', 'dataset', 'geom', 'limit', 'offset', 'shape', 'shapeset'}
     for val in ignore:
         ignored.add(val)
 

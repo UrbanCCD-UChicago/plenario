@@ -96,36 +96,3 @@ def _operator_to_condition(column, operator, operand, literally=False):
         condition = re.sub(r":\w*", operand, str(condition))
 
     return condition
-
-
-# general_filters
-# ===============
-# Filters which apply to all the tables, but whose columns are not directly
-# specified by an argument key. ex: 'obs_date__ge' translates into a condition
-# that needs to be made for a table's 'point_date' column.
-
-general_filters = {
-    'obs_date__ge':
-        lambda table, value:  table.c.point_date >= value,
-    'obs_date__le':
-        lambda table, value:  table.c.point_date <= value,
-    'date__time_of_day_ge':
-        lambda table, value:  date__time_of_day_filter(table, 'ge', value),
-    'date__time_of_day_le':
-        lambda table, value:  date__time_of_day_filter(table, 'le', value),
-    'geom':
-        lambda table, value:  table.c.geom.ST_Within(func.ST_GeomFromGeoJSON(value))
-}
-
-
-def date__time_of_day_filter(table, op, val):
-    """Because I couldn't fit it into a one line lambda.
-
-    :param table: SQLAlchemy table object
-    :param op: string op code
-    :param val: target value to be compared against
-
-    :returns: table condition for just the hour"""
-
-    column = func.date_part('hour', table.c.point_date)
-    return getattr(column, field_ops[op])(val)

@@ -149,6 +149,29 @@ class PointAPITests(BasePlenarioTest):
 
         self.assertEqual(response_data['meta']['total'], 5)
 
+    def test_detail_with_0_hour_filter(self):
+        endpoint = '/v1/api/detail'
+        dataset_arg = '?dataset_name=flu_shot_clinics'
+        date_args = '&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'
+        hour_arg = '&date__time_of_day_ge=0'
+
+        resp = self.app.get(endpoint + dataset_arg + date_args + hour_arg)
+        response_data = json.loads(resp.data)
+
+        self.assertEqual(response_data['meta']['total'], 5)
+
+    def test_detail_with_both_hour_filters(self):
+        endpoint = '/v1/api/detail'
+        dataset_arg = '?dataset_name=crimes'
+        date_args = '&obs_date__ge=2000'
+        lower_hour_arg = '&date__time_of_day_ge=5'
+        upper_hour_arg = '&date__time_of_day_le=17'
+
+        resp = self.app.get(endpoint + dataset_arg + date_args + upper_hour_arg + lower_hour_arg)
+        response_data = json.loads(resp.data)
+
+        self.assertEqual(response_data['meta']['total'], 3)
+
     def test_csv_response(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&data_type=csv'
         resp = self.app.get(query)
@@ -212,7 +235,7 @@ class PointAPITests(BasePlenarioTest):
 
     def test_grid_with_simple_tree_filter(self):
         filter_ = 'crimes__filters={"op": "eq", "col": "description", "val": "CREDIT CARD FRAUD"}'
-        r = self.get_api_response('grid?{}'.format(filter_))
+        r = self.get_api_response('grid?dataset_name=crimes&{}'.format(filter_))
         self.assertEqual(len(r['features']), 2)
 
     def test_space_and_time(self):
@@ -284,6 +307,14 @@ class PointAPITests(BasePlenarioTest):
         expected_counts = [5]
         self.flu_agg('year', expected_counts)
 
+    def test_year_agg_csv(self):
+        # Extend the test reach into the csv part of timeseries.
+        query = '/v1/api/timeseries?obs_date__ge=2013-09-22&obs_date__le=2013-10-1&agg=year&data_type=csv'
+        resp = self.app.get(query)
+
+        # Assert a count of 5 in the year 2013.
+        self.assertEqual(resp.data, 'temporal_group,flu_shot_clinics\r\n2013-01-01,5\r\n')
+
     def test_two_datasets(self):
         # Query over all of 2012 and 2013, aggregating by year.
         resp = self.app.get('/v1/api/timeseries/?obs_date__ge=2012-01-01&obs_date__le=2013-12-31&agg=year')
@@ -315,6 +346,54 @@ class PointAPITests(BasePlenarioTest):
         # Extract the number of flu clinics per time unit
         counts = [time_unit['count'] for time_unit in timeseries['items']]
         self.assertEqual([5], counts)
+
+    def test_timeseries_with_multiple_datasets(self):
+        endpoint = 'timeseries'
+        query = '?obs_date__ge=2000&agg=year&dataset_name__in=flu_shot_clinics,landmarks'
+
+        resp_data = self.get_api_response(endpoint + query)
+
+        self.assertEqual(resp_data['objects'][0]['count'], 65)
+        self.assertEqual(resp_data['objects'][1]['count'], 149)
+
+    def test_timeseries_with_multiple_datasets_but_one_is_bad(self):
+        endpoint = 'timeseries'
+        query = '?obs_date__ge=2000&agg=year&dataset_name__in=flu_shot_clinics,landmarkz'
+
+        resp_data = self.get_api_response(endpoint + query)
+
+        self.assertIn('Invalid table name: landmarkz.', resp_data['meta']['message']['dataset_name__in'])
+
+    # ================================
+    # /timeseries with condition trees
+    # ================================
+
+    def test_timeseries_with_a_tree_filter(self):
+        endpoint = 'timeseries'
+        query = '?obs_date__ge=2005&agg=year'
+        qfilter = '&crimes__filter={"op": "eq", "col": "iucr", "val": 1150}'
+
+        resp_data = self.get_api_response(endpoint + query + qfilter)
+
+        # Crimes is the only one that gets a filter applied.
+        self.assertEqual(resp_data['objects'][0]['count'], 2)
+        self.assertEqual(resp_data['objects'][1]['count'], 65)
+        self.assertEqual(resp_data['objects'][2]['count'], 85)
+
+    def test_timeseries_with_multiple_filters(self):
+        endpoint = 'timeseries'
+        query = '?obs_date__ge=2005&agg=year'
+        cfilter = '&crimes__filter={"op": "eq", "col": "iucr", "val": 1150}'
+        lfilter = '&landmarks__filter={"op": "eq", "col": "architect", "val": "Frommann and Jebsen"}'
+
+        resp_data = self.get_api_response(endpoint + query + cfilter + lfilter)
+
+        # Crime filter gets applied.
+        self.assertEqual(resp_data['objects'][0]['count'], 2)
+        # Flu shots gets no filter applied.
+        self.assertEqual(resp_data['objects'][1]['count'], 65)
+        # Landmark filter gets applied.
+        self.assertEqual(resp_data['objects'][2]['count'], 3)
 
     # =================
     # /detail-aggregate
