@@ -2,7 +2,7 @@ language: python
 python:
 - '2.7'
 addons:
-  postgresql: "9.4"
+  postgresql: '9.4'
   apt:
     packages:
     - gdal-bin
@@ -25,21 +25,24 @@ install:
 script:
 - nosetests tests/points/ tests/shapes/ tests/submission/ -v
 deploy:
-  - provider: elasticbeanstalk
-    access_key_id:
-      secure: "KUWS26l/RxjM7Fn5zy9fSVpF3kQzSmtkJQ7gGLwEqQ/QtrWnAWVyo6S1cnqNx57SChOTzxU15TcAncDQU3Ciy0m7rkVPQnXmfD9UVt4lZraMMDIk+oXh4i4l6yXFjei5LhxoHmtidinH+gl4R05Doh5ptli3sVHX1CaITjAKNSg="
-    secret_access_key:
-      secure: "OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ="
-    region: us-east-1
-    app: plenario
-    env: plenario-app-prod
-    bucket_name: elasticbeanstalk-us-east-1-031052761859
-  - provider: elasticbeanstalk
-    access_key_id:
-      secure: "KUWS26l/RxjM7Fn5zy9fSVpF3kQzSmtkJQ7gGLwEqQ/QtrWnAWVyo6S1cnqNx57SChOTzxU15TcAncDQU3Ciy0m7rkVPQnXmfD9UVt4lZraMMDIk+oXh4i4l6yXFjei5LhxoHmtidinH+gl4R05Doh5ptli3sVHX1CaITjAKNSg="
-    secret_access_key:
-      secure: "OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ="
-    region: us-east-1
-    app: plenario
-    env: plenario-worker-prod
-    bucket_name: elasticbeanstalk-us-east-1-031052761859
+- provider: elasticbeanstalk
+  access_key_id:
+    secure: KUWS26l/RxjM7Fn5zy9fSVpF3kQzSmtkJQ7gGLwEqQ/QtrWnAWVyo6S1cnqNx57SChOTzxU15TcAncDQU3Ciy0m7rkVPQnXmfD9UVt4lZraMMDIk+oXh4i4l6yXFjei5LhxoHmtidinH+gl4R05Doh5ptli3sVHX1CaITjAKNSg=
+  secret_access_key:
+    secure: OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ=
+  region: us-east-1
+  app: plenario
+  env: plenario-app-prod
+  bucket_name: elasticbeanstalk-us-east-1-031052761859
+- provider: elasticbeanstalk
+  access_key_id:
+    secure: KUWS26l/RxjM7Fn5zy9fSVpF3kQzSmtkJQ7gGLwEqQ/QtrWnAWVyo6S1cnqNx57SChOTzxU15TcAncDQU3Ciy0m7rkVPQnXmfD9UVt4lZraMMDIk+oXh4i4l6yXFjei5LhxoHmtidinH+gl4R05Doh5ptli3sVHX1CaITjAKNSg=
+  secret_access_key:
+    secure: OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ=
+  region: us-east-1
+  app: plenario
+  env: plenario-worker-prod
+  bucket_name: elasticbeanstalk-us-east-1-031052761859
+notifications:
+  slack:
+    secure: IsCJP58JKofvwy4jVC4DEZSUShLp+i4V94dzhKSoFrhRFKeT3Te/Hn+uDPBT+ZwTcs7QF0k1DfBHTZt0za1U/Q2fabhxxarrtR3v9DGWo2OfdBjyY9TM05JmZyFESov4CxzA4USvFd+GO7P6QY1IhdDF8oSa9dCViTAerBOGLMk=
