@@ -31,8 +31,8 @@ deploy:
     secret_access_key:
       secure: "OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ="
     region: us-east-1
-    app: plenario-zarniwoop-application
-    env: plenario-app-plenario-zarniwoop
+    app: plenario
+    env: plenario-app-prod
     bucket_name: elasticbeanstalk-us-east-1-031052761859
   - provider: elasticbeanstalk
     access_key_id:
@@ -40,6 +40,6 @@ deploy:
     secret_access_key:
       secure: "OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ="
     region: us-east-1
-    app: plenario-zarniwoop-application
-    env: plenario-worker-plenario-zarniwoop
+    app: plenario
+    env: plenario-worker-prod
     bucket_name: elasticbeanstalk-us-east-1-031052761859
