@@ -206,7 +206,8 @@
         {% set agg = ('agg', 'week', agg_options) %}
         {% set location_geom_within = ('location_geom_within', 'none', "A URL encoded <a href='http://geojson.org/'>GeoJSON</a> polygon representing the area of interest.") %}
         {% set dataset_name = ('dataset_name', 'none', '<strong>Required.</strong> Machine version of the dataset name as you get it from the <code>/v1/api/</code> endpoint.') %}
-        {% set data_type = ('data_type', 'json', 'Response data format. Current options are <code>json</code> and <code>csv</code>.') %}
+        {% set data_type = ('data_type', 'json', 'Response data format. Current
+        options are <code>json</code>, <code>geojson</code> and <code>csv</code>.') %}
         {% set dataset_field =  ('[dataset_field]*', 'none', '<p>Any available dataset field. Discoverable via the <code>/v1/api/fields/&lt;dataset_name&gt;/</code> endpoint. Any number of these query parameters can be chained together and are linked together with a SQL <code>AND</code> under the hood.</p>
                                                                  <p><strong>Query operators</strong><br/> For any given <code>dataset_field</code>, the query can be modified with any of the following operators:</p>' + postgres_ops + '<p><strong>Example:</strong> <code>ward__ge=48</code> translates to "ward >= 48" in SQL</p>') %}
 
