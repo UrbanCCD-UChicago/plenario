@@ -2,7 +2,7 @@ import plenario.models
 import plenario.settings
 from plenario.database import session, app_engine, Base
 from plenario.tasks import hello_world
-from plenario.settings import DB_NAME, DB_USER
+from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DEFAULT_USER
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
 from argparse import ArgumentParser
 import os
@@ -36,24 +36,31 @@ def init_master_meta_user():
 
 
 def init_meta():
+    #Reset concept of a metadata table
     non_meta_tables = [table for table in Base.metadata.sorted_tables
                        if table.name not in
                        {'meta_master', 'meta_shape', 'plenario_user'}]
     for t in non_meta_tables:
         Base.metadata.remove(t)
+    
+    #Create databases (if they don't exist)
     Base.metadata.create_all(bind=app_engine)
 
-
 def init_user():
-    if plenario.settings.DEFAULT_USER:
-        print 'creating default user %s' % plenario.settings.DEFAULT_USER['name']
-        user = plenario.models.User(**plenario.settings.DEFAULT_USER)
+    if DEFAULT_USER['name']:
+        print 'Creating default user %s' % DEFAULT_USER['name']
+        if session.query(plenario.models.User).count() > 0:
+            print 'Users already exist. Skipping this step.'
+            return
+        user = plenario.models.User(**DEFAULT_USER)
         session.add(user)
         try:
             session.commit()
         except Exception as e:
             session.rollback()
-            raise e
+            print "Problem while creating default user: ", e
+    else:
+        print 'No default user specified. Skipping this step.'
 
 
 def init_weather():
@@ -72,22 +79,13 @@ def init_weather():
 
 
 def add_functions():
-    # Makes bold assumption that you're executing on a local,
-    # password-unprotected server for development purposes.
-    # If you can't connect this way,
-    # you'll need to execute the sql script yourself.
-    pwd = os.path.dirname(os.path.realpath(__file__))
-    db_script_path = os.path.join(pwd, 'plenario', 'dbscripts')
-    trigger_path = os.path.join(db_script_path, 'audit_trigger.sql')
-    loc_func_path = os.path.join(db_script_path, 'point_from_location.sql')
-
     def add_function(script_path):
-        args = ['psql', '-U', DB_USER, '-d', DB_NAME, '-f', script_path]
-        subprocess.check_call(args)
+        args = 'PGPASSWORD='+DB_PASSWORD+' psql -h '+DB_HOST+' -U '+DB_USER+' -d '+DB_NAME+' -f '+script_path
+        subprocess.check_output(args, shell=True)
+        #Using shell=True otherwise it seems that aws doesn't have the proper paths.
 
-    add_function(trigger_path)
-    add_function(loc_func_path)
-
+    add_function("./plenario/dbscripts/audit_trigger.sql")
+    add_function("./plenario/dbscripts/point_from_location.sql")
 
 def init_celery():
     hello_world.delay()
