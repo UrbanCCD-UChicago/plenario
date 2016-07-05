@@ -19,6 +19,7 @@ from plenario.api.validator import Validator, DatasetRequiredValidator, NoGeoJSO
 from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator
 from plenario.database import session
 from plenario.models import MetaTable
+from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, REDIS_HOST
 
 
 def form_detail_sql_query(args, aggregate_points=False):
@@ -147,6 +148,64 @@ def meta():
 
     return _meta(validated_args)
 
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def sendJob(message):
+	import boto.sqs
+
+	conn = boto.sqs.connect_to_region(
+		"us-east-1",
+		aws_access_key_id = AWS_ACCESS_KEY,
+		aws_secret_access_key = AWS_SECRET_KEY
+	)
+
+	q = conn.get_queue("testy-queue")
+	
+	import random
+	id = random.randrange(1000)
+
+	from boto.sqs.message import Message
+	m = Message()
+	m.set_body("I AM A MESSAGE")
+	m.message_attributes = {
+		"ticket": {
+			"data_type": "Number",
+			"string_value": str(id)
+		}
+	}
+	q.write(m)
+	
+	import datetime
+	file = open("/opt/python/log/sender.log", "a")
+	file.write("Sent ticket \"{}\" attached to query \"{}\". The time is now {}.\n".format(id, message, datetime.datetime.now()))
+	file.close()
+	
+	import redis
+	pool = redis.ConnectionPool(host=REDIS_HOST, port=6379, db=0)
+	r = redis.Redis(connection_pool=pool)
+	r.set("result_"+str(id), "")
+	r.set("query_"+str(id), message)
+	
+	resp = { "ticket": id, "query": message }
+	resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
+    	resp.headers['Content-Type'] = 'application/json'
+	
+	return resp
+
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def getJob(id):
+	import redis
+	pool = redis.ConnectionPool(host=REDIS_HOST, port=6379, db=0)
+	r = redis.Redis(connection_pool=pool)
+	result = r.get("result_"+str(id))
+	query = r.get("query_"+str(id))
+	
+	resp = { "ticket": id, "query": query, "result": result }
+	resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
+    	resp.headers['Content-Type'] = 'application/json'
+	
+	return resp
 
 # ============
 # _route logic

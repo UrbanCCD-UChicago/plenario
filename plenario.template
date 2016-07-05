@@ -1,0 +1,1148 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Metadata": {
+		"AWS::CloudFormation::Interface": {
+			"ParameterGroups": [
+				{
+					"Label": {
+						"default": "Administration Configuration"
+					},
+					"Parameters": [
+						"adminEmails",
+						"defaultUserName",
+						"defaultUserEmail",
+						"defaultUserPassword",
+						"mailUsername",
+						"mailPassword",
+						"secretKey"
+					]
+				},
+				{
+					"Label": {
+						"default": "Data Configuration"
+					},
+					"Parameters": [
+						"dbName",
+						"dbUser",
+						"dbPassword",
+						"databaseSnapshot",
+						"databaseSize",
+						"multiAZ",
+						"cacheKeyPrefix",
+						"s3Bucket",
+						"sourceBall"
+					]
+				},
+				{
+					"Label": {
+						"default": "Container Configuration"
+					},
+					"Parameters": [
+						"appNodeType",
+						"workerNodeType",
+						"rdsNodeType",
+						"cacheNodeType"
+					]
+				},
+				{
+					"Label": {
+						"default": "Network Configuration"
+					},
+					"Parameters": [
+						"vpcID",
+						"subnet",
+						"dbSubnetGroup",
+						"cacheSubnetGroup",
+						"securityGroup"
+					]
+				},
+				{
+					"Label": {
+						"default": "Logging Configuration"
+					},
+					"Parameters": [
+						"plenarioSentryURL",
+						"celerySentryURL"
+					]
+				}
+			]
+		},
+		"AWS::CloudFormation::Designer": {
+			"99ade141-2e68-4b92-9111-d23a39879b79": {
+				"size": {
+					"width": 210,
+					"height": 180
+				},
+				"position": {
+					"x": 300,
+					"y": 180
+				},
+				"z": 1,
+				"embeds": [
+					"ec8c5b32-db4f-42e1-8e19-0a6a82e58701",
+					"078e17e6-208f-46be-a8ce-748c8d5a56a2",
+					"5f446a16-d418-4b98-86ea-4734fabd510e"
+				],
+				"dependson": [
+					"aedb99ca-9bee-4c79-a352-adb5e3acd2cc",
+					"5ac035f9-6712-42eb-a554-d4610080447e",
+					"563573ee-1063-44a4-aa49-c11dcfd4e100"
+				]
+			},
+			"078e17e6-208f-46be-a8ce-748c8d5a56a2": {
+				"size": {
+					"width": 60,
+					"height": 60
+				},
+				"position": {
+					"x": 420,
+					"y": 290
+				},
+				"z": 2,
+				"parent": "99ade141-2e68-4b92-9111-d23a39879b79",
+				"embeds": [],
+				"dependson": [
+					"99ade141-2e68-4b92-9111-d23a39879b79"
+				],
+				"isrelatedto": [
+					"5ac035f9-6712-42eb-a554-d4610080447e",
+					"aedb99ca-9bee-4c79-a352-adb5e3acd2cc",
+					"563573ee-1063-44a4-aa49-c11dcfd4e100",
+					"ec8c5b32-db4f-42e1-8e19-0a6a82e58701"
+				]
+			},
+			"5f446a16-d418-4b98-86ea-4734fabd510e": {
+				"size": {
+					"width": 60,
+					"height": 60
+				},
+				"position": {
+					"x": 320,
+					"y": 210
+				},
+				"z": 2,
+				"parent": "99ade141-2e68-4b92-9111-d23a39879b79",
+				"embeds": [],
+				"dependson": [
+					"99ade141-2e68-4b92-9111-d23a39879b79"
+				],
+				"isrelatedto": [
+					"5ac035f9-6712-42eb-a554-d4610080447e",
+					"563573ee-1063-44a4-aa49-c11dcfd4e100",
+					"aedb99ca-9bee-4c79-a352-adb5e3acd2cc",
+					"ec8c5b32-db4f-42e1-8e19-0a6a82e58701",
+					"75cd5c59-c30a-426c-8b2c-1084c7a70f96"
+				]
+			},
+			"5ac035f9-6712-42eb-a554-d4610080447e": {
+				"size": {
+					"width": 60,
+					"height": 60
+				},
+				"position": {
+					"x": 540,
+					"y": 290
+				},
+				"z": 1,
+				"embeds": [],
+				"dependson": [
+					"c4fe392a-0838-4e87-8d77-50ae11d037e8"
+				]
+			},
+			"563573ee-1063-44a4-aa49-c11dcfd4e100": {
+				"size": {
+					"width": 60,
+					"height": 60
+				},
+				"position": {
+					"x": 380,
+					"y": 90
+				},
+				"z": 1,
+				"embeds": [],
+				"ismemberof": [
+					"d530240c-1f7b-4dba-8ee9-843a5320c846"
+				],
+				"dependson": [
+					"5ac035f9-6712-42eb-a554-d4610080447e",
+					"ac32bef0-6812-470b-b521-52ac17a01627",
+					"d530240c-1f7b-4dba-8ee9-843a5320c846"
+				],
+				"isrelatedto": [
+					"d530240c-1f7b-4dba-8ee9-843a5320c846"
+				]
+			},
+			"aedb99ca-9bee-4c79-a352-adb5e3acd2cc": {
+				"size": {
+					"width": 60,
+					"height": 60
+				},
+				"position": {
+					"x": 360,
+					"y": 60
+				},
+				"z": 1,
+				"embeds": []
+			},
+			"c4fe392a-0838-4e87-8d77-50ae11d037e8": {
+				"size": {
+					"width": 30,
+					"height": 30
+				},
+				"position": {
+					"x": 780,
+					"y": 310
+				},
+				"z": 1,
+				"parent": "f04be26c-f290-4cbd-83cf-a2cb1a6bf26c",
+				"embeds": [],
+				"isconnectedto": [
+					"2b73228b-0750-4505-87f3-6023c8eaf526",
+					"2ea351e8-2764-4917-8dec-6de175cd693a"
+				],
+				"dependson": [
+					"2b73228b-0750-4505-87f3-6023c8eaf526",
+					"2ea351e8-2764-4917-8dec-6de175cd693a"
+				],
+				"isrelatedto": [
+					"2b73228b-0750-4505-87f3-6023c8eaf526",
+					"2ea351e8-2764-4917-8dec-6de175cd693a"
+				]
+			},
+			"ac32bef0-6812-470b-b521-52ac17a01627": {
+				"size": {
+					"width": 30,
+					"height": 30
+				},
+				"position": {
+					"x": 640,
+					"y": 310
+				},
+				"z": 1,
+				"parent": "f04be26c-f290-4cbd-83cf-a2cb1a6bf26c",
+				"embeds": [],
+				"isconnectedto": [
+					"2b73228b-0750-4505-87f3-6023c8eaf526",
+					"2ea351e8-2764-4917-8dec-6de175cd693a"
+				],
+				"dependson": [
+					"2b73228b-0750-4505-87f3-6023c8eaf526",
+					"2ea351e8-2764-4917-8dec-6de175cd693a"
+				],
+				"isrelatedto": [
+					"2b73228b-0750-4505-87f3-6023c8eaf526",
+					"2ea351e8-2764-4917-8dec-6de175cd693a"
+				]
+			},
+			"1c50f4df-e333-44a9-9358-d5181270ca5f": {
+				"source": {
+					"id": "563573ee-1063-44a4-aa49-c11dcfd4e100"
+				},
+				"target": {
+					"id": "ac32bef0-6812-470b-b521-52ac17a01627"
+				},
+				"z": 3
+			},
+			"f04be26c-f290-4cbd-83cf-a2cb1a6bf26c": {
+				"size": {
+					"width": 260,
+					"height": 180
+				},
+				"position": {
+					"x": 620,
+					"y": 170
+				},
+				"z": 0,
+				"embeds": [
+					"d530240c-1f7b-4dba-8ee9-843a5320c846",
+					"2ea351e8-2764-4917-8dec-6de175cd693a",
+					"2b73228b-0750-4505-87f3-6023c8eaf526",
+					"c4fe392a-0838-4e87-8d77-50ae11d037e8",
+					"ac32bef0-6812-470b-b521-52ac17a01627"
+				]
+			},
+			"2b73228b-0750-4505-87f3-6023c8eaf526": {
+				"size": {
+					"width": 10,
+					"height": 10
+				},
+				"position": {
+					"x": 670,
+					"y": 220
+				},
+				"z": 1,
+				"parent": "f04be26c-f290-4cbd-83cf-a2cb1a6bf26c",
+				"embeds": [],
+				"dependson": [
+					"f04be26c-f290-4cbd-83cf-a2cb1a6bf26c"
+				]
+			},
+			"2ea351e8-2764-4917-8dec-6de175cd693a": {
+				"size": {
+					"width": 10,
+					"height": 10
+				},
+				"position": {
+					"x": 720,
+					"y": 250
+				},
+				"z": 1,
+				"parent": "f04be26c-f290-4cbd-83cf-a2cb1a6bf26c",
+				"embeds": [],
+				"dependson": [
+					"f04be26c-f290-4cbd-83cf-a2cb1a6bf26c"
+				]
+			},
+			"d530240c-1f7b-4dba-8ee9-843a5320c846": {
+				"size": {
+					"width": 60,
+					"height": 60
+				},
+				"position": {
+					"x": 800,
+					"y": 180
+				},
+				"z": 1,
+				"parent": "f04be26c-f290-4cbd-83cf-a2cb1a6bf26c",
+				"embeds": [],
+				"dependson": [
+					"f04be26c-f290-4cbd-83cf-a2cb1a6bf26c"
+				]
+			},
+			"ec8c5b32-db4f-42e1-8e19-0a6a82e58701": {
+				"size": {
+					"width": 60,
+					"height": 60
+				},
+				"position": {
+					"x": 320,
+					"y": 290
+				},
+				"z": 2,
+				"parent": "99ade141-2e68-4b92-9111-d23a39879b79",
+				"embeds": []
+			},
+			"75cd5c59-c30a-426c-8b2c-1084c7a70f96": {
+				"size": {
+					"width": 60,
+					"height": 60
+				},
+				"position": {
+					"x": 540,
+					"y": 180
+				},
+				"z": 1,
+				"embeds": []
+			}
+		}
+	},
+	"Resources": {
+		"PlenarioApplication": {
+			"Type": "AWS::ElasticBeanstalk::Application",
+			"Properties": {
+				"ApplicationName": {
+					"Fn::Join": [
+						"-",
+						[
+							{
+								"Ref": "AWS::StackName"
+							},
+							"application"
+						]
+					]
+				}
+			},
+			"Metadata": {
+				"AWS::CloudFormation::Designer": {
+					"id": "99ade141-2e68-4b92-9111-d23a39879b79"
+				}
+			}
+		},
+		"PlenarioApplicationVersion": {
+			"Type": "AWS::ElasticBeanstalk::ApplicationVersion",
+			"Properties": {
+				"ApplicationName": {
+					"Ref": "PlenarioApplication"
+				},
+				"Description": "Specific Plenario Deployment",
+				"SourceBundle": {
+					"S3Bucket": {
+						"Ref": "s3Bucket"
+					},
+					"S3Key": {
+						"Ref": "sourceBall"
+					}
+				}
+			},
+			"Metadata": {
+				"AWS::CloudFormation::Designer": {
+					"id": "ec8c5b32-db4f-42e1-8e19-0a6a82e58701"
+				}
+			}
+		},
+		"PlenarioEnvironmentWebServer": {
+			"Type": "AWS::ElasticBeanstalk::Environment",
+			"Properties": {
+				"ApplicationName": {
+					"Ref": "PlenarioApplication"
+				},
+				"EnvironmentName": {
+					"Fn::Join": [
+						"-",
+						[
+							"plenario-app",
+							{
+								"Ref": "AWS::StackName"
+							}
+						]
+					]
+				},
+				"SolutionStackName": "64bit Amazon Linux 2016.03 v2.1.3 running Python 2.7",
+				"CNAMEPrefix": {
+					"Fn::Join": [
+						"-",
+						[
+							"plenario-app",
+							{
+								"Ref": "AWS::StackName"
+							}
+						]
+					]
+				},
+				"Description": "Plenario Web Service.",
+				"Tier": {
+					"Name": "WebServer",
+					"Type": "Standard",
+					"Version": "1.0"
+				},
+				"VersionLabel": {
+					"Ref": "PlenarioApplicationVersion"
+				},
+				"OptionSettings": [
+					{
+						"Namespace": "aws:autoscaling:launchconfiguration",
+						"OptionName": "IamInstanceProfile",
+						"Value": {
+							"Fn::Join": [
+								"",
+								[
+									"arn:aws:iam::",
+									{"Ref": "AWS::AccountId"},
+									":instance-profile/aws-elasticbeanstalk-ec2-role"
+								]
+							]
+						}	
+						
+					},
+					{
+						"Namespace": "aws:ec2:vpc",
+						"OptionName": "VPCId",
+						"Value": {
+							"Ref": "vpcID"
+						}
+					},
+					{
+						"Namespace": "aws:ec2:vpc",
+						"OptionName": "Subnets",
+						"Value": {
+							"Ref": "subnet"
+						}
+					},
+					{
+						"Namespace": "aws:ec2:vpc",
+						"OptionName": "AssociatePublicIpAddress",
+						"Value": true
+					},
+					{
+						"Namespace": "aws:autoscaling:launchconfiguration",
+						"OptionName": "InstanceType",
+						"Value": {
+							"Ref": "appNodeType"
+						}
+					},
+					{
+						"Namespace": "aws:autoscaling:trigger",
+						"OptionName": "BreachDuration",
+						"Value": "2"
+					},
+					{
+						"Namespace": "aws:autoscaling:trigger",
+						"OptionName": "LowerThreshold",
+						"Value": "30"
+					},
+					{
+						"Namespace": "aws:autoscaling:trigger",
+						"OptionName": "UpperThreshold",
+						"Value": "60"
+					},
+					{
+						"Namespace": "aws:autoscaling:trigger",
+						"OptionName": "MeasureName",
+						"Value": "CPUUtilization"
+					},
+					{
+						"Namespace": "aws:autoscaling:trigger",
+						"OptionName": "Period",
+						"Value": "1"
+					},
+					{
+						"Namespace": "aws:autoscaling:trigger",
+						"OptionName": "Unit",
+						"Value": "Percent"
+					},
+					{
+						"Namespace": "aws:autoscaling:trigger",
+						"OptionName": "BreachDuration",
+						"Value": "2"
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application",
+						"OptionName": "Application Healthcheck URL",
+						"Value": "/v1/api/datasets"
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:container:python:staticfiles",
+						"OptionName": "/static/",
+						"Value": "plenario/static/"
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "ADMIN_EMAILS",
+						"Value": {
+							"Ref": "adminEmails"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "CACHE_KEY_PREFIX",
+						"Value": {
+							"Ref": "cacheKeyPrefix"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DB_HOST",
+						"Value": {
+							"Fn::GetAtt": [
+								"PlenarioDatabase",
+								"Endpoint.Address"
+							]
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DB_PORT",
+						"Value": {
+							"Fn::GetAtt": [
+								"PlenarioDatabase",
+								"Endpoint.Port"
+							]
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DB_NAME",
+						"Value": {
+							"Ref": "dbName"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DB_USER",
+						"Value": {
+							"Ref": "dbUser"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DB_PASSWORD",
+						"Value": {
+							"Ref": "dbPassword"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "MAIL_PASSWORD",
+						"Value": {
+							"Ref": "mailPassword"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "MAIL_USERNAME",
+						"Value": {
+							"Ref": "mailUsername"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "PLENARIO_SENTRY_URL",
+						"Value": {
+							"Ref": "plenarioSentryURL"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "CELERY_SENTRY_URL",
+						"Value": {
+							"Ref": "celerySentryURL"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "REDIS_HOST",
+						"Value": {
+							"Fn::GetAtt": [
+								"PlenarioCache",
+								"RedisEndpoint.Address"
+							]
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "S3_BUCKET",
+						"Value": {
+							"Ref": "s3Bucket"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "SECRET_KEY",
+						"Value": {
+							"Ref": "secretKey"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "WSGIPath",
+						"Value": "runserver.py"
+					}
+				]
+			},
+			"Metadata": {
+				"AWS::CloudFormation::Designer": {
+					"id": "078e17e6-208f-46be-a8ce-748c8d5a56a2"
+				}
+			}
+		},
+		"PlenarioEnvironmentWorker": {
+			"Type": "AWS::ElasticBeanstalk::Environment",
+			"Properties": {
+				"ApplicationName": {
+					"Ref": "PlenarioApplication"
+				},
+				"EnvironmentName": {
+					"Fn::Join": [
+						"-",
+						[
+							"plenario-worker",
+							{
+								"Ref": "AWS::StackName"
+							}
+						]
+					]
+				},
+				"SolutionStackName": "64bit Amazon Linux 2016.03 v2.1.3 running Python 2.7",
+				"Description": "Plenario Jobs Service.",
+				"Tier": {
+					"Name": "Worker",
+					"Type": "SQS/HTTP",
+					"Version": "1.0"
+				},
+				"VersionLabel": {
+					"Ref": "PlenarioApplicationVersion"
+				},
+				"OptionSettings": [
+					{
+						"Namespace": "aws:autoscaling:launchconfiguration",
+						"OptionName": "IamInstanceProfile",
+						"Value": {
+							"Fn::Join": [
+								"",
+								[
+									"arn:aws:iam::",
+									{"Ref": "AWS::AccountId"},
+									":instance-profile/aws-elasticbeanstalk-ec2-role"
+								]
+							]
+						}	
+						
+					},
+					{
+						"Namespace": "aws:ec2:vpc",
+						"OptionName": "VPCId",
+						"Value": {
+							"Ref": "vpcID"
+						}
+					},
+					{
+						"Namespace": "aws:ec2:vpc",
+						"OptionName": "Subnets",
+						"Value": {
+							"Ref": "subnet"
+						}
+					},
+					{
+						"Namespace": "aws:ec2:vpc",
+						"OptionName": "AssociatePublicIpAddress",
+						"Value": true
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:environment",
+						"OptionName": "EnvironmentType",
+						"Value": "SingleInstance"
+					},
+					{
+						"Namespace": "aws:autoscaling:launchconfiguration",
+						"OptionName": "InstanceType",
+						"Value": {
+							"Ref": "workerNodeType"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "WORKER",
+						"Value": "true"
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "ADMIN_EMAILS",
+						"Value": {
+							"Ref": "adminEmails"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DEFAULT_USER_NAME",
+						"Value": {
+							"Ref": "defaultUserName"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DEFAULT_USER_EMAIL",
+						"Value": {
+							"Ref": "defaultUserEmail"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DEFAULT_USER_PASSWORD",
+						"Value": {
+							"Ref": "defaultUserPassword"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "CACHE_KEY_PREFIX",
+						"Value": {
+							"Ref": "cacheKeyPrefix"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DB_HOST",
+						"Value": {
+							"Fn::GetAtt": [
+								"PlenarioDatabase",
+								"Endpoint.Address"
+							]
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DB_PORT",
+						"Value": {
+							"Fn::GetAtt": [
+								"PlenarioDatabase",
+								"Endpoint.Port"
+							]
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DB_NAME",
+						"Value": {
+							"Ref": "dbName"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DB_USER",
+						"Value": {
+							"Ref": "dbUser"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "DB_PASSWORD",
+						"Value": {
+							"Ref": "dbPassword"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "MAIL_PASSWORD",
+						"Value": {
+							"Ref": "mailPassword"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "MAIL_USERNAME",
+						"Value": {
+							"Ref": "mailUsername"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "PLENARIO_SENTRY_URL",
+						"Value": {
+							"Ref": "plenarioSentryURL"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "CELERY_SENTRY_URL",
+						"Value": {
+							"Ref": "celerySentryURL"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "REDIS_HOST",
+						"Value": {
+							"Fn::GetAtt": [
+								"PlenarioCache",
+								"RedisEndpoint.Address"
+							]
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "S3_BUCKET",
+						"Value": {
+							"Ref": "s3Bucket"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "SECRET_KEY",
+						"Value": {
+							"Ref": "secretKey"
+						}
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:application:environment",
+						"OptionName": "WSGIPath",
+						"Value": "runserver.py"
+					}
+				]
+			},
+			"Metadata": {
+				"AWS::CloudFormation::Designer": {
+					"id": "5f446a16-d418-4b98-86ea-4734fabd510e"
+				}
+			}
+		},
+		"PlenarioDatabase": {
+			"Type": "AWS::RDS::DBInstance",
+			"Properties": {
+				"DBInstanceIdentifier": {
+					"Fn::If": [
+						"UseDBSnapshot",
+						{
+							"Ref": "AWS::NoValue"
+						},
+						{
+							"Fn::Join": [
+								"-",
+								[
+									{
+										"Ref": "AWS::StackName"
+									},
+									"db"
+								]
+							]
+						}
+					]
+				},
+				"DBName": {
+					"Fn::If": [
+						"UseDBSnapshot",
+						{
+							"Ref": "AWS::NoValue"
+						},
+						{
+							"Ref": "dbName"
+						}
+					]
+				},
+				"MasterUsername": {
+					"Fn::If": [
+						"UseDBSnapshot",
+						{
+							"Ref": "AWS::NoValue"
+						},
+						{
+							"Ref": "dbUser"
+						}
+					]
+				},
+				"MasterUserPassword": {
+					"Fn::If": [
+						"UseDBSnapshot",
+						{
+							"Ref": "AWS::NoValue"
+						},
+						{
+							"Ref": "dbPassword"
+						}
+					]
+				},
+				"Engine": "postgres",
+				"DBInstanceClass": {
+					"Ref": "rdsNodeType"
+				},
+				"AllocatedStorage": {
+					"Ref": "databaseSize"
+				},
+				"PubliclyAccessible": false,
+				"DBSubnetGroupName": {
+					"Ref": "dbSubnetGroup"
+				},
+				"DBSnapshotIdentifier": {
+					"Fn::If": [
+						"UseDBSnapshot",
+						{
+							"Ref": "databaseSnapshot"
+						},
+						{
+							"Ref": "AWS::NoValue"
+						}
+					]
+				},
+				"MultiAZ": {
+					"Ref": "multiAZ"
+				}
+			},
+			"Metadata": {
+				"AWS::CloudFormation::Designer": {
+					"id": "5ac035f9-6712-42eb-a554-d4610080447e"
+				}
+			}
+		},
+		"PlenarioCache": {
+			"Type": "AWS::ElastiCache::CacheCluster",
+			"Properties": {
+				"ClusterName": {
+					"Fn::Join": [
+						"-",
+						[
+							{
+								"Ref": "AWS::StackName"
+							},
+							"c"
+						]
+					]
+				},
+				"Engine": "redis",
+				"CacheNodeType": {
+					"Ref": "cacheNodeType"
+				},
+				"NumCacheNodes": "1",
+				"VpcSecurityGroupIds": [
+					{
+						"Ref": "securityGroup"
+					}
+				],
+				"CacheSubnetGroupName": {
+					"Ref": "cacheSubnetGroup"
+				}
+			},
+			"Metadata": {
+				"AWS::CloudFormation::Designer": {
+					"id": "563573ee-1063-44a4-aa49-c11dcfd4e100"
+				}
+			}
+		}
+	},
+	"Parameters": {
+		"adminEmails": {
+			"Type": "String",
+			"Default": "",
+			"Description": "A comma-separated list of emails to notify when things happen."
+		},
+		"defaultUserName": {
+			"Type": "String",
+			"Default": "Plenario Admin",
+			"Description": "The name of the first user to be created."
+		},
+		"defaultUserEmail": {
+			"Type": "String",
+			"Default": "plenario@example.com",
+			"Description": "The email for the first user to be created."
+		},
+		"defaultUserPassword": {
+			"Type": "String",
+			"Default": "CHANGEME",
+			"Description": "The password for the first user to be created."
+		},
+		"cacheKeyPrefix": {
+			"Type": "String",
+			"Default": "plenario_app",
+			"Description": "A prefix to identify this app's entries in the cache (useful if your cache is shared)."
+		},
+		"dbName": {
+			"Type": "String",
+			"Default": "plenario",
+			"Description": "Name of database to use in Plenario DB."
+		},
+		"dbUser": {
+			"Type": "String",
+			"Default": "plenario",
+			"Description": "Name for the user with access to the database."
+		},
+		"dbPassword": {
+			"Type": "String",
+			"Default": "CHANGEME",
+			"Description": "Password for the user with access to the database."
+		},
+		"databaseSnapshot": {
+			"Type": "String",
+			"Default": "",
+			"Description": "Name of a snapshot from which to instantiate the Plenario DB. (Optional; leave blank to create a new database.)"
+		},
+		"databaseSize": {
+			"Type": "String",
+			"Default": "5",
+			"Description": "Size of the desired database. (Overridden if snapshot is used.)"
+		},
+		"multiAZ": {
+			"Type": "String",
+			"Default": "true",
+			"AllowedValues": [
+				"true",
+				"false"
+			],
+			"Description": "Set to true to make this app available in multiple Availability Zones."
+		},
+		"mailUsername": {
+			"Type": "String",
+			"Default": " ",
+			"Description": "GMAIL through which Plenario can send notices and messages."
+		},
+		"mailPassword": {
+			"Type": "String",
+			"Default": " ",
+			"Description": "Password for Plenario's email."
+		},
+		"plenarioSentryURL": {
+			"Type": "String",
+			"Default": " ",
+			"Description": "Sentry URL for monitoring Plenario."
+		},
+		"celerySentryURL": {
+			"Type": "String",
+			"Default": " ",
+			"Description": "Sentry URL for monitoring Plenario's celery workers."
+		},
+		"s3Bucket": {
+			"Type": "String",
+			"Default": "",
+			"Description": "An S3 Bucket tied to this app containing Plenario source code."
+		},
+		"sourceBall": {
+			"Type": "String",
+			"Default": "plenario.zip",
+			"Description": "Path in the S3 bucket to the Plenaro source."
+		},
+		"secretKey": {
+			"Type": "String",
+			"Default": "ThisIsASuperSecretSandwich",
+			"Description": "A super secret key. (Tell no one!)"
+		},
+		"appNodeType": {
+			"Type": "String",
+			"Default": "t2.micro",
+			"Description": "Class of node to use for the main Plenario Webserver."
+		},
+		"workerNodeType": {
+			"Type": "String",
+			"Default": "t2.micro",
+			"Description": "Class of node to use for the Plenario Worker."
+		},
+		"rdsNodeType": {
+			"Type": "String",
+			"Default": "db.t2.micro",
+			"Description": "Class of node to use for the Plenario Database."
+		},
+		"cacheNodeType": {
+			"Type": "String",
+			"Default": "cache.t2.micro",
+			"Description": "Enter a node type for the Plenario Cache."
+		},
+		"vpcID": {
+			"Type": "String",
+			"Default": "",
+			"Description": "ID of the VPC to be used."
+		},
+		"subnet": {
+			"Type": "String",
+			"Default": "",
+			"Description": "ID of the subnet to be used."
+		},
+		"dbSubnetGroup": {
+			"Type": "String",
+			"Default": "",
+			"Description": "ID of the subnet group that Plenario DB should use."
+		},
+		"cacheSubnetGroup": {
+			"Type": "String",
+			"Default": "",
+			"Description": "ID of the subnet group that Plenario Cache should use."
+		},
+		"securityGroup": {
+			"Type": "String",
+			"Default": "",
+			"Description": "ID of the security group that Plenario Cache should use."
+		}
+	},
+	"Conditions": {
+		"UseDBSnapshot": {
+			"Fn::Not": [
+				{
+					"Fn::Equals": [
+						{
+							"Ref": "databaseSnapshot"
+						},
+						""
+					]
+				}
+			]
+		}
+	},
+	"Outputs": {
+		"PlenarioURL": {
+			"Description": "The plenario endpoint URL. Go here to see your new Plenario website!",
+			"Value": {
+				"Fn::Join": [
+					".",
+					[
+						{"Fn::Join": [
+							"-",
+							[
+								"plenario-app",
+								{
+									"Ref": "AWS::StackName"
+								}
+							]
+						]},
+						{"Ref": "AWS::Region"},
+						"elasticbeanstalk.com"
+					]
+				]
+			}
+		}
+	}
+}
