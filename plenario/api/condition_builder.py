@@ -65,10 +65,12 @@ def _parse_condition_tree(table, ctree, literally=False):
         val = ctree['val']
         try:
             return _operator_to_condition(
-                getattr(table, 'columns')[col], op, val, literally
+                table.columns[col], op, val, literally
             )
 
-        # Exists for date__time_of_day. Since it doesn't come
+        # Exists for date__time_of_day. Since it doesn't come as a string
+        # that could specify a column, but rather as a column-like object
+        # itself.
         except KeyError:
             return getattr(col, field_ops[op])(val)
 
@@ -92,7 +94,17 @@ def _operator_to_condition(column, operator, operand, literally=False):
         condition = getattr(column, field_ops[operator])(operand)
 
     if literally:
+        # Normally, SQLAlchemy would construct a condition with placeholder
+        # values that would be filled in by the underlying database driver.
+        #
+        # example_condition = some_column >= :some_column_placeholder
+        #
+        # The following code takes that condition, and literallizes it
+        # to a string, by filling in all the placeholder values.
+
+        # Wraps the value in single quotes, this will only work for PostgreSQL.
         operand = "'{}'".format(operand)
+        # Substitues the :params with the actual values.
         condition = re.sub(r":\w*", operand, str(condition))
 
     return condition
