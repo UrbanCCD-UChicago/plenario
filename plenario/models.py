@@ -1,23 +1,21 @@
-from uuid import uuid4
-from datetime import datetime
-
-from sqlalchemy import Column, String, Boolean, Date, DateTime, \
-    Text, func, Table, select, Integer
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from geoalchemy2 import Geometry
-from sqlalchemy.orm import synonym
-import sqlalchemy as sa
-from plenario.utils.helpers import get_size_in_degrees
-from flask_bcrypt import Bcrypt
-from itertools import groupby
 import json
-from hashlib import md5
-from operator import itemgetter
-
-from plenario.database import session, Base
-from plenario.utils.helpers import slugify
+import sqlalchemy as sa
 
 from collections import namedtuple
+from datetime import datetime
+from flask_bcrypt import Bcrypt
+from geoalchemy2 import Geometry
+from hashlib import md5
+from itertools import groupby
+from operator import itemgetter
+from sqlalchemy import Column, String, Boolean, Date, DateTime, Text, func
+from sqlalchemy import Table, select, Integer
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.orm import synonym
+from uuid import uuid4
+
+from plenario.database import session, Base
+from plenario.utils.helpers import get_size_in_degrees, slugify
 
 bcrypt = Bcrypt()
 
@@ -204,12 +202,16 @@ class MetaTable(Base):
     # {'dataset_name': 'Foo',
     # 'items': [{'datetime': dt, 'count': int}, ...] } ]
     @classmethod
-    def timeseries_all(cls, table_names, agg_unit, start, end, geom=None):
+    def timeseries_all(cls, table_names, agg_unit, start, end, geom=None, ctrees=None):
         # For each table in table_names, generate a query to be unioned
         selects = []
         for name in table_names:
+
+            # If we have condition trees specified, apply them.
+            # .get will return None for those datasets who don't have filters
+            ctree = ctrees.get(name) if ctrees else None
             table = cls.get_by_dataset_name(name)
-            ts_select = table.timeseries(agg_unit, start, end, geom)
+            ts_select = table.timeseries(agg_unit, start, end, geom, ctree)
             selects.append(ts_select)
 
         # Union the time series selects to get a panel
@@ -331,10 +333,9 @@ class MetaTable(Base):
         # inspired this implementation.
         t = self.point_table
 
-        if agg_unit == 'quarter':
-            step = '3 months'
-        else:
-            step = '1 ' + agg_unit
+        # Special case for the 'quarter' unit of aggregation.
+        step = '3 months' if agg_unit == 'quarter' else '1 ' + agg_unit
+
         # Create a CTE to represent every time bucket in the timeseries
         # with a default count of 0
         day_generator = func.generate_series(func.date_trunc(agg_unit, start),
@@ -344,14 +345,16 @@ class MetaTable(Base):
                            day_generator.label('time_bucket')])\
             .alias('defaults')
 
-        # Create a CTE that grabs the number of records
-        # contained in each time bucket.
-        # Will only have rows for buckets with records.
-        where_filters = [t.c.point_date >= start,
-                         t.c.point_date <= end]
-        if column_filters:
-            where_filters += column_filters
+        where_filters = [t.c.point_date >= start, t.c.point_date <= end]
+        if column_filters is not None:
+            # Column filters has to be iterable here, because the '+' operator
+            # behaves differently for SQLAlchemy conditions. Instead of
+            # combining the conditions together, it would try to build
+            # something like :param1 + <column_filters> as a new condition.
+            where_filters += [column_filters]
 
+        # Create a CTE that grabs the number of records contained in each time
+        # bucket. Will only have rows for buckets with records.
         actuals = select([func.count(t.c.hash).label('count'),
                           func.date_trunc(agg_unit, t.c.point_date).
                          label('time_bucket')])\
@@ -463,6 +466,10 @@ class ShapeMetadata(Base):
             listing = cls.add_intersections_to_index(listing, geom)
 
         return listing
+
+    @classmethod
+    def tablenames(cls):
+        return [x.dataset_name for x in session.query(ShapeMetadata.dataset_name).all()]
 
     @staticmethod
     def add_intersections_to_index(listing, geom):

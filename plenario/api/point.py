@@ -9,59 +9,17 @@ from flask import request, make_response
 from itertools import groupby
 from operator import itemgetter
 
-from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, RESPONSE_LIMIT
+from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
 from plenario.api.common import make_cache_key, date_json_handler, unknown_object_json_handler
-from plenario.api.condition_builder import parse_general, general_filters
+from plenario.api.condition_builder import parse_tree
 from plenario.api.response import internal_error, bad_request, json_response_base, make_csv
 from plenario.api.response import geojson_response_base, form_csv_detail_response, form_json_detail_response
 from plenario.api.response import form_geojson_detail_response, add_geojson_feature
-from plenario.api.validator import Validator, DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
-from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator
+from plenario.api.validator import DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
+from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters
 from plenario.database import session
 from plenario.models import MetaTable
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, REDIS_HOST
-
-
-def form_detail_sql_query(args, aggregate_points=False):
-
-    point_table = args.data.get('dataset')
-    shape_table = args.data.get('shape')
-    point_columns = point_table.columns.keys()
-    shape_columns = shape_table.columns.keys() if shape_table is not None else None
-
-    conditions = []
-    for field, value in args.data.items():
-        if value is not None:
-            condition = None
-
-            if shape_columns and field.split('__')[0] in shape_columns:
-                condition = parse_general(shape_table, field, value)
-            else:
-                condition = parse_general(point_table, field, value)
-
-            if condition is not None:
-                conditions.append(condition)
-
-    try:
-        q = session.query(point_table)
-        if conditions:
-            q = q.filter(*conditions)
-    except Exception as e:
-        return internal_error('Failed to construct filters.', e)
-
-    # if the query specified a shape dataset, add a join to the sql query with that dataset
-    if shape_table is not None:
-        shape_columns = ['{}.{} as {}'.format(shape_table.name, col.name, col.name) for col in shape_table.c]
-        if aggregate_points:
-            q = q.from_self(shape_table)\
-                .filter(point_table.c.geom.ST_Intersects(shape_table.c.geom))\
-                .group_by(shape_table)
-        else:
-            q = q.join(shape_table, point_table.c.geom.ST_Within(shape_table.c.geom))
-            # add columns from shape dataset to the select statement
-            q = q.add_columns(*shape_columns)
-
-    return q
 
 
 # ======
@@ -76,7 +34,7 @@ def timeseries():
     validator = NoGeoJSONValidator(only=fields)
     validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
-        return bad_request(validated_args)
+        return bad_request(validated_args.errors)
 
     return _timeseries(validated_args)
 
@@ -89,7 +47,7 @@ def detail_aggregate():
     validator = NoGeoJSONDatasetRequiredValidator(only=fields)
     validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
-        return bad_request(validated_args)
+        return bad_request(validated_args.errors)
     return _detail_aggregate(validated_args)
 
 
@@ -97,11 +55,12 @@ def detail_aggregate():
 @crossdomain(origin="*")
 def detail():
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
-              'obs_date__le', 'data_type', 'offset')
-    validator = NoGeoJSONDatasetRequiredValidator(only=fields)
+              'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
+              'date__time_of_day_le')
+    validator = DatasetRequiredValidator(only=fields)
     validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
-        return bad_request(validated_args)
+        return bad_request(validated_args.errors)
 
     return _detail(validated_args)
 
@@ -111,9 +70,9 @@ def detail():
 def grid():
     fields = ('dataset_name', 'resolution', 'buffer', 'obs_date__le', 'obs_date__ge',
               'location_geom__within')
-    validated_args = validate(DatasetRequiredValidator(), request.args.to_dict())
+    validated_args = validate(DatasetRequiredValidator(only=fields), request.args.to_dict())
     if validated_args.errors:
-        return bad_request(validated_args)
+        return bad_request(validated_args.errors)
 
     return _grid(validated_args)
 
@@ -213,17 +172,27 @@ def getJob(id):
 
 def _timeseries(args):
 
-    geom = args.data['geom']
-    dataset = args.data.get('dataset')
-    table_names = args.data['dataset_name__in']
-    start_date = args.data['obs_date__ge']
-    end_date = args.data['obs_date__le']
-    agg = args.data['agg']
+    meta_params = ['geom', 'dataset', 'dataset_name__in', 'obs_date__ge', 'obs_date__le', 'agg']
+    meta_vals = [args.data.get(k) for k in meta_params]
+    geom, dataset, table_names, start_date, end_date, agg = meta_vals
 
-    # if a single dataset was provided, it's the only thing we need to consider
+    ctrees = {}
+
+    if has_tree_filters(args.data):
+        # Timeseries is a little tricky. If there aren't filters,
+        # it would be ridiculous to build a condition tree for every one.
+        for field, value in args.data.items():
+            if 'filter' in field:
+                metarecord = MetaTable.get_by_dataset_name(field.split('__')[0])
+                pt = metarecord.point_table
+                ctrees[pt.name] = parse_tree(pt, value)
+        # Just cleanliness, since we don't use this argument. Doesn't have
+        # to show up in the JSON response.
+        del args.data['dataset']
+
+    # If a single dataset was provided, it's the only thing we need to consider.
     if dataset is not None:
         table_names = [dataset.name]
-        # for the query's meta information, so that it doesn't show the index
         del args.data['dataset_name__in']
 
     # remove table names which wouldn't return anything for the query, given
@@ -243,7 +212,7 @@ def _timeseries(args):
 
     try:
         panel = MetaTable.timeseries_all(
-            table_names, agg, start_date, end_date, geom
+            table_names, agg, start_date, end_date, geom, ctrees
         )
     except Exception as e:
         msg = 'Failed to construct timeseries.'
@@ -292,44 +261,57 @@ def _timeseries(args):
 
 
 def _detail_aggregate(args):
+    """Returns a record for every row in the specified dataset with brief
+    temporal and spatial information about the row. This can give a user of the
+    platform a quick overview about what is available within their constraints.
 
-    start_date = args.data['obs_date__ge']
-    end_date = args.data['obs_date__le']
-    agg = args.data['agg']
-    geom = args.data['geom']
-    metatable = args.data['metatable']
-    dataset = args.data['dataset']
+    :param args: dictionary of request arguments
 
-    conditions = []
-    for key, value in args.data.items():
-        # These conditions are only meant to address columns, so let's ignore
-        # date and geom filters.
-        if key in general_filters:
-            pass
-        else:
-            condition = parse_general(dataset, key, value)
-            if condition is not None:
-                conditions.append(condition)
+    :returns: csv or json response object"""
 
-    try:
-        ts = metatable.timeseries_one(
-            agg, start_date, end_date, geom, conditions
+    meta_params = ('obs_date__ge', 'obs_date__le', 'agg', 'geom', 'dataset')
+    meta_vals = (args.data.get(k) for k in meta_params)
+    start_date, end_date, agg, geom, dataset = meta_vals
+
+    time_counts = []
+
+    if not has_tree_filters(args.data):
+        # The obs_date arguments set the bounds of all the aggregates.
+        # We don't want to create a condition tree that has point_date filters.
+        args.data[dataset.name + '__filter'] = request_args_to_condition_tree(
+            args.data, ignore=['obs_date__ge', 'obs_date__le']
         )
-    except Exception as e:
-        return internal_error('Failed to construct timeseries', e)
+
+    dataset_conditions = {k: v for k, v in args.data.items() if 'filter' in k}
+    for tablename, condition_tree in dataset_conditions.items():
+
+        tablename = tablename.split('__')[0]
+        table = MetaTable.get_by_dataset_name(tablename).point_table
+        try:
+            conditions = parse_tree(table, condition_tree)
+        except ValueError:  # Catches empty condition tree.
+            conditions = None
+
+        try:
+            ts = MetaTable.get_by_dataset_name(table.name).timeseries_one(
+                agg, start_date, end_date, geom, conditions
+            )
+        except Exception as e:
+            return internal_error('Failed to construct timeseries', e)
+
+        time_counts += [{'count': c, 'datetime': d} for c, d in ts[1:]]
 
     resp = None
 
     datatype = args.data['data_type']
     if datatype == 'json':
-        time_counts = [{'count': c, 'datetime': d} for c, d in ts[1:]]
         resp = json_response_base(args, time_counts, request.args)
         resp['count'] = sum([c['count'] for c in time_counts])
         resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
         resp.headers['Content-Type'] = 'application/json'
 
     elif datatype == 'csv':
-        resp = make_csv(ts)
+        resp = make_csv(time_counts)
         resp.headers['Content-Type'] = 'text/csv'
         filedate = datetime.now().strftime('%Y-%m-%d')
         resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
@@ -339,66 +321,128 @@ def _detail_aggregate(args):
 
 def _detail(args):
 
-    # Part 2: Form SQL query from parameters stored in 'validator' object
-    q = form_detail_sql_query(args)
+    meta_params = ('dataset', 'shape', 'data_type')
+    meta_vals = (args.data.get(k) for k in meta_params)
+    dataset, shapeset, data_type = meta_vals
 
-    # Page in RESPONSE_LIMIT chunks
-    offset = args.data['offset']
-    q = q.limit(RESPONSE_LIMIT)
-    if offset > 0:
-        q = q.offset(offset)
+    q = detail_query(args)
 
-    # Part 3: Make SQL query and dump output into list of rows
-    # (Could explicitly not request point_date and geom here
-    #  to transfer less data)
     try:
-        columns = [col.name for col in args.data['dataset'].columns]
-        if args.data['shape'] is not None:
-            columns += [str(col) for col in args.data['shape'].columns]
-        rows = [OrderedDict(zip(columns, res)) for res in q.all()]
-    except Exception as e:
-        return internal_error('Failed to fetch records.', e)
+        columns = [c.name for c in dataset.columns]
+        if shapeset:
+            columns += [c.name for c in shapeset.columns]
+        result_rows = [OrderedDict(zip(columns, row)) for row in q.all()]
+    except Exception as ex:
+        session.rollback()
+        return internal_error("Failed to fetch records.", ex)
 
-    # Part 4: Format response
     to_remove = ['point_date', 'hash']
-    if args.data.get('shape') is not None:
-        to_remove += ['{}.{}'.format(args.data['shape'].name, col) for col in ['geom', 'hash', 'ogc_fid']]
 
-    datatype = args.data['data_type']
+    if data_type == 'json':
+        return form_json_detail_response(to_remove, args, result_rows)
 
-    if datatype == 'json':
-        return form_json_detail_response(to_remove, args, rows)
+    elif data_type == 'csv':
+        return form_csv_detail_response(to_remove, result_rows)
 
-    elif datatype == 'csv':
-        return form_csv_detail_response(to_remove, rows)
+    elif data_type == 'geojson':
+        return form_geojson_detail_response(to_remove, args, result_rows)
 
-    elif datatype == 'geojson':
-        return form_geojson_detail_response(to_remove, args, rows)
+
+def detail_query(args, aggregate=False):
+
+    meta_params = ('dataset', 'shapeset', 'data_type', 'geom', 'offset', 'limit')
+    meta_vals = (args.data.get(k) for k in meta_params)
+    dataset, shapeset, data_type, geom, offset, limit = meta_vals
+
+    # If there aren't tree filters provided, a little formatting is needed
+    # to make the general filters into an 'and' tree.
+    if not has_tree_filters(args.data):
+        # Creates an AND condition tree and adds it to args.
+        args.data[dataset.name + '__filter'] = request_args_to_condition_tree(
+            request_args=args.data,
+            ignore=['shapeset']
+        )
+
+    # Sort out the filter conditions from the rest of the user arguments.
+    filters = {k: v for k, v in args.data.items() if 'filter' in k}
+
+    # Get upset if they specify more than a dataset and shapeset filter.
+    if len(filters) > 2:
+        return bad_request("Too many table filters provided.")
+
+    # Query the point dataset.
+    q = session.query(dataset)
+
+    # If the user specified a geom, filter results to those within its shape.
+    if geom:
+        q = q.filter(dataset.c.geom.ST_Within(
+            sqlalchemy.func.ST_GeomFromGeoJSON(geom)
+        ))
+
+    # Retrieve the filters and build conditions from them if they exist.
+    point_ctree = filters.get(dataset.name + '__filter')
+
+    # If the user specified point dataset filters, parse and apply them.
+    if point_ctree:
+        point_conditions = parse_tree(dataset, point_ctree)
+        q = q.filter(point_conditions)
+
+    # If a user specified a shape dataset, it was either through the /shapes
+    # enpoint, which uses the aggregate result, or through the /detail endpoint
+    # which uses the joined result.
+    if shapeset is not None:
+        if aggregate:
+            q = q.from_self(shapeset).filter(dataset.c.geom.ST_Intersects(shapeset.c.geom)).group_by(shapeset)
+        else:
+            shape_columns = ['{}.{} as {}'.format(shapeset.name, col.name, col.name) for col in shapeset.c]
+            q = q.join(shapeset, dataset.c.geom.ST_Within(shapeset.c.geom))
+            q = q.add_columns(*shape_columns)
+
+        # If there's a filter specified for the shape dataset, apply those conditions.
+        shape_ctree = filters.get(shapeset.name + '__filter')
+        if shape_ctree:
+            shape_conditions = parse_tree(shapeset, shape_ctree)
+            q = q.filter(shape_conditions)
+
+    return q
 
 
 def _grid(args):
 
-    meta_table = args.data['metatable']
-    point_table = args.data['dataset']
-    geom = args.data['geom']
-    resolution = args.data['resolution']
+    meta_params = ('dataset', 'geom', 'resolution', 'buffer')
+    meta_vals = (args.data.get(k) for k in meta_params)
+    point_table, geom, resolution, buffer_ = meta_vals
 
-    # construct SQL filters
-    conditions = []
-    for field, value in args.data.items():
-        if value is not None:
-            condition = parse_general(point_table, field, value)
-            if condition is not None:
-                conditions.append(condition)
+    result_rows = []
 
-    try:
-        registry_row = meta_table
-        grid_rows, size_x, size_y = registry_row.make_grid(resolution, geom, conditions)
-    except Exception as e:
-        return internal_error('Could not make grid aggregation.', e)
+    if not has_tree_filters(args.data):
+        tname = point_table.name
+        args.data[tname + '__filter'] = request_args_to_condition_tree(
+            request_args=args.data,
+            ignore=['buffer', 'resolution']
+        )
+
+    # We only build conditions from values with a key containing 'filter'.
+    # Therefore we only build dataset conditions from condition trees.
+    dataset_conditions = {k: v for k, v in args.data.items() if 'filter' in k}
+    for tablename, condition_tree in dataset_conditions.items():
+
+        tablename = tablename.split('__')[0]
+
+        metatable = MetaTable.get_by_dataset_name(tablename)
+        table = metatable.point_table
+        conditions = parse_tree(table, condition_tree)
+
+        try:
+            registry_row = MetaTable.get_by_dataset_name(table.name)
+            # make_grid expects conditions to be iterable.
+            grid_rows, size_x, size_y = registry_row.make_grid(resolution, geom, [conditions])
+            result_rows += grid_rows
+        except Exception as e:
+            return internal_error('Could not make grid aggregation.', e)
 
     resp = geojson_response_base()
-    for value in grid_rows:
+    for value in result_rows:
         if value[1]:
             pt = shapely.wkb.loads(value[1].decode('hex'))
             south, west = (pt.x - (size_x / 2)), (pt.y - (size_y / 2))
@@ -416,10 +460,14 @@ def _grid(args):
 
 def _meta(args):
     """Generate meta information about table(s) with records from MetaTable.
-    
+
     :param args: dictionary of request arguments (?foo=bar)
 
     :returns: response dictionary"""
+
+    meta_params = ('dataset', 'geom', 'obs_date__ge', 'obs_date__le')
+    meta_vals = (args.data.get(k) for k in meta_params)
+    dataset, geom, start_date, end_date = meta_vals
 
     # Columns to select as-is
     cols_to_return = ['human_name', 'dataset_name', 'source_url', 'view_url',
@@ -433,12 +481,6 @@ def _meta(args):
 
     # Only return datasets that have been successfully ingested
     q = session.query(*col_objects).filter(MetaTable.date_added.isnot(None))
-
-    # What params did the user provide?
-    dataset = args.data['dataset']
-    geom = args.data.get('geom')
-    start_date = args.data['obs_date__ge']
-    end_date = args.data['obs_date__le']
 
     # Filter over datasets if user provides full date range or geom
     should_filter = geom or (start_date and end_date)
@@ -464,9 +506,6 @@ def _meta(args):
                 )
             )
 
-    failure_messages = []
-    failure_messages.append(args.warnings)
-
     metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
     for record in metadata_records:
         try:
@@ -477,16 +516,55 @@ def _meta(args):
             record['columns'] = [{'field_name': k, 'field_type': v}
                                  for k, v in record['column_names'].items()]
         except Exception as e:
-            failure_messages.append(e.message)
+            args.warnings.append(e.message)
 
         # clear column_names off the json, users don't need to see it
         del record['column_names']
 
     resp = json_response_base(args, metadata_records, request.args)
-
     resp['meta']['total'] = len(resp['objects'])
-    resp['meta']['message'] = failure_messages
     status_code = 200
     resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
+
+# =====
+# Utils
+# =====
+
+def request_args_to_condition_tree(request_args, ignore=list()):
+    """Take dictionary that has a 'dataset' key and column arguments into
+    a single and build a condition tree.
+
+    :param request_args: dictionary with a dataset and column arguments
+    :param ignore: what values to not use for building conditions
+
+    :returns: condition tree"""
+
+    ignored = {'agg', 'data_type', 'dataset', 'geom', 'limit', 'offset', 'shape', 'shapeset'}
+    for val in ignore:
+        ignored.add(val)
+
+    args = request_args.copy()
+
+    # If the key wasn't convertable, it meant that it was a column key.
+    columns = {k: v for k, v in args.items() if k not in ignored}
+
+    ctree = {"op": "and", "val": []}
+
+    # Add AND conditions based on query string parameters.
+    for k, v in columns.items():
+        k = k.split('__')
+        if k[0] == 'obs_date':
+            k[0] = 'point_date'
+        if k[0] == 'date' and 'time_of_day' in k[1]:
+            k[0] = sqlalchemy.func.date_part('hour', args['dataset'].c.point_date)
+            k[1] = 'le' if 'le' in k[1] else 'ge'
+
+        if len(k) == 1:
+            ctree['val'].append({"op": "eq", "col": k[0], "val": v})
+        elif len(k) == 2:
+            ctree['val'].append({"op": k[1], "col": k[0], "val": v})
+
+    return ctree
