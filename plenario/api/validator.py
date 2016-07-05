@@ -274,15 +274,26 @@ def valid_tree(table, tree):
     if not tree.keys():
         raise ValueError("Empty or malformed tree.")
 
-    op = tree['op']
+    op = tree.get('op')
+    if not op:
+        raise ValueError("Invalid keyword in {}".format(tree))
 
     if op == "and" or op == "or":
         return all([valid_tree(table, subtree) for subtree in tree['val']])
 
     elif op in field_ops:
-        col = tree['col']
-        val = tree['val']
+        col = tree.get('col')
+        val = tree.get('val')
+
+        if not col or not val:
+            err_msg = 'Missing or invalid keyword in {}'.format(tree)
+            err_msg += ' -- use format "{\'op\': OP, \'col\': COL, \'val\', VAL}"'
+            raise ValueError(err_msg)
+
         return valid_column_condition(table, col, val)
+
+    else:
+        raise ValueError("Invalid operation {}".format(op))
 
 
 def valid_column_condition(table, column_name, value):

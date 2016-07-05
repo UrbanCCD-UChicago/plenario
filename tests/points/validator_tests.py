@@ -148,3 +148,33 @@ class TestValidator(unittest.TestCase):
 
         self.assertEqual(len(resp_data['meta']['message']), 1)
         self.assertIn('Missing data for required field.', resp_data['meta']['message']['dataset_name'])
+
+    def test_catches_bad_filter_op_keyword(self):
+        endpoint = 'detail'
+        query = '?dataset_name=crimes&crimes__filter='
+        qfilter = '{"opz": "eq"}'
+
+        resp_data = self.get_json_response_data(endpoint + query + qfilter)
+
+        self.assertTrue(len(resp_data['meta']['message']) == 1)
+        self.assertIn('Invalid keyword', resp_data['meta']['message']['crimes'])
+
+    def test_catches_bad_filter_col_keyword(self):
+        endpoint = 'detail'
+        query = '?dataset_name=crimes&crimes__filter='
+        qfilter = '{"op": "eq", "colz": "iucr", "val": 1150}'
+
+        resp_data = self.get_json_response_data(endpoint + query + qfilter)
+
+        self.assertTrue(len(resp_data['meta']['message']) == 1)
+        self.assertIn('invalid keyword', resp_data['meta']['message']['crimes'])
+
+    def test_catches_bad_filter_val_keyword(self):
+        endpoint = 'detail'
+        query = '?dataset_name=crimes&crimes__filter='
+        qfilter = '{"op": "eq", "col": "iucr", "valz": 1150}'
+
+        resp_data = self.get_json_response_data(endpoint + query + qfilter)
+
+        self.assertTrue(len(resp_data['meta']['message']) == 1)
+        self.assertIn('invalid keyword', resp_data['meta']['message']['crimes'])
