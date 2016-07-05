@@ -132,7 +132,7 @@ def _timeseries(args):
         del args.data['dataset']
 
     # If a single dataset was provided, it's the only thing we need to consider.
-    if ctrees or dataset is not None:
+    if dataset is not None:
         if dataset is not None:
             table_names = [dataset.name]
         del args.data['dataset_name__in']
