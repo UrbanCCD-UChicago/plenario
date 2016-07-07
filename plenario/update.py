@@ -1,8 +1,9 @@
-from flask import Flask, abort
-import plenario.tasks as tasks
-from plenario.tasks import celery_app
 from multiprocessing import Process
 
+from flask import Flask, abort
+
+import plenario.tasks as tasks
+from plenario.api.jobs import worker_ready
 
 """
 Task server that runs in AWS Elastic Beanstalk worker environment.
@@ -32,8 +33,8 @@ def create_worker():
 
     @app.route('/health')
     def check_health():
-        if celery_app.control.ping():
-            return "Someone is listening."
+        if worker_ready():
+            return "Workers are available."
         else:
             abort(503)
 

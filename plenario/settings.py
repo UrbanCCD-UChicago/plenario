@@ -32,8 +32,8 @@ DEFAULT_USER = {
     'password': get('DEFAULT_USER_PASSWORD')
 }
 
-AWS_ACCESS_KEY = get('AWS_ACCESS_KEY', '')
-AWS_SECRET_KEY = get('AWS_SECRET_KEY', '')
+AWS_ACCESS_KEY = get('AWS_ACCESS_KEY_ID', '')
+AWS_SECRET_KEY = get('AWS_SECRET_ACCESS_KEY', '')
 S3_BUCKET = get('S3_BUCKET', '')
 AWS_REGION_NAME = get('AWS_REGION_NAME', 'us-east-1')
 
@@ -55,3 +55,6 @@ MAIL_PASSWORD = get('MAIL_PASSWORD', '')
 
 # Toggle maintenence mode
 MAINTENANCE = False
+
+#SQS Jobs Queue
+JOBS_QUEUE = get('JOBS_QUEUE', 'PlenarioQueue')

@@ -1,27 +1,28 @@
-from flask import make_response, request, redirect, url_for, render_template, \
-    Blueprint, flash, session as flask_session
-from plenario.models import MetaTable, User, ShapeMetadata
-from plenario.database import session, Base, app_engine as engine
-from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
-from plenario.tasks import update_dataset as update_dataset_task, \
-    delete_dataset as delete_dataset_task, add_dataset as add_dataset_task, \
-    add_shape as add_shape_task, delete_shape as delete_shape_task
-from flask_login import login_required
-from datetime import datetime, timedelta
-from urlparse import urlparse
-import requests
-from flask_wtf import Form
-from wtforms import TextField, SelectField, StringField
-from wtforms.validators import DataRequired
+import itertools
 import json
 import re
 from cStringIO import StringIO
-from sqlalchemy import Table, text
-import sqlalchemy
-from hashlib import md5
-from sqlalchemy.exc import NoSuchTableError
 from collections import namedtuple
-import itertools
+from datetime import datetime, timedelta
+from hashlib import md5
+from urlparse import urlparse
+
+import requests
+import sqlalchemy
+from flask import make_response, request, redirect, url_for, render_template, \
+    Blueprint, flash, session as flask_session
+from flask_login import login_required
+from flask_wtf import Form
+from sqlalchemy import Table, text
+from sqlalchemy.exc import NoSuchTableError
+from wtforms import TextField, SelectField, StringField
+from wtforms.validators import DataRequired
+
+from plenario.api.jobs import submit_job, get_status
+from plenario.database import session, Base, app_engine as engine
+from plenario.models import MetaTable, User, ShapeMetadata
+from plenario.tasks import delete_dataset as delete_dataset_task, delete_shape as delete_shape_task
+from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 
 views = Blueprint('views', __name__)
 
@@ -81,7 +82,9 @@ def approve_shape(dataset_name):
     meta.approved_status = True
     session.commit()
     # Ingest it
-    add_shape_task.delay(dataset_name)
+    #add_shape_task.delay(dataset_name)
+    job = {"endpoint": "add_shape_task", "query": {"dataset_name": meta.dataset_name}};
+    submit_job(job);
     send_approval_email(meta.human_name, meta.contributor_name,
                         meta.contributor_email)
 
@@ -99,7 +102,9 @@ def approve_dataset(source_url_hash):
     meta.approved_status = True
     session.commit()
     # Ingest it
-    add_dataset_task.delay(source_url_hash)
+    #add_dataset_task.delay(source_url_hash)
+    job = {"endpoint": "add_dataset", "query": {"source_url_hash": meta.source_url_hash}};
+    submit_job(job);
     send_approval_email(meta.human_name, meta.contributor_name,
                         meta.contributor_email)
 
@@ -205,9 +210,13 @@ def submit(context):
         # Now fire ingestion task...
         if is_admin:
             if is_shapefile:
-                add_shape_task.delay(meta.dataset_name)
+                job = {"endpoint": "add_shape", "query": {"dataset_name": meta.dataset_name}};
+                submit_job(job);
+                #add_shape_task.delay(meta.dataset_name)
             else:
-                add_dataset_task.delay(meta.source_url_hash)
+                job = {"endpoint": "add_dataset", "query": {"source_url_hash": meta.source_url_hash}};
+                submit_job(job);
+                #add_dataset_task.delay(meta.source_url_hash)
         # or send thankyou email
         else:
             return send_submission_email(meta.human_name,
@@ -806,18 +815,16 @@ def delete_dataset(source_url_hash):
 
 @views.route('/update-dataset/<source_url_hash>')
 def update_dataset(source_url_hash):
-    result = update_dataset_task.delay(source_url_hash)
+    job = {"endpoint": "update_dataset", "query": {"source_url_hash": source_url_hash}};
+    ticket = submit_job(job);
+    #result = update_dataset_task.delay(source_url_hash)
     return make_response(json.dumps({'status': 'success',
-                                     'task_id': result.id}))
+                                     'ticket': ticket}))
 
 
-@views.route('/check-update/<task_id>')
-def check_update(task_id):
-    result = update_dataset_task.AsyncResult(task_id)
-    if result.ready():
-        r = {'status': 'ready'}
-    else:
-        r = {'status': 'pending'}
+@views.route('/check-update/<ticket>')
+def check_update(ticket):
+    r = {'status': get_status(ticket)}
     resp = make_response(json.dumps(r))
     resp.headers['Content-Type'] = 'application/json'
     return resp

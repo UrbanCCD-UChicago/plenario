@@ -17,6 +17,7 @@ from plenario.api.response import geojson_response_base, form_csv_detail_respons
 from plenario.api.response import form_geojson_detail_response, add_geojson_feature
 from plenario.api.validator import DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
 from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters
+from plenario.api.jobs import jobable
 from plenario.database import session
 from plenario.models import MetaTable
 
@@ -27,6 +28,7 @@ from plenario.models import MetaTable
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
+@jobable
 def timeseries():
     fields = ('location_geom__within', 'dataset_name', 'dataset_name__in',
               'agg', 'obs_date__ge', 'obs_date__le', 'data_type')
