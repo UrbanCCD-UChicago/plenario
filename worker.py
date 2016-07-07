@@ -3,6 +3,7 @@
 
 import datetime, time, signal
 import boto.sqs
+import json
 from os import urandom
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
 from plenario.api.point import _timeseries
@@ -101,17 +102,17 @@ while do_work:
                     set_result(ticket, bad_request(validated_args.errors))
                     set_status(ticket, {
                         "error": {"workerID": worker_id, "queueTime": get_status(ticket)["processing"]["queueTime"],
-                                  "startTime": get_status(ticket)["startTime"], "endTime": str(datetime.datetime.now())}})
+                                  "startTime": get_status(ticket)["processing"]["startTime"], "endTime": str(datetime.datetime.now())}})
 
-                set_result(ticket, _timeseries(validated_args).get_data(as_text=True))
+                set_result(ticket, json.loads(_timeseries(validated_args).get_data(as_text=True)))
                 set_status(ticket, {
                     "success": {"workerID": worker_id, "queueTime": get_status(ticket)["processing"]["queueTime"],
-                                "startTime": get_status(ticket)["startTime"], "endTime": str(datetime.datetime.now())}})
+                                "startTime": get_status(ticket)["processing"]["startTime"], "endTime": str(datetime.datetime.now())}})
             elif req["endpoint"] in ["ping"]:
                 set_result(ticket, {"hello": "from worker {}".format(worker_id)})
                 set_status(ticket, {
                     "success": {"workerID": worker_id, "queueTime": get_status(ticket)["processing"]["queueTime"],
-                                "startTime": get_status(ticket)["startTime"], "endTime": str(datetime.datetime.now())}})
+                                "startTime": get_status(ticket)["processing"]["startTime"], "endTime": str(datetime.datetime.now())}})
 
         JobQueue.delete_message(job)
 
@@ -119,8 +120,10 @@ while do_work:
         file.write("{} - Worker #{}: Finished work on ticket {}.\n".format(datetime.datetime.now(), worker_id, ticket))
 
     else:
-        file.write("{} - Worker #{}: No work. Idling for {} seconds.\n".format(datetime.datetime.now(), worker_id,
-                                                                               wait_interval))
+        #file.write("{} - Worker #{}: No work. Idling for {} seconds.\n".format(datetime.datetime.now(), worker_id,
+        #                                                                      wait_interval))
+
+        # No work! Idle for a bit to save compute cycles.
         time.sleep(wait_interval)
 
     file.close()
