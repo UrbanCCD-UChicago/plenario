@@ -4,7 +4,6 @@ flask_sqlalchemy
 gunicorn
 psycopg2
 geoalchemy2
-celery
 boto
 shapely
 requests
@@ -23,3 +22,4 @@ lxml
 alembic
 boto3
 marshmallow
+functools32

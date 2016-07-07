@@ -1,0 +1,52 @@
+#!/bin/bash
+# processname: union-boss
+# chkconfig: 2345 20 80
+# description: Ensure workers are shut down nicely.
+
+# Source function library.
+. /etc/init.d/functions
+
+start() {
+    # code to start app comes here 
+    # example: daemon program_name &
+    # ...do nothing...
+    touch /var/lock/subsys/unionboss;
+    echo "Union Boss is loaded.";
+}
+
+stop() {
+	# code to stop app comes here 
+	# example: killproc program_name
+	echo "Union Boss: Ensuring workers are shut down nicely...";
+	while [ $(pgrep -f worker.py | wc -l) -gt "0" ]; do
+		echo "$(pgrep -f worker.py | wc -l) workers to go.";
+		sleep 1;
+	done;
+	
+	tail /opt/python/log/worker.log
+	echo "Workers have been mercifully euthanized.";
+	
+	rm -f /var/lock/subsys/unionboss;
+}
+
+case "$1" in 
+    start)
+       start
+       ;;
+    stop)
+       stop
+       ;;
+    restart)
+       stop
+       start
+       ;;
+    status)
+       # code to check status of app comes here 
+       # example: status program_name
+       chkconfig --list unionboss
+       ;;
+    *)
+       echo "Usage: $0 {start|stop|status|restart}"
+esac
+
+exit 0 

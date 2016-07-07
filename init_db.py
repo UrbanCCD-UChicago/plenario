@@ -1,20 +1,18 @@
+import datetime
+import subprocess
+from argparse import ArgumentParser
+
 import plenario.models
 import plenario.settings
 from plenario.database import session, app_engine, Base
-from plenario.tasks import hello_world
 from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DEFAULT_USER
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
-from argparse import ArgumentParser
-import os
-import datetime
-import subprocess
 
 
 def init_db(args):
     if not any(vars(args).values()):
         # No specific arguments specified. Run it all!
-        init_master_meta_user()
-        init_celery()
+        init_tables()
         add_functions()
     else:
         if args.meta:
@@ -23,13 +21,11 @@ def init_db(args):
             init_user()
         if args.weather:
             init_weather()
-        if args.celery:
-            init_celery()
         if args.functions:
             add_functions()
 
 
-def init_master_meta_user():
+def init_tables():
     print 'creating master, meta and user tables'
     init_meta()
     init_user()
@@ -39,7 +35,7 @@ def init_meta():
     #Reset concept of a metadata table
     non_meta_tables = [table for table in Base.metadata.sorted_tables
                        if table.name not in
-                       {'meta_master', 'meta_shape', 'plenario_user'}]
+                       {'meta_master', 'meta_shape', 'plenario_user', 'plenario_variables'}]
     for t in non_meta_tables:
         Base.metadata.remove(t)
     
@@ -61,7 +57,6 @@ def init_user():
             print "Problem while creating default user: ", e
     else:
         print 'No default user specified. Skipping this step.'
-
 
 def init_weather():
     print 'initializing NOAA weather stations'
@@ -87,10 +82,6 @@ def add_functions():
     add_function("./plenario/dbscripts/audit_trigger.sql")
     add_function("./plenario/dbscripts/point_from_location.sql")
 
-def init_celery():
-    hello_world.delay()
-
-
 def build_arg_parser():
     """Creates an argument parser for this script. This is helpful in the event
     that a user needs to only run a portion of the setup script.
@@ -109,8 +100,6 @@ def build_arg_parser():
                         help='Set up NOAA weather station data.\
                               This includes the daily and hourly weather \
                               observations.')
-    parser.add_argument('-cl', '--celery', action="store_true",
-                        help='Say hello world from Celery')
     parser.add_argument('-f', '--functions', action='store_true',
                         help='Add plenario-specific functions to database.')
     return parser
