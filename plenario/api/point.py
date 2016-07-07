@@ -9,7 +9,7 @@ from flask import request, make_response
 from itertools import groupby
 from operator import itemgetter
 
-from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
+from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, RESPONSE_LIMIT
 from plenario.api.common import make_cache_key, date_json_handler, unknown_object_json_handler
 from plenario.api.condition_builder import parse_tree
 from plenario.api.response import internal_error, bad_request, json_response_base, make_csv
@@ -55,7 +55,7 @@ def detail_aggregate():
 def detail():
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
               'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
-              'date__time_of_day_le')
+              'date__time_of_day_le', 'limit')
     validator = DatasetRequiredValidator(only=fields)
     validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
@@ -262,11 +262,15 @@ def _detail_aggregate(args):
 
 def _detail(args):
 
-    meta_params = ('dataset', 'shape', 'data_type')
+    meta_params = ('dataset', 'shape', 'data_type', 'limit', 'offset')
     meta_vals = (args.data.get(k) for k in meta_params)
-    dataset, shapeset, data_type = meta_vals
+    dataset, shapeset, data_type, limit, offset = meta_vals
 
     q = detail_query(args)
+
+    # Apply limit and offset.
+    q = q.limit(limit) if limit else q.limit(RESPONSE_LIMIT)
+    q = q.offset(offset) if offset else q
 
     try:
         columns = [c.name for c in dataset.columns]
@@ -291,9 +295,9 @@ def _detail(args):
 
 def detail_query(args, aggregate=False):
 
-    meta_params = ('dataset', 'shapeset', 'data_type', 'geom', 'offset', 'limit')
+    meta_params = ('dataset', 'shapeset', 'data_type', 'geom')
     meta_vals = (args.data.get(k) for k in meta_params)
-    dataset, shapeset, data_type, geom, offset, limit = meta_vals
+    dataset, shapeset, data_type, geom = meta_vals
 
     # If there aren't tree filters provided, a little formatting is needed
     # to make the general filters into an 'and' tree.
