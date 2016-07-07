@@ -103,6 +103,7 @@ while do_work:
                     set_status(ticket, {
                         "error": {"workerID": worker_id, "queueTime": get_status(ticket)["processing"]["queueTime"],
                                   "startTime": get_status(ticket)["processing"]["startTime"], "endTime": str(datetime.datetime.now())}})
+                        #TODO: Add more detailed error messages here
 
                 set_result(ticket, json.loads(_timeseries(validated_args).get_data(as_text=True)))
                 set_status(ticket, {
