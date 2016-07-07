@@ -9,7 +9,7 @@ from flask import request, make_response
 from itertools import groupby
 from operator import itemgetter
 
-from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT, RESPONSE_LIMIT
+from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
 from plenario.api.common import make_cache_key, date_json_handler, unknown_object_json_handler
 from plenario.api.condition_builder import parse_tree
 from plenario.api.response import internal_error, bad_request, json_response_base, make_csv
@@ -269,7 +269,7 @@ def _detail(args):
     q = detail_query(args)
 
     # Apply limit and offset.
-    q = q.limit(limit) if limit else q.limit(RESPONSE_LIMIT)
+    q = q.limit(limit)
     q = q.offset(offset) if offset else q
 
     try:
