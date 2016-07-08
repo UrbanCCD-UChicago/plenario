@@ -295,9 +295,10 @@ def _detail(args):
 
 def detail_query(args, aggregate=False):
 
-    meta_params = ('dataset', 'shapeset', 'data_type', 'geom')
+    meta_params = ('dataset', 'shapeset', 'data_type', 'geom', 'obs_date__ge',
+                   'obs_date__le')
     meta_vals = (args.data.get(k) for k in meta_params)
-    dataset, shapeset, data_type, geom = meta_vals
+    dataset, shapeset, data_type, geom, obs_date__ge, obs_date__le = meta_vals
 
     # If there aren't tree filters provided, a little formatting is needed
     # to make the general filters into an 'and' tree.
@@ -331,6 +332,10 @@ def detail_query(args, aggregate=False):
     if point_ctree:
         point_conditions = parse_tree(dataset, point_ctree)
         q = q.filter(point_conditions)
+
+        # To allow both obs_date meta params and filter trees.
+        q = q.filter(dataset.c.point_date >= obs_date__ge) if obs_date__ge else q
+        q = q.filter(dataset.c.point_date <= obs_date__le) if obs_date__le else q
 
     # If a user specified a shape dataset, it was either through the /shapes
     # enpoint, which uses the aggregate result, or through the /detail endpoint

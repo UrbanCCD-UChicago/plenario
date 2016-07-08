@@ -123,19 +123,19 @@ class PointAPITests(BasePlenarioTest):
     # ====================
 
     def test_detail_with_simple_flu_filter(self):
-        r = self.get_api_response('detail?dataset_name=flu_shot_clinics&' + FLU_BASE + FLU_FILTER_SIMPLE)
+        r = self.get_api_response('detail?obs_date__ge=2000&dataset_name=flu_shot_clinics&' + FLU_BASE + FLU_FILTER_SIMPLE)
         self.assertEqual(r['meta']['total'], 4)
 
     def test_detail_with_compound_flu_filters_and(self):
-        r = self.get_api_response('detail?dataset_name=flu_shot_clinics&' + FLU_FILTER_COMPOUND_AND)
+        r = self.get_api_response('detail?obs_date__ge=2000&dataset_name=flu_shot_clinics&' + FLU_FILTER_COMPOUND_AND)
         self.assertEqual(r['meta']['total'], 1)
 
     def test_detail_with_compound_flu_filters_or(self):
-        r = self.get_api_response('detail?dataset_name=flu_shot_clinics&' + FLU_FILTER_COMPOUND_OR)
+        r = self.get_api_response('detail?obs_date__ge=2000&dataset_name=flu_shot_clinics&' + FLU_FILTER_COMPOUND_OR)
         self.assertEqual(r['meta']['total'], 13)
 
     def test_detail_with_nested_flu_filters(self):
-        r = self.get_api_response('detail?dataset_name=flu_shot_clinics&' + FLU_BASE + FLU_FILTER_NESTED)
+        r = self.get_api_response('detail?obs_date__ge=2000&dataset_name=flu_shot_clinics&' + FLU_BASE + FLU_FILTER_NESTED)
         self.assertEqual(r['meta']['total'], 4)
 
     # ============================
