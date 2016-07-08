@@ -235,7 +235,7 @@ class PointAPITests(BasePlenarioTest):
 
     def test_grid_with_simple_tree_filter(self):
         filter_ = 'crimes__filters={"op": "eq", "col": "description", "val": "CREDIT CARD FRAUD"}'
-        r = self.get_api_response('grid?dataset_name=crimes&{}'.format(filter_))
+        r = self.get_api_response('grid?obs_date__ge=2000&dataset_name=crimes&{}'.format(filter_))
         self.assertEqual(len(r['features']), 2)
 
     def test_space_and_time(self):

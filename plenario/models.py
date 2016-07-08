@@ -289,7 +289,7 @@ class MetaTable(Base):
             self.date_added = now
         self.last_update = now
 
-    def make_grid(self, resolution, geom=None, conditions=None):
+    def make_grid(self, resolution, geom=None, conditions=None, obs_dates={}):
         """
         :param resolution: length of side of grid square in meters
         :type resolution: int
@@ -319,6 +319,10 @@ class MetaTable(Base):
                           .label('squares'))\
             .filter(*conditions)\
             .group_by('squares')
+
+        if obs_dates:
+            q = q.filter(t.c.point_date >= obs_dates['lower'])
+            q = q.filter(t.c.point_date <= obs_dates['upper'])
 
         if geom:
             q = q.filter(t.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geom)))

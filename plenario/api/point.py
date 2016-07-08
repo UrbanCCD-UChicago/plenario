@@ -359,9 +359,10 @@ def detail_query(args, aggregate=False):
 
 def _grid(args):
 
-    meta_params = ('dataset', 'geom', 'resolution', 'buffer')
+    meta_params = ('dataset', 'geom', 'resolution', 'buffer', 'obs_date__ge',
+                   'obs_date__le')
     meta_vals = (args.data.get(k) for k in meta_params)
-    point_table, geom, resolution, buffer_ = meta_vals
+    point_table, geom, resolution, buffer_, obs_date__ge, obs_date__le = meta_vals
 
     result_rows = []
 
@@ -386,7 +387,12 @@ def _grid(args):
         try:
             registry_row = MetaTable.get_by_dataset_name(table.name)
             # make_grid expects conditions to be iterable.
-            grid_rows, size_x, size_y = registry_row.make_grid(resolution, geom, [conditions])
+            grid_rows, size_x, size_y = registry_row.make_grid(
+                resolution,
+                geom,
+                [conditions],
+                {'upper': obs_date__le, 'lower': obs_date__ge}
+            )
             result_rows += grid_rows
         except Exception as e:
             return internal_error('Could not make grid aggregation.', e)
