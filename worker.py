@@ -27,16 +27,15 @@ worker_threads = 4
 max_wait_interval = 10
 do_work = True
 
-def quit_job(signum, frame):
+def stop_workers(signum, frame):
     global do_work
     file = open("/opt/python/log/worker.log", "a")
     file.write("{} - Worker BOSS: Got termination signal. Telling workers to finish up...\n".format(datetime.datetime.now()))
     file.close()
     do_work = False
 
-
-signal.signal(signal.SIGINT, quit_job)
-signal.signal(signal.SIGTERM, quit_job)
+signal.signal(signal.SIGINT, stop_workers)
+signal.signal(signal.SIGTERM, stop_workers)
 
 conn = boto.sqs.connect_to_region(
     AWS_REGION_NAME,
