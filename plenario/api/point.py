@@ -295,9 +295,10 @@ def _detail(args):
 
 def detail_query(args, aggregate=False):
 
-    meta_params = ('dataset', 'shapeset', 'data_type', 'geom')
+    meta_params = ('dataset', 'shapeset', 'data_type', 'geom', 'obs_date__ge',
+                   'obs_date__le')
     meta_vals = (args.data.get(k) for k in meta_params)
-    dataset, shapeset, data_type, geom = meta_vals
+    dataset, shapeset, data_type, geom, obs_date__ge, obs_date__le = meta_vals
 
     # If there aren't tree filters provided, a little formatting is needed
     # to make the general filters into an 'and' tree.
@@ -332,6 +333,10 @@ def detail_query(args, aggregate=False):
         point_conditions = parse_tree(dataset, point_ctree)
         q = q.filter(point_conditions)
 
+        # To allow both obs_date meta params and filter trees.
+        q = q.filter(dataset.c.point_date >= obs_date__ge) if obs_date__ge else q
+        q = q.filter(dataset.c.point_date <= obs_date__le) if obs_date__le else q
+
     # If a user specified a shape dataset, it was either through the /shapes
     # enpoint, which uses the aggregate result, or through the /detail endpoint
     # which uses the joined result.
@@ -354,9 +359,10 @@ def detail_query(args, aggregate=False):
 
 def _grid(args):
 
-    meta_params = ('dataset', 'geom', 'resolution', 'buffer')
+    meta_params = ('dataset', 'geom', 'resolution', 'buffer', 'obs_date__ge',
+                   'obs_date__le')
     meta_vals = (args.data.get(k) for k in meta_params)
-    point_table, geom, resolution, buffer_ = meta_vals
+    point_table, geom, resolution, buffer_, obs_date__ge, obs_date__le = meta_vals
 
     result_rows = []
 
@@ -381,7 +387,12 @@ def _grid(args):
         try:
             registry_row = MetaTable.get_by_dataset_name(table.name)
             # make_grid expects conditions to be iterable.
-            grid_rows, size_x, size_y = registry_row.make_grid(resolution, geom, [conditions])
+            grid_rows, size_x, size_y = registry_row.make_grid(
+                resolution,
+                geom,
+                [conditions],
+                {'upper': obs_date__le, 'lower': obs_date__ge}
+            )
             result_rows += grid_rows
         except Exception as e:
             return internal_error('Could not make grid aggregation.', e)
