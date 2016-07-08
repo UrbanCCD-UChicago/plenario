@@ -57,7 +57,7 @@ def detail_aggregate():
 def detail():
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
               'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
-              'date__time_of_day_le')
+              'date__time_of_day_le', 'limit')
     validator = DatasetRequiredValidator(only=fields)
     validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
@@ -264,11 +264,15 @@ def _detail_aggregate(args):
 
 def _detail(args):
 
-    meta_params = ('dataset', 'shape', 'data_type')
+    meta_params = ('dataset', 'shape', 'data_type', 'limit', 'offset')
     meta_vals = (args.data.get(k) for k in meta_params)
-    dataset, shapeset, data_type = meta_vals
+    dataset, shapeset, data_type, limit, offset = meta_vals
 
     q = detail_query(args)
+
+    # Apply limit and offset.
+    q = q.limit(limit)
+    q = q.offset(offset) if offset else q
 
     try:
         columns = [c.name for c in dataset.columns]
@@ -293,9 +297,9 @@ def _detail(args):
 
 def detail_query(args, aggregate=False):
 
-    meta_params = ('dataset', 'shapeset', 'data_type', 'geom', 'offset', 'limit')
+    meta_params = ('dataset', 'shapeset', 'data_type', 'geom')
     meta_vals = (args.data.get(k) for k in meta_params)
-    dataset, shapeset, data_type, geom, offset, limit = meta_vals
+    dataset, shapeset, data_type, geom = meta_vals
 
     # If there aren't tree filters provided, a little formatting is needed
     # to make the general filters into an 'and' tree.
