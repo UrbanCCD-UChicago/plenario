@@ -36,8 +36,8 @@ def timeseries():
     validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
         return bad_request(validated_args.errors)
-
-    return _timeseries(validated_args)
+    panel = _timeseries(validated_args)
+    return _timeseries_response(panel, validated_args)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -49,7 +49,8 @@ def detail_aggregate():
     validated_args = validate(validator, request.args.to_dict())
     if validated_args.errors:
         return bad_request(validated_args.errors)
-    return _detail_aggregate(validated_args)
+    time_counts = _detail_aggregate(validated_args)
+    return _detail_aggregate_response(time_counts, validated_args)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -63,7 +64,8 @@ def detail():
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
-    return _detail(validated_args)
+    result_rows = _detail(validated_args)
+    return _detail_response(result_rows, validated_args)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -75,7 +77,8 @@ def grid():
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
-    return _grid(validated_args)
+    result_data = _grid(validated_args)
+    return _grid_response(result_data)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -89,13 +92,8 @@ def dataset_fields(dataset_name):
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
-    response = _meta(validated_args)
-
-    # API defines column values to be in the 'objects' list.
-    resp_dict = json.loads(response.data)
-    resp_dict['objects'] = resp_dict['objects'][0]['columns']
-    response.data = json.dumps(resp_dict)
-    return response
+    result_data = _meta(validated_args)
+    return _fields_response(result_data, validated_args)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -105,8 +103,8 @@ def meta():
     validated_args = validate(NoDefaultDatesValidator(only=fields), request.args.to_dict())
     if validated_args.errors:
         return bad_request(validated_args.errors)
-
-    return _meta(validated_args)
+    result_data = _meta(validated_args)
+    return _meta_response(result_data, validated_args)
 
 
 # ============
@@ -161,46 +159,7 @@ def _timeseries(args):
         msg = 'Failed to construct timeseries.'
         return internal_error(msg, e)
 
-    panel = MetaTable.attach_metadata(panel)
-    resp = json_response_base(args, panel, args.data)
-
-    datatype = args.data['data_type']
-    if datatype == 'json':
-        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
-        resp.headers['Content-Type'] = 'application/json'
-    elif datatype == 'csv':
-
-        # response format
-        # temporal_group,dataset_name_1,dataset_name_2
-        # 2014-02-24 00:00:00,235,653
-        # 2014-03-03 00:00:00,156,624
-
-        fields = ['temporal_group']
-        for o in resp['objects']:
-            fields.append(o['dataset_name'])
-
-        csv_resp = []
-        i = 0
-        for k, g in groupby(resp['objects'], key=itemgetter('dataset_name')):
-            l_g = list(g)[0]
-
-            j = 0
-            for row in l_g['items']:
-                # first iteration, populate the first column with temporal_groups
-                if i == 0:
-                    csv_resp.append([row['datetime']])
-                csv_resp[j].append(row['count'])
-                j += 1
-            i += 1
-
-        csv_resp.insert(0, fields)
-        csv_resp = make_csv(csv_resp)
-        resp = make_response(csv_resp, 200)
-        resp.headers['Content-Type'] = 'text/csv'
-        filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
-
-    return resp
+    return MetaTable.attach_metadata(panel)
 
 
 def _detail_aggregate(args):
@@ -244,22 +203,7 @@ def _detail_aggregate(args):
 
         time_counts += [{'count': c, 'datetime': d} for c, d in ts[1:]]
 
-    resp = None
-
-    datatype = args.data['data_type']
-    if datatype == 'json':
-        resp = json_response_base(args, time_counts, request.args)
-        resp['count'] = sum([c['count'] for c in time_counts])
-        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
-        resp.headers['Content-Type'] = 'application/json'
-
-    elif datatype == 'csv':
-        resp = make_csv(time_counts)
-        resp.headers['Content-Type'] = 'text/csv'
-        filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
-
-    return resp
+    return time_counts
 
 
 def _detail(args):
@@ -278,21 +222,10 @@ def _detail(args):
         columns = [c.name for c in dataset.columns]
         if shapeset:
             columns += [c.name for c in shapeset.columns]
-        result_rows = [OrderedDict(zip(columns, row)) for row in q.all()]
+        return [OrderedDict(zip(columns, row)) for row in q.all()]
     except Exception as ex:
         session.rollback()
         return internal_error("Failed to fetch records.", ex)
-
-    to_remove = ['point_date', 'hash']
-
-    if data_type == 'json':
-        return form_json_detail_response(to_remove, args, result_rows)
-
-    elif data_type == 'csv':
-        return form_csv_detail_response(to_remove, result_rows)
-
-    elif data_type == 'geojson':
-        return form_geojson_detail_response(to_remove, args, result_rows)
 
 
 def detail_query(args, aggregate=False):
@@ -400,8 +333,6 @@ def _grid(args):
         new_property = {'count': value[0], }
         add_geojson_feature(resp, new_geom, new_property)
 
-    resp = make_response(json.dumps(resp, default=date_json_handler), 200)
-    resp.headers['Content-Type'] = 'application/json'
     return resp
 
 
@@ -468,11 +399,113 @@ def _meta(args):
         # clear column_names off the json, users don't need to see it
         del record['column_names']
 
-    resp = json_response_base(args, metadata_records, request.args)
+    return metadata_records
+
+
+# =================
+# _endpoint_reponse
+# =================
+
+def _meta_response(query_result, query_args):
+
+    resp = json_response_base(query_args, query_result, request.args)
     resp['meta']['total'] = len(resp['objects'])
     status_code = 200
     resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
     resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
+def _fields_response(query_result, query_args):
+
+    resp = json_response_base(query_args, query_result, request.args)
+    resp['objects'] = query_result[0]['columns']
+    status_code = 200
+    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
+def _grid_response(query_result):
+
+    resp = make_response(json.dumps(query_result, default=date_json_handler), 200)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
+def _detail_response(query_result, query_args):
+
+    to_remove = ['point_date', 'hash']
+
+    data_type = query_args.data['data_type']
+    if data_type == 'json':
+        return form_json_detail_response(to_remove, query_args, query_result)
+
+    elif data_type == 'csv':
+        return form_csv_detail_response(to_remove, query_result)
+
+    elif data_type == 'geojson':
+        return form_geojson_detail_response(to_remove, query_args, query_result)
+
+
+def _detail_aggregate_response(query_result, query_args):
+
+    datatype = query_args.data['data_type']
+
+    if datatype == 'csv':
+        resp = make_csv(query_result)
+        resp.headers['Content-Type'] = 'text/csv'
+        filedate = datetime.now().strftime('%Y-%m-%d')
+        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
+    else:
+        resp = json_response_base(query_args, query_result, request.args)
+        resp['count'] = sum([c['count'] for c in query_result])
+        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
+        resp.headers['Content-Type'] = 'application/json'
+
+    return resp
+
+
+def _timeseries_response(query_result, query_args):
+
+    resp = json_response_base(query_args, query_result, query_args.data)
+
+    datatype = query_args.data['data_type']
+    if datatype == 'json':
+        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
+        resp.headers['Content-Type'] = 'application/json'
+    elif datatype == 'csv':
+
+        # response format
+        # temporal_group,dataset_name_1,dataset_name_2
+        # 2014-02-24 00:00:00,235,653
+        # 2014-03-03 00:00:00,156,624
+
+        fields = ['temporal_group']
+        for o in resp['objects']:
+            fields.append(o['dataset_name'])
+
+        csv_resp = []
+        i = 0
+        for k, g in groupby(resp['objects'], key=itemgetter('dataset_name')):
+            l_g = list(g)[0]
+
+            j = 0
+            for row in l_g['items']:
+                # first iteration, populate the first column with temporal_groups
+                if i == 0:
+                    csv_resp.append([row['datetime']])
+                csv_resp[j].append(row['count'])
+                j += 1
+            i += 1
+
+        csv_resp.insert(0, fields)
+        csv_resp = make_csv(csv_resp)
+        resp = make_response(csv_resp, 200)
+        resp.headers['Content-Type'] = 'text/csv'
+        filedate = datetime.now().strftime('%Y-%m-%d')
+        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
+
     return resp
 
 
