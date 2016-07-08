@@ -6,9 +6,8 @@ logging.basicConfig()
 
 if os.environ.get('WORKER'):
     from plenario.update import create_worker
-    for i in range(4):
-        subprocess.Popen(["python", "worker.py"])
-    print "Spawned worker processes."
+    subprocess.Popen(["python", "worker.py"])
+    print "Spawned worker process."
     application = create_worker()
 else:
     from plenario import create_app

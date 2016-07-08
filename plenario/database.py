@@ -6,7 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from plenario.settings import DATABASE_CONN
 
 
-app_engine = create_engine(DATABASE_CONN, convert_unicode=True)
+app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=5)
 
 session = scoped_session(sessionmaker(bind=app_engine,
                                       autocommit=False,
