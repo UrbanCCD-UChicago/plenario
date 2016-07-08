@@ -24,7 +24,7 @@ from plenario.api.jobs import get_status, set_status, get_request, set_result
 from flask import Flask
 
 worker_threads = 4
-max_wait_interval = 10
+max_wait_interval = 15
 do_work = True
 
 # For development, so we can get loud logs.
