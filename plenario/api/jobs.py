@@ -126,12 +126,12 @@ def jobable(fn):
     """
 
     @wraps(fn)
-    def wrapper():
-        is_job = request.args.get('job')
+    def wrapper(validator_result):
+        is_job = validator_result.data.get('job')
         if is_job:
             return make_job_response()
         else:
-            return fn()
+            return fn(validator_result)
     return wrapper
 
 

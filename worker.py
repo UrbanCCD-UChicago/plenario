@@ -4,10 +4,11 @@
 import datetime, time, signal
 import boto.sqs
 import json
+import logging
 from os import urandom
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
-from plenario.api.point import _timeseries
-from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters
+from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta,_grid
+from plenario.api.validator import validate, Validator
 from plenario.api.response import internal_error, bad_request, json_response_base, make_csv
 from plenario.api.jobs import get_status, set_status, get_request, set_result
 from flask import Flask
@@ -16,12 +17,46 @@ wait_interval = 10
 do_work = True
 worker_id = urandom(4).encode('hex')
 
+# For development, so we can get loud logs.
+logging.basicConfig(level=logging.DEBUG)
+
+
+def log(msg):
+    logging.debug(msg)
+    # The constant opening and closing is meh, I know. But I'm feeling lazy
+    # right now.
+    logfile = open('/opt/python/log/worker.log', "a")
+    logfile.write(msg + '\n')
+    logfile.close()
+
+
+# Holds the methods which perform the work requested by an incoming job.
+endpoint_logic = {
+    'timeseries': lambda args: _timeseries(args),
+    'detail-aggregate': lambda args: _detail_aggregate(args),
+    'detail': lambda args: _detail(args),
+    'meta': lambda args: _meta(args),
+    'fields': lambda args: _meta(args),
+    'grid': lambda args: _grid(args),
+    'ping': lambda args: {'hallo': 'from worker {}'.format(worker_id)}
+}
+
+
+def report_job(tick, status_str):
+    return \
+        {status_str:
+            {
+                "workerID": worker_id,
+                "queueTime": get_status(tick)["processing"]["queueTime"],
+                "startTime": get_status(tick)["processing"]["startTime"],
+                "endTime": str(datetime.datetime.now())
+            }}
+
 
 def quit_job(signum, frame):
     global do_work
-    file = open("/opt/python/log/worker.log", "a")
-    file.write("{} - Worker #{}: Got termination signal. Finishing job...\n".format(datetime.datetime.now(), worker_id))
-    file.close()
+    log("{} - Worker #{}: Got termination signal. Finishing job...\n"
+        .format(datetime.datetime.now(), worker_id))
     do_work = False
 
 
@@ -35,89 +70,70 @@ conn = boto.sqs.connect_to_region(
 )
 JobQueue = conn.get_queue(JOBS_QUEUE)
 
-file = open("/opt/python/log/worker.log", "a")
-file.write("{} - Worker #{}: Hello! I'm ready for anything.\n".format(datetime.datetime.now(), worker_id))
+log("{} - Worker #{}: Hello! I'm ready for anything.\n"
+    .format(datetime.datetime.now(), worker_id))
 
 while do_work:
     response = JobQueue.get_messages(message_attributes=["ticket"])
-    file = open("/opt/python/log/worker.log", "a")
     if len(response) > 0:
         job = response[0]
         body = job.get_body()
         if not body == "plenario_job":
-            file.write("{} - Worker #{}: Message is not a Plenario Job. Skipping.\n".format(datetime.datetime.now(),
-                                                                                            worker_id))
-            file.close()
+            log("{} - Worker #{}: Message is not a Plenario Job. Skipping.\n"
+                .format(datetime.datetime.now(), worker_id))
             continue
 
         try:
             ticket = str(job.message_attributes["ticket"]["string_value"])
-        except:
-            file.write("{} - Worker #{}: Job does not contain a ticket! Removing.\n".format(datetime.datetime.now(),
-                                                                                            worker_id))
-            file.close()
-
+        except KeyError:
+            log("{} - Worker #{}: Job does not contain a ticket! Removing.\n"
+                .format(datetime.datetime.now(), worker_id))
             JobQueue.delete_message(job)
 
             continue
 
-        file.write("{} - Worker #{}: Received job with ticket {}.\n".format(datetime.datetime.now(),
-                                                                            worker_id, ticket))
+        log("{} - Worker #{}: Received job with ticket {}.\n"
+            .format(datetime.datetime.now(), worker_id, ticket))
 
         try:
             status = get_status(ticket)
         except Exception as e:
-            file.write("{} - Worker #{}: Job is malformed. Removing.\n".format(datetime.datetime.now(),
-                                                                               worker_id))
-            file.close()
+            log("{} - Worker #{}: Job is malformed. Removing.\n"
+                .format(datetime.datetime.now(), worker_id))
             JobQueue.delete_message(job)
             print e
 
             continue
-        if not "queued" in status.keys():
-            file.write("{} - Worker #{}: Job has already been started. Skipping.\n".format(datetime.datetime.now(),
-                                                                                           worker_id))
-            file.close()
+        if "queued" not in status.keys():
+            log("{} - Worker #{}: Job has already been started. Skipping.\n"
+                .format(datetime.datetime.now(), worker_id))
             continue
 
-        set_status(ticket, {"processing": {"workerID": worker_id, "queueTime": status["queued"]["queueTime"],
-                                           "startTime": str(datetime.datetime.now())}})
-
+        set_status(ticket, report_job(ticket, 'processing'))
         req = get_request(ticket)
 
-        file.write("{} - Worker #{}: Starting work on ticket {}.\n".format(datetime.datetime.now(), worker_id, ticket))
-        file.close()
+        log("{} - Worker #{}: Starting work on ticket {}.\n"
+            .format(datetime.datetime.now(), worker_id, ticket))
 
         ### Do work on query ###
         app = Flask(__name__)
         with app.app_context():
-            # timeseries
-            if req["endpoint"] in ["/v1/api/timeseries", "/v1/api/timeseries/"]:
-                fields = ('location_geom__within', 'dataset_name', 'dataset_name__in',
-                          'agg', 'obs_date__ge', 'obs_date__le', 'data_type')
 
-                validator = NoGeoJSONValidator(only=fields)
-                validated_args = validate(validator, req["query"])
-                if validated_args.errors:
-                    set_result(ticket, bad_request(validated_args.errors))
-                    set_status(ticket, {
-                        "error": {"workerID": worker_id, "queueTime": get_status(ticket)["processing"]["queueTime"],
-                                  "startTime": get_status(ticket)["processing"]["startTime"], "endTime": str(datetime.datetime.now())}})
+            # Just pluck the endpoint name off the end of /v1/api/endpoint.
+            endpoint = req['endpoint'].split('/')[2]
+            query_args = req['query']
 
-                set_result(ticket, json.loads(_timeseries(validated_args).get_data(as_text=True)))
-                set_status(ticket, {
-                    "success": {"workerID": worker_id, "queueTime": get_status(ticket)["processing"]["queueTime"],
-                                "startTime": get_status(ticket)["processing"]["startTime"], "endTime": str(datetime.datetime.now())}})
-            elif req["endpoint"] in ["ping"]:
-                set_result(ticket, {"hello": "from worker {}".format(worker_id)})
-                set_status(ticket, {
-                    "success": {"workerID": worker_id, "queueTime": get_status(ticket)["processing"]["queueTime"],
-                                "startTime": get_status(ticket)["processing"]["startTime"], "endTime": str(datetime.datetime.now())}})
+            logging.debug("WORKER ENDPOINT: {}".format(endpoint))
+            logging.debug("WORKER REQUEST ARGS: {}".format(query_args))
+
+            if endpoint in endpoint_logic:
+                set_result(ticket, endpoint_logic[endpoint](query_args))
+                set_status(ticket, report_job(ticket, 'success'))
 
         JobQueue.delete_message(job)
 
-        file = open("/opt/python/log/worker.log", "a")
-        file.write("{} - Worker #{}: Finished work on ticket {}.\n".format(datetime.datetime.now(), worker_id, ticket))
+        log("{} - Worker #{}: Finished work on ticket {}.\n"
+            .format(datetime.datetime.now(), worker_id, ticket))
 
     else:
         #file.write("{} - Worker #{}: No work. Idling for {} seconds.\n".format(datetime.datetime.now(), worker_id,
@@ -126,8 +142,5 @@ while do_work:
         # No work! Idle for a bit to save compute cycles.
         time.sleep(wait_interval)
 
-    file.close()
-
-file = open("/opt/python/log/worker.log", "a")
-file.write("{} - Worker #{}: Exited run loop. Goodbye!\n".format(datetime.datetime.now(), worker_id, wait_interval))
-file.close()
+log("{} - Worker #{}: Exited run loop. Goodbye!\n"
+    .format(datetime.datetime.now(), worker_id, wait_interval))

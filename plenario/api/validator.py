@@ -53,6 +53,7 @@ class Validator(Schema):
     limit = fields.Integer(default=1000)
     offset = fields.Integer(default=0, validate=Range(0))
     resolution = fields.Integer(default=500, validate=Range(0))
+    job = fields.Bool(default=False)
 
 
 class DatasetRequiredValidator(Validator):

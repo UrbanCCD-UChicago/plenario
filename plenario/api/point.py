@@ -28,29 +28,38 @@ from plenario.models import MetaTable
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-@jobable
 def timeseries():
     fields = ('location_geom__within', 'dataset_name', 'dataset_name__in',
-              'agg', 'obs_date__ge', 'obs_date__le', 'data_type')
+              'agg', 'obs_date__ge', 'obs_date__le', 'data_type', 'job')
     validator = NoGeoJSONValidator(only=fields)
-    validated_args = validate(validator, request.args.to_dict())
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
-    panel = _timeseries(validated_args)
-    return _timeseries_response(panel, validated_args)
+    validator_result = validate(validator, request.args.to_dict())
+
+    if validator_result.errors:
+        return bad_request(validator_result.errors)
+
+    if validator_result.data.get('job'):
+        return _timeseries(validator_result)
+    else:
+        panel = _timeseries(validator_result)
+        return _timeseries_response(panel, validator_result)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail_aggregate():
     fields = ('location_geom__within', 'dataset_name', 'agg', 'obs_date__ge',
-              'obs_date__le', 'data_type')
+              'obs_date__le', 'data_type', 'job')
     validator = NoGeoJSONDatasetRequiredValidator(only=fields)
-    validated_args = validate(validator, request.args.to_dict())
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
-    time_counts = _detail_aggregate(validated_args)
-    return _detail_aggregate_response(time_counts, validated_args)
+    validator_result = validate(validator, request.args.to_dict())
+
+    if validator_result.errors:
+        return bad_request(validator_result.errors)
+
+    if validator_result.data.get('job'):
+        return _detail_aggregate(validator_result)
+    else:
+        time_counts = _detail_aggregate(validator_result)
+        return _detail_aggregate_response(time_counts, validator_result)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -58,27 +67,35 @@ def detail_aggregate():
 def detail():
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
               'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
-              'date__time_of_day_le', 'limit')
+              'date__time_of_day_le', 'limit', 'job')
     validator = DatasetRequiredValidator(only=fields)
-    validated_args = validate(validator, request.args.to_dict())
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
+    validator_result = validate(validator, request.args.to_dict())
 
-    result_rows = _detail(validated_args)
-    return _detail_response(result_rows, validated_args)
+    if validator_result.errors:
+        return bad_request(validator_result.errors)
+
+    if validator_result.data.get('job'):
+        return _detail(validator_result)
+    else:
+        result_rows = _detail(validator_result)
+        return _detail_response(result_rows, validator_result)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def grid():
     fields = ('dataset_name', 'resolution', 'buffer', 'obs_date__le', 'obs_date__ge',
-              'location_geom__within')
-    validated_args = validate(DatasetRequiredValidator(only=fields), request.args.to_dict())
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
+              'location_geom__within', 'job')
+    validator_result = validate(DatasetRequiredValidator(only=fields), request.args.to_dict())
 
-    result_data = _grid(validated_args)
-    return _grid_response(result_data)
+    if validator_result.errors:
+        return bad_request(validator_result.errors)
+
+    if validator_result.data.get('job'):
+        return _grid(validator_result)
+    else:
+        result_data = _grid(validator_result)
+        return _grid_response(result_data)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -86,31 +103,41 @@ def grid():
 def dataset_fields(dataset_name):
     request_args = request.args.to_dict()
     request_args['dataset_name'] = dataset_name
-    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name')
+    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name', 'job')
     validator = DatasetRequiredValidator(only=fields)
-    validated_args = validate(validator, request_args)
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
+    validator_result = validate(validator, request_args)
 
-    result_data = _meta(validated_args)
-    return _fields_response(result_data, validated_args)
+    if validator_result.errors:
+        return bad_request(validator_result.errors)
+
+    if validator_result.data.get('job'):
+        return _meta(validator_result)
+    else:
+        result_data = _meta(validator_result)
+        return _fields_response(result_data, validator_result)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def meta():
-    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name', 'location_geom__within')
-    validated_args = validate(NoDefaultDatesValidator(only=fields), request.args.to_dict())
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
-    result_data = _meta(validated_args)
-    return _meta_response(result_data, validated_args)
+    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name', 'location_geom__within', 'job')
+    validator_result = validate(NoDefaultDatesValidator(only=fields), request.args.to_dict())
+
+    if validator_result.errors:
+        return bad_request(validator_result.errors)
+
+    if validator_result.data.get('job'):
+        return _meta(validator_result)
+    else:
+        result_data = _meta(validator_result)
+        return _meta_response(result_data, validator_result)
 
 
 # ============
 # _route logic
 # ============
 
+@jobable
 def _timeseries(args):
 
     meta_params = ['geom', 'dataset', 'dataset_name__in', 'obs_date__ge', 'obs_date__le', 'agg']
@@ -162,7 +189,9 @@ def _timeseries(args):
     return MetaTable.attach_metadata(panel)
 
 
+@jobable
 def _detail_aggregate(args):
+
     """Returns a record for every row in the specified dataset with brief
     temporal and spatial information about the row. This can give a user of the
     platform a quick overview about what is available within their constraints.
@@ -206,8 +235,8 @@ def _detail_aggregate(args):
     return time_counts
 
 
+@jobable
 def _detail(args):
-
     meta_params = ('dataset', 'shape', 'data_type', 'limit', 'offset')
     meta_vals = (args.data.get(k) for k in meta_params)
     dataset, shapeset, data_type, limit, offset = meta_vals
@@ -228,6 +257,7 @@ def _detail(args):
         return internal_error("Failed to fetch records.", ex)
 
 
+@jobable
 def detail_query(args, aggregate=False):
 
     meta_params = ('dataset', 'shapeset', 'data_type', 'geom')
@@ -287,6 +317,7 @@ def detail_query(args, aggregate=False):
     return q
 
 
+@jobable
 def _grid(args):
 
     meta_params = ('dataset', 'geom', 'resolution', 'buffer')
@@ -336,6 +367,7 @@ def _grid(args):
     return resp
 
 
+@jobable
 def _meta(args):
     """Generate meta information about table(s) with records from MetaTable.
 
@@ -522,7 +554,8 @@ def request_args_to_condition_tree(request_args, ignore=list()):
 
     :returns: condition tree"""
 
-    ignored = {'agg', 'data_type', 'dataset', 'geom', 'limit', 'offset', 'shape', 'shapeset'}
+    ignored = {'agg', 'data_type', 'dataset', 'geom', 'limit', 'offset',
+               'shape', 'shapeset', 'job'}
     for val in ignore:
         ignored.add(val)
 
