@@ -17,6 +17,15 @@ def make_error(msg, status_code):
     resp['meta']['query'] = request.args
     return make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
 
+def make_raw_error(msg):
+    resp = {
+        'meta': {
+            'status': 'error',
+            'message': msg,
+        },
+        'objects': [],
+    }
+    return resp
 
 def bad_request(msg):
     return make_error(msg, 400)

@@ -2,6 +2,7 @@ import json
 import shapely.geometry
 import shapely.wkb
 import sqlalchemy
+import traceback
 
 from collections import OrderedDict
 from datetime import datetime
@@ -12,12 +13,12 @@ from operator import itemgetter
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
 from plenario.api.common import make_cache_key, date_json_handler, unknown_object_json_handler
 from plenario.api.condition_builder import parse_tree
-from plenario.api.response import internal_error, bad_request, json_response_base, make_csv
+from plenario.api.response import make_raw_error, bad_request, json_response_base, make_csv
 from plenario.api.response import geojson_response_base, form_csv_detail_response, form_json_detail_response
 from plenario.api.response import form_geojson_detail_response, add_geojson_feature
 from plenario.api.validator import DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
 from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters
-from plenario.api.jobs import jobable
+from plenario.api.jobs import make_job_response
 from plenario.database import session
 from plenario.models import MetaTable
 
@@ -38,7 +39,7 @@ def timeseries():
         return bad_request(validator_result.errors)
 
     if validator_result.data.get('job'):
-        return _timeseries(validator_result)
+        return make_job_response("timeseries", validator_result)
     else:
         panel = _timeseries(validator_result)
         return _timeseries_response(panel, validator_result)
@@ -56,7 +57,7 @@ def detail_aggregate():
         return bad_request(validator_result.errors)
 
     if validator_result.data.get('job'):
-        return _detail_aggregate(validator_result)
+        return make_job_response("detail-aggregate", validator_result)
     else:
         time_counts = _detail_aggregate(validator_result)
         return _detail_aggregate_response(time_counts, validator_result)
@@ -75,7 +76,7 @@ def detail():
         return bad_request(validator_result.errors)
 
     if validator_result.data.get('job'):
-        return _detail(validator_result)
+        return make_job_response("detail", validator_result)
     else:
         result_rows = _detail(validator_result)
         return _detail_response(result_rows, validator_result)
@@ -92,7 +93,7 @@ def grid():
         return bad_request(validator_result.errors)
 
     if validator_result.data.get('job'):
-        return _grid(validator_result)
+        return make_job_response("grid", validator_result)
     else:
         result_data = _grid(validator_result)
         return _grid_response(result_data)
@@ -111,7 +112,7 @@ def dataset_fields(dataset_name):
         return bad_request(validator_result.errors)
 
     if validator_result.data.get('job'):
-        return _meta(validator_result)
+        return make_job_response("fields", validator_result)
     else:
         result_data = _meta(validator_result)
         return _fields_response(result_data, validator_result)
@@ -127,7 +128,7 @@ def meta():
         return bad_request(validator_result.errors)
 
     if validator_result.data.get('job'):
-        return _meta(validator_result)
+        return make_job_response("meta", validator_result)
     else:
         result_data = _meta(validator_result)
         return _meta_response(result_data, validator_result)
@@ -137,7 +138,7 @@ def meta():
 # _route logic
 # ============
 
-@jobable
+
 def _timeseries(args):
 
     meta_params = ['geom', 'dataset', 'dataset_name__in', 'obs_date__ge', 'obs_date__le', 'agg']
@@ -168,8 +169,11 @@ def _timeseries(args):
     try:
         table_names = MetaTable.narrow_candidates(table_names, start_date, end_date, geom)
     except Exception as e:
+        traceback.print_exc()
         msg = 'Failed to gather candidate tables.'
-        return internal_error(msg, e)
+        return make_raw_error("{}: {}".format(msg, e))
+        # TODO: Correctly handle _timeseries (and all the other endpoints)
+        # TODO: so that make_error is called when there is an error.
 
     # If there aren't any table names, it causes an error down the code. Better
     # to return and inform them that the request wouldn't have found anything.
@@ -184,12 +188,11 @@ def _timeseries(args):
         )
     except Exception as e:
         msg = 'Failed to construct timeseries.'
-        return internal_error(msg, e)
+        return make_raw_error("{}: {}".format(msg, e))
 
     return MetaTable.attach_metadata(panel)
 
 
-@jobable
 def _detail_aggregate(args):
 
     """Returns a record for every row in the specified dataset with brief
@@ -228,14 +231,14 @@ def _detail_aggregate(args):
                 agg, start_date, end_date, geom, conditions
             )
         except Exception as e:
-            return internal_error('Failed to construct timeseries', e)
+            msg = 'Failed to construct timeseries'
+            return make_raw_error("{}: {}".format(msg, e))
 
         time_counts += [{'count': c, 'datetime': d} for c, d in ts[1:]]
 
     return time_counts
 
 
-@jobable
 def _detail(args):
     meta_params = ('dataset', 'shape', 'data_type', 'limit', 'offset')
     meta_vals = (args.data.get(k) for k in meta_params)
@@ -252,12 +255,12 @@ def _detail(args):
         if shapeset:
             columns += [c.name for c in shapeset.columns]
         return [OrderedDict(zip(columns, row)) for row in q.all()]
-    except Exception as ex:
+    except Exception as e:
         session.rollback()
-        return internal_error("Failed to fetch records.", ex)
+        msg = "Failed to fetch records."
+        return make_raw_error("{}: {}".format(msg, e))
 
 
-@jobable
 def detail_query(args, aggregate=False):
 
     meta_params = ('dataset', 'shapeset', 'data_type', 'geom', 'obs_date__ge',
@@ -322,7 +325,6 @@ def detail_query(args, aggregate=False):
     return q
 
 
-@jobable
 def _grid(args):
 
     meta_params = ('dataset', 'geom', 'resolution', 'buffer', 'obs_date__ge',
@@ -361,7 +363,8 @@ def _grid(args):
             )
             result_rows += grid_rows
         except Exception as e:
-            return internal_error('Could not make grid aggregation.', e)
+            msg = 'Could not make grid aggregation.'
+            return make_raw_error("{}: {}".format(msg, e))
 
     resp = geojson_response_base()
     for value in result_rows:
@@ -378,7 +381,6 @@ def _grid(args):
     return resp
 
 
-@jobable
 def _meta(args):
     """Generate meta information about table(s) with records from MetaTable.
 

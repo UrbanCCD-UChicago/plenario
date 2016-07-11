@@ -1,15 +1,16 @@
 """jobs: api endpoint for submitting, monitoring, and deleting jobs"""
 
-import boto.sqs, redis, json
-from boto.sqs.message import Message
-from os import urandom
-import datetime, time
+import boto.sqs
+import redis
+import json
+import datetime
+import time
 
 from plenario.settings import CACHE_CONFIG, AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
 from plenario.api.common import unknown_object_json_handler
-from plenario.database import session as Session
 from flask import request, make_response
-from functools32 import wraps
+from boto.sqs.message import Message
+from os import urandom
 
 # ========================================= #
 # HTTP      URI         ACTION              #
@@ -28,7 +29,7 @@ def get_status(ticket):
 
 
 def set_status(ticket, status):
-    JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_status_" + ticket, json.dumps(status))
+    JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_status_" + ticket, json.dumps(status, default=unknown_object_json_handler))
 
 
 def get_request(ticket):
@@ -36,7 +37,7 @@ def get_request(ticket):
 
 
 def set_request(ticket, request):
-    JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_query_" + ticket, json.dumps(request))
+    JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_query_" + ticket, json.dumps(request, default=unknown_object_json_handler))
 
 
 def get_result(ticket):
@@ -44,7 +45,7 @@ def get_result(ticket):
 
 
 def set_result(ticket, result):
-    JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_result_" + ticket, json.dumps(result))
+    JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_result_" + ticket, json.dumps(result, default=unknown_object_json_handler))
 
 
 def touch_ticket_expiry(ticket):
@@ -88,17 +89,17 @@ def get_job(ticket):
     return resp
 
 
-def post_job():
-    # TODO: Establish a friendly form!
-    return make_job_response()
+# def post_job():
+#     # TODO: Establish a friendly form!
+#     return make_job_response()
 
 #def delete_job(job_id):
 #    return '200 Ok: job', job_id, 'removed'
 
 
-def make_job_response():
+def make_job_response(endpoint, validated_query):
 
-    req = {"endpoint": request.path, "query": request.args.to_dict()}
+    req = {"endpoint": endpoint, "query": validated_query.data}
 
     ticket = submit_job(req)
 
@@ -115,31 +116,27 @@ def make_job_response():
 # enqueue_message: creates a job message and adds it to a queue for the worker
 
 
-def jobable(fn):
-    """
-    Decorating for existing route functions. Allows user to specify if they
-    would like to add their query to the job queue and recieve a ticket.
-
-    :param fn: flask route function
-
-    :returns: decorated endpoint
-    """
-
-    @wraps(fn)
-    def wrapper(validator_result):
-        is_job = validator_result.data.get('job')
-        if is_job:
-            return make_job_response()
-        else:
-            return fn(validator_result)
-    return wrapper
+# def jobable(fn):
+#     """
+#     Decorating for existing route functions. Allows user to specify if they
+#     would like to add their query to the job queue and recieve a ticket.
+#
+#     :param fn: flask route function
+#
+#     :returns: decorated endpoint
+#     """
+#     is_job = validator_result.data.get('job')
+#     if is_job:
+#         return make_job_response()
+#     else:
+#         return fn(validator_result)
 
 
 def submit_job(req):
     """
     Submit job to a Plenario Worker via the Amazon SQS Queue and Redis. Return a ticket for the job.
 
-    :param request: The job request
+    :param req: The job request
 
     :returns: ticket: An id that can be used to fetch the job results and status.
     """
@@ -167,7 +164,7 @@ def submit_job(req):
         }
     }
 
-    set_status(ticket, {"queued": {"queueTime": str(datetime.datetime.now())}})
+    set_status(ticket, {"status": "queued", "meta": {"queueTime": str(datetime.datetime.now())}})
     touch_ticket_expiry(ticket)
 
     #Send this *last* after everything is ready.

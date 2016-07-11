@@ -27,7 +27,7 @@ api.add_url_rule(prefix + '/shapes/', 'shape_index', get_all_shape_datasets)
 api.add_url_rule(prefix + '/shapes/<dataset_name>', 'shape_export', export_shape)
 api.add_url_rule(prefix + '/shapes/<polygon_dataset_name>/<point_dataset_name>', 'aggregate', aggregate_point_data)
 
-api.add_url_rule(prefix + '/jobs', view_func=post_job, methods=['POST'])
+#api.add_url_rule(prefix + '/jobs', view_func=post_job, methods=['POST'])
 api.add_url_rule(prefix + '/jobs/<ticket>', view_func=get_job, methods=['GET'])
 #api.add_url_rule(prefix + '/jobs/<job_id>', view_func=deleteJob, methods=['DELETE'])
 

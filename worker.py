@@ -9,57 +9,33 @@
 # appropriate number of worker threads and watches over them. #
 ###############################################################
 
-import datetime, time, signal
+import datetime
+import time
+import signal
 import boto.sqs
-import json
-import logging
 import random
 import threading
+import traceback
 from os import urandom
+from collections import namedtuple
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
 from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta,_grid
-from plenario.api.validator import validate, Validator
-from plenario.api.response import internal_error, bad_request, json_response_base, make_csv
 from plenario.api.jobs import get_status, set_status, get_request, set_result
+from plenario.api.validator import convert
 from flask import Flask
 
 worker_threads = 4
 max_wait_interval = 15
 do_work = True
 
-# For development, so we can get loud logs.
-logging.basicConfig(level=logging.DEBUG)
+ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
 
-
-def log(msg, id):
-    logging.debug(msg)
+def log(msg, worker_id):
     # The constant opening and closing is meh, I know. But I'm feeling lazy
     # right now.
     logfile = open('/opt/python/log/worker.log', "a")
-    logfile.write("{} - Worker #{}: {}\n".format(datetime.datetime.now(), id, msg) + '\n')
+    logfile.write("{} - Worker #{}: {}\n".format(datetime.datetime.now(), worker_id, msg))
     logfile.close()
-
-
-# Holds the methods which perform the work requested by an incoming job.
-endpoint_logic = {
-    'timeseries': lambda args: _timeseries(args),
-    'detail-aggregate': lambda args: _detail_aggregate(args),
-    'detail': lambda args: _detail(args),
-    'meta': lambda args: _meta(args),
-    'fields': lambda args: _meta(args),
-    'grid': lambda args: _grid(args),
-}
-
-
-def report_job(tick, status_str, id):
-    return \
-        {status_str:
-            {
-                "workerID": id,
-                "queueTime": get_status(tick)["processing"]["queueTime"],
-                "startTime": get_status(tick)["processing"]["startTime"],
-                "endTime": str(datetime.datetime.now())
-            }}
 
 
 def stop_workers(signum, frame):
@@ -81,76 +57,92 @@ JobQueue = conn.get_queue(JOBS_QUEUE)
 def worker():
     worker_id = urandom(4).encode('hex')
 
-    endpoint_logic['ping'] = lambda args: {'hello': 'from worker id {}'.format(worker_id)}
+    # Holds the methods which perform the work requested by an incoming job.
+    app = Flask(__name__)
+    with app.app_context():
 
-    log("Hello! I'm ready for anything.", worker_id)
+        endpoint_logic = {
+            'timeseries': lambda args: _timeseries(args),
+            'detail-aggregate': lambda args: _detail_aggregate(args),
+            'detail': lambda args: _detail(args),
+            'meta': lambda args: _meta(args),
+            'fields': lambda args: _meta(args),
+            'grid': lambda args: _grid(args),
+            'ping': lambda args: {'hello': 'from worker id {}'.format(worker_id)}
+        }
 
-    while do_work:
-        response = JobQueue.get_messages(message_attributes=["ticket"])
-        if len(response) > 0:
-            job = response[0]
-            body = job.get_body()
-            if not body == "plenario_job":
-                log("{} - Worker #{}: Message is not a Plenario Job. Skipping.\n"
-                    .format(datetime.datetime.now(), worker_id))
-                continue
+        log("Hello! I'm ready for anything.", worker_id)
 
-            try:
-                ticket = str(job.message_attributes["ticket"]["string_value"])
-            except KeyError:
-                log("{} - Worker #{}: Job does not contain a ticket! Removing.\n"
-                    .format(datetime.datetime.now(), worker_id))
-                JobQueue.delete_message(job)
+        while do_work:
+            response = JobQueue.get_messages(message_attributes=["ticket"])
+            if len(response) > 0:
+                job = response[0]
+                body = job.get_body()
+                if not body == "plenario_job":
+                    log("Message is not a Plenario Job. Skipping.", worker_id)
+                    continue
 
-                continue
+                try:
+                    ticket = str(job.message_attributes["ticket"]["string_value"])
+                except KeyError:
+                    log("Job does not contain a ticket! Removing.", worker_id)
+                    JobQueue.delete_message(job)
 
-            log("{} - Worker #{}: Received job with ticket {}.\n"
-                .format(datetime.datetime.now(), worker_id, ticket))
+                    continue
 
-            try:
-                status = get_status(ticket)
-            except Exception as e:
-                log("{} - Worker #{}: Job is malformed. Removing.\n"
-                    .format(datetime.datetime.now(), worker_id))
-                JobQueue.delete_message(job)
-                print e
+                log("Received job with ticket {}.".format(ticket), worker_id)
 
-                continue
-            if "queued" not in status.keys():
-                log("{} - Worker #{}: Job has already been started. Skipping.\n"
-                    .format(datetime.datetime.now(), worker_id))
-                continue
+                try:
+                    status = get_status(ticket)
+                    status["status"]
+                    status["meta"]
+                except Exception as e:
+                    print(get_status(ticket))
+                    log("Job is malformed ({}). Removing.".format(e), worker_id)
+                    JobQueue.delete_message(job)
 
-            set_status(ticket, report_job(ticket, 'processing', worker_id))
-            req = get_request(ticket)
+                    continue
+                if status["status"] != "queued":
+                    log("Job has already been started. Skipping.", worker_id)
+                    continue
 
-            log("{} - Worker #{}: Starting work on ticket {}.\n"
-                .format(datetime.datetime.now(), worker_id, ticket))
+                status["status"] = "processing"
+                status["meta"]["startTime"] = str(datetime.datetime.now())
+                set_status(ticket, status)
+                req = get_request(ticket)
 
-            ### Do work on query ###
-            app = Flask(__name__)
-            with app.app_context():
+                log("Starting work on ticket {}.".format(ticket), worker_id)
 
-                # Just pluck the endpoint name off the end of /v1/api/endpoint.
-                endpoint = req['endpoint'].split('/')[-1]
-                query_args = req['query']
+                # =========== Do work on query =========== #
+                try:
+                    # Just pluck the endpoint name off the end of /v1/api/endpoint.
+                    endpoint = req['endpoint'].split('/')[-1]
+                    query_args = req['query']
 
-                logging.debug("WORKER ENDPOINT: {}".format(endpoint))
-                logging.debug("WORKER REQUEST ARGS: {}".format(query_args))
+                    convert(query_args)
+                    query_args = ValidatorProxy(query_args)
 
-                if endpoint in endpoint_logic:
-                    set_result(ticket, endpoint_logic[endpoint](query_args))
-                    set_status(ticket, report_job(ticket, 'success', worker_id))
+                    if endpoint in endpoint_logic:
+                        status["status"] = "success"
+                        status["meta"]["endTime"] = str(datetime.datetime.now())
+                        set_result(ticket, endpoint_logic[endpoint](query_args))
+                        set_status(ticket, status)
+                except Exception as e:
+                    status["status"] = "error"
+                    status["meta"]["endTime"] = str(datetime.datetime.now())
+                    log("Ticket {} errored with: {}.".format(ticket, e), worker_id)
+                    set_status(ticket, status)
+                    JobQueue.delete_message(job)
+                    traceback.print_exc()
 
+                log("Finished work on ticket {}.".format(ticket), worker_id)
 
-            log("Finished work on ticket {}.".format(ticket), worker_id);
-
-        else:
-            # No work! Idle for a bit to save compute cycles.
-            # This interval is random in order to stagger workers
-            idle = random.randrange(max_wait_interval)
-            log("Ho hum nothing to do. Idling for {} seconds.".format(idle))
-            time.sleep(idle)
+            else:
+                # No work! Idle for a bit to save compute cycles.
+                # This interval is random in order to stagger workers
+                idle = random.randrange(max_wait_interval)
+                log("Ho hum nothing to do. Idling for {} seconds.".format(idle), worker_id)
+                time.sleep(idle)
 
     log("Exited run loop. Goodbye!", worker_id)
 
