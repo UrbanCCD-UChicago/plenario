@@ -92,6 +92,16 @@ class ShapeTests(BasePlenarioTest):
         self.assertEqual(shape_nums['zip_codes'], 61)
         self.assertEqual(shape_nums['pedestrian_streets'], 41)
 
+    def test_column_metadata(self):
+        resp = self.app.get('/v1/api/shapes/')
+        response_data = json.loads(resp.data)
+
+        limits = filter(
+            lambda dset: dset['dataset_name'] == 'chicago_city_limits',
+            response_data['objects']
+        )[0]
+        self.assertEqual(4, len(limits['columns']))
+
 
     ''' /intersections '''
 
@@ -290,4 +300,3 @@ class ShapeTests(BasePlenarioTest):
             self.assertFalse(feature['properties'].get('hash'))
             self.assertFalse(feature['properties'].get('ogc_fid'))
             self.assertTrue(feature['properties'].get('count'))
-
