@@ -15,6 +15,7 @@ if CELERY_SENTRY_URL:
     handler = SentryHandler(CELERY_SENTRY_URL)
     setup_logging(handler)
 
+
 def delete_dataset(source_url_hash):
     md = session.query(MetaTable).get(source_url_hash)
     try:
@@ -29,6 +30,7 @@ def delete_dataset(source_url_hash):
     except InternalError, e:
         raise delete_dataset.retry(exc=e)
     return 'Deleted {0} ({1})'.format(md.human_name, md.source_url_hash)
+
 
 def add_dataset(self, source_url_hash, data_types=None):
     md = session.query(MetaTable).get(source_url_hash)
@@ -57,6 +59,7 @@ def add_shape(table_name):
     return 'Finished adding shape dataset {} from {}.'.format(meta.dataset_name,
                                                               meta.source_url)
 
+
 def update_shape(table_name):
     meta = session.query(ShapeMetadata).get(table_name)
 
@@ -65,11 +68,13 @@ def update_shape(table_name):
     return 'Finished updating shape dataset {} from {}.'.\
         format(meta.dataset_name, meta.source_url)
 
+
 def delete_shape(table_name):
     shape_meta = session.query(ShapeMetadata).get(table_name)
     shape_meta.remove_table()
     session.commit()
     return 'Removed {}'.format(table_name)
+
 
 def frequency_update(frequency):
     # hourly, daily, weekly, monthly, yearly
@@ -88,6 +93,7 @@ def frequency_update(frequency):
         update_shape.delay(m.dataset_name)
     return '%s update complete' % frequency
 
+
 def update_dataset(self, source_url_hash):
     md = session.query(MetaTable).get(source_url_hash)
     if md.result_ids:
@@ -102,6 +108,7 @@ def update_dataset(self, source_url_hash):
     etl = PlenarioETL(md)
     etl.update()
     return 'Finished updating {0} ({1})'.format(md.human_name, md.source_url_hash)
+
 
 def update_metar():
     print "update_metar()"

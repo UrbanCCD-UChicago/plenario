@@ -22,6 +22,9 @@ from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, J
 from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta,_grid
 from plenario.api.jobs import get_status, set_status, get_request, set_result
 from plenario.api.validator import convert
+from plenario.tasks import add_dataset, delete_dataset, update_dataset
+from plenario.tasks import add_shape, update_shape, delete_shape
+from plenario.tasks import frequency_update
 from flask import Flask
 
 worker_threads = 4
@@ -62,12 +65,19 @@ def worker():
     with app.app_context():
 
         endpoint_logic = {
+            # Point endpoints.
             'timeseries': lambda args: _timeseries(args),
             'detail-aggregate': lambda args: _detail_aggregate(args),
             'detail': lambda args: _detail(args),
             'meta': lambda args: _meta(args),
             'fields': lambda args: _meta(args),
             'grid': lambda args: _grid(args),
+            # ETL Task endpoints.
+            'add_dataset': lambda args: add_dataset(args),
+            'delete_dataset': lambda args: delete_dataset(args),
+            'add_shape': lambda args: add_shape(args),
+            'delete_shape': lambda args: delete_shape(args),
+            # Health endpoint.
             'ping': lambda args: {'hello': 'from worker id {}'.format(worker_id)}
         }
 
@@ -115,8 +125,7 @@ def worker():
 
                 # =========== Do work on query =========== #
                 try:
-                    # Just pluck the endpoint name off the end of /v1/api/endpoint.
-                    endpoint = req['endpoint'].split('/')[-1]
+                    endpoint = req['endpoint']
                     query_args = req['query']
 
                     convert(query_args)

@@ -57,4 +57,4 @@ MAIL_PASSWORD = get('MAIL_PASSWORD', '')
 MAINTENANCE = False
 
 #SQS Jobs Queue
-JOBS_QUEUE = get('JOBS_QUEUE', 'PlenarioQueue')
+JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-queue-test')

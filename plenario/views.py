@@ -21,7 +21,6 @@ from wtforms.validators import DataRequired
 from plenario.api.jobs import submit_job, get_status
 from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata
-from plenario.tasks import delete_dataset as delete_dataset_task, delete_shape as delete_shape_task
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 
 views = Blueprint('views', __name__)
@@ -83,8 +82,8 @@ def approve_shape(dataset_name):
     session.commit()
     # Ingest it
     #add_shape_task.delay(dataset_name)
-    job = {"endpoint": "add_shape_task", "query": {"dataset_name": meta.dataset_name}};
-    submit_job(job);
+    job = {"endpoint": "add_shape_task", "query": meta.dataset_name}
+    submit_job(job)
     send_approval_email(meta.human_name, meta.contributor_name,
                         meta.contributor_email)
 
@@ -103,8 +102,8 @@ def approve_dataset(source_url_hash):
     session.commit()
     # Ingest it
     #add_dataset_task.delay(source_url_hash)
-    job = {"endpoint": "add_dataset", "query": {"source_url_hash": meta.source_url_hash}};
-    submit_job(job);
+    job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
+    submit_job(job)
     send_approval_email(meta.human_name, meta.contributor_name,
                         meta.contributor_email)
 
@@ -210,12 +209,12 @@ def submit(context):
         # Now fire ingestion task...
         if is_admin:
             if is_shapefile:
-                job = {"endpoint": "add_shape", "query": {"dataset_name": meta.dataset_name}};
-                submit_job(job);
+                job = {"endpoint": "add_shape", "query": meta.dataset_name}
+                submit_job(job)
                 #add_shape_task.delay(meta.dataset_name)
             else:
-                job = {"endpoint": "add_dataset", "query": {"source_url_hash": meta.source_url_hash}};
-                submit_job(job);
+                job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
+                submit_job(job)
                 #add_dataset_task.delay(meta.source_url_hash)
         # or send thankyou email
         else:
@@ -808,15 +807,15 @@ def edit_dataset(source_url_hash):
 @views.route('/admin/delete-dataset/<source_url_hash>')
 @login_required
 def delete_dataset(source_url_hash):
-    result = delete_dataset_task(source_url_hash)
+    ticket = submit_job({'endpoint': 'delete_dataset', 'query': source_url_hash})
     return make_response(json.dumps({'status': 'success',
-                                     'text': result}))
+                                     'ticket': ticket}))
 
 
 @views.route('/update-dataset/<source_url_hash>')
 def update_dataset(source_url_hash):
-    job = {"endpoint": "update_dataset", "query": {"source_url_hash": source_url_hash}};
-    ticket = submit_job(job);
+    job = {"endpoint": "update_dataset", "query": source_url_hash}
+    ticket = submit_job(job)
     #result = update_dataset_task.delay(source_url_hash)
     return make_response(json.dumps({'status': 'success',
                                      'ticket': ticket}))
@@ -844,6 +843,6 @@ def shape_status():
 @views.route('/admin/delete-shape/<table_name>')
 @login_required
 def delete_shape(table_name):
-    result = delete_shape_task(table_name)
+    ticket = submit_job({'endpoint': 'delete_shape', 'query': table_name})
     return make_response(json.dumps({'status': 'success',
-                                     'text': result}))
+                                     'ticket': ticket}))
