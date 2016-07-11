@@ -6,7 +6,7 @@ from shape import get_all_shape_datasets,\
                     export_shape, aggregate_point_data
 from time import sleep
 from sensor import weather_stations, weather
-from jobs import post_job, get_job
+from jobs import get_job
 
 API_VERSION = '/v1'
 

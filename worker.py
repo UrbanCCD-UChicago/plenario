@@ -123,9 +123,9 @@ def worker():
                     query_args = ValidatorProxy(query_args)
 
                     if endpoint in endpoint_logic:
+                        set_result(ticket, endpoint_logic[endpoint](query_args))
                         status["status"] = "success"
                         status["meta"]["endTime"] = str(datetime.datetime.now())
-                        set_result(ticket, endpoint_logic[endpoint](query_args))
                         set_status(ticket, status)
                 except Exception as e:
                     status["status"] = "error"
