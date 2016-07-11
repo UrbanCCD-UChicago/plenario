@@ -1,3 +1,4 @@
+import os
 import json
 import shapely.geometry
 import shapely.wkb
@@ -19,8 +20,15 @@ from plenario.api.response import form_geojson_detail_response, add_geojson_feat
 from plenario.api.validator import DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
 from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters
 from plenario.api.jobs import make_job_response
-from plenario.database import session
 from plenario.models import MetaTable
+
+# Use the standard pool if this is just the app,
+# but use the shared connection pool if this
+# is the worker. It's more efficient!
+if os.environ.get('WORKER'):
+    from worker import session
+else:
+    from plenario.database import session
 
 
 # ======
