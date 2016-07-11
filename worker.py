@@ -128,8 +128,12 @@ def worker():
                     endpoint = req['endpoint']
                     query_args = req['query']
 
-                    convert(query_args)
-                    query_args = ValidatorProxy(query_args)
+                    # Simpler endpoints, like the ETL Tasks, only really
+                    # need a single string argument. No point in converting
+                    # it to a ValidatorProxy.
+                    if type(query_args) != str:
+                        convert(query_args)
+                        query_args = ValidatorProxy(query_args)
 
                     if endpoint in endpoint_logic:
                         status["status"] = "success"
