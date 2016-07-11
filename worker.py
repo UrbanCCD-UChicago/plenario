@@ -114,7 +114,7 @@ if __name__ == "__main__":
                         status["status"]
                         status["meta"]
                     except Exception as e:
-                        print(get_status(ticket))
+                        traceback.print_exc()
                         log("Job is malformed ({}). Removing.".format(e), worker_id)
                         JobQueue.delete_message(job)
 
@@ -138,7 +138,7 @@ if __name__ == "__main__":
                         # Simpler endpoints, like the ETL Tasks, only really
                         # need a single string argument. No point in converting
                         # it to a ValidatorProxy.
-                        if type(query_args) != str:
+                        if type(query_args) != unicode:
                             convert(query_args)
                             query_args = ValidatorProxy(query_args)
 

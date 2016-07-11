@@ -32,7 +32,7 @@ def delete_dataset(source_url_hash):
     return 'Deleted {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 
-def add_dataset(self, source_url_hash, data_types=None):
+def add_dataset(self, source_url_hash):
     md = session.query(MetaTable).get(source_url_hash)
     session.close()
     if md.result_ids:
