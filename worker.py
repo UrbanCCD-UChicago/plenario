@@ -12,28 +12,28 @@
 import plenario.database
 session = plenario.database.session
 
-import datetime
-import time
-import signal
-import boto.sqs
-import random
-import threading
-import traceback
-from os import urandom
-from collections import namedtuple
-from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
-from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta,_grid
-from plenario.api.jobs import get_status, set_status, get_request, set_result
-from plenario.api.validator import convert
-from plenario.tasks import add_dataset, delete_dataset, update_dataset
-from plenario.tasks import add_shape, update_shape, delete_shape
-from plenario.tasks import frequency_update
-from flask import Flask
-
 worker_threads = 4
 max_wait_interval = 15
 
 if __name__ == "__main__":
+
+    import datetime
+    import time
+    import signal
+    import boto.sqs
+    import random
+    import threading
+    import traceback
+    from os import urandom
+    from collections import namedtuple
+    from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
+    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid
+    from plenario.api.jobs import get_status, set_status, get_request, set_result
+    from plenario.api.validator import convert
+    from plenario.tasks import add_dataset, delete_dataset, update_dataset
+    from plenario.tasks import add_shape, update_shape, delete_shape
+    from plenario.tasks import frequency_update
+    from flask import Flask
 
     do_work = True
 
