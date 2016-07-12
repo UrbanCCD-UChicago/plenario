@@ -63,7 +63,6 @@ def add_dataset(source_url_hash):
 
 def update_dataset(source_url_hash):
     """Update the row information for an approved dataset.
-
     :param source_url_hash: (string) identifier used to grab target table info
     :returns: (string) a helpful confirmation message"""
 
