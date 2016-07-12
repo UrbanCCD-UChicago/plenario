@@ -147,9 +147,9 @@ if __name__ == "__main__":
                             log("worker.query_args: {}".format(query_args), worker_id)
                             log("worker.req: {}".format(req), worker_id)
 
+                            set_result(ticket, endpoint_logic[endpoint](query_args))
                             status["status"] = "success"
                             status["meta"]["endTime"] = str(datetime.datetime.now())
-                            set_result(ticket, endpoint_logic[endpoint](query_args))
                             set_status(ticket, status)
 
                     except Exception as e:
