@@ -13,6 +13,12 @@ services:
 sudo: required
 dist: trusty
 cache: pip
+env:
+  AWS_ACCESS_KEY_ID:
+    secure: Xp0ClmdKs/OJcm5fZvc65nkorzncxwnbGvBt5jYQxtcoXc3ld9wJhEulHzbMwn4bOP5AKyiipYAsOy2ouGyG6OxaaGbpqFX2HrQAtLe+0Wyr2+MW7kvPpyILG/J9SLzAgY8ETwhMIS1j5xfqCAFQpPSE6MxYBsOiAjmhLycYvqg=
+  AWS_SECRET_ACCESS_KEY:
+    secure: XPcUFYB7zcquWiRFT7LQviRmIObJvcDI0FLFjDacIqS4RjlRCaouTOoFNcMbGBxGtVM8kXwNY7nogTmnXV6Gm1OlPrnCYuJ+m7XK3gRiXtzXN8wXTabStJSocmUTBrf1Im7mHO6cV/k90pxFXoVQIiXZBpdSz0X25BGchp9wu70=
+  JOBS_QUEUE=Plenario-Testing-Queue
 before_install:
 - pip install -r requirements.txt
 install:
