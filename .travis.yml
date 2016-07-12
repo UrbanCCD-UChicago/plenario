@@ -20,9 +20,10 @@ env:
     - JOBS_QUEUE=Plenario-Testing-Queue
 before_install:
 - pip install -r requirements.txt
-- mkdir -p /opt/python/logs/
-- touch /opt/python/logs/worker.log
-- touch /opt/python/logs/sender.log
+- sudo mkdir -p /opt/python/log/
+- sudo chmod 777 /opt/python/log/
+- touch /opt/python/log/worker.log
+- touch /opt/python/log/sender.log
 install:
 - sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
 - sudo -u postgres psql -c "CREATE DATABASE plenario_test;"

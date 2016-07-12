@@ -1,13 +1,11 @@
-import boto
 import unittest
 import subprocess
+import random
 
 from plenario import create_app
 from plenario.api import prefix
 from plenario.api.jobs import *
 from plenario.update import create_worker
-from tests.jobs import RANDOM_NAME
-import plenario.settings
 
 
 class TestJobs(unittest.TestCase):
@@ -77,7 +75,8 @@ class TestJobs(unittest.TestCase):
     def test_job_submission_by_api(self):
 
         # submit job
-        response = self.app.get(prefix + '/datasets?job=true&obs_date__ge=2010-07-08')
+        # /datasets with a cachebuster at the end
+        response = self.app.get(prefix + '/datasets?job=true&obs_date__ge=2010-07-08&'+str(random.randrange(0,1000000)))
         response = json.loads(response.get_data())
         ticket = response["ticket"]
         self.assertIsNotNone(ticket)
