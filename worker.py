@@ -74,8 +74,10 @@ def worker():
             'grid': lambda args: _grid(args),
             # ETL Task endpoints.
             'add_dataset': lambda args: add_dataset(args),
+            'update_dataset': lambda args: add_dataset(args),
             'delete_dataset': lambda args: delete_dataset(args),
             'add_shape': lambda args: add_shape(args),
+            'update_shape': lambda args: update_shape(args),
             'delete_shape': lambda args: delete_shape(args),
             # Health endpoint.
             'ping': lambda args: {'hello': 'from worker id {}'.format(worker_id)}
@@ -103,11 +105,11 @@ def worker():
                 log("Received job with ticket {}.".format(ticket), worker_id)
 
                 try:
+                    log("worker.CALL.get_status({})".format(ticket), worker_id)
                     status = get_status(ticket)
                     status["status"]
                     status["meta"]
                 except Exception as e:
-                    print(get_status(ticket))
                     log("Job is malformed ({}). Removing.".format(e), worker_id)
                     JobQueue.delete_message(job)
 
@@ -131,15 +133,19 @@ def worker():
                     # Simpler endpoints, like the ETL Tasks, only really
                     # need a single string argument. No point in converting
                     # it to a ValidatorProxy.
-                    if type(query_args) != str:
+                    if type(query_args) != unicode:
                         convert(query_args)
                         query_args = ValidatorProxy(query_args)
 
                     if endpoint in endpoint_logic:
+                        log("worker.query_args: {}".format(query_args), worker_id)
+                        log("worker.req: {}".format(req), worker_id)
+
                         status["status"] = "success"
                         status["meta"]["endTime"] = str(datetime.datetime.now())
                         set_result(ticket, endpoint_logic[endpoint](query_args))
                         set_status(ticket, status)
+
                 except Exception as e:
                     status["status"] = "error"
                     status["meta"]["endTime"] = str(datetime.datetime.now())

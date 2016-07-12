@@ -16,64 +16,94 @@ if CELERY_SENTRY_URL:
     setup_logging(handler)
 
 
+def task_complete_msg(task_name, mt):
+    """Create a confirmation message for a completed task.
+
+    :param task_name: (string) task name, like 'update' or 'delete'
+    :param mt: (MetaTable Record) meta info about the target dataset
+    :returns: (string) confirmation message"""
+
+    # Check for attributes which differenciate MetaTable from ShapeTable.
+    tname = mt.human_name if hasattr(mt, 'human_name') else mt.dataset_name
+    source = mt.source_url if hasattr(mt, 'source_url') else mt.source_url_hash
+    return "Finished {} for {} ({})".format(task_name, tname, source)
+
+
 def delete_dataset(source_url_hash):
-    md = session.query(MetaTable).get(source_url_hash)
+    """Delete the row information and meta table for an approved dataset.
+
+    :param source_url_hash: (string) identifier used to grab target table
+    :returns: (string) a helpful confirmation message"""
+
+    meta = session.query(MetaTable).get(source_url_hash)
     try:
-        dat_table = md.point_table
+        dat_table = meta.point_table
         dat_table.drop(engine, checkfirst=True)
     except NoSuchTableError:
         # Move on so we can get rid of the metadata
         pass
-    session.delete(md)
+    session.delete(meta)
     try:
         session.commit()
     except InternalError, e:
         raise delete_dataset.retry(exc=e)
-    return 'Deleted {0} ({1})'.format(md.human_name, md.source_url_hash)
+    return task_complete_msg('deletion', meta)
 
 
-def add_dataset(self, source_url_hash, data_types=None):
-    md = session.query(MetaTable).get(source_url_hash)
-    session.close()
-    if md.result_ids:
-        ids = md.result_ids
-        ids.append(self.request.id)
-    else:
-        ids = [self.request.id]
-    with engine.begin() as c:
-        c.execute(MetaTable.__table__.update()\
-            .where(MetaTable.source_url_hash == source_url_hash)\
-            .values(result_ids=ids))
+def add_dataset(source_url_hash):
+    """Ingest the row information for an approved dataset.
 
-    etl = PlenarioETL(md)
-    etl.add()
-    return 'Finished adding {0} ({1})'.format(md.human_name, md.source_url_hash)
+    :param source_url_hash: (string) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
+
+    metatable = session.query(MetaTable).get(source_url_hash)
+    PlenarioETL(metatable).add()
+    return task_complete_msg('ingest', metatable)
+
+
+def update_dataset(source_url_hash):
+    """Update the row information for an approved dataset.
+
+    :param source_url_hash: (string) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
+
+    metatable = session.query(MetaTable).get(source_url_hash)
+    PlenarioETL(metatable).update()
+    return task_complete_msg('update', metatable)
 
 
 def add_shape(table_name):
+    """Ingest the row information for an approved shapeset.
+
+    :param table_name: (string) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
 
     meta = session.query(ShapeMetadata).get(table_name)
-
-    # Ingest the shapefile
-    ShapeETL(meta=meta).add()
-    return 'Finished adding shape dataset {} from {}.'.format(meta.dataset_name,
-                                                              meta.source_url)
+    ShapeETL(meta).add()
+    return task_complete_msg('ingest', meta)
 
 
 def update_shape(table_name):
-    meta = session.query(ShapeMetadata).get(table_name)
+    """Update the row information for an approved shapeset.
 
-    # Update the shapefile
+    :param table_name: (string) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
+
+    meta = session.query(ShapeMetadata).get(table_name)
     ShapeETL(meta=meta).update()
-    return 'Finished updating shape dataset {} from {}.'.\
-        format(meta.dataset_name, meta.source_url)
+    return task_complete_msg('update', meta)
 
 
 def delete_shape(table_name):
+    """Delete the row and meta information for an approved shapeset.
+
+    :param table_name: (string) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
+
     shape_meta = session.query(ShapeMetadata).get(table_name)
     shape_meta.remove_table()
     session.commit()
-    return 'Removed {}'.format(table_name)
+    return task_complete_msg('deletion', shape_meta)
 
 
 def frequency_update(frequency):
@@ -92,22 +122,6 @@ def frequency_update(frequency):
     for m in md:
         update_shape.delay(m.dataset_name)
     return '%s update complete' % frequency
-
-
-def update_dataset(self, source_url_hash):
-    md = session.query(MetaTable).get(source_url_hash)
-    if md.result_ids:
-        ids = md.result_ids
-        ids.append(self.request.id)
-    else:
-        ids = [self.request.id]
-    with engine.begin() as c:
-        c.execute(MetaTable.__table__.update()\
-            .where(MetaTable.source_url_hash == source_url_hash)\
-            .values(result_ids=ids))
-    etl = PlenarioETL(md)
-    etl.update()
-    return 'Finished updating {0} ({1})'.format(md.human_name, md.source_url_hash)
 
 
 def update_metar():
