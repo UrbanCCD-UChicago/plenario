@@ -21,13 +21,15 @@ env:
   JOBS_QUEUE=Plenario-Testing-Queue
 before_install:
 - pip install -r requirements.txt
+- mkdir -p /opt/python/logs/
+- touch /opt/python/logs/worker.log
 install:
 - sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
 - sudo -u postgres psql -c "CREATE DATABASE plenario_test;"
 - sudo -u postgres psql -c "CREATE EXTENSION postgis;" plenario_test
 - python init_db.py
 script:
-- nosetests tests/points/ tests/shapes/ tests/submission/ tests/jobs -v
+- nosetests tests/points/ tests/shapes/ tests/submission/ tests/jobs -vv
 deploy:
 - provider: elasticbeanstalk
   access_key_id:
