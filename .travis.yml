@@ -30,7 +30,7 @@ install:
 - sudo -u postgres psql -c "CREATE EXTENSION postgis;" plenario_test
 - python init_db.py
 script:
-- nosetests tests/points/ tests/shapes/ tests/submission/ tests/jobs -vv
+- nosetests tests/points/ tests/shapes/ tests/submission/ tests/jobs -vvv
 deploy:
 - provider: elasticbeanstalk
   access_key_id:
