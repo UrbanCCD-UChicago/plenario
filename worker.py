@@ -42,7 +42,7 @@ if __name__ == "__main__":
         # The constant opening and closing is meh, I know. But I'm feeling lazy
         # right now.
         logfile = open('/opt/python/log/worker.log', "a")
-        logfile.write("{} - Worker {}: {}\n".format(datetime.datetime.now(), worker_id.rjust(24), msg))
+        logfile.write("{} - Worker {}: {}\n".format(datetime.datetime.now(), worker_id.ljust(30), msg))
         logfile.close()
 
 
