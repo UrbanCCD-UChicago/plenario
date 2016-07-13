@@ -11,6 +11,7 @@ from operator import itemgetter
 from sqlalchemy import Column, String, Boolean, Date, DateTime, Text, func
 from sqlalchemy import Table, select, Integer
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import synonym
 from uuid import uuid4
 
@@ -247,9 +248,15 @@ class MetaTable(Base):
     # Information about all point datasets
     @classmethod
     def index(cls):
-        results = session.query(cls.dataset_name)\
-                        .filter(cls.approved_status == True)
-        names = [result.dataset_name for result in results]
+        try:
+            q = session.query(cls.dataset_name)
+            q = q.filter(cls.approved_status == True)
+            names = [result.dataset_name for result in q.all()]
+        except ProgrammingError:
+            # Handles a case that causes init_db to crash.
+            # Validator calls index when initializing, prevents this call
+            # from raising an error when the database is empty.
+            names = []
         return names
 
     @classmethod

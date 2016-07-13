@@ -5,12 +5,14 @@ import random
 from plenario import create_app
 from plenario.api import prefix
 from plenario.api.jobs import *
+from plenario.database import session
 from plenario.update import create_worker
 
 
 class TestJobs(unittest.TestCase):
 
     currentTicket = ""
+
 
     @classmethod
     def setUpClass(cls):
@@ -68,6 +70,57 @@ class TestJobs(unittest.TestCase):
         set_result(ticket, "the_final_countdown")
         self.assertEqual(get_result(ticket), "the_final_countdown")
 
+    # ============================================================
+    # TEST: Admin DB Actions: add, update, delete (meta/shapemeta)
+    # ============================================================
+    # These tests rely on the 2010_2014_restaurant_applications dataset to
+    # be present in the MetaTable.
+    #
+    # Link: https://opendata.bristol.gov.uk/api/views/5niz-5v5u/rows.csv
+
+    def test_admin_dataset_actions(self):
+        from sqlalchemy.exc import NoSuchTableError
+        from plenario.models import MetaTable
+        from plenario.views import approve_dataset, update_dataset
+        from plenario.views import delete_dataset
+
+        # Grab the source url hash.
+        dname = '2010_2014_restaurant_applications'
+        q = session.query(MetaTable.source_url_hash)
+        source_url_hash = q.filter(MetaTable.dataset_name == dname).scalar()
+
+        # Queue the ingestion job.
+        ticket = approve_dataset(source_url_hash)
+
+        wait_on(ticket, 10)
+
+        status = get_status(ticket)['status']
+        # First check if it finished correctly.
+        self.assertIn(status, ['error', 'success'])
+        # Then check if the job was successful.
+        self.assertEqual(status, 'success')
+        # Now check if the ingestion process ran correctly.
+        table = MetaTable.get_by_dataset_name(dname).point_table
+        count = session.query(func.count(table)).first()
+        self.assertEqual(count, 317)
+
+        # Queue the update job.
+        ticket = update_dataset(source_url_hash).data['ticket']
+        wait_on(ticket, 10)
+        self.assertIn(status, {'error', 'success'})
+        self.assertEqual(status, 'success')
+        count = len(session.query(table).all())
+        self.assertEqual(count, 317)
+
+        # Queue the deletion job.
+        ticket = delete_dataset(source_url_hash).data['ticket']
+        wait_on(ticket, 10)
+        self.assertIn(status, {'error', 'success'})
+        self.assertEqual(status, 'success')
+        # Make sure that the table does not exist.
+        self.assertRaises(NoSuchTableError, session.query, table)
+
+
     # =======================
     # ACCEPTANCE TEST: Job submission
     # =======================
@@ -108,3 +161,12 @@ class TestJobs(unittest.TestCase):
     def tearDownClass(cls):
         print("Stopping worker.")
         subprocess.Popen(["pkill", "-f", "worker.py"])
+
+
+def wait_on(ticket, seconds):
+    for i in range(seconds):
+        status = get_status(ticket)['status']
+        print "wait_on.status: {}".format(status)
+        if status == 'success' or status == 'error':
+            break
+        time.sleep(1)

@@ -13,7 +13,7 @@ from flask import make_response, request, redirect, url_for, render_template, \
     Blueprint, flash, session as flask_session
 from flask_login import login_required
 from flask_wtf import Form
-from sqlalchemy import Table, text
+from sqlalchemy import Table, text, select
 from sqlalchemy.exc import NoSuchTableError
 from wtforms import TextField, SelectField, StringField
 from wtforms.validators import DataRequired
@@ -22,6 +22,7 @@ from plenario.api.jobs import submit_job, get_status
 from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
+from plenario.utils.model_helpers import fetch_pending_tables, fetch_table_etl_status
 
 views = Blueprint('views', __name__)
 
@@ -563,45 +564,42 @@ class SocrataSuggestion(object):
 @views.route('/admin/view-datasets')
 @login_required
 def view_datasets():
-    datasets_pending = session.query(MetaTable).\
-        filter(MetaTable.approved_status != True).\
-        all()
 
-    shapes_pending = session.query(ShapeMetadata).\
-        filter(ShapeMetadata.approved_status != True).\
-        all()
+    datasets_pending = fetch_pending_tables(MetaTable)
+    shapes_pending = fetch_pending_tables(ShapeMetadata)
+    datasets = fetch_table_etl_status(MetaTable)
+    shapesets = fetch_table_etl_status(ShapeMetadata)
 
-    try:
-        q = text(''' 
-            SELECT m.*, c.status, c.task_id
-            FROM meta_master AS m 
-            LEFT JOIN celery_taskmeta AS c 
-              ON c.id = (
-                SELECT id FROM celery_taskmeta 
-                WHERE task_id = ANY(m.result_ids) 
-                ORDER BY date_done DESC 
-                LIMIT 1
-              )
-            WHERE m.approved_status = 'true'
-        ''')
-        with engine.begin() as c:
-            datasets = list(c.execute(q))
-    except NoSuchTableError:
-        datasets = session.query(MetaTable)\
-            .filter(MetaTable.approved_status == True)\
-            .all()
+    # q = text('''
+    #         SELECT m.*, c.status, c.task_id
+    #         FROM meta_master AS m
+    #         LEFT JOIN celery_taskmeta AS c
+    #           ON c.id = (
+    #             SELECT id FROM celery_taskmeta
+    #             WHERE task_id = ANY(m.result_ids)
+    #             ORDER BY date_done DESC
+    #             LIMIT 1
+    #           )
+    #         WHERE m.approved_status = 'true'
+    #     ''')
+    #     with engine.begin() as c:
+    #         datasets = list(c.execute(q))
+    # except NoSuchTableError:
+    #     datasets = session.query(MetaTable)\
+    #         .filter(MetaTable.approved_status == True)\
+    #         .all()
 
-    try:
-        shape_datasets = ShapeMetadata.get_all_with_etl_status()
-    except NoSuchTableError:
-        # If we can't find shape metadata, soldier on.
-        shape_datasets = None
+    # try:
+    #     shape_datasets = ShapeMetadata.get_all_with_etl_status()
+    # except NoSuchTableError:
+    #     If we can't find shape metadata, soldier on.
+    #     shape_datasets = None
 
     return render_template('admin/view-datasets.html',
                            datasets_pending=datasets_pending,
                            shapes_pending=shapes_pending,
                            datasets=datasets,
-                           shape_datasets=shape_datasets)
+                           shape_datasets=shapesets)
 
 
 @views.route('/admin/dataset-status/')
