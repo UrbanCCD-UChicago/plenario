@@ -1,0 +1,19 @@
+# $Id: macosx.mtree.in 31289 2007-11-19 19:36:23Z jmpp@macports.org $
+#
+# MacPorts filesystem hierarchy, for internal use only. Changes to this file will not stick across installations.
+#
+
+/set type=dir uname=root gname=wheel mode=@DSTMODE@
+.
+    usr
+    ..
+..
+/set type=dir uname=root gname=admin mode=@DSTMODE@
+.
+    Applications
+    ..
+    Developer
+    ..
+    Library
+    ..
+..
