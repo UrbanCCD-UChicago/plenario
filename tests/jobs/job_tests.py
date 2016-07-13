@@ -29,6 +29,8 @@ class TestJobs(unittest.TestCase):
         # give worker time to start up
         time.sleep(3)
 
+    # ========================= FUNCTIONALITY TESTS ========================== #
+
     # =======================
     # TEST: General Job Methods: submit_job, get_status, get_request, get_result
     # =======================
@@ -94,7 +96,7 @@ class TestJobs(unittest.TestCase):
 
         # Wait for job to complete.
         for i in range(10):
-            if response["status"]["status"] == "success":
+            if get_status(ticket)["status"] == "success":
                 break
             time.sleep(1)
 
@@ -102,9 +104,62 @@ class TestJobs(unittest.TestCase):
         response = json.loads(response.get_data())
         self.assertIsNotNone(response["status"]["meta"]["startTime"])
         self.assertIsNotNone(response["status"]["meta"]["endTime"])
+        self.assertIsNotNone(response["status"]["meta"]["worker"])
         self.assertGreater(json.dumps(response["result"]), len("{\"\"}"))
+
+    # =======================
+    # ACCEPTANCE TEST: Get non-existent job
+    # =======================
+
+    def test_bad_job_retrieval(self):
+
+        # dummy job with a cachebuster at the end
+        ticket = "for_sure_this_isnt_a_job_because_jobs_are_in_hex"
+        response = self.app.get(prefix + "/jobs/" + ticket + "&" + str(random.randrange(0, 1000000)))
+        response = json.loads(response.get_data())
+        self.assertEqual(response["ticket"], ticket)
+        self.assertIsNotNone(response["error"])
+
+    # ============================ ENDPOINT TESTS ============================ #
+
+    # =======================
+    # ACCEPTANCE TEST: timeseries
+    # =======================
+
+    def test_timeseries_job(self):
+        response = self.app.get(prefix + '/timeseries/?obs_date__ge=2013-09-22&obs_date__le=2013-10-1&agg=day?job=true&' + str(random.randrange(0, 1000000)))
+        response = json.loads(response.get_data())
+        ticket = response["ticket"]
+        self.assertIsNotNone(ticket)
+        self.assertIsNotNone(response["url"])
+        self.assertEqual(response["request"]["endpoint"], "timeseries")
+        self.assertEqual(response["request"]["query"]["obs_date__ge"], "2013-09-22")
+        self.assertEqual(response["request"]["query"]["obs_date__le"], "2013-10-01")
+        self.assertEqual(response["request"]["query"]["agg"], "day")
+        self.assertEqual(response["request"]["query"]["job"], "true")
+
+        # Wait for job to complete.
+        for i in range(10):
+            if get_status(ticket)["status"] == "success":
+                break
+            time.sleep(1)
+
+        # retrieve job
+        url = response["url"]
+        response = self.app.get(url)
+        response = json.loads(response.get_data())
+        self.assertIsNone(response["error"])
+        self.assertEqual(response["status"]["status"], "success")
+        self.assertEqual(response["result"]["meta"]["status"], "ok")
+        self.assertEqual(response["result"]["meta"]["query"]["obs_date__ge"], "2013-09-22")
+        self.assertEqual(len(response["result"]["objects"]), 1)
+        self.assertEqual(response["result"]["objects"]["count"], 5)
+        self.assertEqual(response["result"]["objects"][0]["dataset_name"], "flu_shot_clinics")
+        
 
     @classmethod
     def tearDownClass(cls):
         print("Stopping worker.")
         subprocess.Popen(["pkill", "-f", "worker.py"])
+
+
