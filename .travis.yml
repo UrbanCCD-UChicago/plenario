@@ -30,6 +30,13 @@ install:
 - sudo -u postgres psql -c "CREATE EXTENSION postgis;" plenario_test
 - python init_db.py
 script:
+###
+# Something strange is up with our tests
+# running these tests together causes them
+# to error and fail...but they work when
+# run separately. Probably something to
+# do with test fixure setup and tear down
+###
 - nosetests tests/points/ -vv
 - nosetests tests/shapes/ -vv
 - nosetests tests/submission/ -vv
