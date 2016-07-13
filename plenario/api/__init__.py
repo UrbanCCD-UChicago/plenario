@@ -7,7 +7,7 @@ from shape import get_all_shape_datasets,\
 from time import sleep
 from sensor import weather_stations, weather
 
-from plenario.sensor_networks import all_sensor_network_metadata #, sensor_network_metadata, all_node_metadata, node_metadata
+from sensor_networks import get_all_sensor_network_metadata, get_sensor_network_metadata, get_all_sensor_node_metadata, get_sensor_node_metadata
 
 API_VERSION = '/v1'
 
@@ -28,10 +28,11 @@ api.add_url_rule(prefix + '/shapes/', 'shape_index', get_all_shape_datasets)
 api.add_url_rule(prefix + '/shapes/<dataset_name>', 'shape_export', export_shape)
 api.add_url_rule(prefix + '/shapes/<polygon_dataset_name>/<point_dataset_name>', 'aggregate', aggregate_point_data)
 
-api.add_url_rule(prefix + '/sensor-networks/', 'sensor-networks', all_sensor_network_metadata)
-# api.add_url_rule(prefix + '/sensor-networks/<network-name>', 'sensor-network', sensor_network_metadata)
-# api.add_url_rule(prefix + '/sensor-networks/<network-name>/nodes/', 'sensor-network', all_node_metadata)
-# api.add_url_rule(prefix + '/sensor-networks/<network-name>/nodes/<node-id>', 'sensor-network', node_metadata)
+api.add_url_rule(prefix + '/sensor-networks/', 'sensor_networks', get_all_sensor_network_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>', 'sensor_network', get_sensor_network_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes', 'nodes', get_all_sensor_node_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>', 'node', get_sensor_node_metadata)
+api.add_url_rule(prefix + '/sensor-networks/nodes/<node_id>', 'node', get_sensor_node_metadata)
 
 
 @api.route(prefix + '/flush-cache')

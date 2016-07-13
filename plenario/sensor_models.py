@@ -31,12 +31,6 @@ class NetworkMeta(Base):
     featuresOfInterest = Column(ARRAY(String))
     nodes = relationship('NodeMeta', backref='network', cascade='all, delete-orphan')
 
-    # def __repr__(self):
-    #     return json.dumps({'name': self.name,
-    #             'nodeMetadata': self.nodeMetadata,
-    #             'nodes': [node.id for node in self.nodes],
-    #             'featuresOfInterest': self.featuresOfInterest})
-
 
 class NodeMeta(Base):
     __tablename__ = 'sensor_node_metadata'
@@ -47,12 +41,4 @@ class NodeMeta(Base):
     version = Column(Integer)
     featuresOfInterest = Column(ARRAY(String))
     procedures = Column(JSON)
-
-    # def __repr__(self):
-    #     return json.dumps({'id': self.id,
-    #             'sensorNetwork': self.sensorNetwork,
-    #             'location': self.location,
-    #             'version': self.version,
-    #             'featuresOfInterest': self.featuresOfInterest,
-    #             'procedures': self.procedures})
 
