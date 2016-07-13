@@ -37,10 +37,14 @@ script:
 # run separately. Probably something to
 # do with test fixure setup and tear down
 ###
-- nosetests tests/points/ -vv
-- nosetests tests/shapes/ -vv
-- nosetests tests/submission/ -vv
-- nosetests tests/jobs -vv
+# Furthermore, don't run the jobs test first.
+# Points (etc?) does some kind of setup that 
+# is useful to jobs (it fails otherwise)
+###
+- nosetests tests/points/ -v
+- nosetests tests/shapes/ -v
+- nosetests tests/submission/ -v
+- nosetests tests/jobs -v
 deploy:
 - provider: elasticbeanstalk
   access_key_id:

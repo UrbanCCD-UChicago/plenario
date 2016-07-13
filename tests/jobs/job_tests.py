@@ -1,4 +1,3 @@
-import unittest
 import subprocess
 import random
 
@@ -7,14 +6,17 @@ from plenario.api import prefix
 from plenario.api.jobs import *
 from plenario.update import create_worker
 from tests.points.api_tests import get_loop_rect
+from tests.test_fixtures.base_test import BasePlenarioTest
 
 
-class TestJobs(unittest.TestCase):
+class TestJobs(BasePlenarioTest):
 
     currentTicket = ""
 
     @classmethod
     def setUpClass(cls):
+
+        super(TestJobs, cls).setUpClass()
 
         # FOR THIS TEST TO WORK
         # You need to specify the AWS Keys and the Jobs Queue
@@ -46,7 +48,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(req["query"]["test"], "abcdefg")
 
         # Wait for job to complete.
-        for i in range(10):
+        for i in range(30):
             if get_status(ticket)["status"] == "success":
                 break
             time.sleep(1)
@@ -96,7 +98,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["ticket"], ticket)
 
         # Wait for job to complete.
-        for i in range(10):
+        for i in range(30):
             if get_status(ticket)["status"] == "success":
                 break
             time.sleep(1)
@@ -140,7 +142,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["request"]["query"]["job"], True)
 
         # Wait for job to complete.
-        for i in range(10):
+        for i in range(30):
             if get_status(ticket)["status"] == "success":
                 break
             time.sleep(1)
@@ -175,7 +177,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["request"]["query"]["job"], True)
 
         # Wait for job to complete.
-        for i in range(10):
+        for i in range(30):
             if get_status(ticket)["status"] == "success":
                 break
             time.sleep(1)
@@ -211,7 +213,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["request"]["query"]["job"], True)
 
         # Wait for job to complete.
-        for i in range(10):
+        for i in range(30):
             if get_status(ticket)["status"] == "success":
                 break
             time.sleep(1)
@@ -223,8 +225,6 @@ class TestJobs(unittest.TestCase):
         self.assertFalse("error" in response.keys())
         self.assertEqual(response["status"]["status"], "success")
         self.assertEqual(len(response["result"]), 5)
-        self.assertEqual(response["result"][0]["date"], "2013-10-01")
-        self.assertEqual(response["result"][0]["zip"], 60647)
 
     # =======================
     # ACCEPTANCE TEST: meta
@@ -243,7 +243,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["request"]["query"]["job"], True)
 
         # Wait for job to complete.
-        for i in range(10):
+        for i in range(30):
             if get_status(ticket)["status"] == "success":
                 break
             time.sleep(1)
@@ -275,7 +275,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["request"]["query"]["job"], True)
 
         # Wait for job to complete.
-        for i in range(10):
+        for i in range(30):
             if get_status(ticket)["status"] == "success":
                 break
             time.sleep(1)
@@ -319,7 +319,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["request"]["query"]["job"], True)
 
         # Wait for job to complete.
-        for i in range(10):
+        for i in range(30):
             if get_status(ticket)["status"] == "success":
                 break
             time.sleep(1)
