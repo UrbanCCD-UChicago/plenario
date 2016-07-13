@@ -32,6 +32,7 @@ if __name__ == "__main__":
     from plenario.tasks import add_dataset, delete_dataset
     from plenario.tasks import add_shape, update_shape, delete_shape
     from plenario.utils.name_generator import generate_name
+    from plenario.api.response import remove_columns_from_dict
     from flask import Flask
 
     do_work = True
@@ -73,7 +74,8 @@ if __name__ == "__main__":
                 # Point endpoints.
                 'timeseries': lambda args: _timeseries(args),
                 'detail-aggregate': lambda args: _detail_aggregate(args),
-                'detail': lambda args: _detail(args),
+                # emulating row-removal features of _detail_response. Not very DRY, but it's the cleanest option.
+                'detail': lambda args: [{key: row[key] for key in row.keys() if not key in ['point_date', 'hash', 'geom']} for row in _detail(args)],
                 'meta': lambda args: _meta(args),
                 'fields': lambda args: _meta(args),
                 'grid': lambda args: _grid(args),
