@@ -21,10 +21,9 @@ if __name__ == "__main__":
     import time
     import signal
     import boto.sqs
-    import random
     import threading
     import traceback
-    from os import urandom
+    import random
     from collections import namedtuple
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
     from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid
@@ -32,7 +31,7 @@ if __name__ == "__main__":
     from plenario.api.validator import convert
     from plenario.tasks import add_dataset, delete_dataset, update_dataset
     from plenario.tasks import add_shape, update_shape, delete_shape
-    from plenario.tasks import frequency_update
+    from plenario.utils.name_generator import generate_name
     from flask import Flask
 
     do_work = True
@@ -43,7 +42,7 @@ if __name__ == "__main__":
         # The constant opening and closing is meh, I know. But I'm feeling lazy
         # right now.
         logfile = open('/opt/python/log/worker.log', "a")
-        logfile.write("{} - Worker #{}: {}\n".format(datetime.datetime.now(), worker_id, msg))
+        logfile.write("{} - Worker {}: {}\n".format(datetime.datetime.now(), worker_id.ljust(30), msg))
         logfile.close()
 
 
@@ -64,7 +63,7 @@ if __name__ == "__main__":
 
 
     def worker():
-        worker_id = urandom(4).encode('hex')
+        worker_id = generate_name()
 
         # Holds the methods which perform the work requested by an incoming job.
         app = Flask(__name__)
@@ -74,7 +73,8 @@ if __name__ == "__main__":
                 # Point endpoints.
                 'timeseries': lambda args: _timeseries(args),
                 'detail-aggregate': lambda args: _detail_aggregate(args),
-                'detail': lambda args: _detail(args),
+                # emulating row-removal features of _detail_response. Not very DRY, but it's the cleanest option.
+                'detail': lambda args: [{key: row[key] for key in row.keys() if key not in ['point_date', 'hash', 'geom']} for row in _detail(args)],
                 'meta': lambda args: _meta(args),
                 'fields': lambda args: _meta(args),
                 'grid': lambda args: _grid(args),
@@ -86,7 +86,7 @@ if __name__ == "__main__":
                 'update_shape': lambda args: update_shape(args),
                 'delete_shape': lambda args: delete_shape(args),
                 # Health endpoint.
-                'ping': lambda args: {'hello': 'from worker id {}'.format(worker_id)}
+                'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)}
             }
 
             log("Hello! I'm ready for anything.", worker_id)
@@ -125,6 +125,8 @@ if __name__ == "__main__":
 
                     status["status"] = "processing"
                     status["meta"]["startTime"] = str(datetime.datetime.now())
+                    status["meta"]["worker"] = worker_id
+
                     log("Begin set_status", worker_id)
                     set_status(ticket, status)
                     log("End set_status", worker_id)
