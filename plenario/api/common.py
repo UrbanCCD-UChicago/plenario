@@ -35,6 +35,7 @@ def unknown_object_json_handler(obj):
     elif isinstance(obj, MetaTable):
         return obj.__tablename__
     else:
+        print obj
         raise ValueError
 
 

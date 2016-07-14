@@ -29,11 +29,11 @@ class Validator(Schema):
 
     <FIELD_NAME> = fields.<TYPE>(default=<DEFAULT_VALUE>, validate=<VALIDATOR FN>)
 
-    The validator, when instanciated, has a method called 'dump'.which expects a
+    The validator, when instantiated, has a method called 'dump'.which expects a
     dictionary of arguments, where keys correspond to <FIELD_NAME>. The validator
     has a default <TYPE> checker, that along with extra <VALIDATOR FN>s will
     accept or reject the value associated with the key. If the value is missing
-    or rejected, the validator will substitue it with the value specified by
+    or rejected, the validator will substitute it with the value specified by
     <DEFAULT_VALUE>."""
 
     valid_aggs = {'day', 'week', 'month', 'quarter', 'year'}
@@ -54,6 +54,7 @@ class Validator(Schema):
     offset = fields.Integer(default=0, validate=Range(0))
     resolution = fields.Integer(default=500, validate=Range(0))
     job = fields.Bool(default=False)
+    all = fields.Bool(default=False)
 
 
 class DatasetRequiredValidator(Validator):

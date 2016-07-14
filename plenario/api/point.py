@@ -1,13 +1,16 @@
 import os
 import json
+import math
+import time
 import shapely.geometry
 import shapely.wkb
 import sqlalchemy
 import traceback
+import copy
 
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from datetime import datetime
-from flask import request, make_response
+from flask import request, make_response, Response
 from itertools import groupby
 from operator import itemgetter
 
@@ -18,9 +21,9 @@ from plenario.api.response import make_raw_error, bad_request, json_response_bas
 from plenario.api.response import geojson_response_base, form_csv_detail_response, form_json_detail_response
 from plenario.api.response import form_geojson_detail_response, add_geojson_feature
 from plenario.api.validator import DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
-from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters
-from plenario.api.jobs import make_job_response
-from plenario.models import MetaTable
+from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters, convert
+from plenario.api.jobs import make_job_response, submit_job, get_status, get_result
+from plenario.models import MetaTable, DataDump
 
 # Use the standard pool if this is just the app,
 # but use the shared connection pool if this
@@ -76,19 +79,75 @@ def detail_aggregate():
 def detail():
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
               'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
-              'date__time_of_day_le', 'limit', 'job')
+              'date__time_of_day_le', 'limit', 'job', 'all')
     validator = DatasetRequiredValidator(only=fields)
     validator_result = validate(validator, request.args.to_dict())
 
     if validator_result.errors:
         return bad_request(validator_result.errors)
 
-    if validator_result.data.get('job'):
+    # Using the "all" flag will override the "limit" option.
+    if validator_result.data.get('all'):
+        return datadump(validator_result)
+
+    elif validator_result.data.get('job'):
         return make_job_response("detail", validator_result)
     else:
         result_rows = _detail(validator_result)
         return _detail_response(result_rows, validator_result)
 
+
+def datadump(validator_result):
+    requestid = os.urandom(16).encode("hex")
+    jobs = []
+    chunksize = 5000
+    query = copy.deepcopy(validator_result.data)
+    rows = detail_query(validator_result).count()
+    print "Download contains {} rows.".format(rows)
+    chunks = int(math.floor(rows / float(chunksize)) + 1)
+    query["limit"] = chunksize
+    query["datadump_total"] = chunks
+    query["datadump_requestid"] = requestid
+    for part in range(chunks):
+        print "Part {}/{}".format(part + 1, chunks)
+        query["offset"] = part * chunksize
+        query["datadump_part"] = part + 1
+        req = {"endpoint": "datadump", "query": query}
+        jobs.append(submit_job(req))
+
+    def stream_data():
+        workerlist = set()
+        yield """{{"startTime": "{}", "data": [""".format(str(datetime.now()))
+        for part in range(chunks):
+            ticket = jobs[part]
+            print "Waiting on job {}...".format(ticket)
+            while get_status(ticket)["status"] != "success":
+                print "---> Still waiting on that job..."
+                print get_status(ticket)
+                time.sleep(1)
+                if get_status(ticket)["status"] == "error":
+                    print "---> RIP {}\nABORT".format(ticket)
+                    yield "FAILED"
+                    return
+            print "---> OK it's done."
+            data_id = get_result(ticket)["id"]
+            workerlist.add(get_status(ticket)["meta"]["worker"])
+            # Return result with the list brackets [] sliced off.
+            yield session.query(DataDump).filter(DataDump.id == data_id).one().get_data()[1:-1]
+            if part+1 < chunks: yield ","
+        yield """], "endTime": "{}", "workers": {}}}""".format(str(datetime.now()), json.dumps(list(workerlist)))
+        print "Finished generating download."
+        print "Clearing request from database."
+        try:
+            session.query(DataDump).filter(DataDump.request == requestid).delete()
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            traceback.print_exc()
+            print "Problem while clearing datadump request: ", e
+        print "DONE"
+
+    return Response(stream_data(), mimetype="text/json")
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
@@ -267,6 +326,19 @@ def _detail(args):
         session.rollback()
         msg = "Failed to fetch records."
         return make_raw_error("{}: {}".format(msg, e))
+
+
+def _datadump(args):
+    data = [{key: row[key] for key in row.keys() if not key in ['point_date', 'hash', 'geom']} for row in _detail(args)]
+    dump = DataDump(args.data["jobsframework_ticket"], args.data["datadump_requestid"], args.data["datadump_part"], args.data["datadump_total"], json.dumps(data, default=unknown_object_json_handler))
+    session.add(dump)
+    try:
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        traceback.print_exc()
+        print "Problem while creating datadump: ", e
+    return {"id": dump.get_id()}
 
 
 def detail_query(args, aggregate=False):
@@ -576,7 +648,8 @@ def request_args_to_condition_tree(request_args, ignore=list()):
     :returns: condition tree"""
 
     ignored = {'agg', 'data_type', 'dataset', 'geom', 'limit', 'offset',
-               'shape', 'shapeset', 'job'}
+               'shape', 'shapeset', 'job', 'all', 'datadump_part', 'datadump_total',
+               "datadump_requestid", "jobsframework_ticket", "jobsframework_workerid"}
     for val in ignore:
         ignored.add(val)
 

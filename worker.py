@@ -24,15 +24,16 @@ if __name__ == "__main__":
     import threading
     import traceback
     import random
+    import os
     from collections import namedtuple
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
-    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid
+    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump
     from plenario.api.jobs import get_status, set_status, get_request, set_result
     from plenario.api.validator import convert
     from plenario.tasks import add_dataset, delete_dataset
     from plenario.tasks import add_shape, update_shape, delete_shape
     from plenario.utils.name_generator import generate_name
-    from plenario.api.response import remove_columns_from_dict
+    from plenario.models import DataDump
     from flask import Flask
 
     do_work = True
@@ -79,6 +80,7 @@ if __name__ == "__main__":
                 'meta': lambda args: _meta(args),
                 'fields': lambda args: _meta(args),
                 'grid': lambda args: _grid(args),
+                'datadump': lambda args: _datadump(args),
                 # ETL Task endpoints.
                 'add_dataset': lambda args: add_dataset(args),
                 'update_dataset': lambda args: add_dataset(args),
@@ -137,6 +139,10 @@ if __name__ == "__main__":
                     try:
                         endpoint = req['endpoint']
                         query_args = req['query']
+
+                        # Add worker metadata
+                        query_args["jobsframework_ticket"] = ticket
+                        query_args["jobsframework_workerid"] = worker_id
 
                         # Simpler endpoints, like the ETL Tasks, only really
                         # need a single string argument. No point in converting

@@ -26,7 +26,7 @@ def init_db(args):
 
 
 def init_tables():
-    print 'creating master, meta and user tables'
+    print 'creating master, meta, data, and user tables'
     init_meta()
     init_user()
 
@@ -35,7 +35,7 @@ def init_meta():
     #Reset concept of a metadata table
     non_meta_tables = [table for table in Base.metadata.sorted_tables
                        if table.name not in
-                       {'meta_master', 'meta_shape', 'plenario_user', 'plenario_variables'}]
+                       {'meta_master', 'meta_shape', 'plenario_user', 'plenario_datadump'}]
     for t in non_meta_tables:
         Base.metadata.remove(t)
     

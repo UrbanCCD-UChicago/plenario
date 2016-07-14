@@ -609,7 +609,7 @@ class User(Base):
 
     def is_authenticated(self):
         return True
-    
+
     def is_active(self):
         return True
 
@@ -618,3 +618,31 @@ class User(Base):
 
     def get_id(self):
         return self.id
+
+
+class DataDump(Base):
+    __tablename__ = "plenario_datadump"
+    id = Column(String(32), primary_key=True)
+    request = Column(String(32), nullable=False)
+    part = Column(Integer, nullable=False)
+    total = Column(Integer, nullable=False)
+    data = Column(Text)
+
+    def __init__(self, id, request, part, total, data):
+        self.id = id
+        self.request = request
+        self.part = part
+        self.total = total
+        self.data = data
+
+    def get_data(self):
+        return self.data
+
+    def get_id(self):
+        return self.id
+
+# Testing whether this is really needed.
+# def fast_count(q):
+#     count_q = q.statement.with_only_columns([func.count()]).order_by(None)
+#     count = q.session.execute(count_q).scalar()
+#     return count
