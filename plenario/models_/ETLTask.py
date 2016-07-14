@@ -14,5 +14,4 @@ class ETLTask(Base):
 
 
 if __name__ == '__main__':
-    from plenario.database import app_engine
-    ETLTask.create(bind=app_engine)
+    Base.metadata.create_all()

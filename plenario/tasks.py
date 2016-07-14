@@ -29,6 +29,28 @@ def task_complete_msg(task_name, mt):
     return "Finished {} for {} ({})".format(task_name, tname, source)
 
 
+def add_dataset(source_url_hash):
+    """Ingest the row information for an approved dataset.
+
+    :param source_url_hash: (string) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
+
+    metatable = session.query(MetaTable).get(source_url_hash)
+    PlenarioETL(metatable).add()
+    return task_complete_msg('ingest', metatable)
+
+
+def update_dataset(source_url_hash):
+    """Update the row information for an approved dataset.
+
+    :param source_url_hash: (string) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
+
+    metatable = session.query(MetaTable).get(source_url_hash)
+    PlenarioETL(metatable).update()
+    return task_complete_msg('update', metatable)
+
+
 def delete_dataset(source_url_hash):
     """Delete the row information and meta table for an approved dataset.
 
@@ -48,27 +70,6 @@ def delete_dataset(source_url_hash):
     except InternalError, e:
         raise delete_dataset.retry(exc=e)
     return task_complete_msg('deletion', meta)
-
-
-def add_dataset(source_url_hash):
-    """Ingest the row information for an approved dataset.
-
-    :param source_url_hash: (string) identifier used to grab target table info
-    :returns: (string) a helpful confirmation message"""
-
-    metatable = session.query(MetaTable).get(source_url_hash)
-    PlenarioETL(metatable).add()
-    return task_complete_msg('ingest', metatable)
-
-
-def update_dataset(source_url_hash):
-    """Update the row information for an approved dataset.
-    :param source_url_hash: (string) identifier used to grab target table info
-    :returns: (string) a helpful confirmation message"""
-
-    metatable = session.query(MetaTable).get(source_url_hash)
-    PlenarioETL(metatable).update()
-    return task_complete_msg('update', metatable)
 
 
 def add_shape(table_name):

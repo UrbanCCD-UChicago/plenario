@@ -76,17 +76,24 @@ def terms_view():
 
 @views.route('/admin/approve-shape/<dataset_name>')
 @login_required
+def approve_shape_view(dataset_name):
+    return approve_shape(dataset_name)
+
+
 def approve_shape(dataset_name):
     # Approve it
+    print "approve_shape"
     meta = session.query(ShapeMetadata).get(dataset_name)
     meta.approved_status = True
     session.commit()
     # Ingest it
-    #add_shape_task.delay(dataset_name)
-    job = {"endpoint": "add_shape_task", "query": meta.dataset_name}
-    submit_job(job)
+    job = {"endpoint": "add_shape", "query": meta.dataset_name}
+    print "approve_shape.job: {}".format(job)
     send_approval_email(meta.human_name, meta.contributor_name,
                         meta.contributor_email)
+    ticket = submit_job(job)
+    print "approve_shape.ticket: {}".format(ticket)
+    return ticket
 
 
 @views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
@@ -104,9 +111,10 @@ def approve_dataset(source_url_hash):
     # Ingest it
     #add_dataset_task.delay(source_url_hash)
     job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
-    submit_job(job)
-    send_approval_email(meta.human_name, meta.contributor_name,
+    send_approval_email(meta.human_name,
+                        meta.contributor_name,
                         meta.contributor_email)
+    return submit_job(job)
 
 
 def send_approval_email(dataset_name, contributor_name, contributor_email):
@@ -296,6 +304,8 @@ def point_meta_from_submit_form(form, is_approved):
     columns, labels = form_columns(form)
     name = slugify(form['dataset_name'], delim=u'_')[:50]
 
+    print 'point_meta_from_submit_form: {}'.format(form)
+
     metatable = MetaTable(
         url=form['file_url'],
         view_url=form.get('view_url'),
@@ -321,6 +331,8 @@ def point_meta_from_submit_form(form, is_approved):
 
 
 def shape_meta_from_submit_form(form, is_approved):
+
+    print 'shape_meta_from_submit_form: {}'.format(form)
 
     md = ShapeMetadata.add(
         human_name=form['dataset_name'],
@@ -704,6 +716,15 @@ def edit_shape(dataset_name):
     return render_template('admin/edit-shape.html', **context)
 
 
+# TODO: Currently not accessible from the admin views.
+# I added this because datasets have an analogous function.
+# Was this meant to be a feature? Or is this intentionally left out?
+def update_shape(source_url_hash):
+    job = {"endpoint": "update_shape", "query": source_url_hash}
+    ticket = submit_job(job)
+    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
+
+
 class EditDatasetForm(Form):
     """ 
     Form to edit meta_master information for a dataset
@@ -804,19 +825,24 @@ def edit_dataset(source_url_hash):
 
 @views.route('/admin/delete-dataset/<source_url_hash>')
 @login_required
+def delete_dataset_view(source_url_hash):
+    return delete_dataset(source_url_hash)
+
+
 def delete_dataset(source_url_hash):
     ticket = submit_job({'endpoint': 'delete_dataset', 'query': source_url_hash})
-    return make_response(json.dumps({'status': 'success',
-                                     'ticket': ticket}))
+    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
 
 
 @views.route('/update-dataset/<source_url_hash>')
+def update_dataset_view(source_url_hash):
+    return update_dataset(source_url_hash)
+
+
 def update_dataset(source_url_hash):
     job = {"endpoint": "update_dataset", "query": source_url_hash}
     ticket = submit_job(job)
-    #result = update_dataset_task.delay(source_url_hash)
-    return make_response(json.dumps({'status': 'success',
-                                     'ticket': ticket}))
+    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
 
 
 @views.route('/check-update/<ticket>')
@@ -840,7 +866,10 @@ def shape_status():
 
 @views.route('/admin/delete-shape/<table_name>')
 @login_required
+def delete_shape_view(table_name):
+    return delete_shape(table_name)
+
+
 def delete_shape(table_name):
     ticket = submit_job({'endpoint': 'delete_shape', 'query': table_name})
-    return make_response(json.dumps({'status': 'success',
-                                     'ticket': ticket}))
+    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))

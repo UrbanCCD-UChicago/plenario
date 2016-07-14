@@ -27,9 +27,9 @@ CACHE_CONFIG = {
 
 # Load a default admin
 DEFAULT_USER = {
-    'name': get('DEFAULT_USER_NAME'),
-    'email': get('DEFAULT_USER_EMAIL'),
-    'password': get('DEFAULT_USER_PASSWORD')
+    'name': get('DEFAULT_USER_NAME', 'jesse'),
+    'email': get('DEFAULT_USER_EMAIL', 'jesse@gmail.com'),
+    'password': get('DEFAULT_USER_PASSWORD', 'password')
 }
 
 AWS_ACCESS_KEY = get('AWS_ACCESS_KEY_ID', '')
@@ -57,4 +57,4 @@ MAIL_PASSWORD = get('MAIL_PASSWORD', '')
 MAINTENANCE = False
 
 #SQS Jobs Queue
-JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-queue-test')
+JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-queue-test-2')

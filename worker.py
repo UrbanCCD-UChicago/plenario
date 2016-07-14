@@ -80,7 +80,7 @@ if __name__ == "__main__":
                 'grid': lambda args: _grid(args),
                 # ETL Task endpoints.
                 'add_dataset': lambda args: add_dataset(args),
-                'update_dataset': lambda args: add_dataset(args),
+                'update_dataset': lambda args: update_dataset(args),
                 'delete_dataset': lambda args: delete_dataset(args),
                 'add_shape': lambda args: add_shape(args),
                 'update_shape': lambda args: update_shape(args),
@@ -111,23 +111,26 @@ if __name__ == "__main__":
                     log("Received job with ticket {}.".format(ticket), worker_id)
 
                     try:
-                        log("worker.CALL.get_status({})".format(ticket), worker_id)
                         status = get_status(ticket)
                         status["status"]
                         status["meta"]
                     except Exception as e:
                         log("Job is malformed ({}). Removing.".format(e), worker_id)
                         JobQueue.delete_message(job)
-
                         continue
+
                     if status["status"] != "queued":
                         log("Job has already been started. Skipping.", worker_id)
                         continue
 
                     status["status"] = "processing"
                     status["meta"]["startTime"] = str(datetime.datetime.now())
+                    log("Begin set_status", worker_id)
                     set_status(ticket, status)
+                    log("End set_status", worker_id)
+                    log("Begin get_request", worker_id)
                     req = get_request(ticket)
+                    log("End get_request", worker_id)
 
                     log("Starting work on ticket {}.".format(ticket), worker_id)
 
