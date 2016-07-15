@@ -1,6 +1,9 @@
 import json
 import unittest
 from plenario import create_app
+from plenario.api.validator import Validator
+from plenario.utils.model_helpers import table_exists, add_meta_if_not_exists, add_table_if_not_exists
+from tests.test_fixtures.post_data import roadworks_post_data
 
 
 class TestValidator(unittest.TestCase):
@@ -178,3 +181,17 @@ class TestValidator(unittest.TestCase):
 
         self.assertTrue(len(resp_data['meta']['message']) == 1)
         self.assertIn('invalid keyword', resp_data['meta']['message']['crimes'])
+
+    def test_updates_index_and_validates_correctly(self):
+
+        validator = Validator()
+
+        add_meta_if_not_exists(app=self.test_client,
+                               table_name='roadworks',
+                               post_data=roadworks_post_data,
+                               shape=False)
+        add_table_if_not_exists('roadworks', shape=False)
+
+        validator_result = validator.loads('{"dataset_name": "roadworks"}')
+        self.assertFalse(bool(validator_result.errors))
+        self.assertEqual('roadworks', validator_result.data['dataset_name'])

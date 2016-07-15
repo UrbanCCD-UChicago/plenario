@@ -23,7 +23,22 @@ install:
 - celery -A plenario.celery_app worker --loglevel=info &
 - python init_db.py
 script:
-- nosetests tests/points/ tests/shapes/ tests/submission/ -v
+###
+# Something strange is up with our tests
+# running these tests together causes them
+# to error and fail...but they work when
+# run separately. Probably something to
+# do with test fixture setup and tear down
+###
+# Furthermore, don't run the jobs test first.
+# Points (etc?) does some kind of setup that
+# is useful to jobs (it fails otherwise)
+###
+- nosetests tests/points/ -v
+- nosetests tests/shapes/ -v
+- nosetests tests/submission/ -v
+- nosetests tests/jobs -v
+- nosetests tests/utils -v
 deploy:
 - provider: elasticbeanstalk
   access_key_id:

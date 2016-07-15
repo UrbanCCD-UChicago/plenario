@@ -11,15 +11,17 @@ from plenario.api.common import extract_first_geometry_fragment, make_fragment_s
 from plenario.api.condition_builder import field_ops
 from plenario.database import session
 from plenario.models import MetaTable, ShapeMetadata
+from plenario.utils.model_helpers import table_exists
+
+
+def validate_dataset(dataset_name):
+    if not table_exists(dataset_name):
+        raise ValidationError("Invalid table name: {}.".format(dataset_name))
 
 
 def validate_many_datasets(list_of_datasets):
-    """Custom validator for dataset_name__in parameter."""
-
-    valid_tables = MetaTable.index()
-    for dataset_name in list_of_datasets:
-        if dataset_name not in valid_tables:
-            raise ValidationError("Invalid table name: {}.".format(dataset_name))
+    for dataset in list_of_datasets:
+        validate_dataset(dataset)
 
 
 class Validator(Schema):
@@ -41,8 +43,8 @@ class Validator(Schema):
 
     agg = fields.Str(default='week', validate=OneOf(valid_aggs))
     buffer = fields.Integer(default=100, validate=Range(0))
-    dataset_name = fields.Str(default=None, validate=OneOf(MetaTable.index()), dump_to='dataset')
-    shape = fields.Str(default=None, validate=OneOf(ShapeMetadata.tablenames()), dump_to='shapeset')
+    dataset_name = fields.Str(default=None, validate=validate_dataset, dump_to='dataset')
+    shape = fields.Str(default=None, validate=validate_dataset, dump_to='shapeset')
     dataset_name__in = fields.List(fields.Str(), default=MetaTable.index(), validate=validate_many_datasets)
     date__time_of_day_ge = fields.Integer(default=0, validate=Range(0, 23))
     date__time_of_day_le = fields.Integer(default=23, validate=Range(0, 23))
