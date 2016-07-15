@@ -61,7 +61,7 @@ if __name__ == "__main__":
         aws_access_key_id=AWS_ACCESS_KEY,
         aws_secret_access_key=AWS_SECRET_KEY
     )
-    JobQueue = conn.get_queue(JOBS_QUEUE)
+    JobsQueue = conn.get_queue(JOBS_QUEUE)
 
 
     def worker():
@@ -95,7 +95,7 @@ if __name__ == "__main__":
             log("Hello! I'm ready for anything.", worker_id)
 
             while do_work:
-                response = JobQueue.get_messages(message_attributes=["ticket"])
+                response = JobsQueue.get_messages(message_attributes=["ticket"])
                 if len(response) > 0:
                     job = response[0]
                     body = job.get_body()
@@ -107,7 +107,7 @@ if __name__ == "__main__":
                         ticket = str(job.message_attributes["ticket"]["string_value"])
                     except KeyError:
                         log("Job does not contain a ticket! Removing.", worker_id)
-                        JobQueue.delete_message(job)
+                        JobsQueue.delete_message(job)
 
                         continue
 
@@ -120,7 +120,7 @@ if __name__ == "__main__":
                         status["meta"]
                     except Exception as e:
                         log("Job is malformed ({}). Removing.".format(e), worker_id)
-                        JobQueue.delete_message(job)
+                        JobsQueue.delete_message(job)
 
                         continue
                     if status["status"] != "queued":
@@ -165,10 +165,11 @@ if __name__ == "__main__":
                         status["meta"]["endTime"] = str(datetime.datetime.now())
                         log("Ticket {} errored with: {}.".format(ticket, e), worker_id)
                         set_status(ticket, status)
-                        JobQueue.delete_message(job)
+                        JobsQueue.delete_message(job)
                         traceback.print_exc()
 
                     log("Finished work on ticket {}.".format(ticket), worker_id)
+                    JobsQueue.delete_message(job)
 
                 else:
                     # No work! Idle for a bit to save compute cycles.

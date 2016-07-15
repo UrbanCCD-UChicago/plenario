@@ -36,6 +36,7 @@ class TestJobs(BasePlenarioTest):
 
     # =======================
     # TEST: General Job Methods: submit_job, get_status, get_request, get_result
+    #       Also test ping endpoint.
     # =======================
 
     def test_job_submission_by_methods(self):
@@ -334,9 +335,29 @@ class TestJobs(BasePlenarioTest):
         self.assertEqual(response["result"]["type"], "FeatureCollection")
         self.assertEqual(response["result"]["features"][0]["properties"]["count"], 1)
 
+    # =======================
+    # ACCEPTANCE TEST: grid
+    # =======================
+
+    def test_datadump_job(self):
+        response = self.app.get(prefix + '/datadump?obs_date__ge=2000-1-1&obs_date__le=2014-1-1&dataset_name=flu_shot_clinics')
+        try:
+            response = json.loads(response.get_data())
+        except Exception as e:
+            self.fail("Response is not valid JSON (it probably failed): {}".format(e))
+        self.assertEqual(len(response["data"]), 65)
+        self.assertEqual(response["data"][0]["date"], "2013-12-14")
+        self.assertIsNotNone(response["startTime"])
+        self.assertIsNotNone(response["endTime"])
+        self.assertIsNotNone(response["workers"])
+
+    # ============================ TEARDOWN ============================ #
+
     @classmethod
     def tearDownClass(cls):
         print("Stopping worker.")
         subprocess.Popen(["pkill", "-f", "worker.py"])
+
+
 
 

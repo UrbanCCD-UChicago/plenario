@@ -22,7 +22,7 @@ from plenario.api.response import geojson_response_base, form_csv_detail_respons
 from plenario.api.response import form_geojson_detail_response, add_geojson_feature
 from plenario.api.validator import DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
 from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters, convert
-from plenario.api.jobs import make_job_response, submit_job, get_status, get_result
+from plenario.api.jobs import make_job_response, submit_job, get_status, get_result, cancel_job
 from plenario.models import MetaTable, DataDump
 
 # Use the standard pool if this is just the app,
@@ -79,75 +79,129 @@ def detail_aggregate():
 def detail():
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
               'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
-              'date__time_of_day_le', 'limit', 'job', 'all')
+              'date__time_of_day_le', 'limit', 'job')
     validator = DatasetRequiredValidator(only=fields)
     validator_result = validate(validator, request.args.to_dict())
 
     if validator_result.errors:
         return bad_request(validator_result.errors)
 
-    # Using the "all" flag will override the "limit" option.
-    if validator_result.data.get('all'):
-        return datadump(validator_result)
-
-    elif validator_result.data.get('job'):
+    if validator_result.data.get('job'):
         return make_job_response("detail", validator_result)
     else:
         result_rows = _detail(validator_result)
         return _detail_response(result_rows, validator_result)
 
 
-def datadump(validator_result):
+# Don't even try to cache this...the stream is not pickleable.
+@crossdomain(origin="*")
+def datadump():
+
+    def log(msg):
+        # The constant opening and closing is meh, I know. But I'm feeling lazy
+        # right now.
+        logfile = open('/opt/python/log/highvolume.log', "a")
+        logfile.write("{} - {}\n".format(datetime.now(), msg))
+        logfile.close()
+
+    fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
+              'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
+              'date__time_of_day_le', 'limit', 'job')
+    validator = DatasetRequiredValidator(only=fields)
+    validator_result = validate(validator, request.args.to_dict())
+
+    if validator_result.data.get("data_type") == "geojson":
+        return bad_request("geoJSON datadump is not yet supported.")
+
     requestid = os.urandom(16).encode("hex")
-    jobs = []
-    chunksize = 5000
-    query = copy.deepcopy(validator_result.data)
+    chunksize = 1000
+    original_validated = copy.deepcopy(validator_result)
+    query = original_validated.data
     rows = detail_query(validator_result).count()
-    print "Download contains {} rows.".format(rows)
+    log("===== DATADUMP REQUESTED BY {} =====".format(request.headers.get("X-Forwarded-For")))
+    log("-> Query: {}".format(request.full_path))
+    log("-> Dump contains {} rows.".format(rows))
     chunks = int(math.floor(rows / float(chunksize)) + 1)
     query["limit"] = chunksize
     query["datadump_total"] = chunks
     query["datadump_requestid"] = requestid
-    for part in range(chunks):
-        print "Part {}/{}".format(part + 1, chunks)
-        query["offset"] = part * chunksize
-        query["datadump_part"] = part + 1
-        req = {"endpoint": "datadump", "query": query}
-        jobs.append(submit_job(req))
 
     def stream_data():
+        if validator_result.data.get("data_type") == "json":
+            yield """{{"startTime": "{}", "data": [""".format(str(datetime.now()))
+        elif validator_result.data.get("data_type") == "csv":
+            yield "# STARTTIME: {}\n".format(str(datetime.now()))
+            columns = [column["field_name"] for column in _meta(original_validated)[0]["columns"]]
+            yield ",".join(columns)+"\n"
+        log("-> Acknowledged request.")
+
+        jobs = []
         workerlist = set()
-        yield """{{"startTime": "{}", "data": [""".format(str(datetime.now()))
-        for part in range(chunks):
-            ticket = jobs[part]
-            print "Waiting on job {}...".format(ticket)
-            while get_status(ticket)["status"] != "success":
-                print "---> Still waiting on that job..."
-                print get_status(ticket)
-                time.sleep(1)
-                if get_status(ticket)["status"] == "error":
-                    print "---> RIP {}\nABORT".format(ticket)
-                    yield "FAILED"
-                    return
-            print "---> OK it's done."
-            data_id = get_result(ticket)["id"]
-            workerlist.add(get_status(ticket)["meta"]["worker"])
-            # Return result with the list brackets [] sliced off.
-            yield session.query(DataDump).filter(DataDump.id == data_id).one().get_data()[1:-1]
-            if part+1 < chunks: yield ","
-        yield """], "endTime": "{}", "workers": {}}}""".format(str(datetime.now()), json.dumps(list(workerlist)))
-        print "Finished generating download."
-        print "Clearing request from database."
+
+        try:
+            log("-> Spawning jobs.")
+            for part in range(chunks):
+                query["offset"] = part * chunksize
+                query["datadump_part"] = part + 1
+                req = {"endpoint": "datadump", "query": query}
+                jobs.append(submit_job(req))
+                # Keepalive
+                yield ""
+
+            part = 0
+
+            log("-> Streaming data.")
+            while part < chunks:
+                ticket = jobs[part]
+                if get_status(ticket)["status"] != "success":
+                    if get_status(ticket)["status"] == "error":
+                        log("---> JOB FAILED! Ticket: {}\nABORT".format(ticket))
+                        print("ERROR IN DATADUMP - TICKET {} FAILED".format(ticket))
+                        yield "\nFAILED"
+                        raise Exception("Aborted due to failure in worker.")
+                    time.sleep(10)
+                    # Send something to keep the connection open.
+                    yield ""
+                else:
+                    data_id = get_result(ticket)["id"]
+                    workerlist.add(get_status(ticket)["meta"]["worker"])
+                    # Return result with the list brackets [] sliced off.
+                    part += 1
+                    if validator_result.data.get("data_type") == "json":
+                        yield session.query(DataDump).filter(DataDump.id == data_id).one().get_data()[1:-1]
+                        if part + 1 < chunks: yield ","
+                    elif validator_result.data.get("data_type") == "csv":
+                        for row in json.loads(session.query(DataDump).filter(DataDump.id == data_id).one().get_data()):
+                            yield ",".join([str(row[key]) for key in columns])+"\n"
+            if validator_result.data.get("data_type") == "json":
+                yield """], "endTime": "{}", "workers": {}}}""".format(str(datetime.now()), json.dumps(list(workerlist)))
+            elif validator_result.data.get("data_type") == "csv":
+                yield "# ENDTIME: {}\n".format(str(datetime.now()))
+                yield "# WORKERS: {}".format(", ".join(workerlist))
+            log("-> Finished generating download.")
+
+            log("===== DATADUMP COMPLETE =====")
+
+        except Exception as e:
+            log("-> ERROR while performing datadump: {}".format(e))
+            traceback.print_exc()
+            log("-> Stopping jobs.")
+            for job in jobs:
+                cancel_job(job)
+            log("===== DATADUMP ABORTED =====")
+
+        log("-> Clearing request from database.")
         try:
             session.query(DataDump).filter(DataDump.request == requestid).delete()
             session.commit()
         except Exception as e:
             session.rollback()
             traceback.print_exc()
-            print "Problem while clearing datadump request: ", e
-        print "DONE"
+            log("---> Problem while clearing datadump request: {}".format(e))
+            print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
 
-    return Response(stream_data(), mimetype="text/json")
+    return Response(stream_data(), mimetype="text/"+validator_result.data.get("data_type"))
+
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
@@ -402,7 +456,7 @@ def detail_query(args, aggregate=False):
             shape_conditions = parse_tree(shapeset, shape_ctree)
             q = q.filter(shape_conditions)
 
-    return q
+    return q.order_by(dataset.c.point_date.desc())
 
 
 def _grid(args):

@@ -161,6 +161,11 @@ def submit_job(req):
         "ticket": {
             "data_type": "String",
             "string_value": str(ticket)
+        },
+        # For getting job by ticket
+        str(ticket): {
+            "data_type": "String",
+            "string_value": "ticket"
         }
     }
 
@@ -175,3 +180,18 @@ def submit_job(req):
     file.close()
 
     return ticket
+
+
+def cancel_job(ticket):
+    conn = boto.sqs.connect_to_region(
+        AWS_REGION_NAME,
+        aws_access_key_id=AWS_ACCESS_KEY,
+        aws_secret_access_key=AWS_SECRET_KEY
+    )
+    JobsQueue = conn.get_queue(JOBS_QUEUE)
+
+    response = JobsQueue.get_messages(message_attributes=[ticket])
+    if len(response) > 0:
+        JobsQueue.delete_message(response[0])
+        return ticket
+    return None
