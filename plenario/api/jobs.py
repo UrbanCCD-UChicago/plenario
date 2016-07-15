@@ -48,6 +48,15 @@ def set_result(ticket, result):
     JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_result_" + ticket, json.dumps(result, default=unknown_object_json_handler))
 
 
+def get_flag(flag):
+    return JobsDB.get(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_flag_" + flag)=="true"
+
+
+def set_flag(flag, state, expire=60):
+    JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_flag_" + flag, "true" if state else "false")
+    JobsDB.expire(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_flag_" + flag, expire)
+
+
 def touch_ticket_expiry(ticket):
     # Expire all job handles in 1 hour.
     JobsDB.expire(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_query_" + ticket, 3600)

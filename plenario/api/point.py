@@ -21,9 +21,9 @@ from plenario.api.response import make_raw_error, bad_request, json_response_bas
 from plenario.api.response import geojson_response_base, form_csv_detail_response, form_json_detail_response
 from plenario.api.response import form_geojson_detail_response, add_geojson_feature
 from plenario.api.validator import DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
-from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters, convert
-from plenario.api.jobs import make_job_response, submit_job, get_status, get_result, cancel_job
-from plenario.models import MetaTable, DataDump
+from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters, converters
+from plenario.api.jobs import make_job_response, submit_job, get_status, get_result, cancel_job, set_flag, get_flag
+from plenario.models import MetaTable, DataDump, fast_count
 
 # Use the standard pool if this is just the app,
 # but use the shared connection pool if this
@@ -92,17 +92,9 @@ def detail():
         result_rows = _detail(validator_result)
         return _detail_response(result_rows, validator_result)
 
-
 # Don't even try to cache this...the stream is not pickleable.
 @crossdomain(origin="*")
 def datadump():
-
-    def log(msg):
-        # The constant opening and closing is meh, I know. But I'm feeling lazy
-        # right now.
-        logfile = open('/opt/python/log/highvolume.log', "a")
-        logfile.write("{} - {}\n".format(datetime.now(), msg))
-        logfile.close()
 
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
               'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
@@ -111,29 +103,39 @@ def datadump():
     validator_result = validate(validator, request.args.to_dict())
 
     if validator_result.data.get("data_type") == "geojson":
-        return bad_request("geoJSON datadump is not yet supported.")
+        validator_result.data.set("data_type", "json")
 
     requestid = os.urandom(16).encode("hex")
-    chunksize = 1000
+    chunksize = 5000
     original_validated = copy.deepcopy(validator_result)
-    query = original_validated.data
-    rows = detail_query(validator_result).count()
-    log("===== DATADUMP REQUESTED BY {} =====".format(request.headers.get("X-Forwarded-For")))
-    log("-> Query: {}".format(request.full_path))
-    log("-> Dump contains {} rows.".format(rows))
-    chunks = int(math.floor(rows / float(chunksize)) + 1)
-    query["limit"] = chunksize
-    query["datadump_total"] = chunks
-    query["datadump_requestid"] = requestid
+    origin_ip = request.headers.get("X-Forwarded-For")
+    if not origin_ip:
+        origin_ip = request.remote_addr
+    full_path = request.full_path
+
+    # Flag that workers will look at to see if the request is active
+    # If the flag expires, then the request has died.
+    set_flag(requestid + "_dowork", True)
 
     def stream_data():
+        query = original_validated.data
+        log("===== DATADUMP REQUESTED BY {} =====".format(origin_ip))
+
         if validator_result.data.get("data_type") == "json":
             yield """{{"startTime": "{}", "data": [""".format(str(datetime.now()))
         elif validator_result.data.get("data_type") == "csv":
             yield "# STARTTIME: {}\n".format(str(datetime.now()))
             columns = [column["field_name"] for column in _meta(original_validated)[0]["columns"]]
-            yield ",".join(columns)+"\n"
+            yield ",".join(columns) + "\n"
         log("-> Acknowledged request.")
+
+        log("-> Query: {}".format(full_path))
+        rows = fast_count(detail_query(validator_result))
+        log("-> Dump contains {} rows.".format(rows))
+        chunks = int(math.floor(rows / float(chunksize)) + 1)
+        query["limit"] = chunksize
+        query["datadump_total"] = chunks
+        query["datadump_requestid"] = requestid
 
         jobs = []
         workerlist = set()
@@ -141,12 +143,18 @@ def datadump():
         try:
             log("-> Spawning jobs.")
             for part in range(chunks):
+                # Keep connection from idling
+                yield ""
                 query["offset"] = part * chunksize
                 query["datadump_part"] = part + 1
                 req = {"endpoint": "datadump", "query": query}
                 jobs.append(submit_job(req))
-                # Keepalive
-                yield ""
+                # Keep workers alive
+                set_flag(requestid + "_dowork", True, 10)
+
+            #Make a cleanup job
+            req = {"endpoint": "datadump_cleanup", "query": query}
+            submit_job(req)
 
             part = 0
 
@@ -160,11 +168,13 @@ def datadump():
                         yield "\nFAILED"
                         raise Exception("Aborted due to failure in worker.")
                     time.sleep(10)
-                    # Send something to keep the connection open.
+                    # Keep Alive
                     yield ""
+                    set_flag(requestid + "_dowork", True, 20)
+
                 else:
                     data_id = get_result(ticket)["id"]
-                    workerlist.add(get_status(ticket)["meta"]["worker"])
+                    workerlist.add(*get_status(ticket)["meta"]["workers"])
                     # Return result with the list brackets [] sliced off.
                     part += 1
                     if validator_result.data.get("data_type") == "json":
@@ -185,23 +195,36 @@ def datadump():
         except Exception as e:
             log("-> ERROR while performing datadump: {}".format(e))
             traceback.print_exc()
-            log("-> Stopping jobs.")
-            for job in jobs:
-                cancel_job(job)
             log("===== DATADUMP ABORTED =====")
 
-        log("-> Clearing request from database.")
-        try:
-            session.query(DataDump).filter(DataDump.request == requestid).delete()
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            traceback.print_exc()
-            log("---> Problem while clearing datadump request: {}".format(e))
-            print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
+        set_flag(requestid + "_dowork", False)
 
-    return Response(stream_data(), mimetype="text/"+validator_result.data.get("data_type"))
+    response = Response(stream_data(), mimetype="text/"+validator_result.data.get("data_type"))
+    response.headers["Content-Disposition"] = "attachment; filename=\""+str(original_validated.data.get("dataset"))+".datadump."+original_validated.data.get("data_type")+"\""
+    response.headers["Keep-Alive"] = "timeout=3600, max=10"
+    return response
 
+
+# Datadump utilities =======================
+def cleanup_datadump(requestid):
+    log("-> Removed request {} from database.".format(requestid))
+    try:
+        session.query(DataDump).filter(DataDump.request == requestid).delete()
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        traceback.print_exc()
+        log("---> Problem while clearing datadump request: {}".format(e))
+        print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
+
+
+def log(msg):
+    # The constant opening and closing is meh, I know. But I'm feeling lazy
+    # right now.
+    logfile = open('/opt/python/log/highvolume.log', "a")
+    logfile.write("{} - {}\n".format(datetime.now(), msg))
+    logfile.close()
+# ==========================================
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
@@ -383,7 +406,10 @@ def _detail(args):
 
 
 def _datadump(args):
-    data = [{key: row[key] for key in row.keys() if not key in ['point_date', 'hash', 'geom']} for row in _detail(args)]
+    if not get_flag(args.data["datadump_requestid"]+"_dowork"):
+        return {"error": "aborted"}
+    result = _detail(args)
+    data = [{key: row[key] for key in row.keys() if not key in ['point_date', 'hash', 'geom']} for row in result]
     dump = DataDump(args.data["jobsframework_ticket"], args.data["datadump_requestid"], args.data["datadump_part"], args.data["datadump_total"], json.dumps(data, default=unknown_object_json_handler))
     session.add(dump)
     try:
@@ -393,6 +419,14 @@ def _datadump(args):
         traceback.print_exc()
         print "Problem while creating datadump: ", e
     return {"id": dump.get_id()}
+
+
+def _datadump_cleanup(args):
+    if not get_flag(args.data["datadump_requestid"] + "_dowork"):
+        cleanup_datadump(args.data["datadump_requestid"])
+        return {"status": "success"}
+    else:
+        return {"jobsframework_metacommands": ["defer"]}
 
 
 def detail_query(args, aggregate=False):
@@ -720,6 +754,8 @@ def request_args_to_condition_tree(request_args, ignore=list()):
         if k[0] == 'obs_date':
             k[0] = 'point_date'
         if k[0] == 'date' and 'time_of_day' in k[1]:
+            if type(args["dataset"]) != sqlalchemy.sql.schema.Table:
+                args['dataset'] = converters['dataset'](args['dataset'])
             k[0] = sqlalchemy.func.date_part('hour', args['dataset'].c.point_date)
             k[1] = 'le' if 'le' in k[1] else 'ge'
 

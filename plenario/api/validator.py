@@ -1,4 +1,5 @@
 import json
+import sqlalchemy
 
 from collections import namedtuple
 from datetime import datetime, timedelta
@@ -315,6 +316,8 @@ def valid_column_condition(table, column_name, value):
     value = condition[column_name]
 
     try:
+        if type(table) != sqlalchemy.sql.schema.Table:
+            table = converters['dataset'](table)
         column = table.columns[column_name]
     except KeyError:
         raise KeyError("Invalid column name {}".format(column_name))

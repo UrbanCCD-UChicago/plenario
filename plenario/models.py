@@ -641,8 +641,8 @@ class DataDump(Base):
     def get_id(self):
         return self.id
 
-# Testing whether this is really needed.
-# def fast_count(q):
-#     count_q = q.statement.with_only_columns([func.count()]).order_by(None)
-#     count = q.session.execute(count_q).scalar()
-#     return count
+
+def fast_count(q):
+    count_q = q.statement.with_only_columns([func.count()]).order_by(None)
+    count = q.session.execute(count_q).scalar()
+    return count

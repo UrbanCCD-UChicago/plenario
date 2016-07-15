@@ -27,7 +27,7 @@ if __name__ == "__main__":
     import os
     from collections import namedtuple
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
-    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump
+    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump, _datadump_cleanup
     from plenario.api.jobs import get_status, set_status, get_request, set_result
     from plenario.api.validator import convert
     from plenario.tasks import add_dataset, delete_dataset
@@ -89,7 +89,9 @@ if __name__ == "__main__":
                 'update_shape': lambda args: update_shape(args),
                 'delete_shape': lambda args: delete_shape(args),
                 # Health endpoint.
-                'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)}
+                'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)},
+                # Utility tasks
+                'datadump_cleanup': lambda args: _datadump_cleanup(args)
             }
 
             log("Hello! I'm ready for anything.", worker_id)
@@ -129,7 +131,9 @@ if __name__ == "__main__":
 
                     status["status"] = "processing"
                     status["meta"]["startTime"] = str(datetime.datetime.now())
-                    status["meta"]["worker"] = worker_id
+                    if not "workers" in status["meta"]:
+                        status["meta"]["workers"] = []
+                    status["meta"]["workers"].append(worker_id)
                     set_status(ticket, status)
                     req = get_request(ticket)
 
@@ -155,10 +159,25 @@ if __name__ == "__main__":
                             log("worker.query_args: {}".format(query_args), worker_id)
                             log("worker.req: {}".format(req), worker_id)
 
-                            set_result(ticket, endpoint_logic[endpoint](query_args))
+                            result = endpoint_logic[endpoint](query_args)
+
+                            # Check for metacommands
+                            if "jobsframework_metacommands" in result:
+                                if "defer" in result["jobsframework_metacommands"]:
+                                    status["status"] = "queued"
+                                    status["meta"]["lastDeferredTime"] = str(datetime.datetime.now())
+                                    del(status["meta"]["startTime"])
+                                    set_status(ticket, status)
+                                    log("Deferred work on ticket {}.".format(ticket), worker_id)
+                                    continue
+
+                            set_result(ticket, result)
                             status["status"] = "success"
                             status["meta"]["endTime"] = str(datetime.datetime.now())
                             set_status(ticket, status)
+
+                            log("Finished work on ticket {}.".format(ticket), worker_id)
+                            JobsQueue.delete_message(job)
 
                     except Exception as e:
                         status["status"] = "error"
@@ -167,9 +186,6 @@ if __name__ == "__main__":
                         set_status(ticket, status)
                         JobsQueue.delete_message(job)
                         traceback.print_exc()
-
-                    log("Finished work on ticket {}.".format(ticket), worker_id)
-                    JobsQueue.delete_message(job)
 
                 else:
                     # No work! Idle for a bit to save compute cycles.
