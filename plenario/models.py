@@ -10,9 +10,11 @@ from itertools import groupby
 from operator import itemgetter
 from sqlalchemy import Column, String, Boolean, Date, DateTime, Text, func
 from sqlalchemy import Table, select, Integer
+from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import synonym
+from sqlalchemy.types import NullType
 from uuid import uuid4
 
 from plenario.database import session, Base
@@ -476,6 +478,39 @@ class ShapeMetadata(Base):
         if geom:
             listing = cls.add_intersections_to_index(listing, geom)
 
+        listing = cls._add_fields_to_index(listing)
+
+        return listing
+
+    @classmethod
+    def _add_fields_to_index(cls, listing):
+        for dataset in listing:
+            name = dataset['dataset_name']
+            try:
+                # Reflect up the shape table
+                table = Table(name,
+                              Base.metadata,
+                              autoload=True,
+                              extend_existing=True)
+            except NoSuchTableError:
+                # If that table doesn't exist (?!?!)
+                # don't try to form the fields.
+                continue
+
+            finally:
+                # Extract every column's info.
+                fields_list = []
+                for col in table.columns:
+                    if not isinstance(col.type, NullType):
+                        # Don't report our internal-use columns
+                        if col.name in {'geom', 'ogc_fid', 'hash'}:
+                            continue
+                        field_object = {
+                            'field_name': col.name,
+                            'field_type': str(col.type)
+                        }
+                        fields_list.append(field_object)
+                dataset['columns'] = fields_list
         return listing
 
     @classmethod

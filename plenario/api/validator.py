@@ -218,7 +218,7 @@ def validate(validator, request_args):
                     cond_tree = json.loads(value)
                     if valid_tree(table, cond_tree):
                         result.data[key] = cond_tree
-                except ValueError as err:
+                except (ValueError, KeyError) as err:
                     result.errors[t_name] = "Bad tree: {} -- causes error {}.".format(value, err)
                     return result
 

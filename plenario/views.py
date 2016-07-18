@@ -46,7 +46,7 @@ def explore_kludge(path):
 @views.route('/api-docs')
 def api_docs_view():
     dt_now = datetime.now()
-    return render_template('api-docs.html', yesterday=dt_now-timedelta(days=1))
+    return redirect("http://docs.plenar.io", code=302)
 
 
 @views.route('/about')
