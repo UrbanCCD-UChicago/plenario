@@ -8,9 +8,8 @@ from plenario.api.common import make_csv, unknown_object_json_handler
 def make_error(msg, status_code):
     resp = {
         'meta': {
-            'message': msg
         },
-        'data': [],
+        'error': msg,
     }
 
     resp['meta']['query'] = request.args
@@ -26,10 +25,9 @@ def internal_error(context_msg, exception):
     return make_error(msg, 500)
 
 
-def json_response_base(data, validator=None,  query=''):
+def json_response_base(data, validator=None, query=''):
     meta = {
-        'message': '',
-        'query': query,
+        'message': ''
     }
 
     if validator:

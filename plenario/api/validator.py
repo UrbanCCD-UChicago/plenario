@@ -11,6 +11,7 @@ from plenario.api.common import extract_first_geometry_fragment, make_fragment_s
 from plenario.api.condition_builder import field_ops
 from plenario.database import session
 from plenario.models import MetaTable, ShapeMetadata
+from plenario.sensor_models import NodeMeta, NetworkMeta
 
 
 def validate_many_datasets(list_of_datasets):
@@ -20,6 +21,14 @@ def validate_many_datasets(list_of_datasets):
     for dataset_name in list_of_datasets:
         if dataset_name not in valid_tables:
             raise ValidationError("Invalid table name: {}.".format(dataset_name))
+
+def validate_nodes(nodes):
+    """Custom validator for nodes parameter."""
+
+    valid_nodes = NodeMeta.index()
+    for node in nodes:
+        if node not in valid_nodes:
+            raise ValidationError("Invalid node ID: {}.".format(node))
 
 
 class Validator(Schema):
@@ -53,6 +62,11 @@ class Validator(Schema):
     limit = fields.Integer(default=1000)
     offset = fields.Integer(default=0, validate=Range(0))
     resolution = fields.Integer(default=500, validate=Range(0))
+    network_name = fields.Str(default=None, validate=OneOf(NetworkMeta.index()))
+    node_id = fields.Str(default=None, validate=OneOf(NodeMeta.index()))
+    nodes = fields.List(fields.Str(), default=NodeMeta.index(), validate=validate_nodes)
+    start_datetime = fields.DateTime(default=datetime.now() - timedelta(days=90))
+    end_datetime = fields.DateTime(default=datetime.now())
 
 
 class DatasetRequiredValidator(Validator):
@@ -93,6 +107,9 @@ class ExportFormatsValidator(Validator):
     valid_formats = {'shapefile', 'kml', 'json'}
     data_type = fields.Str(default='json', validate=OneOf(valid_formats))
 
+
+class SensorNetworkValidator(Validator):
+    """For sensor networks"""
 
 # ValidatorResult
 # ===============
