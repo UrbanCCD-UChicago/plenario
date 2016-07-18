@@ -167,6 +167,12 @@ def _timeseries(args):
         # to show up in the JSON response.
         del args.data['dataset']
 
+    # If no dataset_name__in list was provided, have to fill it in by invoking
+    # MetaTable.index() here! Not in the validator. This way the list stays up
+    # to date.
+    if table_names is None:
+        table_names = MetaTable.index()
+
     # If a single dataset was provided, it's the only thing we need to consider.
     if dataset is not None:
         table_names = [dataset.name]

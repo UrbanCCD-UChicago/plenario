@@ -1,6 +1,13 @@
 import json
 import unittest
+
+from sqlalchemy.exc import ProgrammingError
+
 from plenario import create_app
+from plenario.database import app_engine
+from plenario.etl.point import PlenarioETL
+from plenario.models import MetaTable
+from tests.test_fixtures.post_data import roadworks_post_data
 
 
 class TestValidator(unittest.TestCase):
@@ -22,7 +29,7 @@ class TestValidator(unittest.TestCase):
         resp_data = self.get_json_response_data(endpoint + query)
 
         self.assertTrue(len(resp_data['meta']['message']) == 1)
-        self.assertEquals(resp_data['meta']['message']['dataset_name'], ['Not a valid choice.'])
+        self.assertEquals(resp_data['meta']['message']['dataset_name'], ['Invalid table name: crimez.'])
 
     def test_validator_bad_dataset_name_and_date(self):
         endpoint = 'detail'
@@ -31,7 +38,7 @@ class TestValidator(unittest.TestCase):
         resp_data = self.get_json_response_data(endpoint + query)
 
         self.assertTrue(len(resp_data['meta']['message']) == 2)
-        self.assertEquals(resp_data['meta']['message']['dataset_name'], ['Not a valid choice.'])
+        self.assertEquals(resp_data['meta']['message']['dataset_name'], ['Invalid table name: crimez.'])
         self.assertEquals(resp_data['meta']['message']['obs_date__ge'], ['Not a valid date.'])
 
     def test_validator_bad_column_name(self):
@@ -178,3 +185,27 @@ class TestValidator(unittest.TestCase):
 
         self.assertTrue(len(resp_data['meta']['message']) == 1)
         self.assertIn('invalid keyword', resp_data['meta']['message']['crimes'])
+
+    def test_updates_index_and_validates_correctly(self):
+
+        # Adds a MetaTable record.
+        self.test_client.post('/add?is_shapefile=false', data=roadworks_post_data)
+        meta = MetaTable.get_by_dataset_name('roadworks')
+        # Creates the table.
+        PlenarioETL(meta).add()
+
+        # Perform a query on the newly added dataset (to check if the
+        # validator allows the query through).
+        query = '/v1/api/detail?dataset_name=roadworks&obs_date__ge=2000'
+        response = self.test_client.get(query)
+        data = json.loads(response.data)
+
+        self.assertEqual(len(data['objects']), 126)
+
+    def tearDown(self):
+
+        try:
+            app_engine.execute("drop table roadworks")
+            app_engine.execute("delete from meta_master where dataset_name = 'roadworks'")
+        except ProgrammingError:
+            pass

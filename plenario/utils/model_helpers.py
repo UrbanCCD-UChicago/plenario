@@ -1,8 +1,8 @@
 """model_helpers: Just a collection of functions which perform common
 interactions with the models."""
 
-from sqlalchemy.exc import NoSuchTableError
-from plenario.database import session
+from sqlalchemy.exc import ProgrammingError
+from plenario.database import app_engine, session
 from plenario.models_ import ETLTask
 
 
@@ -35,9 +35,15 @@ def fetch_table(model, dataset_name):
     return model.get_by_dataset_name(dataset_name).point_table
 
 
-def table_exists(model, dataset_name):
+def table_exists(table_name):
+    """Make an inexpensive query to the database. It the table does not exist,
+    the query will cause a ProgrammingError.
+
+    :param table_name: (string) table name
+    :returns: (bool) true if the table exists, false otherwise"""
+
     try:
-        fetch_table(model, dataset_name)
+        app_engine.execute("select '{}'::regclass".format(table_name))
         return True
-    except (AttributeError, NoSuchTableError):
+    except ProgrammingError:
         return False
