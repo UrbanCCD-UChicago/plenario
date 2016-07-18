@@ -92,7 +92,7 @@ def detail():
         result_rows = _detail(validator_result)
         return _detail_response(result_rows, validator_result)
 
-# Don't even try to cache this...the stream is not pickleable.
+# Do not cache this endpoint. The streams are large and are unpickleable anyway.
 @crossdomain(origin="*")
 def datadump():
 
@@ -106,8 +106,10 @@ def datadump():
         validator_result.data.set("data_type", "json")
 
     requestid = os.urandom(16).encode("hex")
-    chunksize = 5000
+    chunksize = 2000
     original_validated = copy.deepcopy(validator_result)
+
+    # Get origin IP to have records against Denial-of-Service
     origin_ip = request.headers.get("X-Forwarded-For")
     if not origin_ip:
         origin_ip = request.remote_addr
@@ -115,12 +117,14 @@ def datadump():
 
     # Flag that workers will look at to see if the request is active
     # If the flag expires, then the request has died.
+    # Default timeout is 60 seconds if not bumped.
     set_flag(requestid + "_dowork", True)
 
     def stream_data():
         query = original_validated.data
         log("===== DATADUMP REQUESTED BY {} =====".format(origin_ip))
 
+        # Send boilerplates for JSON and CSV.
         if validator_result.data.get("data_type") == "json":
             yield """{{"startTime": "{}", "data": [""".format(str(datetime.now()))
         elif validator_result.data.get("data_type") == "csv":
@@ -129,6 +133,7 @@ def datadump():
             yield ",".join(columns) + "\n"
         log("-> Acknowledged request.")
 
+        # Calculate query parameters
         log("-> Query: {}".format(full_path))
         rows = fast_count(detail_query(validator_result))
         log("-> Dump contains {} rows.".format(rows))
@@ -140,19 +145,24 @@ def datadump():
         jobs = []
         workerlist = set()
 
-        try:
-            log("-> Spawning jobs.")
-            for part in range(chunks):
-                # Keep connection from idling
-                yield ""
-                query["offset"] = part * chunksize
-                query["datadump_part"] = part + 1
-                req = {"endpoint": "datadump", "query": query}
-                jobs.append(submit_job(req))
-                # Keep workers alive
-                set_flag(requestid + "_dowork", True, 10)
+        # Method to queue jobs
+        def queue_part(part, query):
+            query["offset"] = part * chunksize
+            query["datadump_part"] = part + 1
+            req = {"endpoint": "datadump", "query": query}
+            return submit_job(req)
 
-            #Make a cleanup job
+        try:
+            # Queue an initial set of jobs. This group should be small
+            # so that the first job in the sequence will be done quickly
+            # and the user will get a response right away.
+            # In fact, it should be lower than the number of workers
+            # so that other jobs can concurrently with these.
+            log("-> Starting jobs.")
+            for part in range(min(3, chunks)):
+                jobs.append(queue_part(part, query))
+
+            # Queue a cleanup job
             req = {"endpoint": "datadump_cleanup", "query": query}
             submit_job(req)
 
@@ -167,22 +177,35 @@ def datadump():
                         print("ERROR IN DATADUMP - TICKET {} FAILED".format(ticket))
                         yield "\nFAILED"
                         raise Exception("Aborted due to failure in worker.")
-                    time.sleep(10)
-                    # Keep Alive
-                    yield ""
-                    set_flag(requestid + "_dowork", True, 20)
+
+                    # Idle to save CPU cycles and let other threads do work.
+                    time.sleep(5)
+
+                    # Bump the workers. Note that if the stream fails, this won't be called
+                    # so that the flag will expire and the workers will stop.
+                    set_flag(requestid + "_dowork", True, 10)
 
                 else:
+                    # Since a job just completed, queue a new job if there is
+                    # still work to do
+                    if len(jobs) < chunks:
+                        jobs.append(queue_part(len(jobs), query))
+
                     data_id = get_result(ticket)["id"]
                     workerlist.add(*get_status(ticket)["meta"]["workers"])
-                    # Return result with the list brackets [] sliced off.
-                    part += 1
+
+                    # Send the latest row data
                     if validator_result.data.get("data_type") == "json":
+                        # Return result with the list brackets [] sliced off.
                         yield session.query(DataDump).filter(DataDump.id == data_id).one().get_data()[1:-1]
                         if part + 1 < chunks: yield ","
                     elif validator_result.data.get("data_type") == "csv":
                         for row in json.loads(session.query(DataDump).filter(DataDump.id == data_id).one().get_data()):
-                            yield ",".join([str(row[key]) for key in columns])+"\n"
+                            yield ",".join([json.dumps(row[key].encode("utf-8")) if type(row[key]) is unicode else json.dumps(str(row[key])) for key in columns])+"\n"
+
+                    part += 1
+
+            # Finish off the file and add some metadata.
             if validator_result.data.get("data_type") == "json":
                 yield """], "endTime": "{}", "workers": {}}}""".format(str(datetime.now()), json.dumps(list(workerlist)))
             elif validator_result.data.get("data_type") == "csv":
@@ -201,7 +224,6 @@ def datadump():
 
     response = Response(stream_data(), mimetype="text/"+validator_result.data.get("data_type"))
     response.headers["Content-Disposition"] = "attachment; filename=\""+str(original_validated.data.get("dataset"))+".datadump."+original_validated.data.get("data_type")+"\""
-    response.headers["Keep-Alive"] = "timeout=3600, max=10"
     return response
 
 

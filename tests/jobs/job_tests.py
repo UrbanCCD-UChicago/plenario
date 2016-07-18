@@ -108,7 +108,7 @@ class TestJobs(BasePlenarioTest):
         response = json.loads(response.get_data())
         self.assertIsNotNone(response["status"]["meta"]["startTime"])
         self.assertIsNotNone(response["status"]["meta"]["endTime"])
-        self.assertIsNotNone(response["status"]["meta"]["worker"])
+        self.assertIsNotNone(response["status"]["meta"]["workers"])
         self.assertGreater(json.dumps(response["result"]), len("{\"\"}"))
 
     # =======================
@@ -336,11 +336,28 @@ class TestJobs(BasePlenarioTest):
         self.assertEqual(response["result"]["features"][0]["properties"]["count"], 1)
 
     # =======================
-    # ACCEPTANCE TEST: grid
+    # ACCEPTANCE TEST: datadump (JSON)
     # =======================
 
-    def test_datadump_job(self):
+    def test_datadump_json_job(self):
         response = self.app.get(prefix + '/datadump?obs_date__ge=2000-1-1&obs_date__le=2014-1-1&dataset_name=flu_shot_clinics')
+        try:
+            response = json.loads(response.get_data())
+        except Exception as e:
+            self.fail("Response is not valid JSON (it probably failed): {}".format(e))
+        self.assertEqual(len(response["data"]), 65)
+        self.assertEqual(response["data"][0]["date"], "2013-12-14")
+        self.assertIsNotNone(response["startTime"])
+        self.assertIsNotNone(response["endTime"])
+        self.assertIsNotNone(response["workers"])
+
+    # =======================
+    # ACCEPTANCE TEST: datadump (CSV)
+    # =======================
+
+    def test_datadump_csv_job(self):
+        response = self.app.get(
+            prefix + '/datadump?obs_date__ge=2000-1-1&obs_date__le=2014-1-1&dataset_name=flu_shot_clinics')
         try:
             response = json.loads(response.get_data())
         except Exception as e:

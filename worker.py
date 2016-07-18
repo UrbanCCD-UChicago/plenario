@@ -184,6 +184,7 @@ if __name__ == "__main__":
                         status["meta"]["endTime"] = str(datetime.datetime.now())
                         log("Ticket {} errored with: {}.".format(ticket, e), worker_id)
                         set_status(ticket, status)
+                        set_result(ticket, {"error": e})
                         JobsQueue.delete_message(job)
                         traceback.print_exc()
 
