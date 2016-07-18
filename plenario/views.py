@@ -21,8 +21,9 @@ from wtforms.validators import DataRequired
 from plenario.api.jobs import submit_job, get_status
 from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata
+from plenario.models_.ETLTask import ETLStatus, ETLType, add_task
+from plenario.models_.ETLTask import fetch_pending_tables, fetch_table_etl_status
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
-from plenario.utils.model_helpers import fetch_pending_tables, fetch_table_etl_status
 
 views = Blueprint('views', __name__)
 
@@ -108,12 +109,17 @@ def approve_dataset(source_url_hash):
     meta = session.query(MetaTable).get(source_url_hash)
     meta.approved_status = True
     session.commit()
-    # Ingest it
-    #add_dataset_task.delay(source_url_hash)
-    job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
+
     send_approval_email(meta.human_name,
                         meta.contributor_name,
                         meta.contributor_email)
+
+    add_task(dataset_name=meta.dataset_name,
+             status=ETLStatus['pending'],
+             error=None,
+             type_=ETLType['dataset'])
+
+    job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
     return submit_job(job)
 
 
@@ -213,6 +219,7 @@ def submit(context):
     except RuntimeError as e:
         context['error_msg'] = e.message
         return render_with_context(context)
+
     else:
         # Successfully stored the metadata
         # Now fire ingestion task...
@@ -220,12 +227,17 @@ def submit(context):
             if is_shapefile:
                 job = {"endpoint": "add_shape", "query": meta.dataset_name}
                 submit_job(job)
-                #add_shape_task.delay(meta.dataset_name)
+                add_task(dataset_name=meta.dataset_name,
+                         status=ETLStatus['pending'],
+                         error=None,
+                         type_=ETLType['shapeset'])
             else:
                 job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
                 submit_job(job)
-                #add_dataset_task.delay(meta.source_url_hash)
-        # or send thankyou email
+                add_task(dataset_name=meta.dataset_name,
+                         status=ETLStatus['pending'],
+                         error=None,
+                         type_=ETLType['dataset'])
         else:
             return send_submission_email(meta.human_name,
                                          meta.contributor_name,

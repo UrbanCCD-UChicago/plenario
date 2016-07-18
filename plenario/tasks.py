@@ -1,14 +1,16 @@
-from datetime import datetime, timedelta
+import traceback
 
+from datetime import datetime, timedelta
 from raven.conf import setup_logging
 from raven.handlers.logging import SentryHandler
 from sqlalchemy.exc import NoSuchTableError, InternalError
 
 from plenario.database import session as session, app_engine as engine
+from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
+from plenario.models_.ETLTask import update_task, ETLStatus, delete_task
 from plenario.settings import CELERY_SENTRY_URL
-from plenario.etl.point import PlenarioETL
 from plenario.utils.weather import WeatherETL
 
 if CELERY_SENTRY_URL:
@@ -23,7 +25,7 @@ def task_complete_msg(task_name, mt):
     :param mt: (MetaTable Record) meta info about the target dataset
     :returns: (string) confirmation message"""
 
-    # Check for attributes which differenciate MetaTable from ShapeTable.
+    # Check for attributes which differentiate MetaTable from ShapeTable.
     tname = mt.human_name if hasattr(mt, 'human_name') else mt.dataset_name
     source = mt.source_url if hasattr(mt, 'source_url') else mt.source_url_hash
     return "Finished {} for {} ({})".format(task_name, tname, source)
@@ -36,7 +38,14 @@ def add_dataset(source_url_hash):
     :returns: (string) a helpful confirmation message"""
 
     metatable = session.query(MetaTable).get(source_url_hash)
-    PlenarioETL(metatable).add()
+    update_task(metatable.dataset_name, ETLStatus['started'], None)
+    try:
+        PlenarioETL(metatable).add()
+        update_task(metatable.dataset_name, ETLStatus['success'], None)
+    except Exception:
+        update_task(metatable.dataset_name,
+                    ETLStatus['failure'],
+                    traceback.format_exc())
     return task_complete_msg('ingest', metatable)
 
 
@@ -69,6 +78,8 @@ def delete_dataset(source_url_hash):
         session.commit()
     except InternalError, e:
         raise delete_dataset.retry(exc=e)
+
+    delete_task(meta.dataset_name)
     return task_complete_msg('deletion', meta)
 
 

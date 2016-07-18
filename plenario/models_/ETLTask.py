@@ -4,12 +4,21 @@ from sqlalchemy.exc import IntegrityError
 from plenario.database import app_engine, Base, session
 
 
+# Notes
+# -----
+# 1) Is there any point in offering a choice for add_task? No matter what,
+#    it means that a dataset has been newly approved and will be pending
+#    ingestion. There will never be a situation where you add a completed
+#    task. A change here will cause test_fetch_etl_status test to break.
+
+
 # These dictionaries help to keep me from making errors. If a message or
 # status is misspelled, it will cause a fast and loud KeyError, saving me
 # the trouble of weeding out the issue somewhere down the line.
 
 ETLStatus = {
     'pending': 'Ingest Pending',
+    'started': 'Ingest Started',
     'success': 'Success',
     'failure': 'Failure'
 }
@@ -67,6 +76,11 @@ def update_task(dataset_name, status, error):
             values={ETLTask.status: status, ETLTask.error: error}
         ).where(ETLTask.dataset_name == dataset_name)
     )
+
+    try:
+        session.commit()
+    except:
+        session.rollback()
 
 
 def fetch_task(dataset_name):
