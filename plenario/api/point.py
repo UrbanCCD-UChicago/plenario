@@ -136,6 +136,7 @@ def _timeseries(args):
     # to date.
     if table_names is None:
         table_names = MetaTable.index()
+        args.data['dataset_name__in'] = table_names
 
     # If a single dataset was provided, it's the only thing we need to consider.
     if dataset is not None:
