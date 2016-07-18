@@ -81,21 +81,19 @@ def worker_ready():
 def get_job(ticket):
 
     if not ticket_exists(ticket):
-        resp = {"ticket": ticket, "error": "Job not found."}
-        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 404)
-        resp.headers['Content-Type'] = 'application/json'
-
-        return resp
+        response = {"ticket": ticket, "error": "Job not found."}
+        response = make_response(json.dumps(response, default=unknown_object_json_handler), 404)
+        response.headers['Content-Type'] = 'application/json'
+        return response
 
     req = get_request(ticket)
     result = get_result(ticket)
     status = get_status(ticket)
 
-
-    resp = {"ticket": ticket, "request": req, "result": result, "status": status}
-    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
+    response = {"ticket": ticket, "request": req, "result": result, "status": status}
+    response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
+    response.headers['Content-Type'] = 'application/json'
+    return response
 
 
 # def post_job():
@@ -112,10 +110,10 @@ def make_job_response(endpoint, validated_query):
 
     ticket = submit_job(req)
 
-    resp = {"ticket": ticket, "request": req, "url": request.url_root+"v1/api/jobs/" + ticket}
-    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
+    response = {"ticket": ticket, "request": req, "url": request.url_root+"v1/api/jobs/" + ticket}
+    response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
+    response.headers['Content-Type'] = 'application/json'
+    return response
 
 # ===========
 # Job Methods

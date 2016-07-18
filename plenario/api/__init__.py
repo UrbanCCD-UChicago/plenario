@@ -1,6 +1,6 @@
 import json
 from flask import make_response, Blueprint
-from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump
+from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump
 from common import cache, make_cache_key
 from shape import get_all_shape_datasets,\
                     export_shape, aggregate_point_data
@@ -30,6 +30,7 @@ api.add_url_rule(prefix + '/shapes/<polygon_dataset_name>/<point_dataset_name>',
 api.add_url_rule(prefix + '/jobs/<ticket>', view_func=get_job, methods=['GET'])
 
 api.add_url_rule(prefix + '/datadump', 'datadump', datadump)
+api.add_url_rule(prefix + '/datadump/<ticket>', 'get_datadump', get_datadump)
 
 @api.route(prefix + '/flush-cache')
 def flush_cache():

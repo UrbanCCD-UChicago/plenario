@@ -24,17 +24,15 @@ if __name__ == "__main__":
     import threading
     import traceback
     import random
-    import os
     from collections import namedtuple
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
-    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump, _datadump_cleanup
+    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump, _datadump_manager, _datadump_cleanup
     from plenario.api.jobs import get_status, set_status, get_request, set_result
     from plenario.api.validator import convert
     from plenario.tasks import add_dataset, delete_dataset
     from plenario.tasks import add_shape, update_shape, delete_shape
     from plenario.utils.name_generator import generate_name
-    from plenario.models import DataDump
-    from flask import Flask
+    from flask import Flask, request
 
     do_work = True
 
@@ -80,7 +78,8 @@ if __name__ == "__main__":
                 'meta': lambda args: _meta(args),
                 'fields': lambda args: _meta(args),
                 'grid': lambda args: _grid(args),
-                'datadump': lambda args: _datadump(args),
+                'datadump': lambda args: _datadump_manager(args),
+                'datadump_work': lambda args: _datadump(args),
                 # ETL Task endpoints.
                 'add_dataset': lambda args: add_dataset(args),
                 'update_dataset': lambda args: add_dataset(args),
@@ -110,13 +109,12 @@ if __name__ == "__main__":
                     except KeyError:
                         log("Job does not contain a ticket! Removing.", worker_id)
                         JobsQueue.delete_message(job)
-
                         continue
 
                     log("Received job with ticket {}.".format(ticket), worker_id)
 
                     try:
-                        log("worker.CALL.get_status({})".format(ticket), worker_id)
+                        #log("worker.CALL.get_status({})".format(ticket), worker_id)
                         status = get_status(ticket)
                         status["status"]
                         status["meta"]
@@ -156,22 +154,31 @@ if __name__ == "__main__":
                             query_args = ValidatorProxy(query_args)
 
                         if endpoint in endpoint_logic:
-                            log("worker.query_args: {}".format(query_args), worker_id)
-                            log("worker.req: {}".format(req), worker_id)
+
+                            log("Ticket {} uses endpoint {}.".format(ticket, endpoint), worker_id)
+
+                            #log("worker.query_args: {}".format(query_args), worker_id)
+                            #log("worker.req: {}".format(req), worker_id)
 
                             result = endpoint_logic[endpoint](query_args)
 
                             # Check for metacommands
                             if "jobsframework_metacommands" in result:
-                                if "defer" in result["jobsframework_metacommands"]:
-                                    status["status"] = "queued"
-                                    status["meta"]["lastDeferredTime"] = str(datetime.datetime.now())
-                                    del(status["meta"]["startTime"])
-                                    set_status(ticket, status)
-                                    log("Deferred work on ticket {}.".format(ticket), worker_id)
-                                    continue
+                                defer = False
+                                for command in result["jobsframework_metacommands"]:
+                                    if "setTimeout" in command:
+                                        job.change_visibility(command["setTimeout"])
+                                    elif "defer" in command:
+                                        status = get_status(ticket)
+                                        status["status"] = "queued"
+                                        status["meta"]["lastDeferredTime"] = str(datetime.datetime.now())
+                                        set_status(ticket, status)
+                                        log("Deferred work on ticket {}.".format(ticket), worker_id)
+                                        defer = True
+                                if defer: continue
 
                             set_result(ticket, result)
+                            status = get_status(ticket)
                             status["status"] = "success"
                             status["meta"]["endTime"] = str(datetime.datetime.now())
                             set_status(ticket, status)
@@ -180,11 +187,12 @@ if __name__ == "__main__":
                             JobsQueue.delete_message(job)
 
                     except Exception as e:
+                        status = get_status(ticket)
                         status["status"] = "error"
                         status["meta"]["endTime"] = str(datetime.datetime.now())
                         log("Ticket {} errored with: {}.".format(ticket, e), worker_id)
                         set_status(ticket, status)
-                        set_result(ticket, {"error": e})
+                        set_result(ticket, {"error": str(e)})
                         JobsQueue.delete_message(job)
                         traceback.print_exc()
 
