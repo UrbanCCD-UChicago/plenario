@@ -2,7 +2,6 @@ from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy import select, update, func
 from sqlalchemy.exc import IntegrityError
 from plenario.database import app_engine, Base, session
-from plenario.models import MetaTable
 
 
 # Notes
@@ -145,7 +144,7 @@ def dataset_status_info_query(source_url_hash=None):
         WHERE etl.date_done IS NOT NULL
     '''.format(columns)
 
-    q += "AND m.source_url_hash = :source_url_hash" if source_url_hash else ""
+    q += "AND meta.source_url_hash = :source_url_hash" if source_url_hash else ""
     q += " ORDER BY etl.task_id DESC LIMIT 1000"
 
     return q
