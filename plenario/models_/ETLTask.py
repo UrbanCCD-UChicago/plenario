@@ -19,7 +19,7 @@ from plenario.database import app_engine, Base, session
 ETLStatus = {
     'pending': 'Ingest Pending',
     'started': 'Ingest Started',
-    'success': 'Success',
+    'success': 'SUCCESS',
     'failure': 'Failure'
 }
 
@@ -111,7 +111,7 @@ def fetch_pending_tables(model):
     :param model: (class) ORM Class corresponding to a meta table
     :returns: (list) contains all records for which is_approved is false"""
 
-    query = session.query(model).filter(model.approved_status is not True)
+    query = session.query(model).filter(model.approved_status == 'f')
     return query.all()
 
 
@@ -123,7 +123,7 @@ def fetch_table_etl_status(type_):
     :param type_: (string) designates what tasks to return
     :returns: (list) contains all records for datasets and ETL status"""
 
-    q = "select * from etl_task where type = '{}'".format(type_)
+    q = "select * from meta_{}, etl_task where type = '{}'".format(type_, type_)
     return app_engine.execute(q).fetchall()
 
 

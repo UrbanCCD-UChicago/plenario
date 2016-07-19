@@ -224,6 +224,9 @@ def submit(context):
         # Successfully stored the metadata
         # Now fire ingestion task...
         if is_admin:
+
+            meta.is_approved = True
+
             if is_shapefile:
                 job = {"endpoint": "add_shape", "query": meta.dataset_name}
                 submit_job(job)
@@ -591,33 +594,8 @@ def view_datasets():
 
     datasets_pending = fetch_pending_tables(MetaTable)
     shapes_pending = fetch_pending_tables(ShapeMetadata)
-    datasets = fetch_table_etl_status(MetaTable)
-    shapesets = fetch_table_etl_status(ShapeMetadata)
-
-    # q = text('''
-    #         SELECT m.*, c.status, c.task_id
-    #         FROM meta_master AS m
-    #         LEFT JOIN celery_taskmeta AS c
-    #           ON c.id = (
-    #             SELECT id FROM celery_taskmeta
-    #             WHERE task_id = ANY(m.result_ids)
-    #             ORDER BY date_done DESC
-    #             LIMIT 1
-    #           )
-    #         WHERE m.approved_status = 'true'
-    #     ''')
-    #     with engine.begin() as c:
-    #         datasets = list(c.execute(q))
-    # except NoSuchTableError:
-    #     datasets = session.query(MetaTable)\
-    #         .filter(MetaTable.approved_status == True)\
-    #         .all()
-
-    # try:
-    #     shape_datasets = ShapeMetadata.get_all_with_etl_status()
-    # except NoSuchTableError:
-    #     If we can't find shape metadata, soldier on.
-    #     shape_datasets = None
+    datasets = fetch_table_etl_status(ETLType['dataset'])
+    shapesets = fetch_table_etl_status(ETLType['shapeset'])
 
     return render_template('admin/view-datasets.html',
                            datasets_pending=datasets_pending,
@@ -629,6 +607,8 @@ def view_datasets():
 @views.route('/admin/dataset-status/')
 @login_required
 def dataset_status():
+
+    # Needs to support source_url_hash argument.
 
     source_url_hash = request.args.get("source_url_hash")
 

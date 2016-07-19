@@ -86,6 +86,8 @@ class TestETLTask(unittest.TestCase):
         add_task('neighborhoods', ETLStatus['failure'], 'you goofed', ETLType['shapeset'])
 
         tasks = fetch_table_etl_status('master')
+        for task in tasks:
+            print task
 
         self.assertEqual(len(tasks), 2)
 
