@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String
-from sqlalchemy import update
+from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import select, update, func
 from sqlalchemy.exc import IntegrityError
 from plenario.database import app_engine, Base, session
+from plenario.models import MetaTable
 
 
 # Notes
@@ -33,8 +34,9 @@ class ETLTask(Base):
     """Store information about completed jobs pertaining to ETL actions."""
 
     __tablename__ = 'etl_task'
-    id = Column(Integer, primary_key=True)
+    task_id = Column(Integer, primary_key=True)
     dataset_name = Column(String, nullable=False, unique=True)
+    date_done = Column(DateTime)
     status = Column(String)
     error = Column(String)
     type = Column(String)
@@ -63,22 +65,28 @@ def add_task(dataset_name, status, error, type_):
         session.rollback()
 
 
-def update_task(dataset_name, status, error):
+def update_task(dataset_name, date_done, status, error):
     """Used when a dataset completes or fails. Updates a single ETLTask.
 
     :param dataset_name: (string)
+    :param date_done: (DateTime) marks when the task was completed by a worker
     :param status: (string) best to use a status from the ETLStatus dict
     :param error: (string) printout of an exception and traceback"""
 
     session.execute(
         update(
             ETLTask,
-            values={ETLTask.status: status, ETLTask.error: error}
+            values={
+                ETLTask.status: status,
+                ETLTask.error: error,
+                ETLTask.date_done: date_done
+            }
         ).where(ETLTask.dataset_name == dataset_name)
     )
 
     try:
         session.commit()
+    # TODO: Figure out what this breaks on exactly.
     except:
         session.rollback()
 
@@ -125,6 +133,22 @@ def fetch_table_etl_status(type_):
 
     q = "select * from meta_{}, etl_task where type = '{}'".format(type_, type_)
     return app_engine.execute(q).fetchall()
+
+
+def dataset_status_info_query(source_url_hash=None):
+    # TODO: Make better.
+
+    columns = "meta.human_name, meta.source_url_hash, etl.error, etl.status, etl.date_done, etl.task_id"
+
+    q = '''SELECT {}
+        FROM meta_master AS meta, etl_task AS etl
+        WHERE etl.date_done IS NOT NULL
+    '''.format(columns)
+
+    q += "AND m.source_url_hash = :source_url_hash" if source_url_hash else ""
+    q += " ORDER BY etl.task_id DESC LIMIT 1000"
+
+    return q
 
 
 if __name__ == '__main__':

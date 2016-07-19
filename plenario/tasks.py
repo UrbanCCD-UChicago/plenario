@@ -13,6 +13,10 @@ from plenario.models_.ETLTask import update_task, ETLStatus, delete_task
 from plenario.settings import CELERY_SENTRY_URL
 from plenario.utils.weather import WeatherETL
 
+# TODO: Make tasks expect ValidatorProxies.
+# TODO: Get rid of ValidatorProxies???
+
+
 if CELERY_SENTRY_URL:
     handler = SentryHandler(CELERY_SENTRY_URL)
     setup_logging(handler)
@@ -38,10 +42,10 @@ def add_dataset(source_url_hash):
     :returns: (string) a helpful confirmation message"""
 
     metatable = session.query(MetaTable).get(source_url_hash)
-    update_task(metatable.dataset_name, ETLStatus['started'], None)
+    update_task(metatable.dataset_name, None, ETLStatus['started'], None)
     try:
         PlenarioETL(metatable).add()
-        update_task(metatable.dataset_name, ETLStatus['success'], None)
+        update_task(metatable.dataset_name, datetime.now(), ETLStatus['success'], None)
     except Exception:
         update_task(metatable.dataset_name,
                     ETLStatus['failure'],

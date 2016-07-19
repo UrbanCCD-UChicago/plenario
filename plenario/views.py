@@ -21,7 +21,7 @@ from wtforms.validators import DataRequired
 from plenario.api.jobs import submit_job, get_status
 from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata
-from plenario.models_.ETLTask import ETLStatus, ETLType, add_task
+from plenario.models_.ETLTask import ETLStatus, ETLType, add_task, dataset_status_info_query
 from plenario.models_.ETLTask import fetch_pending_tables, fetch_table_etl_status
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 
@@ -608,40 +608,42 @@ def view_datasets():
 @login_required
 def dataset_status():
 
-    # Needs to support source_url_hash argument.
-
     source_url_hash = request.args.get("source_url_hash")
 
-    q = ''' 
-        SELECT 
-          m.human_name, 
-          m.source_url_hash,
-          c.status, 
-          c.date_done,
-          c.traceback,
-          c.task_id
-        FROM meta_master AS m, 
-        UNNEST(m.result_ids) AS ids 
-        LEFT JOIN celery_taskmeta AS c 
-          ON c.task_id = ids
-        WHERE c.date_done IS NOT NULL
-    '''
+    # q = '''
+    #     SELECT
+    #       m.human_name,
+    #       m.source_url_hash,
+    #       c.status,
+    #       c.date_done,
+    #       c.traceback,
+    #       c.task_id
+    #     FROM meta_master AS m,
+    #     UNNEST(m.result_ids) AS ids
+    #     LEFT JOIN celery_taskmeta AS c
+    #       ON c.task_id = ids
+    #     WHERE c.date_done IS NOT NULL
+    # '''
 
     if source_url_hash:
         name = session.query(MetaTable).get(source_url_hash).dataset_name
-        q = q + "AND m.source_url_hash = :source_url_hash"
     else:
         name = None
 
-    q = q + " ORDER BY c.id DESC LIMIT 1000"
+    q = dataset_status_info_query(source_url_hash)
 
-    with engine.begin() as c:
-        results = list(c.execute(text(q), source_url_hash=source_url_hash))
+    print "q: {}".format(q)
+
+    with engine.begin() as conn:
+        results = list(conn.execute(text(q), source_url_hash=source_url_hash))
+
+    print "results: {}".format(results)
+
     r = []
     for result in results:
         tb = None
-        if result.traceback:
-            tb = result.traceback\
+        if result.error:
+            tb = result.error\
                 .replace('\r\n', '<br />')\
                 .replace('\n\r', '<br />')\
                 .replace('\n', '<br />')\
