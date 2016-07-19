@@ -130,22 +130,23 @@ def fetch_table_etl_status(type_):
     :param type_: (string) designates what tasks to return
     :returns: (list) contains all records for datasets and ETL status"""
 
-    q = "select * from meta_{}, etl_task where type = '{}'".format(type_, type_)
+    q = "select * " \
+        "from etl_task left join meta_{0} " \
+        "on etl_task.dataset_name = meta_{0}.dataset_name " \
+        "where type = '{0}'".format(type_)
+
     return app_engine.execute(q).fetchall()
 
 
 def dataset_status_info_query(source_url_hash=None):
-    # TODO: Make better.
 
-    columns = "meta.human_name, meta.source_url_hash, etl.error, etl.status, etl.date_done, etl.task_id"
+    q = "select * " \
+        "from etl_task left join meta_master " \
+        "on etl_task.dataset_name = meta_master.dataset_name " \
+        "where etl_task.date_done is not null"
 
-    q = '''SELECT {}
-        FROM meta_master AS meta, etl_task AS etl
-        WHERE etl.date_done IS NOT NULL
-    '''.format(columns)
-
-    q += "AND meta.source_url_hash = :source_url_hash" if source_url_hash else ""
-    q += " ORDER BY etl.task_id DESC LIMIT 1000"
+    q += " and meta_master.source_url_hash = :source_url_hash" if source_url_hash else ""
+    q += " order by etl_task.task_id desc limit 1000"
 
     return q
 

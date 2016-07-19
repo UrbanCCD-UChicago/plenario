@@ -597,6 +597,8 @@ def view_datasets():
     datasets = fetch_table_etl_status(ETLType['dataset'])
     shapesets = fetch_table_etl_status(ETLType['shapeset'])
 
+    print "view_datasets.datasets.len: {}".format(len(datasets))
+
     return render_template('admin/view-datasets.html',
                            datasets_pending=datasets_pending,
                            shapes_pending=shapes_pending,
