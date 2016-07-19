@@ -66,6 +66,7 @@ class TestJobs(unittest.TestCase):
 
     # =======================
     # TEST: General Job Methods: submit_job, get_status, get_request, get_result
+    #       Also test ping endpoint.
     # =======================
 
     def test_job_submission_by_methods(self):
@@ -287,7 +288,7 @@ class TestJobs(unittest.TestCase):
         response = json.loads(response.get_data())
         self.assertIsNotNone(response["status"]["meta"]["startTime"])
         self.assertIsNotNone(response["status"]["meta"]["endTime"])
-        self.assertIsNotNone(response["status"]["meta"]["worker"])
+        self.assertIsNotNone(response["status"]["meta"]["workers"])
         self.assertGreater(json.dumps(response["result"]), len("{\"\"}"))
 
     # =======================
@@ -514,6 +515,85 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["result"]["type"], "FeatureCollection")
         self.assertEqual(response["result"]["features"][0]["properties"]["count"], 1)
 
+    # =======================
+    # ACCEPTANCE TEST: datadump (JSON)
+    # =======================
+
+    def test_datadump_json_job(self):
+        response = self.app.get(prefix + '/datadump?obs_date__ge=2000-1-1&obs_date__le=2014-1-1&dataset_name=flu_shot_clinics&' + str(
+                random.randrange(0, 1000000)))
+        response = json.loads(response.get_data())
+        ticket = response["ticket"]
+        self.assertIsNotNone(ticket)
+        self.assertIsNotNone(response["url"])
+        self.assertEqual(response["request"]["endpoint"], "datadump")
+        self.assertEqual(response["request"]["query"]["dataset"], "flu_shot_clinics")
+        self.assertEqual(response["request"]["query"]["job"], True)
+
+        # Wait for job to complete.
+        for i in range(60):
+            if get_status(ticket)["status"] == "success":
+                break
+            time.sleep(1)
+
+        # retrieve job
+        url = response["url"]
+        response = self.app.get(url)
+        response = json.loads(response.get_data())
+        self.assertIsNotNone(response["status"]["progress"])
+
+        url = response["result"]["url"]
+        response = self.app.get(url)
+        response = json.loads(response.get_data())
+
+        self.assertEqual(len(response["data"]), 65)
+        self.assertEqual(response["data"][0]["date"], "2013-12-14")
+        self.assertIsNotNone(response["startTime"])
+        self.assertIsNotNone(response["endTime"])
+        self.assertIsNotNone(response["workers"])
+
+    # =======================
+    # ACCEPTANCE TEST: datadump (CSV)
+    # =======================
+
+    def test_datadump_csv_job(self):
+        response = self.app.get(
+            prefix + '/datadump?obs_date__ge=2000-1-1&obs_date__le=2014-1-1&dataset_name=flu_shot_clinics&data_type=csv&' + str(
+                random.randrange(0, 1000000)))
+        response = json.loads(response.get_data())
+        ticket = response["ticket"]
+        self.assertIsNotNone(ticket)
+        self.assertIsNotNone(response["url"])
+        self.assertEqual(response["request"]["endpoint"], "datadump")
+        self.assertEqual(response["request"]["query"]["dataset"], "flu_shot_clinics")
+        self.assertEqual(response["request"]["query"]["job"], True)
+
+        # Wait for job to complete.
+        for i in range(60):
+            if get_status(ticket)["status"] == "success":
+                break
+            time.sleep(1)
+
+        # retrieve job
+        url = response["url"]
+        response = self.app.get(url)
+        response = json.loads(response.get_data())
+        self.assertIsNotNone(response["status"]["progress"])
+
+        url = response["result"]["url"]
+        response = self.app.get(url)
+
+        response = response.get_data().split("\n")
+        # 65 data lines, 4 meta lines, and 1 newline at the end.
+        self.assertEqual(len(response), 65+4+1)
+        self.assertEqual(response[0][:11], "# STARTTIME")
+        self.assertEqual(response[1][:9], "# ENDTIME")
+        self.assertEqual(response[2][:9], "# WORKERS")
+        self.assertEqual(response[3], '"city","community_area_number","event_type","zip","latitude","start_time","longitude","event","phone","state","end_time","address","date","community_area_name","ward","day","location"')
+        self.assertEqual(response[4].split(",")[12], '"2013-12-14"')
+
+    # ============================ TEARDOWN ============================ #
+
     @classmethod
     def tearDownClass(cls):
         print("Stopping worker.")
@@ -530,7 +610,6 @@ class TestJobs(unittest.TestCase):
 
 
 def wait_on(ticket, seconds):
-
     if ticket is None:
         return
     for i in range(seconds):

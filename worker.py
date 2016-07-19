@@ -26,7 +26,7 @@ if __name__ == "__main__":
     import random
     from collections import namedtuple
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
-    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid
+    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump_manager, _datadump
     from plenario.api.jobs import get_status, set_status, get_request, set_result
     from plenario.api.validator import convert
     from plenario.tasks import add_dataset, delete_dataset, update_dataset
@@ -42,7 +42,7 @@ if __name__ == "__main__":
         # The constant opening and closing is meh, I know. But I'm feeling lazy
         # right now.
         logfile = open('/opt/python/log/worker.log', "a")
-        logfile.write("{} - Worker {}: {}\n".format(datetime.datetime.now(), worker_id.ljust(30), msg))
+        logfile.write("{} - Worker {}: {}\n".format(datetime.datetime.now(), worker_id.ljust(24), msg))
         logfile.close()
 
 
@@ -59,7 +59,7 @@ if __name__ == "__main__":
         aws_access_key_id=AWS_ACCESS_KEY,
         aws_secret_access_key=AWS_SECRET_KEY
     )
-    JobQueue = conn.get_queue(JOBS_QUEUE)
+    JobsQueue = conn.get_queue(JOBS_QUEUE)
 
 
     def worker():
@@ -74,10 +74,13 @@ if __name__ == "__main__":
                 'timeseries': lambda args: _timeseries(args),
                 'detail-aggregate': lambda args: _detail_aggregate(args),
                 # emulating row-removal features of _detail_response. Not very DRY, but it's the cleanest option.
-                'detail': lambda args: [{key: row[key] for key in row.keys() if key not in ['point_date', 'hash', 'geom']} for row in _detail(args)],
+                'detail': lambda args: [{key: row[key] for key in row.keys()
+                                         if key not in ['point_date', 'hash', 'geom']} for row in _detail(args)],
                 'meta': lambda args: _meta(args),
                 'fields': lambda args: _meta(args),
                 'grid': lambda args: _grid(args),
+                'datadump': lambda args: _datadump_manager(args),
+                'datadump_work': lambda args: _datadump(args),
                 # ETL Task endpoints.
                 'add_dataset': lambda args: add_dataset(args),
                 'update_dataset': lambda args: update_dataset(args),
@@ -86,13 +89,15 @@ if __name__ == "__main__":
                 'update_shape': lambda args: update_shape(args),
                 'delete_shape': lambda args: delete_shape(args),
                 # Health endpoint.
-                'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)}
+                'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)},
+                # Utility tasks
+                'datadump_cleanup': lambda args: _datadump_cleanup(args)
             }
 
             log("Hello! I'm ready for anything.", worker_id)
 
             while do_work:
-                response = JobQueue.get_messages(message_attributes=["ticket"])
+                response = JobsQueue.get_messages(message_attributes=["ticket"])
                 if len(response) > 0:
                     job = response[0]
                     body = job.get_body()
@@ -104,8 +109,7 @@ if __name__ == "__main__":
                         ticket = str(job.message_attributes["ticket"]["string_value"])
                     except KeyError:
                         log("Job does not contain a ticket! Removing.", worker_id)
-                        JobQueue.delete_message(job)
-
+                        JobsQueue.delete_message(job)
                         continue
 
                     log("Received job with ticket {}.".format(ticket), worker_id)
@@ -116,7 +120,7 @@ if __name__ == "__main__":
                         status["meta"]
                     except Exception as e:
                         log("Job is malformed ({}). Removing.".format(e), worker_id)
-                        JobQueue.delete_message(job)
+                        JobsQueue.delete_message(job)
                         continue
 
                     if status["status"] != "queued":
@@ -124,48 +128,77 @@ if __name__ == "__main__":
                         continue
 
                     status["status"] = "processing"
-                    status["meta"]["startTime"] = str(datetime.datetime.now())
-                    status["meta"]["worker"] = worker_id
-
-                    log("Begin set_status", worker_id)
+                    if "lastDeferredTime" in status["meta"]:
+                        status["meta"]["lastResumeTime"] = str(datetime.datetime.now())
+                    else:
+                        status["meta"]["startTime"] = str(datetime.datetime.now())
+                    if "workers" not in status["meta"]:
+                        status["meta"]["workers"] = []
+                    status["meta"]["workers"].append(worker_id)
                     set_status(ticket, status)
-                    log("End set_status", worker_id)
-                    log("Begin get_request", worker_id)
-                    req = get_request(ticket)
-                    log("End get_request", worker_id)
 
                     log("Starting work on ticket {}.".format(ticket), worker_id)
 
                     # =========== Do work on query =========== #
                     try:
+                        req = get_request(ticket)
                         endpoint = req['endpoint']
                         query_args = req['query']
 
-                        # Simpler endpoints, like the ETL Tasks, only really
-                        # need a single string argument. No point in converting
-                        # it to a ValidatorProxy.
-                        if type(query_args) != unicode:
-                            convert(query_args)
-                            query_args = ValidatorProxy(query_args)
+                        # Add worker metadata
+                        query_args["jobsframework_ticket"] = ticket
+                        query_args["jobsframework_workerid"] = worker_id
+
+                        # Because we're getting serialized arguments from Redis,
+                        # we need to convert them back into a validated form.
+                        # TODO: Update ETL endpoints to handle ValidatorProxy.
+                        convert(query_args)
+                        query_args = ValidatorProxy(query_args)
 
                         if endpoint in endpoint_logic:
-                            log("worker.query_args: {}".format(query_args), worker_id)
-                            log("worker.req: {}".format(req), worker_id)
 
-                            set_result(ticket, endpoint_logic[endpoint](query_args))
+                            log("Ticket {} uses endpoint {}.".format(ticket, endpoint), worker_id)
+
+                            # log("worker.query_args: {}".format(query_args), worker_id)
+                            # log("worker.req: {}".format(req), worker_id)
+                            print "{} worker.query_args: {}".format(ticket, query_args)
+
+                            result = endpoint_logic[endpoint](query_args)
+
+                            # Check for metacommands
+                            if "jobsframework_metacommands" in result:
+                                defer = False
+                                for command in result["jobsframework_metacommands"]:
+                                    if "setTimeout" in command:
+                                        job.change_visibility(command["setTimeout"])
+                                    elif "defer" in command:
+                                        status = get_status(ticket)
+                                        status["status"] = "queued"
+                                        status["meta"]["lastDeferredTime"] = str(datetime.datetime.now())
+                                        set_status(ticket, status)
+                                        log("Deferred work on ticket {}.".format(ticket), worker_id)
+                                        defer = True
+                                if defer:
+                                    continue
+
+                            set_result(ticket, result)
+                            status = get_status(ticket)
                             status["status"] = "success"
                             status["meta"]["endTime"] = str(datetime.datetime.now())
                             set_status(ticket, status)
 
+                            log("Finished work on ticket {}.".format(ticket), worker_id)
+                            JobsQueue.delete_message(job)
+
                     except Exception as e:
+                        status = get_status(ticket)
                         status["status"] = "error"
                         status["meta"]["endTime"] = str(datetime.datetime.now())
                         log("Ticket {} errored with: {}.".format(ticket, e), worker_id)
                         set_status(ticket, status)
-                        JobQueue.delete_message(job)
+                        set_result(ticket, {"error": str(e)})
+                        JobsQueue.delete_message(job)
                         traceback.print_exc()
-
-                    log("Finished work on ticket {}.".format(ticket), worker_id)
 
                 else:
                     # No work! Idle for a bit to save compute cycles.

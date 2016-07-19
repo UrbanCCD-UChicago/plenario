@@ -48,6 +48,15 @@ def set_result(ticket, result):
     JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_result_" + ticket, json.dumps(result, default=unknown_object_json_handler))
 
 
+def get_flag(flag):
+    return JobsDB.get(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_flag_" + flag)=="true"
+
+
+def set_flag(flag, state, expire=60):
+    JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_flag_" + flag, "true" if state else "false")
+    JobsDB.expire(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_flag_" + flag, expire)
+
+
 def touch_ticket_expiry(ticket):
     # Expire all job handles in 1 hour.
     JobsDB.expire(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_query_" + ticket, 3600)
@@ -61,7 +70,7 @@ def ticket_exists(ticket):
 
 def worker_ready():
     try:
-        job = {"endpoint": "ping", "query":{}}
+        job = {"endpoint" : "ping", "query" : {}}
         ticket = submit_job(job)
         time.sleep(1)   # Wait for worker to get started. Modify as necessary.
         return "hello" in get_result(ticket).keys()
@@ -72,28 +81,26 @@ def worker_ready():
 def get_job(ticket):
 
     if not ticket_exists(ticket):
-        resp = {"ticket": ticket, "error": "Job not found."}
-        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 404)
-        resp.headers['Content-Type'] = 'application/json'
-
-        return resp
+        response = {"ticket": ticket, "error": "Job not found."}
+        response = make_response(json.dumps(response, default=unknown_object_json_handler), 404)
+        response.headers['Content-Type'] = 'application/json'
+        return response
 
     req = get_request(ticket)
     result = get_result(ticket)
     status = get_status(ticket)
 
-
-    resp = {"ticket": ticket, "request": req, "result": result, "status": status}
-    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
+    response = {"ticket": ticket, "request": req, "result": result, "status": status}
+    response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
+    response.headers['Content-Type'] = 'application/json'
+    return response
 
 
 # def post_job():
 #     # TODO: Establish a friendly form!
 #     return make_job_response()
 
-#def delete_job(job_id):
+# def delete_job(job_id):
 #    return '200 Ok: job', job_id, 'removed'
 
 
@@ -103,10 +110,10 @@ def make_job_response(endpoint, validated_query):
 
     ticket = submit_job(req)
 
-    resp = {"ticket": ticket, "request": req, "url": request.url_root+"v1/api/jobs/" + ticket}
-    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
+    response = {"ticket": ticket, "request": req, "url": request.url_root+"v1/api/jobs/" + ticket}
+    response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
+    response.headers['Content-Type'] = 'application/json'
+    return response
 
 # ===========
 # Job Methods
@@ -141,8 +148,8 @@ def submit_job(req):
     :returns: ticket: An id that can be used to fetch the job results and status.
     """
 
-    #Quickly generate a random hash. Collisions are highly unlikely!
-    #Seems safer than relying on a counter in the database.
+    # Quickly generate a random hash. Collisions are highly unlikely!
+    # Seems safer than relying on a counter in the database.
     ticket = urandom(16).encode('hex')
 
     conn = boto.sqs.connect_to_region(
@@ -161,17 +168,37 @@ def submit_job(req):
         "ticket": {
             "data_type": "String",
             "string_value": str(ticket)
+        },
+        # For getting job by ticket
+        str(ticket): {
+            "data_type": "String",
+            "string_value": "ticket"
         }
     }
 
     set_status(ticket, {"status": "queued", "meta": {"queueTime": str(datetime.datetime.now())}})
     touch_ticket_expiry(ticket)
 
-    #Send this *last* after everything is ready.
+    # Send this *last* after everything is ready.
     JobsQueue.write(message)
 
-    file = open("/opt/python/log/sender.log", "a")
-    file.write("{}: Sent job with ticket {}...\n".format(datetime.datetime.now(), ticket))
-    file.close()
+    file_ = open("/opt/python/log/sender.log", "a")
+    file_.write("{}: Sent job with ticket {}...\n".format(datetime.datetime.now(), ticket))
+    file_.close()
 
     return ticket
+
+
+def cancel_job(ticket):
+    conn = boto.sqs.connect_to_region(
+        AWS_REGION_NAME,
+        aws_access_key_id=AWS_ACCESS_KEY,
+        aws_secret_access_key=AWS_SECRET_KEY
+    )
+    JobsQueue = conn.get_queue(JOBS_QUEUE)
+
+    response = JobsQueue.get_messages(message_attributes=[ticket])
+    if len(response) > 0:
+        JobsQueue.delete_message(response[0])
+        return ticket
+    return None
