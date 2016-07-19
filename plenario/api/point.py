@@ -111,6 +111,9 @@ def datadump():
     # Keep URL root to form download link later
     validator_result.data["datadump_urlroot"] = request.url_root
 
+    # Set job to True just to be canonical
+    validator_result.data["job"] = True
+
     job = make_job_response("datadump", validator_result)
     log("===== DATADUMP {} REQUESTED BY {} =====".format(json.loads(job.get_data())["ticket"], origin_ip))
     return job
@@ -314,7 +317,7 @@ def _detail(args):
     meta_vals = (args.data.get(k) for k in meta_params)
     dataset, shapeset, data_type, limit, offset = meta_vals
 
-    q = detail_query(args)
+    q = detail_query(args).order_by(dataset.c.point_date.desc())
 
     # Apply limit and offset.
     q = q.limit(limit)
@@ -456,7 +459,7 @@ def _datadump_manager(args):
         req = get_request(requestid)
         req["workarea"]["columns"] = columns
         set_request(requestid, req)
-        metadata += ",".join(columns) + "\n"
+        metadata += ",".join([json.dumps(c) for c in columns]) + "\n"
 
     dump = DataDump(args.data["jobsframework_ticket"], args.data["jobsframework_ticket"], 0,
                     chunks, metadata)
@@ -562,7 +565,7 @@ def detail_query(args, aggregate=False):
             shape_conditions = parse_tree(shapeset, shape_ctree)
             q = q.filter(shape_conditions)
 
-    return q.order_by(dataset.c.point_date.desc())
+    return q
 
 
 def _grid(args):

@@ -128,7 +128,10 @@ if __name__ == "__main__":
                         continue
 
                     status["status"] = "processing"
-                    status["meta"]["startTime"] = str(datetime.datetime.now())
+                    if "lastDeferredTime" in status["meta"]:
+                        status["meta"]["lastResumeTime"] = str(datetime.datetime.now())
+                    else:
+                        status["meta"]["startTime"] = str(datetime.datetime.now())
                     if not "workers" in status["meta"]:
                         status["meta"]["workers"] = []
                     status["meta"]["workers"].append(worker_id)
