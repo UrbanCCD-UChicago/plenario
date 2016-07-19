@@ -7,7 +7,7 @@ from shape import get_all_shape_datasets,\
 from time import sleep
 from sensor import weather_stations, weather
 
-from sensor_networks import get_network_metadata, get_node_metadata, get_observations
+from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, get_observations
 
 API_VERSION = '/v1'
 
