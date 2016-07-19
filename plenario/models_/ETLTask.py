@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy import select, update, func
+from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from plenario.database import app_engine, Base, session
 
@@ -122,12 +122,13 @@ def fetch_pending_tables(model):
     return query.all()
 
 
-def fetch_table_etl_status(type_):
+def fetch_table_etl_status(type_, dataset_name=None):
     """Used in views.py, fetch all records corresponding to tables that have
     entered the ETL process. Used to report successful, ongoing, or failed
-    ETL tasks.
+    ETL tasks. Used for the view-datasets endpoints.
 
     :param type_: (string) designates what tasks to return
+    :param dataset_name: (string) optional
     :returns: (list) contains all records for datasets and ETL status"""
 
     q = "select * " \
@@ -135,20 +136,10 @@ def fetch_table_etl_status(type_):
         "on etl_task.dataset_name = meta_{0}.dataset_name " \
         "where type = '{0}'".format(type_)
 
+    if dataset_name:
+        q += " and meta_{0}.dataset_name = '{1}'".format(type_, dataset_name)
+
     return app_engine.execute(q).fetchall()
-
-
-def dataset_status_info_query(source_url_hash=None):
-
-    q = "select * " \
-        "from etl_task left join meta_master " \
-        "on etl_task.dataset_name = meta_master.dataset_name " \
-        "where etl_task.date_done is not null"
-
-    q += " and meta_master.source_url_hash = :source_url_hash" if source_url_hash else ""
-    q += " order by etl_task.task_id desc limit 1000"
-
-    return q
 
 
 if __name__ == '__main__':

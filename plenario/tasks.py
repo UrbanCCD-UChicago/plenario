@@ -94,7 +94,9 @@ def add_shape(table_name):
     :returns: (string) a helpful confirmation message"""
 
     meta = session.query(ShapeMetadata).get(table_name)
+    update_task(meta.dataset_name, None, ETLStatus['started'], None)
     ShapeETL(meta).add()
+    update_task(meta.dataset_name, datetime.now(), ETLStatus['success'], None)
     return task_complete_msg('ingest', meta)
 
 
@@ -105,7 +107,9 @@ def update_shape(table_name):
     :returns: (string) a helpful confirmation message"""
 
     meta = session.query(ShapeMetadata).get(table_name)
+    update_task(meta.dataset_name, None, ETLStatus['started'], None)
     ShapeETL(meta=meta).update()
+    update_task(meta.dataset_name, datetime.now(), ETLStatus['success'], None)
     return task_complete_msg('update', meta)
 
 
@@ -117,6 +121,7 @@ def delete_shape(table_name):
 
     shape_meta = session.query(ShapeMetadata).get(table_name)
     shape_meta.remove_table()
+    delete_task(shape_meta.dataset_name)
     session.commit()
     return task_complete_msg('deletion', shape_meta)
 

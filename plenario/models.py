@@ -539,19 +539,6 @@ class ShapeMetadata(Base):
         return intersecting_rows
 
     @classmethod
-    def get_metadata_with_etl_result(cls, table_name):
-        query = '''
-            SELECT meta.*, celery.status, celery.traceback, celery.date_done
-            FROM meta_shape as meta
-            LEFT JOIN celery_taskmeta as celery
-            ON celery.task_id = meta.celery_task_id
-            WHERE meta.dataset_name='{}';
-        '''.format(table_name)
-
-        metadata = session.execute(query).first()
-        return metadata
-
-    @classmethod
     def get_by_human_name(cls, human_name):
         return session.query(cls).get(cls.make_table_name(human_name))
 

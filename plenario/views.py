@@ -3,7 +3,7 @@ import json
 import re
 from cStringIO import StringIO
 from collections import namedtuple
-from datetime import datetime, timedelta
+from datetime import datetime
 from hashlib import md5
 from urlparse import urlparse
 
@@ -13,15 +13,15 @@ from flask import make_response, request, redirect, url_for, render_template, \
     Blueprint, flash, session as flask_session
 from flask_login import login_required
 from flask_wtf import Form
-from sqlalchemy import Table, text, select
+from sqlalchemy import Table, text
 from sqlalchemy.exc import NoSuchTableError
-from wtforms import TextField, SelectField, StringField
+from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
 from plenario.api.jobs import submit_job, get_status
 from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata
-from plenario.models_.ETLTask import ETLStatus, ETLType, add_task, dataset_status_info_query
+from plenario.models_.ETLTask import ETLStatus, ETLType, add_task
 from plenario.models_.ETLTask import fetch_pending_tables, fetch_table_etl_status
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 
@@ -82,18 +82,22 @@ def approve_shape_view(dataset_name):
 
 
 def approve_shape(dataset_name):
-    # Approve it
-    print "approve_shape"
+
     meta = session.query(ShapeMetadata).get(dataset_name)
     meta.approved_status = True
     session.commit()
-    # Ingest it
+
+    # Send ingest task to SQS.
     job = {"endpoint": "add_shape", "query": meta.dataset_name}
-    print "approve_shape.job: {}".format(job)
+    ticket = submit_job(job)
+
+    # Create and record task status.
+    add_task(meta.dataset_name, ETLStatus['pending'], None, ETLType['shapeset'])
+
+    # Let the fans know.
     send_approval_email(meta.human_name, meta.contributor_name,
                         meta.contributor_email)
-    ticket = submit_job(job)
-    print "approve_shape.ticket: {}".format(ticket)
+
     return ticket
 
 
@@ -612,34 +616,12 @@ def dataset_status():
 
     source_url_hash = request.args.get("source_url_hash")
 
-    # q = '''
-    #     SELECT
-    #       m.human_name,
-    #       m.source_url_hash,
-    #       c.status,
-    #       c.date_done,
-    #       c.traceback,
-    #       c.task_id
-    #     FROM meta_master AS m,
-    #     UNNEST(m.result_ids) AS ids
-    #     LEFT JOIN celery_taskmeta AS c
-    #       ON c.task_id = ids
-    #     WHERE c.date_done IS NOT NULL
-    # '''
-
+    name = None
     if source_url_hash:
         name = session.query(MetaTable).get(source_url_hash).dataset_name
-    else:
-        name = None
 
-    q = dataset_status_info_query(source_url_hash)
-
-    print "q: {}".format(q)
-
-    with engine.begin() as conn:
-        results = list(conn.execute(text(q), source_url_hash=source_url_hash))
-
-    print "results: {}".format(results)
+    results = fetch_table_etl_status(ETLType['dataset'], name)
+    results += fetch_table_etl_status(ETLType['shapeset'], name)
 
     r = []
     for result in results:
@@ -652,12 +634,17 @@ def dataset_status():
                 .replace('\r', '<br />')
         d = {
             'human_name': result.human_name,
-            'source_url_hash': result.source_url_hash,
             'status': result.status,
             'task_id': result.task_id,
             'traceback': tb,
             'date_done': None,
         }
+
+        try:
+            d['source_url_hash'] = result.source_url_hash  # Point dataset.
+        except AttributeError:
+            d['source_url_hash'] = result.dataset_name  # Shape dataset.
+
         if result.date_done:
             d['date_done'] = result.date_done.strftime('%B %d, %Y %H:%M'),
         r.append(d)
@@ -725,19 +712,19 @@ class EditDatasetForm(Form):
     """ 
     Form to edit meta_master information for a dataset
     """
-    human_name = TextField('human_name', validators=[DataRequired()])
-    description = TextField('description', validators=[DataRequired()])
-    attribution = TextField('attribution', validators=[DataRequired()])
+    human_name = StringField('human_name', validators=[DataRequired()])
+    description = StringField('description', validators=[DataRequired()])
+    attribution = StringField('attribution', validators=[DataRequired()])
     update_freq = SelectField('update_freq', 
                               choices=[('daily', 'Daily'),
                                        ('weekly', 'Weekly'),
                                        ('monthly', 'Monthly'),
                                        ('yearly', 'Yearly')], 
                               validators=[DataRequired()])
-    observed_date = TextField('observed_date', validators=[DataRequired()])
-    latitude = TextField('latitude')
-    longitude = TextField('longitude')
-    location = TextField('location')
+    observed_date = StringField('observed_date', validators=[DataRequired()])
+    latitude = StringField('latitude')
+    longitude = StringField('longitude')
+    location = StringField('location')
 
     def validate(self):
         rv = Form.validate(self)
@@ -856,7 +843,9 @@ def check_update(ticket):
 @login_required
 def shape_status():
     table_name = request.args['dataset_name']
-    shape_meta = ShapeMetadata.get_metadata_with_etl_result(table_name)
+    shape_meta = fetch_table_etl_status(ETLType['shapeset'], table_name)[0]
+    print "shape_status.shape_meta: {}".format(shape_meta)
+    print "shape_stats.shape_meta.status: {}".format(shape_meta.status)
     return render_template('admin/shape-status.html', shape=shape_meta)
 
 

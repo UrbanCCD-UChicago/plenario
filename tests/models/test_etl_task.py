@@ -54,7 +54,7 @@ class TestETLTask(unittest.TestCase):
     def test_02_update_task(self):
 
         add_task('foo_dset_name', 'foo_status', 'foo_error', 'foo_type')
-        update_task('foo_dset_name', 'new_status', 'terrible_error')
+        update_task('foo_dset_name', '2000-01-01', 'new_status', 'terrible_error')
 
         task = session.execute(
             "select * from etl_task where dataset_name = 'foo_dset_name'"
