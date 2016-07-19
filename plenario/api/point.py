@@ -1,16 +1,15 @@
 import os
 import json
 import math
-import time
 import shapely.geometry
 import shapely.wkb
 import sqlalchemy
 import traceback
 import copy
 
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict
 from datetime import datetime
-from flask import request, make_response, Response, Flask
+from flask import request, make_response, Response
 from itertools import groupby
 from operator import itemgetter
 
@@ -32,7 +31,6 @@ if os.environ.get('WORKER'):
     from worker import session
 else:
     from plenario.database import session
-
 
 # ======
 # routes
@@ -96,7 +94,6 @@ def detail():
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def datadump():
-
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
               'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
               'date__time_of_day_le', 'limit', 'job')
@@ -106,73 +103,54 @@ def datadump():
     if validator_result.data["data_type"] == "geojson":
         validator_result.data["data_type"] = "json"
 
-    # Get origin IP to have records against Denial-of-Service
+    # Get origin IP for Denial-of-Service protection
     origin_ip = request.headers.get("X-Forwarded-For")
     if not origin_ip:
         origin_ip = request.remote_addr
 
+    # Keep URL root to form download link later
     validator_result.data["datadump_urlroot"] = request.url_root
 
     job = make_job_response("datadump", validator_result)
-
     log("===== DATADUMP {} REQUESTED BY {} =====".format(json.loads(job.get_data())["ticket"], origin_ip))
-
     return job
 
 @crossdomain(origin="*")
 def get_datadump(ticket):
     job = get_job(ticket)
-    if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
+    try:
+        if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
 
-        #Send data in sequence
-        def stream_data():
-            counter = 1
-            for row in session.query(DataDump).filter(DataDump.request == ticket).order_by(DataDump.part.asc()).all():
-                if counter == 1:
-                    # Yield header
-                    yield row.get_data()
-                else:
-                    if get_request(ticket)["query"]["data_type"] == "json":
-                        # Return result with the list brackets [] sliced off.
-                        yield row.get_data()[1:-1]
-                        if counter < get_status(ticket)["progress"]["total"]: yield ","
-                    elif get_request(ticket)["query"]["data_type"] == "csv":
-                        for csvrow in json.loads(row.get_data()):
-                            yield ",".join(
-                                [json.dumps(csvrow[key].encode("utf-8")) if type(csvrow[key]) is unicode else json.dumps(str(csvrow[key]))
-                                 for key in get_request(ticket)["workarea"]["columns"]]) + "\n"
-                counter += 1
-            if get_request(ticket)["query"]["data_type"] == "json":
-                    # Finish off JSON syntax
-                    yield "]}"
+            #Send data from Postgres in sequence
+            def stream_data():
+                counter = 1
+                for row in session.query(DataDump).filter(DataDump.request == ticket).order_by(DataDump.part.asc()).all():
+                    if counter == 1:
+                        # Yield header
+                        yield row.get_data()
+                    else:
+                        if get_request(ticket)["query"]["data_type"] == "json":
+                            # Return result with the list brackets [] sliced off.
+                            yield row.get_data()[1:-1]
+                            if counter < get_status(ticket)["progress"]["total"]: yield ","
+                        elif get_request(ticket)["query"]["data_type"] == "csv":
+                            for csvrow in json.loads(row.get_data()):
+                                yield ",".join(
+                                    [json.dumps(csvrow[key].encode("utf-8")) if type(csvrow[key]) is unicode else json.dumps(str(csvrow[key]))
+                                     for key in get_request(ticket)["workarea"]["columns"]]) + "\n"
+                    counter += 1
+                if get_request(ticket)["query"]["data_type"] == "json":
+                        # Finish off JSON syntax
+                        yield "]}"
 
-        response = Response(stream_data(), mimetype="text/"+get_request(ticket)["query"]["data_type"])
-        response.headers["Content-Disposition"] = "attachment; filename=\""+get_request(ticket)["query"]["dataset"]+".datadump."+get_request(ticket)["query"]["data_type"]+"\""
-        return response
-    else:
+            response = Response(stream_data(), mimetype="text/"+get_request(ticket)["query"]["data_type"])
+            response.headers["Content-Disposition"] = "attachment; filename=\""+get_request(ticket)["query"]["dataset"]+".datadump."+get_request(ticket)["query"]["data_type"]+"\""
+            return response
+        else:
+            return job
+    except:
         return job
 
-
-# Datadump utilities =======================
-def cleanup_datadump(requestid):
-    log("-> Removed request {} from database.".format(requestid))
-    try:
-        session.query(DataDump).filter(DataDump.request == requestid).delete()
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        traceback.print_exc()
-        log("---> Problem while clearing datadump request: {}".format(e))
-        print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
-
-
-def log(msg):
-    # The constant opening and closing is meh, I know. But I'm feeling lazy
-    # right now.
-    logfile = open('/opt/python/log/api.log', "a")
-    logfile.write("{} - {}\n".format(datetime.now(), msg))
-    logfile.close()
-# ==========================================
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
@@ -386,15 +364,15 @@ def _datadump_manager(args):
         log("-> Dump contains {} rows.".format(rows))
         chunks = int(math.floor(rows / float(chunksize)) + 1)
         jobs = []
+        workerlist = set()
     else:
         chunks = get_status(requestid)["progress"]["total"]
         jobs = get_request(requestid)["workarea"]["jobs"]
+        workerlist = set(get_request(requestid)["workarea"]["workers"])
 
     query["limit"] = chunksize
     query["datadump_total"] = chunks
     query["datadump_requestid"] = requestid
-
-    workerlist = set()
 
     # Method to queue jobs
     def queue_part(part, query):
@@ -422,6 +400,7 @@ def _datadump_manager(args):
         req = get_request(requestid)
         req["workarea"] = {}
         req["workarea"]["jobs"] = jobs
+        req["workarea"]["workers"] = {}
         set_request(requestid, req)
 
         # Queue a cleanup job
@@ -436,7 +415,6 @@ def _datadump_manager(args):
     status["progress"] = {"done": part, "total": chunks}
     set_status(requestid, status)
 
-    log("-> Waiting for jobs")
     while part < chunks:
         ticket = jobs[part]
 
@@ -457,10 +435,11 @@ def _datadump_manager(args):
             # still work to do
             if len(jobs) < chunks:
                 jobs.append(queue_part(len(jobs), query))
+            workerlist.add(*get_status(ticket)["meta"]["workers"])
             req = get_request(requestid)
             req["workarea"]["jobs"] = jobs
+            req["workarea"]["workers"] = list(workerlist)
             set_request(requestid, req)
-            workerlist.add(*get_status(ticket)["meta"]["workers"])
 
             part += 1
 
@@ -468,7 +447,7 @@ def _datadump_manager(args):
             set_status(requestid, status)
 
     metadata = ""
-    # Send boilerplates for JSON and CSV.
+    # Make headers for JSON and CSV.
     if args.data.get("data_type") == "json":
         metadata += """{{"startTime": "{}", "endTime": "{}", "workers": {}, "data": [""".format(get_status(requestid)["meta"]["startTime"], str(datetime.now()), json.dumps(list(workerlist)))
     elif args.data.get("data_type") == "csv":
@@ -499,6 +478,27 @@ def _datadump_cleanup(args):
         return {"status": "success"}
     else:
         return {"jobsframework_metacommands": ["defer"]}
+
+# Datadump utilities =======================
+def cleanup_datadump(requestid):
+    log("-> Removed request {} from database.".format(requestid))
+    try:
+        session.query(DataDump).filter(DataDump.request == requestid).delete()
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        traceback.print_exc()
+        log("---> Problem while clearing datadump request: {}".format(e))
+        print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
+
+
+def log(msg):
+    # The constant opening and closing is meh, I know. But I'm feeling lazy
+    # right now.
+    logfile = open('/opt/python/log/api.log', "a")
+    logfile.write("{} - {}\n".format(datetime.now(), msg))
+    logfile.close()
+# ==========================================
 
 
 def detail_query(args, aggregate=False):
@@ -826,8 +826,6 @@ def request_args_to_condition_tree(request_args, ignore=list()):
         if k[0] == 'obs_date':
             k[0] = 'point_date'
         if k[0] == 'date' and 'time_of_day' in k[1]:
-            if type(args["dataset"]) != sqlalchemy.sql.schema.Table:
-                args['dataset'] = converters['dataset'](args['dataset'])
             k[0] = sqlalchemy.func.date_part('hour', args['dataset'].c.point_date)
             k[1] = 'le' if 'le' in k[1] else 'ge'
 

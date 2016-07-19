@@ -146,12 +146,11 @@ if __name__ == "__main__":
                         query_args["jobsframework_ticket"] = ticket
                         query_args["jobsframework_workerid"] = worker_id
 
-                        # Simpler endpoints, like the ETL Tasks, only really
-                        # need a single string argument. No point in converting
-                        # it to a ValidatorProxy.
-                        if type(query_args) != unicode:
-                            convert(query_args)
-                            query_args = ValidatorProxy(query_args)
+                        # Because we're getting serialized arguments from Redis,
+                        # we need to convert them back into a validated form.
+                        # TODO: Update ETL endpoints to handle ValidatorProxy.
+                        convert(query_args)
+                        query_args = ValidatorProxy(query_args)
 
                         if endpoint in endpoint_logic:
 
