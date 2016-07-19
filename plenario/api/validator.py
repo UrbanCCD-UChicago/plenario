@@ -143,6 +143,7 @@ def convert(request_args):
         try:
             request_args[key] = converters[key](value)
         except (KeyError, TypeError, AttributeError, NoSuchTableError):
+            print "UNABLE TO CONVERT {} {}".format(key, value)
             pass
         except (DatabaseError, ProgrammingError):
             # Failed transactions, which we do expect, can cause

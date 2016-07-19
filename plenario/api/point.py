@@ -21,7 +21,7 @@ from plenario.api.response import geojson_response_base, form_csv_detail_respons
 from plenario.api.response import form_geojson_detail_response, add_geojson_feature
 from plenario.api.validator import DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
 from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters, converters
-from plenario.api.jobs import make_job_response, submit_job, get_job, set_status, get_status, set_request, get_request, set_flag, get_flag
+from plenario.api.jobs import make_job_response, submit_job, get_job, set_status, get_status, set_request, get_request, get_result, set_flag, get_flag
 from plenario.models import MetaTable, DataDump, fast_count
 
 # Use the standard pool if this is just the app,
@@ -126,9 +126,14 @@ def get_datadump(ticket):
 
             #Send data from Postgres in sequence
             def stream_data():
-                counter = 1
-                for row in session.query(DataDump).filter(DataDump.request == ticket).order_by(DataDump.part.asc()).all():
-                    if counter == 1:
+                counter = 0
+                # The "total" in the status lists the largest part number.
+                # In reality, there are total+1 parts because the header occupies part 0.
+                # So we also want to go up to the total as well. Don't worry,
+                # logic in the _datadump_manager ensures that total is the largest part number.
+                while counter <= get_status(ticket)["progress"]["total"]:
+                    row = session.query(DataDump).filter(sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
+                    if counter == 0:
                         # Yield header
                         yield row.get_data()
                     else:
@@ -146,12 +151,13 @@ def get_datadump(ticket):
                         # Finish off JSON syntax
                         yield "]}"
 
-            response = Response(stream_data(), mimetype="text/"+get_request(ticket)["query"]["data_type"])
-            response.headers["Content-Disposition"] = "attachment; filename=\""+get_request(ticket)["query"]["dataset"]+".datadump."+get_request(ticket)["query"]["data_type"]+"\""
+            response = Response(stream_data(), mimetype="text/{}".format(get_request(ticket)["query"]["data_type"]))
+            response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(get_request(ticket)["query"]["dataset"], get_request(ticket)["query"]["data_type"])
             return response
         else:
             return job
     except:
+        traceback.print_exc()
         return job
 
 
@@ -336,7 +342,7 @@ def _detail(args):
 
 def _datadump(args):
     if not get_flag(args.data["datadump_requestid"]+"_dowork"):
-        return {"error": "aborted"}
+        raise Exception("stalled/aborted -- try again later.")
     result = _detail(args)
     data = [{key: row[key] for key in row.keys() if not key in ['point_date', 'hash', 'geom']} for row in result]
     dump = DataDump(args.data["jobsframework_ticket"], args.data["datadump_requestid"], args.data["datadump_part"], args.data["datadump_total"], json.dumps(data, default=unknown_object_json_handler))
@@ -352,7 +358,7 @@ def _datadump(args):
 
 def _datadump_manager(args):
     requestid = args.data["jobsframework_ticket"]
-    chunksize = 2000
+    chunksize = 10000
     original_validated = copy.deepcopy(args)
 
     query = original_validated.data
@@ -424,11 +430,11 @@ def _datadump_manager(args):
         if get_status(ticket)["status"] != "success":
             if get_status(ticket)["status"] == "error":
                 log("---> JOB FAILED! Ticket: {}\nABORT".format(ticket))
-                raise Exception("Aborted due to failure in worker.")
+                raise Exception("Aborted due to failure on ticket {}: {}".format(ticket, get_result(ticket)["error"]))
 
             # Bump the workers. Note that if the stream fails, this won't be called
             # so that the flag will expire and the workers will stop.
-            set_flag(requestid + "_dowork", True)
+            set_flag(requestid + "_dowork", True, 600)
 
             # Idle until later to save CPU cycles and let other threads do work.
             return {"jobsframework_metacommands": [{"setTimeout": 5}, {"defer"}]}
@@ -515,6 +521,10 @@ def detail_query(args, aggregate=False):
     # to make the general filters into an 'and' tree.
     if not has_tree_filters(args.data):
         # Creates an AND condition tree and adds it to args.
+        if type(dataset) == unicode:
+            print "ONE"
+            print dataset
+            print converters["dataset"][dataset]
         args.data[dataset.name + '__filter'] = request_args_to_condition_tree(
             request_args=args.data,
             ignore=['shapeset']
@@ -816,10 +826,8 @@ def request_args_to_condition_tree(request_args, ignore=list()):
     for val in ignore:
         ignored.add(val)
 
-    args = request_args.copy()
-
     # If the key wasn't convertable, it meant that it was a column key.
-    columns = {k: v for k, v in args.items() if k not in ignored}
+    columns = {k: v for k, v in request_args.items() if k not in ignored}
 
     ctree = {"op": "and", "val": []}
 
@@ -829,7 +837,11 @@ def request_args_to_condition_tree(request_args, ignore=list()):
         if k[0] == 'obs_date':
             k[0] = 'point_date'
         if k[0] == 'date' and 'time_of_day' in k[1]:
-            k[0] = sqlalchemy.func.date_part('hour', args['dataset'].c.point_date)
+            if type(request_args.get('dataset')) == unicode:
+                print "TWO"
+                print request_args["dataset"]
+                print converters["dataset"][request_args["dataset"]]
+            k[0] = sqlalchemy.func.date_part('hour', request_args.get('dataset').c.point_date)
             k[1] = 'le' if 'le' in k[1] else 'ge'
 
         if len(k) == 1:

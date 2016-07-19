@@ -42,7 +42,7 @@ if __name__ == "__main__":
         # The constant opening and closing is meh, I know. But I'm feeling lazy
         # right now.
         logfile = open('/opt/python/log/worker.log', "a")
-        logfile.write("{} - Worker {}: {}\n".format(datetime.datetime.now(), worker_id.ljust(30), msg))
+        logfile.write("{} - Worker {}: {}\n".format(datetime.datetime.now(), worker_id.ljust(24), msg))
         logfile.close()
 
 
@@ -136,12 +136,12 @@ if __name__ == "__main__":
                         status["meta"]["workers"] = []
                     status["meta"]["workers"].append(worker_id)
                     set_status(ticket, status)
-                    req = get_request(ticket)
 
                     log("Starting work on ticket {}.".format(ticket), worker_id)
 
                     # =========== Do work on query =========== #
                     try:
+                        req = get_request(ticket)
                         endpoint = req['endpoint']
                         query_args = req['query']
 
@@ -161,6 +161,7 @@ if __name__ == "__main__":
 
                             #log("worker.query_args: {}".format(query_args), worker_id)
                             #log("worker.req: {}".format(req), worker_id)
+                            print "{} worker.query_args: {}".format(ticket, query_args)
 
                             result = endpoint_logic[endpoint](query_args)
 
