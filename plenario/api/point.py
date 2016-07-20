@@ -1,4 +1,5 @@
 import json
+import re
 import shapely.geometry
 import shapely.wkb
 import sqlalchemy
@@ -124,7 +125,11 @@ def _timeseries(args):
         # it would be ridiculous to build a condition tree for every one.
         for field, value in args.data.items():
             if 'filter' in field:
-                metarecord = MetaTable.get_by_dataset_name(field.split('__')[0])
+                # This pattern matches the last occurrence of the '__' pattern.
+                # Prevents an error that is caused by dataset names with trailing
+                # underscores.
+                tablename = re.split(r'__(?!_)', field)[0]
+                metarecord = MetaTable.get_by_dataset_name(tablename)
                 pt = metarecord.point_table
                 ctrees[pt.name] = parse_tree(pt, value)
         # Just cleanliness, since we don't use this argument. Doesn't have
@@ -232,8 +237,10 @@ def _detail_aggregate(args):
 
     dataset_conditions = {k: v for k, v in args.data.items() if 'filter' in k}
     for tablename, condition_tree in dataset_conditions.items():
-
-        tablename = tablename.split('__')[0]
+        # This pattern matches the last occurrence of the '__' pattern.
+        # Prevents an error that is caused by dataset names with trailing
+        # underscores.
+        tablename = re.split(r'__(?!_)', tablename)[0]
         table = MetaTable.get_by_dataset_name(tablename).point_table
         try:
             conditions = parse_tree(table, condition_tree)
