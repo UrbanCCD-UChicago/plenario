@@ -1,4 +1,5 @@
 import json
+import re
 import sqlalchemy
 
 from collections import namedtuple
@@ -205,7 +206,10 @@ def validate(validator, request_args):
         for key in request_args:
             value = args[key]
             if 'filter' in key:
-                t_name = key.split('__')[0]
+                # This pattern matches the last occurrence of the '__' pattern.
+                # Prevents an error that is caused by dataset names with trailing
+                # underscores.
+                t_name = re.split(r'__(?!_)', key)[0]
 
                 # Report a filter which specifies a non-existent tree.
                 try:
