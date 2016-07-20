@@ -29,6 +29,7 @@ if __name__ == "__main__":
     from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump_manager, _datadump
     from plenario.api.jobs import get_status, set_status, get_request, set_result
     from plenario.api.validator import convert
+    from plenario.models_.ETLTask import update_task
     from plenario.tasks import add_dataset, delete_dataset, update_dataset
     from plenario.tasks import add_shape, update_shape, delete_shape
     from plenario.utils.name_generator import generate_name
@@ -81,17 +82,19 @@ if __name__ == "__main__":
                 'grid': lambda args: _grid(args),
                 'datadump': lambda args: _datadump_manager(args),
                 'datadump_work': lambda args: _datadump(args),
-                # ETL Task endpoints.
+                # Health endpoint.
+                'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)},
+                # Utility tasks
+                'datadump_cleanup': lambda args: _datadump_cleanup(args)
+            }
+
+            etl_logic = {
                 'add_dataset': lambda args: add_dataset(args),
                 'update_dataset': lambda args: update_dataset(args),
                 'delete_dataset': lambda args: delete_dataset(args),
                 'add_shape': lambda args: add_shape(args),
                 'update_shape': lambda args: update_shape(args),
                 'delete_shape': lambda args: delete_shape(args),
-                # Health endpoint.
-                'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)},
-                # Utility tasks
-                'datadump_cleanup': lambda args: _datadump_cleanup(args)
             }
 
             log("Hello! I'm ready for anything.", worker_id)
@@ -145,17 +148,16 @@ if __name__ == "__main__":
                         endpoint = req['endpoint']
                         query_args = req['query']
 
-                        # Add worker metadata
-                        query_args["jobsframework_ticket"] = ticket
-                        query_args["jobsframework_workerid"] = worker_id
-
-                        # Because we're getting serialized arguments from Redis,
-                        # we need to convert them back into a validated form.
-                        # TODO: Update ETL endpoints to handle ValidatorProxy.
-                        convert(query_args)
-                        query_args = ValidatorProxy(query_args)
-
                         if endpoint in endpoint_logic:
+
+                            # Add worker metadata
+                            query_args["jobsframework_ticket"] = ticket
+                            query_args["jobsframework_workerid"] = worker_id
+
+                            # Because we're getting serialized arguments from Redis,
+                            # we need to convert them back into a validated form.
+                            convert(query_args)
+                            query_args = ValidatorProxy(query_args)
 
                             log("Ticket {} uses endpoint {}.".format(ticket, endpoint), worker_id)
 
@@ -181,14 +183,25 @@ if __name__ == "__main__":
                                 if defer:
                                     continue
 
-                            set_result(ticket, result)
-                            status = get_status(ticket)
-                            status["status"] = "success"
-                            status["meta"]["endTime"] = str(datetime.datetime.now())
-                            set_status(ticket, status)
+                        elif endpoint in etl_logic:
 
-                            log("Finished work on ticket {}.".format(ticket), worker_id)
-                            JobsQueue.delete_message(job)
+                            log("Ticket {} uses endpoint {}.".format(ticket, endpoint), worker_id)
+                            result = etl_logic[endpoint](query_args)
+
+                        else:
+
+                            raise ValueError("Attempting to send a job to an"
+                                             "invalid endpoint ->> {}"
+                                             .format(endpoint))
+
+                        set_result(ticket, result)
+                        status = get_status(ticket)
+                        status["status"] = "success"
+                        status["meta"]["endTime"] = str(datetime.datetime.now())
+                        set_status(ticket, status)
+
+                        log("Finished work on ticket {}.".format(ticket), worker_id)
+                        JobsQueue.delete_message(job)
 
                     except Exception as e:
                         status = get_status(ticket)

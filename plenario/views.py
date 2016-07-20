@@ -92,7 +92,7 @@ def approve_shape(dataset_name):
     ticket = submit_job(job)
 
     # Create and record task status.
-    add_task(meta.dataset_name, ETLStatus['pending'], None, ETLType['shapeset'])
+    add_task(meta.dataset_name, ETLType['shapeset'])
 
     # Let the fans know.
     send_approval_email(meta.human_name, meta.contributor_name,
@@ -118,10 +118,7 @@ def approve_dataset(source_url_hash):
                         meta.contributor_name,
                         meta.contributor_email)
 
-    add_task(dataset_name=meta.dataset_name,
-             status=ETLStatus['pending'],
-             error=None,
-             type_=ETLType['dataset'])
+    add_task(meta.dataset_name, ETLType['dataset'])
 
     job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
     return submit_job(job)
@@ -234,17 +231,11 @@ def submit(context):
             if is_shapefile:
                 job = {"endpoint": "add_shape", "query": meta.dataset_name}
                 submit_job(job)
-                add_task(dataset_name=meta.dataset_name,
-                         status=ETLStatus['pending'],
-                         error=None,
-                         type_=ETLType['shapeset'])
+                add_task(meta.dataset_name, ETLType['shapeset'])
             else:
                 job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
                 submit_job(job)
-                add_task(dataset_name=meta.dataset_name,
-                         status=ETLStatus['pending'],
-                         error=None,
-                         type_=ETLType['dataset'])
+                add_task(meta.dataset_name, ETLType['dataset'])
         else:
             return send_submission_email(meta.human_name,
                                          meta.contributor_name,

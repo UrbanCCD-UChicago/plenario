@@ -1,6 +1,7 @@
 import traceback
 
 from datetime import datetime, timedelta
+from functools import wraps
 from raven.conf import setup_logging
 from raven.handlers.logging import SentryHandler
 from sqlalchemy.exc import NoSuchTableError, InternalError
@@ -12,9 +13,6 @@ from plenario.models import MetaTable, ShapeMetadata
 from plenario.models_.ETLTask import update_task, ETLStatus, delete_task
 from plenario.settings import CELERY_SENTRY_URL
 from plenario.utils.weather import WeatherETL
-
-# TODO: Make tasks expect ValidatorProxies.
-# TODO: Get rid of ValidatorProxies???
 
 
 if CELERY_SENTRY_URL:
@@ -35,39 +33,56 @@ def task_complete_msg(task_name, mt):
     return "Finished {} for {} ({})".format(task_name, tname, source)
 
 
-def add_dataset(source_url_hash):
+def etl_report(fn):
+    """Decorator for ETL task methods. Takes care of recording the status of
+    each task to PostgreSQL. Also reports failed tasks to Sentry."""
+
+    @wraps(fn)
+    def wrapper(identifier):
+
+        try:
+            meta = session.query(MetaTable).get(identifier)
+        except NoSuchTableError:
+            meta = session.query(ShapeMetadata).get(identifier)
+
+        try:
+            update_task(meta.dataset_name, None, ETLStatus['started'], None)
+            completion_msg = fn(meta)
+            update_task(meta.dataset_name, datetime.now(), ETLStatus['success'], None)
+            return completion_msg
+        except Exception:
+            update_task(meta.dataset_name, datetime.now(), ETLStatus['failure'], traceback.format_exc())
+            # TODO: Report to Sentry.
+
+    return wrapper
+
+
+@etl_report
+def add_dataset(meta):
     """Ingest the row information for an approved dataset.
 
-    :param source_url_hash: (string) identifier used to grab target table info
+    :param meta: (MetaTable record) identifier used to grab target table info
     :returns: (string) a helpful confirmation message"""
 
-    metatable = session.query(MetaTable).get(source_url_hash)
-    update_task(metatable.dataset_name, None, ETLStatus['started'], None)
-    try:
-        PlenarioETL(metatable).add()
-        update_task(metatable.dataset_name, datetime.now(), ETLStatus['success'], None)
-    except Exception:
-        update_task(metatable.dataset_name,
-                    ETLStatus['failure'],
-                    traceback.format_exc())
-    return task_complete_msg('ingest', metatable)
+    PlenarioETL(meta).add()
+    return task_complete_msg('ingest', meta)
 
 
-def update_dataset(source_url_hash):
+@etl_report
+def update_dataset(meta):
     """Update the row information for an approved dataset.
 
-    :param source_url_hash: (string) identifier used to grab target table info
+    :param meta: (MetaTable record) identifier used to grab target table info
     :returns: (string) a helpful confirmation message"""
 
-    metatable = session.query(MetaTable).get(source_url_hash)
-    PlenarioETL(metatable).update()
-    return task_complete_msg('update', metatable)
+    PlenarioETL(meta).update()
+    return task_complete_msg('update', meta)
 
 
 def delete_dataset(source_url_hash):
     """Delete the row information and meta table for an approved dataset.
 
-    :param source_url_hash: (string) identifier used to grab target table
+    :param source_url_hash: (string) identifier used to grab target table info
     :returns: (string) a helpful confirmation message"""
 
     meta = session.query(MetaTable).get(source_url_hash)
@@ -78,38 +93,35 @@ def delete_dataset(source_url_hash):
         # Move on so we can get rid of the metadata
         pass
     session.delete(meta)
+
     try:
         session.commit()
-    except InternalError, e:
-        raise delete_dataset.retry(exc=e)
+        delete_task(meta.dataset_name)
+    except InternalError:
+        session.rollback()
 
-    delete_task(meta.dataset_name)
     return task_complete_msg('deletion', meta)
 
 
-def add_shape(table_name):
+@etl_report
+def add_shape(meta):
     """Ingest the row information for an approved shapeset.
 
-    :param table_name: (string) identifier used to grab target table info
+    :param meta: (MetaTable record) identifier used to grab target table info
     :returns: (string) a helpful confirmation message"""
 
-    meta = session.query(ShapeMetadata).get(table_name)
-    update_task(meta.dataset_name, None, ETLStatus['started'], None)
     ShapeETL(meta).add()
-    update_task(meta.dataset_name, datetime.now(), ETLStatus['success'], None)
     return task_complete_msg('ingest', meta)
 
 
-def update_shape(table_name):
+@etl_report
+def update_shape(meta):
     """Update the row information for an approved shapeset.
 
-    :param table_name: (string) identifier used to grab target table info
+    :param meta: (MetaTable record) identifier used to grab target table info
     :returns: (string) a helpful confirmation message"""
 
-    meta = session.query(ShapeMetadata).get(table_name)
-    update_task(meta.dataset_name, None, ETLStatus['started'], None)
-    ShapeETL(meta=meta).update()
-    update_task(meta.dataset_name, datetime.now(), ETLStatus['success'], None)
+    ShapeETL(meta).update()
     return task_complete_msg('update', meta)
 
 
