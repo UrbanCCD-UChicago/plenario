@@ -95,13 +95,10 @@ def detail():
 @crossdomain(origin="*")
 def datadump():
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
-              'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
+              'obs_date__le', 'offset', 'date__time_of_day_ge',
               'date__time_of_day_le', 'limit', 'job')
     validator = DatasetRequiredValidator(only=fields)
     validator_result = validate(validator, request.args.to_dict())
-
-    if validator_result.data["data_type"] == "geojson":
-        validator_result.data["data_type"] = "json"
 
     # Get origin IP for Denial-of-Service protection
     origin_ip = request.headers.get("X-Forwarded-For")
@@ -123,6 +120,7 @@ def get_datadump(ticket):
     job = get_job(ticket)
     try:
         if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
+            datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get("data_type") in ["json", "csv"] else "json"
 
             #Send data from Postgres in sequence
             def stream_data():
@@ -131,28 +129,36 @@ def get_datadump(ticket):
                 # In reality, there are total+1 parts because the header occupies part 0.
                 # So we also want to go up to the total as well. Don't worry,
                 # logic in the _datadump_manager ensures that total is the largest part number.
+                metadata = {}
                 while counter <= get_status(ticket)["progress"]["total"]:
                     row = session.query(DataDump).filter(sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
                     if counter == 0:
-                        # Yield header
-                        yield row.get_data()
+                        # Make headers for JSON and CSV.
+                        metadata = json.loads(row.get_data())
+                        if datatype == "json":
+                            yield """{{"startTime": "{}", "endTime": "{}", "workers": {}, "data": [""".format(
+                                metadata["startTime"], metadata["endTime"], json.dumps(metadata["workers"]))
+                        elif datatype == "csv":
+                            yield "# STARTTIME: {}\n# ENDTIME: {}\n# WORKERS: {}\n".format(metadata["startTime"], metadata["endTime"], ", ".join(metadata["workers"]))
+                            columns = metadata["columns"]
+                            yield ",".join([json.dumps(column) for column in columns]) + "\n"
                     else:
-                        if get_request(ticket)["query"]["data_type"] == "json":
+                        if datatype == "json":
                             # Return result with the list brackets [] sliced off.
                             yield row.get_data()[1:-1]
                             if counter < get_status(ticket)["progress"]["total"]: yield ","
-                        elif get_request(ticket)["query"]["data_type"] == "csv":
+                        elif datatype == "csv":
                             for csvrow in json.loads(row.get_data()):
                                 yield ",".join(
                                     [json.dumps(csvrow[key].encode("utf-8")) if type(csvrow[key]) is unicode else json.dumps(str(csvrow[key]))
-                                     for key in get_request(ticket)["workarea"]["columns"]]) + "\n"
+                                     for key in metadata["columns"]]) + "\n"
                     counter += 1
-                if get_request(ticket)["query"]["data_type"] == "json":
+                if datatype == "json":
                         # Finish off JSON syntax
                         yield "]}"
 
-            response = Response(stream_data(), mimetype="text/{}".format(get_request(ticket)["query"]["data_type"]))
-            response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(get_request(ticket)["query"]["dataset"], get_request(ticket)["query"]["data_type"])
+            response = Response(stream_data(), mimetype="text/{}".format(datatype))
+            response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(get_request(ticket)["query"]["dataset"], datatype)
             return response
         else:
             return job
@@ -461,18 +467,8 @@ def _datadump_manager(args):
             status["progress"] = {"done": part, "total": chunks}
             set_status(requestid, status)
 
-    metadata = ""
-    # Make headers for JSON and CSV.
-    if args.data.get("data_type") == "json":
-        metadata += """{{"startTime": "{}", "endTime": "{}", "workers": {}, "data": [""".format(get_status(requestid)["meta"]["startTime"], str(datetime.now()), json.dumps(list(workerlist)))
-    elif args.data.get("data_type") == "csv":
-        metadata += "# STARTTIME: {}\n# ENDTIME: {}\n# WORKERS: {}\n".format(get_status(requestid)["meta"]["startTime"], str(datetime.now()), ", ".join(workerlist))
-        columns = [column["field_name"] for column in _meta(original_validated)[0]["columns"]]
-        req = get_request(requestid)
-        req["workarea"]["columns"] = columns
-        set_request(requestid, req)
-        metadata += ",".join([json.dumps(c) for c in columns]) + "\n"
-
+    columns = [column["field_name"] for column in _meta(original_validated)[0]["columns"]]
+    metadata = """{{"startTime": "{}", "endTime": "{}", "workers": {}, "columns": {}}}""".format(get_status(requestid)["meta"]["startTime"], str(datetime.now()), json.dumps(list(workerlist)), json.dumps(columns))
     dump = DataDump(args.data["jobsframework_ticket"], args.data["jobsframework_ticket"], 0,
                     chunks, metadata)
     session.add(dump)
