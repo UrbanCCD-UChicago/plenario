@@ -10,6 +10,7 @@
 ###############################################################
 
 import plenario.database
+from pprint import pprint
 session = plenario.database.session
 
 worker_threads = 4
@@ -19,6 +20,7 @@ if __name__ == "__main__":
 
     import datetime
     import time
+    import shapely.wkb
     import signal
     import boto.sqs
     import threading
@@ -28,6 +30,8 @@ if __name__ == "__main__":
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
     from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump_manager, _datadump
     from plenario.api.jobs import get_status, set_status, get_request, set_result
+    from plenario.api.shape import _aggregate_point_data, _export_shape
+    from plenario.api.response import geojson_response_base, add_geojson_feature
     from plenario.api.validator import convert
     from plenario.models_.ETLTask import update_task
     from plenario.tasks import add_dataset, delete_dataset, update_dataset
@@ -71,14 +75,19 @@ if __name__ == "__main__":
         with app.app_context():
 
             endpoint_logic = {
-                # Point endpoints.
+                # /timeseries?<args>
                 'timeseries': lambda args: _timeseries(args),
+                # /detail-aggregate?<args>
                 'detail-aggregate': lambda args: _detail_aggregate(args),
+                # /detail?<args>
                 # emulating row-removal features of _detail_response. Not very DRY, but it's the cleanest option.
                 'detail': lambda args: [{key: row[key] for key in row.keys()
                                          if key not in ['point_date', 'hash', 'geom']} for row in _detail(args)],
+                # /datasets?<args>
                 'meta': lambda args: _meta(args),
+                # /fields/<dataset>
                 'fields': lambda args: _meta(args),
+                # /grid?<args>
                 'grid': lambda args: _grid(args),
                 'datadump': lambda args: _datadump_manager(args),
                 'datadump_work': lambda args: _datadump(args),
@@ -86,6 +95,15 @@ if __name__ == "__main__":
                 'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)},
                 # Utility tasks
                 'datadump_cleanup': lambda args: _datadump_cleanup(args)
+            }
+
+            shape_logic = {
+                # /shapes/<shape>?<args>
+                'export-shape': lambda args: _export_shape(args),
+                # /shapes/<dataset>/<shape>?<args>
+                'aggregate-point-data': lambda args: [{key: row[key] for key in row.keys()
+                                                       if key not in ['hash', 'ogc_fid']}
+                                                      for row in _aggregate_point_data(args)]
             }
 
             etl_logic = {
@@ -163,9 +181,10 @@ if __name__ == "__main__":
 
                             # log("worker.query_args: {}".format(query_args), worker_id)
                             # log("worker.req: {}".format(req), worker_id)
-                            print "{} worker.query_args: {}".format(ticket, query_args)
+                            # print "{} worker.query_args: {}".format(ticket, query_args)
 
                             result = endpoint_logic[endpoint](query_args)
+                            pprint("worker.result: {}".format(result))
 
                             # Check for metacommands
                             if "jobsframework_metacommands" in result:
@@ -183,6 +202,24 @@ if __name__ == "__main__":
                                 if defer:
                                     continue
 
+                        # TODO: Yeesh, let's pull this and the response logic
+                        # TODO: that this is copied from into a method.
+                        elif endpoint in shape_logic:
+                            convert(query_args)
+                            query_args = ValidatorProxy(query_args)
+                            result = shape_logic[endpoint](query_args)
+                            if endpoint == 'aggregate-point-data' and query_args.data.get('data_type') != 'csv':
+                                geojson_resp = geojson_response_base()
+                                for row in result:
+                                    try:
+                                        wkb = row.pop('geom')
+                                        geom = shapely.wkb.loads(wkb.desc, hex=True).__geo_interface__
+                                    except (KeyError, AttributeError):
+                                        continue
+                                    else:
+                                        add_geojson_feature(geojson_resp, geom, row)
+                                result = geojson_resp
+
                         elif endpoint in etl_logic:
 
                             log("Ticket {} uses endpoint {}.".format(ticket, endpoint), worker_id)
@@ -190,7 +227,7 @@ if __name__ == "__main__":
 
                         else:
 
-                            raise ValueError("Attempting to send a job to an"
+                            raise ValueError("Attempting to send a job to an "
                                              "invalid endpoint ->> {}"
                                              .format(endpoint))
 

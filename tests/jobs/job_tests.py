@@ -1,10 +1,7 @@
-import json
 import unittest
 import subprocess
 import random
-import traceback
 
-from sqlalchemy.exc import NoSuchTableError
 
 from plenario import create_app
 from plenario.api import prefix
@@ -12,11 +9,10 @@ from plenario.api.jobs import *
 from plenario.database import app_engine, session
 from plenario.models import MetaTable, ShapeMetadata
 from plenario.update import create_worker
-from plenario.utils.model_helpers import fetch_table, table_exists
+from plenario.utils.model_helpers import fetch_table, table_exists, fetch_meta
 from plenario.views import approve_dataset, update_dataset, delete_dataset
 from plenario.views import approve_shape, update_shape, delete_shape
 from tests.points.api_tests import get_loop_rect
-from tests.test_fixtures.base_test import BasePlenarioTest
 
 
 class TestJobs(unittest.TestCase):
@@ -121,7 +117,7 @@ class TestJobs(unittest.TestCase):
         dname = 'restaurant_applications'
 
         # Drop the table if it already exists.
-        if table_exists(MetaTable, dname):
+        if table_exists(dname):
             fetch_table(MetaTable, dname).drop()
 
         q = session.query(MetaTable.source_url_hash)
@@ -185,16 +181,11 @@ class TestJobs(unittest.TestCase):
         self.assertTrue(table is None)
 
     def admin_test_04_approve_shapeset(self):
-        print "TEST 04 ============================="
-
         shape_name = 'boundaries_neighborhoods'
 
         # Drop the table if it already exists.
-        try:
-            table = ShapeMetadata.get_by_dataset_name(shape_name).shape_table
-            table.drop()
-        except NoSuchTableError:
-            pass
+        if table_exists(shape_name):
+            fetch_table(ShapeMetadata, shape_name).drop()
 
         # Queue the ingestion job.
         with self.other_app.test_request_context():
@@ -216,8 +207,6 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(count, 98)
 
     def admin_test_05_update_shapeset(self):
-        print "TEST 05 ============================="
-
         # Grab source url hash.
         shape_name = 'boundaries_neighborhoods'
 

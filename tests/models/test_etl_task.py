@@ -94,7 +94,8 @@ class TestETLTask(unittest.TestCase):
         for task in tasks:
             self.assertEqual(task.type, 'master')
 
-        self.assertEqual(tasks[0], 'Ingest Pending')
+        self.assertEqual(tasks[0].status, 'Ingest Pending')
+        self.assertEqual(tasks[1].status, 'Ingest Pending')
 
     def test_05_task_submitted_with_approve_dataset(self):
         # Simulate a user submitting a request for roadworks.

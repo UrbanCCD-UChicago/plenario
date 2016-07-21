@@ -294,8 +294,6 @@ def csv_already_submitted(url):
 
 def shape_already_submitted(name):
     shape = ShapeMetadata.get_by_human_name(name)
-    print shape, shape is not None
-
     return shape is not None
 
 
@@ -313,8 +311,6 @@ def contrib_thankyou():
 def point_meta_from_submit_form(form, is_approved):
     columns, labels = form_columns(form)
     name = slugify(form['dataset_name'], delim=u'_')[:50]
-
-    print 'point_meta_from_submit_form: {}'.format(form)
 
     metatable = MetaTable(
         url=form['file_url'],
@@ -341,8 +337,6 @@ def point_meta_from_submit_form(form, is_approved):
 
 
 def shape_meta_from_submit_form(form, is_approved):
-
-    print 'shape_meta_from_submit_form: {}'.format(form)
 
     md = ShapeMetadata.add(
         human_name=form['dataset_name'],
@@ -592,8 +586,6 @@ def view_datasets():
     datasets = fetch_table_etl_status(ETLType['dataset'])
     shapesets = fetch_table_etl_status(ETLType['shapeset'])
 
-    print "view_datasets.datasets.len: {}".format(len(datasets))
-
     return render_template('admin/view-datasets.html',
                            datasets_pending=datasets_pending,
                            shapes_pending=shapes_pending,
@@ -835,8 +827,6 @@ def check_update(ticket):
 def shape_status():
     table_name = request.args['dataset_name']
     shape_meta = fetch_table_etl_status(ETLType['shapeset'], table_name)[0]
-    print "shape_status.shape_meta: {}".format(shape_meta)
-    print "shape_stats.shape_meta.status: {}".format(shape_meta.status)
     return render_template('admin/shape-status.html', shape=shape_meta)
 
 
