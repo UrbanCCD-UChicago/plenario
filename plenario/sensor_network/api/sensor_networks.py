@@ -18,8 +18,8 @@ from plenario.api.common import make_cache_key, date_json_handler, unknown_objec
 from plenario.api.condition_builder import parse_tree
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.sensor_network.api.sensor_validator import SensorNetworkValidator, validate
-from plenario.database import session
-from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta
+from plenario.database import session, redshift_session
+from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, Observation
 from plenario.sensor_network import dynamodb_query
 
 
@@ -185,11 +185,9 @@ def _get_observations(args):
 
     # convert datetime into ISO string for dynamodb queries
     if type(args.data.get('start_datetime')) is datetime:
-        args.data['start_datetime'] = args.data.get('start_datetime').isoformat()
-    args.data['start_datetime'] = args.data.get('start_datetime').split('+')[0]
+        args.data['start_datetime'] = args.data['start_datetime'].isoformat().split('+')[0]
     if type(args.data.get('end_datetime')) is datetime:
-        args.data['end_datetime'] = args.data.get('end_datetime').isoformat()
-    args.data['end_datetime'] = args.data.get('end_datetime').split('+')[0]
+        args.data['end_datetime'] = args.data['end_datetime'].isoformat().split('+')[0]
 
     # 'node_id'and 'location_geom__within' are now encapsulated within 'nodes'
     # and, for cleanliness, will not be passed as args to dynamodb_query

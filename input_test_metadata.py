@@ -1,7 +1,8 @@
-from plenario.sensor_models import NetworkMeta, NodeMeta
+from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta
 from plenario.database import session, Base, app_engine
 from geoalchemy2.elements import WKTElement
 import random
+
 
 aot = NetworkMeta(name='ArrayOfThings', nodeMetadata={
     "height": "meters",
@@ -60,8 +61,5 @@ session.commit()
 
 for i in session.query(NetworkMeta).all()[0].nodes:
     print i.id
-for i in session.query(NetworkMeta).all()[1].nodes:
-    print i.id
-
 
 

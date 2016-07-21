@@ -41,7 +41,6 @@ class Validator(Schema):
 
     location_geom__within = fields.Str(default=None, dump_to='geom')
     network_name = fields.Str(default=None, validate=OneOf(NetworkMeta.index()))
-    # assumes NodeMeta holds only AoT nodes
     node_id = fields.Str(default=None, validate=OneOf(NodeMeta.index()))
     nodes = fields.List(fields.Str(), default=NodeMeta.index(), validate=validate_nodes)
     start_datetime = fields.DateTime(default=datetime.now() - timedelta(days=90))

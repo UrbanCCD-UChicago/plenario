@@ -12,8 +12,16 @@ DB_HOST = get('DB_HOST', 'aot-metadata-test2.c6r1g0x3odle.us-east-1.rds.amazonaw
 DB_PORT = get('DB_PORT', '5432')
 DB_NAME = get('DB_NAME', 'aotMeta')
 
+RS_USER = get('RS_USER', 'plenario')
+RS_PASSWORD = get('RS_PASSWORD', 'Plenario22')
+RS_HOST = get('RS_HOST', 'aot-test.cgsdruid1put.us-east-1.redshift.amazonaws.com')
+RS_PORT = get('RS_PORT', '5439')
+RS_NAME = get('RS_NAME', 'dev')
+
 DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.\
     format(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
+REDSHIFT_CONN = 'redshift+psycopg2://{}:{}@{}:{}/{}'.\
+    format(RS_USER, RS_PASSWORD, RS_HOST, RS_PORT, RS_NAME)
 
 REDIS_HOST = get('REDIS_HOST', 'localhost')
 
