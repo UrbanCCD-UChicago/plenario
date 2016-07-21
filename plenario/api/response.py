@@ -118,26 +118,31 @@ def form_csv_detail_response(to_remove, rows):
     return resp
 
 
-def form_geojson_detail_response(to_remove, validator, rows):
-    geojson_resp = geojson_response_base()
-    # We want the geom this time.
+def form_geojson_detail_response(to_remove, rows):
     remove_columns_from_dict(rows, to_remove)
+    geojson_resp = convert_result_geoms(rows)
+    resp = make_response(json.dumps(geojson_resp, default=unknown_object_json_handler), 200)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
 
-    for row in rows:
+
+def convert_result_geoms(result):
+    """Given a list of rows, convert the geom for each row from a shape
+    to a list of coordinates.
+
+    :param result: (list) contains the results of some query
+    :returns (list) modified result, where geoms are represented by lists"""
+
+    geojson_resp = geojson_response_base()
+    for row in result:
         try:
             wkb = row.pop('geom')
             geom = shapely.wkb.loads(wkb.desc, hex=True).__geo_interface__
         except (KeyError, AttributeError):
-            # If we couldn't fund a geom value,
-            # or said value was not of the expected type,
-            # then skip this column
             continue
         else:
             add_geojson_feature(geojson_resp, geom, row)
-
-    resp = make_response(json.dumps(geojson_resp, default=unknown_object_json_handler), 200)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
+    return geojson_resp
 
 
 # Point Endpoint Repsonses ====================================================
@@ -199,7 +204,7 @@ def detail_response(query_result, query_args):
         return form_csv_detail_response(to_remove, query_result)
 
     elif data_type == 'geojson':
-        return form_geojson_detail_response(to_remove, query_args, query_result)
+        return form_geojson_detail_response(to_remove, query_result)
 
 
 def timeseries_response(query_result, query_args):
@@ -247,11 +252,11 @@ def timeseries_response(query_result, query_args):
 
 # Shape Endpoint Responses ====================================================
 
-def aggregate_point_data_response(args, data_type, rows):
+def aggregate_point_data_response(data_type, rows):
     if data_type == 'csv':
         return form_csv_detail_response(['hash', 'ogc_fid'], rows)
     else:
-        return form_geojson_detail_response(['hash', 'ogc_fid'], args, rows)
+        return form_geojson_detail_response(['hash', 'ogc_fid'], rows)
 
 
 # ====================

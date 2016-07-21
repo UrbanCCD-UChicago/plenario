@@ -20,7 +20,6 @@ if __name__ == "__main__":
 
     import datetime
     import time
-    import shapely.wkb
     import signal
     import boto.sqs
     import threading
@@ -31,9 +30,8 @@ if __name__ == "__main__":
     from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump_manager, _datadump
     from plenario.api.jobs import get_status, set_status, get_request, set_result
     from plenario.api.shape import _aggregate_point_data, _export_shape
-    from plenario.api.response import geojson_response_base, add_geojson_feature
+    from plenario.api.response import convert_result_geoms
     from plenario.api.validator import convert
-    from plenario.models_.ETLTask import update_task
     from plenario.tasks import add_dataset, delete_dataset, update_dataset
     from plenario.tasks import add_shape, update_shape, delete_shape
     from plenario.utils.name_generator import generate_name
@@ -202,23 +200,12 @@ if __name__ == "__main__":
                                 if defer:
                                     continue
 
-                        # TODO: Yeesh, let's pull this and the response logic
-                        # TODO: that this is copied from into a method.
                         elif endpoint in shape_logic:
                             convert(query_args)
                             query_args = ValidatorProxy(query_args)
                             result = shape_logic[endpoint](query_args)
                             if endpoint == 'aggregate-point-data' and query_args.data.get('data_type') != 'csv':
-                                geojson_resp = geojson_response_base()
-                                for row in result:
-                                    try:
-                                        wkb = row.pop('geom')
-                                        geom = shapely.wkb.loads(wkb.desc, hex=True).__geo_interface__
-                                    except (KeyError, AttributeError):
-                                        continue
-                                    else:
-                                        add_geojson_feature(geojson_resp, geom, row)
-                                result = geojson_resp
+                                result = convert_result_geoms(result)
 
                         elif endpoint in etl_logic:
 

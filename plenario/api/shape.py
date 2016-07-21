@@ -74,7 +74,7 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     else:
         result = _aggregate_point_data(validated_args)
         data_type = validated_args.data.get('data_type')
-        return api_response.aggregate_point_data_response(validated_args, data_type, result)
+        return api_response.aggregate_point_data_response(data_type, result)
 
 
 @crossdomain(origin="*")
