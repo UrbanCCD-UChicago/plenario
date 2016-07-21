@@ -1,7 +1,9 @@
 import unittest
 import subprocess
 import random
+import zipfile
 
+from StringIO import StringIO
 
 from plenario import create_app
 from plenario.api import prefix
@@ -9,7 +11,8 @@ from plenario.api.jobs import *
 from plenario.database import app_engine, session
 from plenario.models import MetaTable, ShapeMetadata
 from plenario.update import create_worker
-from plenario.utils.model_helpers import fetch_table, table_exists, fetch_meta
+from plenario.utils.shapefile import Shapefile
+from plenario.utils.model_helpers import fetch_table, table_exists
 from plenario.views import approve_dataset, update_dataset, delete_dataset
 from plenario.views import approve_shape, update_shape, delete_shape
 from tests.points.api_tests import get_loop_rect
@@ -118,7 +121,7 @@ class TestJobs(unittest.TestCase):
 
         # Drop the table if it already exists.
         if table_exists(dname):
-            fetch_table(MetaTable, dname).drop()
+            fetch_table(MetaTable).drop()
 
         q = session.query(MetaTable.source_url_hash)
         source_url_hash = q.filter(MetaTable.dataset_name == dname).scalar()
@@ -185,7 +188,7 @@ class TestJobs(unittest.TestCase):
 
         # Drop the table if it already exists.
         if table_exists(shape_name):
-            fetch_table(ShapeMetadata, shape_name).drop()
+            fetch_table(shape_name).drop()
 
         # Queue the ingestion job.
         with self.other_app.test_request_context():
@@ -503,6 +506,83 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(len(response["result"]["features"]), 4)
         self.assertEqual(response["result"]["type"], "FeatureCollection")
         self.assertEqual(response["result"]["features"][0]["properties"]["count"], 1)
+
+    # ===============================
+    # ACCEPTANCE TEST: shapes/<shape>
+    # ===============================
+
+    def test_export_shape_job(self):
+
+        response = self.app.get("/v1/api/shapes/chicago_neighborhoods?job=true")
+        response = json.loads(response.get_data())
+        ticket = response['ticket']
+
+        self.assertIsNotNone(ticket)
+        self.assertIsNotNone(response["url"])
+        self.assertEqual(response["request"]["endpoint"], "export-shape")
+        self.assertEqual(response["request"]["query"]["shapeset"], "chicago_neighborhoods")
+        self.assertEqual(response["request"]["query"]["job"], True)
+
+        wait_on(ticket, 10)
+
+        url = response["url"]
+        response = self.app.get(url)
+        response = json.loads(response.get_data())
+
+        self.assertEqual(len(response['features']), 98)
+
+    def test_export_shape_job_shapefile(self):
+
+        response = self.app.get("/v1/api/shapes/chicago_neighborhoods?data_type=shapefile&job=true")
+        response = json.loads(response.get_data())
+        ticket = response['ticket']
+
+        self.assertIsNotNone(ticket)
+        self.assertIsNotNone(response["url"])
+        self.assertEqual(response["request"]["endpoint"], "export-shape")
+        self.assertEqual(response["request"]["query"]["shapeset"], "chicago_neighborhoods")
+        self.assertEqual(response["request"]["query"]["data_type"], "shapefile")
+        self.assertEqual(response["request"]["query"]["job"], True)
+
+        wait_on(ticket, 10)
+
+        url = response["url"]
+        response = self.app.get(url)
+
+        file_content = StringIO(response.data)
+        as_zip = zipfile.ZipFile(file_content)
+
+        # The Shapefile utility class takes a ZipFile, opens it,
+        # and throws an exception if it doesn't have the expected shapefile components (.shp and .prj namely)
+        with Shapefile(as_zip):
+            pass
+
+    def test_aggregate_point_data(self):
+
+        url = '/v1/api/shapes/chicago_neighborhoods/landmarks/' \
+              '?obs_date__ge=2000-09-22&obs_date__le=2013-10-1'
+        response = self.app.get(url + '&job=true')
+        response = json.loads(response.get_data())
+        ticket = response['ticket']
+
+        self.assertIsNotNone(ticket)
+        self.assertIsNotNone(response["url"])
+        self.assertEqual(response["request"]["endpoint"], "aggregate-point-data")
+        self.assertEqual(response["request"]["query"]["shapeset"], "chicago_neighborhoods")
+        self.assertEqual(response["request"]["query"]["dataset"], "landmarks")
+        self.assertEqual(response["request"]["query"]["data_type"], "json")
+        self.assertEqual(response["request"]["query"]["job"], True)
+
+        wait_on(ticket, 10)
+
+        url = response["url"]
+        response = self.app.get(url)
+        data = json.loads(response.data)
+        neighborhoods = data['result']['features']
+        self.assertEqual(len(neighborhoods), 54)
+
+        for neighborhood in neighborhoods:
+            self.assertGreaterEqual(neighborhood['properties']['count'], 1)
 
     # =======================
     # ACCEPTANCE TEST: datadump (JSON)
