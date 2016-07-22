@@ -5,7 +5,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSON
 from sqlalchemy.orm import relationship
 
 from plenario.database import session, Base
-from plenario.database import redshift_Base
+from plenario.database import redshift_engine, redshift_Base
 
 
 class NetworkMeta(Base):
@@ -42,7 +42,7 @@ class Observation(redshift_Base):
     __tablename__ = 'observations'
 
     node_id = Column(String, primary_key=True)
-    datetime = Column(DateTime)
+    datetime = Column(DateTime, primary_key=True)
     temperature_temperature = Column(Numeric)
     atmosphericPressure_atmosphericPressure = Column(Numeric)
     relativeHumidity_relativeHumidity = Column(Numeric)
@@ -64,5 +64,6 @@ class Observation(redshift_Base):
     particulateMatter_PM1 = Column(Numeric)
     particulateMatter_PM2_5 = Column(Numeric)
     particulateMatter_PM10 = Column(Numeric)
+
 
 

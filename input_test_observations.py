@@ -7,7 +7,7 @@ import random
 import datetime
 
 observations = []
-for i in range(0, 100):
+for i in range(0, 1800):
     observations.append(Observation(
         node_id='ArrayOfThings' + str(random.randrange(0, 30)),
         datetime=datetime.datetime(2016, 4, 1, 14, 14, 14) + datetime.timedelta(seconds=random.randrange(0, 7776000)),

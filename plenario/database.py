@@ -16,7 +16,7 @@ Base.query = session.query_property()
 
 # Redshift connection setup
 
-redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=True)
+redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True)
 
 redshift_session = scoped_session(sessionmaker(bind=redshift_engine,
                                       autocommit=False,

@@ -25,9 +25,10 @@ def internal_error(context_msg, exception):
     return make_error(msg, 500)
 
 
-def json_response_base(data, validator=None, query=''):
+def json_response_base(validator, data, query=''):
     meta = {
-        'message': ''
+        'message': '',
+        'total': len(data)
     }
 
     if validator:

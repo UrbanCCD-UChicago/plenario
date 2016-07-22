@@ -5,16 +5,15 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 from dateutil import parser
 from marshmallow import fields, Schema
-from marshmallow.validate import Range, Length, OneOf, ValidationError
+from marshmallow.validate import OneOf, ValidationError
+from psycopg2 import Error
 from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
 from plenario.api.condition_builder import field_ops
 from plenario.database import session
-from plenario.models import MetaTable, ShapeMetadata
-from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta
+from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, Observation
 
-from plenario.database import client
 
 def validate_nodes(nodes):
     """Custom validator for nodes parameter."""
@@ -23,6 +22,17 @@ def validate_nodes(nodes):
     for node in nodes:
         if node not in valid_nodes:
             raise ValidationError("Invalid node ID: {}.".format(node))
+
+
+# not working...
+def validate_geom(geom):
+    """Custom validator for geom parameter."""
+
+    try:
+        fragment = extract_first_geometry_fragment(geom)
+    except Error:
+        return False
+    return True
 
 
 class Validator(Schema):
@@ -39,13 +49,12 @@ class Validator(Schema):
     or rejected, the validator will substitue it with the value specified by
     <DEFAULT_VALUE>."""
 
-    location_geom__within = fields.Str(default=None, dump_to='geom')
-    network_name = fields.Str(default=None, validate=OneOf(NetworkMeta.index()))
+    location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
+    network_name = fields.Str(allow_none=True, missing=None, default=None, validate=OneOf(NetworkMeta.index()))
     node_id = fields.Str(default=None, validate=OneOf(NodeMeta.index()))
     nodes = fields.List(fields.Str(), default=NodeMeta.index(), validate=validate_nodes)
     start_datetime = fields.DateTime(default=datetime.now() - timedelta(days=90))
     end_datetime = fields.DateTime(default=datetime.now())
-    filter = fields.Dict(default=None)
 
 
 class NoGeoJSONValidator(Validator):
@@ -82,6 +91,8 @@ ValidatorResult = namedtuple('ValidatorResult', 'data errors warnings')
 
 converters = {
     'geom': lambda x: make_fragment_str(extract_first_geometry_fragment(x)),
+    'start_datetime': lambda x: x.isoformat().split('+')[0],
+    'end_datetime': lambda x: x.isoformat().split('+')[0],
 }
 
 
@@ -91,13 +102,14 @@ def convert(request_args):
     above.
 
     :param request_args: dictionary of request arguments
+    :param converters: dictionary of converter functions
 
     :returns: converted dictionary"""
 
     for key, value in request_args.items():
         try:
             request_args[key] = converters[key](value)
-        except (KeyError, TypeError, AttributeError, ValueError, NoSuchTableError):
+        except (KeyError, TypeError, AttributeError, NoSuchTableError):
             pass
         except (DatabaseError, ProgrammingError):
             # Failed transactions, which we do expect, can cause
@@ -106,7 +118,7 @@ def convert(request_args):
             session.rollback()
 
 
-def validate(validator, args):
+def validate(validator, request_args):
     """Validate a dictionary of arguments. Substitute all missing fields with
     defaults if not explicitly told to do otherwise.
 
@@ -114,6 +126,8 @@ def validate(validator, args):
     :param args: dictionary of arguments from a request object
 
     :returns: ValidatorResult namedtuple"""
+
+    args = request_args.copy()
 
     # If there are errors, fail quickly and return.
     result = validator.load(args)
@@ -137,23 +151,23 @@ def validate(validator, args):
 
     # If tree filters were provided, ignore ALL unchecked parameters that are
     # not tree filters or response format information.
-    if 'filter - FIX' in args.keys():
+
+    if 'filter' in request_args.keys():
 
         # Report a tree which causes the JSON parser to fail.
         # Or a tree whose value is not valid.
         try:
-            cond_tree = json.loads(args['filter'])
-            if valid_tree(args['network_name'], cond_tree):
+            cond_tree = json.loads(request_args['filter'])
+            if valid_tree(cond_tree):
                 result.data['filter'] = cond_tree
-        except ValueError as err:
-            result.errors[args['network_name']] = "Bad tree: {} -- causes error {}.".format(args['network_name'], err)
+        except (ValueError, KeyError) as err:
+            result.errors['filter'] = "Bad tree: {} -- causes error {}.".format(request_args['filter'], err)
             return result
 
     # ValidatorResult(dict, dict, list)
     return ValidatorResult(result.data, result.errors, warnings)
 
-
-def valid_tree(network_name, tree):
+def valid_tree(tree):
     """Given a dictionary containing a condition tree, validate all conditions
     nestled in the tree.
 
@@ -170,24 +184,23 @@ def valid_tree(network_name, tree):
         raise ValueError("Invalid keyword in {}".format(tree))
 
     if op == "and" or op == "or":
-        return all([valid_tree(network_name, subtree) for subtree in tree['val']])
+        return all([valid_tree(subtree) for subtree in tree['val']])
 
     elif op in field_ops:
         col = tree.get('col')
         val = tree.get('val')
 
-        if not col or not val:
+        if col is None or val is None:
             err_msg = 'Missing or invalid keyword in {}'.format(tree)
             err_msg += ' -- use format "{\'op\': OP, \'col\': COL, \'val\', VAL}"'
             raise ValueError(err_msg)
 
-        return valid_column_condition(table, col, val)
+        return valid_column_condition(col, val)
 
     else:
         raise ValueError("Invalid operation {}".format(op))
 
-
-def valid_column_condition(table, column_name, value):
+def valid_column_condition(column_name, value):
     """Establish whether or not a set of components is able to make a valid
     condition for the provided table.
 
@@ -202,9 +215,9 @@ def valid_column_condition(table, column_name, value):
     convert(condition)
     value = condition[column_name]
 
-    try:
-        column = table.columns[column_name]
-    except KeyError:
+    if column_name in Observation.__dict__.keys():
+        column = Observation.__table__.c[column_name]
+    else:
         raise KeyError("Invalid column name {}".format(column_name))
 
     try:
@@ -215,4 +228,3 @@ def valid_column_condition(table, column_name, value):
                          .format(value, column.type.python_type))
 
     return True
-
