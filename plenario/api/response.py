@@ -105,6 +105,7 @@ def form_json_detail_response(to_remove, validator, rows):
 
 def form_csv_detail_response(to_remove, rows):
     to_remove.append('geom')
+    print "rows ->> " + str(rows)
     remove_columns_from_dict(rows, to_remove)
 
     # Column headers from arbitrary row,

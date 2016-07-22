@@ -105,15 +105,14 @@ def get_job(ticket):
             shapeset = fetch_table(req['query']['shapeset'])
             data_type = req['query']['data_type']
             return api_response.export_dataset_to_response(shapeset, data_type, result)
-        elif req['query'].get('data_type') == 'json':
-            response = {"ticket": ticket, "request": req, "result": result, "status": status}
-            response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
-            response.headers['Content-Type'] = 'application/json'
         elif req['query'].get('data_type') == 'csv':
             # Exports CSV files for aggregate-point-data and detail-aggregate.
             # This method appends geom to remove on its own.
             return api_response.form_csv_detail_response([], result)
-
+        else:
+            response = {"ticket": ticket, "request": req, "result": result, "status": status}
+            response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
+            response.headers['Content-Type'] = 'application/json'
     else:
         response = {"ticket": ticket, "request": req, "result": result, "status": status}
         response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
