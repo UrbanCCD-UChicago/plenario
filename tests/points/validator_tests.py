@@ -18,9 +18,10 @@ class TestValidator(unittest.TestCase):
         response = self.test_client.get('/v1/api/' + endpoint)
         return json.loads(response.data)
 
-    def setUp(self):
-        self.app = create_app()
-        self.test_client = self.app.test_client()
+    @classmethod
+    def setUpClass(cls):
+        cls.app = create_app()
+        cls.test_client = cls.app.test_client()
 
     def test_validator_bad_dataset_name(self):
         endpoint = 'detail'
@@ -202,7 +203,15 @@ class TestValidator(unittest.TestCase):
 
         self.assertGreaterEqual(len(data['objects']), 100)
 
-    def tearDown(self):
+    def test_approves_non_obs_date_datetime_args(self):
+
+        query = 'detail?dataset_name=landmarks&obs_date__ge=2000&landmark_designation_date__ge=2010-10-10'
+
+        resp_data = self.get_json_response_data(query)
+        self.assertEqual(len(resp_data['objects']), 24)
+
+    @classmethod
+    def tearDownClass(cls):
 
         try:
             app_engine.execute("drop table roadworks")

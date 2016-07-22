@@ -311,18 +311,26 @@ def valid_column_condition(table, column_name, value):
     :param column_name: Name of the column
     :param value: target value"""
 
-    # This is mostly to deal with what a pain datetime is.
-    # I can't just use its type to cast a string. :(
-
-    condition = {column_name: value}
-    convert(condition)
-    value = condition[column_name]
-
     try:
         column = table.columns[column_name]
     except KeyError:
         raise KeyError("Invalid column name {}".format(column_name))
 
+    # Dates are trickier than other types, the check that follows this will
+    # not correctly approve string dates because they are usually coerced from
+    # int values.
+    if 'date' in column_name:
+        try:
+            parser.parse(value)
+            return True
+        except (AttributeError, TypeError):
+            raise ValueError("Invalid value type for {}. Was expecting {}"
+                             .format(value, 'datetime'))
+
+    # If the value is not a date, we can do a couple more checks to see if the
+    # value is usable. If the type of the value does not exactly match the
+    # column type, try and coerce it to the column type. If it can't be coerced
+    # it's not usable.
     try:
         if type(value) != column.type.python_type:
             column.type.python_type(value)  # Blessed Python.
