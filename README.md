@@ -3,6 +3,8 @@
 
 # Plenar.io
 
+[![Join the chat at https://gitter.im/UrbanCCD-UChicago/plenario](https://badges.gitter.im/UrbanCCD-UChicago/plenario.svg)](https://gitter.im/UrbanCCD-UChicago/plenario?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 RESTful API for geospatial and time aggregation across multiple open datasets.
 
 This project is funded by the [NSF Computer and Information Science and Engineering (CISE) Directorate](http://www.nsf.gov/dir/index.jsp?org=CISE) through a grant to the [Urban Center for Computation and Data](https://urbanccd.org/) (UrbanCCD) at the [Computation Institute](http://ci.uchicago.edu) of the [University of Chicago](http://uchicago.edu) and [Argonne National Laboratory](http://www.anl.gov). It is being implemented by [DataMade](http://datamade.us) and UrbanCCD.
