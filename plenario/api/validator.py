@@ -28,7 +28,7 @@ def validate_many_datasets(list_of_datasets):
 def validate_geom(geojson_str):
     try:
         return extract_first_geometry_fragment(geojson_str)
-    except ValueError:
+    except (ValueError, AttributeError):
         raise ValidationError("Invalid geom: {}".format(geojson_str))
 
 
