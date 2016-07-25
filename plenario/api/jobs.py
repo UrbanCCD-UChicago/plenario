@@ -6,11 +6,16 @@ import json
 import datetime
 import time
 
+import response as api_response
+
 from plenario.settings import CACHE_CONFIG, AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
 from plenario.api.common import unknown_object_json_handler
+from plenario.utils.model_helpers import fetch_table
 from flask import request, make_response
 from boto.sqs.message import Message
 from os import urandom
+
+from pprint import pprint
 
 # ========================================= #
 # HTTP      URI         ACTION              #
@@ -90,9 +95,29 @@ def get_job(ticket):
     result = get_result(ticket)
     status = get_status(ticket)
 
-    response = {"ticket": ticket, "request": req, "result": result, "status": status}
-    response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
-    response.headers['Content-Type'] = 'application/json'
+    if status['status'] == "success":
+        # Here we need to do some legwork to find out what kind of response the
+        # user wants. This is to address endpoints such as export-shape, which
+        # can return many different downloadable format types.
+        if req['endpoint'] == "export-shape":
+            # TODO: Here, the work is not being done by the worker. Need to
+            # TODO: correct this.
+            shapeset = fetch_table(req['query']['shapeset'])
+            data_type = req['query']['data_type']
+            return api_response.export_dataset_to_response(shapeset, data_type, result)
+        elif req['query'].get('data_type') == 'csv':
+            # Exports CSV files for aggregate-point-data and detail-aggregate.
+            # This method appends geom to remove on its own.
+            return api_response.form_csv_detail_response([], result)
+        else:
+            response = {"ticket": ticket, "request": req, "result": result, "status": status}
+            response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
+            response.headers['Content-Type'] = 'application/json'
+    else:
+        response = {"ticket": ticket, "request": req, "result": result, "status": status}
+        response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
+        response.headers['Content-Type'] = 'application/json'
+
     return response
 
 

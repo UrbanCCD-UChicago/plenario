@@ -1,10 +1,9 @@
-import json
 import unittest
 import subprocess
 import random
-import traceback
+import zipfile
 
-from sqlalchemy.exc import NoSuchTableError
+from StringIO import StringIO
 
 from plenario import create_app
 from plenario.api import prefix
@@ -12,11 +11,11 @@ from plenario.api.jobs import *
 from plenario.database import app_engine, session
 from plenario.models import MetaTable, ShapeMetadata
 from plenario.update import create_worker
+from plenario.utils.shapefile import Shapefile
 from plenario.utils.model_helpers import fetch_table, table_exists
 from plenario.views import approve_dataset, update_dataset, delete_dataset
 from plenario.views import approve_shape, update_shape, delete_shape
 from tests.points.api_tests import get_loop_rect
-from tests.test_fixtures.base_test import BasePlenarioTest
 
 
 class TestJobs(unittest.TestCase):
@@ -121,8 +120,8 @@ class TestJobs(unittest.TestCase):
         dname = 'restaurant_applications'
 
         # Drop the table if it already exists.
-        if table_exists(MetaTable, dname):
-            fetch_table(MetaTable, dname).drop()
+        if table_exists(dname):
+            fetch_table(MetaTable).drop()
 
         q = session.query(MetaTable.source_url_hash)
         source_url_hash = q.filter(MetaTable.dataset_name == dname).scalar()
@@ -185,16 +184,11 @@ class TestJobs(unittest.TestCase):
         self.assertTrue(table is None)
 
     def admin_test_04_approve_shapeset(self):
-        print "TEST 04 ============================="
-
         shape_name = 'boundaries_neighborhoods'
 
         # Drop the table if it already exists.
-        try:
-            table = ShapeMetadata.get_by_dataset_name(shape_name).shape_table
-            table.drop()
-        except NoSuchTableError:
-            pass
+        if table_exists(shape_name):
+            fetch_table(shape_name).drop()
 
         # Queue the ingestion job.
         with self.other_app.test_request_context():
@@ -216,8 +210,6 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(count, 98)
 
     def admin_test_05_update_shapeset(self):
-        print "TEST 05 ============================="
-
         # Grab source url hash.
         shape_name = 'boundaries_neighborhoods'
 
@@ -234,25 +226,24 @@ class TestJobs(unittest.TestCase):
         count = len(session.query(table).all())
         self.assertEqual(count, 98)
 
-    # TODO: Why does including this test break the other shape tests?
-    # def admin_test_06_delete_shapeset(self):
-    #     print "TEST 06 ============================="
-    #
-    #     Get source url hash.
-    #     shape_name = 'boundaries_neighborhoods'
-    #
-    #     Queue the deletion job.
-    #     with self.other_app.test_request_context():
-    #         ticket = delete_shape(shape_name)
-    #         ticket = json.loads(ticket.data)['ticket']
-    #         print 'shape_delete.ticket: {}'.format(ticket)
-    #     wait_on(ticket, 20)
-    #     status = get_status(ticket)['status']
-    #     self.assertIn(status, {'error', 'success'})
-    #     self.assertEqual(status, 'success')
-    #
-    #     table = ShapeMetadata.get_by_dataset_name(shape_name)
-    #     self.assertTrue(table is None)
+    def admin_test_06_delete_shapeset(self):
+
+        # Get source url hash.
+        shape_name = 'boundaries_neighborhoods'
+
+        # Queue the deletion job.
+        with self.other_app.test_request_context():
+            ticket = delete_shape(shape_name)
+            ticket = json.loads(ticket.data)['ticket']
+
+        wait_on(ticket, 10)
+
+        status = get_status(ticket)['status']
+        self.assertIn(status, {'error', 'success'})
+        self.assertEqual(status, 'success')
+
+        table = ShapeMetadata.get_by_dataset_name(shape_name)
+        self.assertTrue(table is None)
 
     # =======================
     # ACCEPTANCE TEST: Job submission
@@ -514,6 +505,83 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(len(response["result"]["features"]), 4)
         self.assertEqual(response["result"]["type"], "FeatureCollection")
         self.assertEqual(response["result"]["features"][0]["properties"]["count"], 1)
+
+    # ===============================
+    # ACCEPTANCE TEST: shapes/<shape>
+    # ===============================
+
+    def test_export_shape_job(self):
+
+        response = self.app.get("/v1/api/shapes/chicago_neighborhoods?job=true")
+        response = json.loads(response.get_data())
+        ticket = response['ticket']
+
+        self.assertIsNotNone(ticket)
+        self.assertIsNotNone(response["url"])
+        self.assertEqual(response["request"]["endpoint"], "export-shape")
+        self.assertEqual(response["request"]["query"]["shapeset"], "chicago_neighborhoods")
+        self.assertEqual(response["request"]["query"]["job"], True)
+
+        wait_on(ticket, 10)
+
+        url = response["url"]
+        response = self.app.get(url)
+        response = json.loads(response.get_data())
+
+        self.assertEqual(len(response['features']), 98)
+
+    def test_export_shape_job_shapefile(self):
+
+        response = self.app.get("/v1/api/shapes/chicago_neighborhoods?data_type=shapefile&job=true")
+        response = json.loads(response.get_data())
+        ticket = response['ticket']
+
+        self.assertIsNotNone(ticket)
+        self.assertIsNotNone(response["url"])
+        self.assertEqual(response["request"]["endpoint"], "export-shape")
+        self.assertEqual(response["request"]["query"]["shapeset"], "chicago_neighborhoods")
+        self.assertEqual(response["request"]["query"]["data_type"], "shapefile")
+        self.assertEqual(response["request"]["query"]["job"], True)
+
+        wait_on(ticket, 10)
+
+        url = response["url"]
+        response = self.app.get(url)
+
+        file_content = StringIO(response.data)
+        as_zip = zipfile.ZipFile(file_content)
+
+        # The Shapefile utility class takes a ZipFile, opens it,
+        # and throws an exception if it doesn't have the expected shapefile components (.shp and .prj namely)
+        with Shapefile(as_zip):
+            pass
+
+    def test_aggregate_point_data(self):
+
+        url = '/v1/api/shapes/chicago_neighborhoods/landmarks/' \
+              '?obs_date__ge=2000-09-22&obs_date__le=2013-10-1'
+        response = self.app.get(url + '&job=true')
+        response = json.loads(response.get_data())
+        ticket = response['ticket']
+
+        self.assertIsNotNone(ticket)
+        self.assertIsNotNone(response["url"])
+        self.assertEqual(response["request"]["endpoint"], "aggregate-point-data")
+        self.assertEqual(response["request"]["query"]["shapeset"], "chicago_neighborhoods")
+        self.assertEqual(response["request"]["query"]["dataset"], "landmarks")
+        self.assertEqual(response["request"]["query"]["data_type"], "json")
+        self.assertEqual(response["request"]["query"]["job"], True)
+
+        wait_on(ticket, 10)
+
+        url = response["url"]
+        response = self.app.get(url)
+        data = json.loads(response.data)
+        neighborhoods = data['result']['features']
+        self.assertEqual(len(neighborhoods), 54)
+
+        for neighborhood in neighborhoods:
+            self.assertGreaterEqual(neighborhood['properties']['count'], 1)
 
     # =======================
     # ACCEPTANCE TEST: datadump (JSON)

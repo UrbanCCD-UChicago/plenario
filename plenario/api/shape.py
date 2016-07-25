@@ -1,6 +1,6 @@
-import os
 import json
-import tempfile
+
+import response as api_response
 
 from collections import OrderedDict
 from flask import make_response, request
@@ -10,39 +10,12 @@ from sqlalchemy.exc import NoSuchTableError
 from plenario.api.common import crossdomain, extract_first_geometry_fragment
 from plenario.api.common import make_fragment_str
 from plenario.api.condition_builder import parse_tree
-from plenario.api.point import detail_query, form_csv_detail_response
-from plenario.api.point import form_geojson_detail_response, bad_request
+from plenario.api.point import detail_query
+from plenario.api.jobs import make_job_response
 from plenario.api.response import make_error
 from plenario.api.validator import validate, has_tree_filters, Validator, ExportFormatsValidator
 from plenario.models import ShapeMetadata
-from plenario.utils.ogr2ogr import OgrExport
 
-
-# ====================
-# Shape Format Headers
-# ====================
-
-def _shape_format_to_content_header(requested_format):
-    format_map = {
-        'json': 'application/json',
-        'kml': 'application/vnd.google-earth.kml+xml',
-        'shapefile': 'application/zip'
-    }
-    return format_map[requested_format]
-
-
-def _shape_format_to_file_extension(requested_format):
-    format_map = {
-        'json': 'json',
-        'kml': 'kml',
-        'shapefile': 'zip'
-    }
-    return format_map[requested_format]
-
-
-# ============
-# Shape Routes
-# ============
 
 @crossdomain(origin="*")
 def get_all_shape_datasets():
@@ -86,7 +59,7 @@ def get_all_shape_datasets():
 @crossdomain(origin="*")
 def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     consider = ('dataset_name', 'shape', 'obs_date__ge', 'obs_date__le',
-                'data_type', 'location_geom__within')
+                'data_type', 'location_geom__within', 'job')
 
     request_args = request.args.to_dict()
     request_args['dataset_name'] = point_dataset_name
@@ -95,9 +68,13 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     validated_args = validate(Validator(only=consider), request_args)
 
     if validated_args.errors:
-        return bad_request(validated_args.errors)
-
-    return _aggregate_point_data(validated_args)
+        return api_response.bad_request(validated_args.errors)
+    elif validated_args.data.get('job'):
+        return make_job_response('aggregate-point-data', validated_args)
+    else:
+        result = _aggregate_point_data(validated_args)
+        data_type = validated_args.data.get('data_type')
+        return api_response.aggregate_point_data_response(data_type, result)
 
 
 @crossdomain(origin="*")
@@ -117,15 +94,22 @@ def export_shape(dataset_name):
     except NoSuchTableError:
         return make_error(dataset_name + ' has yet to be ingested.', 404)
 
-    meta_params = ('shape', 'data_type', 'location_geom__within')
+    meta_params = ('shape', 'data_type', 'location_geom__within', 'job')
     request_args = request.args.to_dict()
 
     # Using the 'shape' key triggers the correct validator.
     request_args['shape'] = dataset_name
     validated_args = validate(ExportFormatsValidator(only=meta_params), request_args)
+
     if validated_args.errors:
-        return bad_request(validated_args.errors)
-    return _export_shape(validated_args)
+        return api_response.bad_request(validated_args.errors)
+    elif validated_args.data.get('job'):
+        return make_job_response('export-shape', validated_args)
+    else:
+        query = _export_shape(validated_args)
+        shapeset = validated_args.data.get('shapeset')
+        data_type = validated_args.data.get('data_type')
+        return api_response.export_dataset_to_response(shapeset, data_type, query)
 
 
 # =================
@@ -149,11 +133,7 @@ def _aggregate_point_data(args):
             res_cols.append(col[1])
     res_cols.append('count')
 
-    rows = [OrderedDict(zip(res_cols, res)) for res in q.all()]
-    if data_type == 'csv':
-        return form_csv_detail_response(['hash', 'ogc_fid'], rows)
-    else:
-        return form_geojson_detail_response(['hash', 'ogc_fid'], args, rows)
+    return [OrderedDict(zip(res_cols, res)) for res in q.all()]
 
 
 def _export_shape(args):
@@ -189,37 +169,5 @@ def _export_shape(args):
     if conditions:
         query += " WHERE " + conditions
 
-    return _export_dataset_to_response(shapeset, data_type, query)
+    return query
 
-
-def _export_dataset_to_response(shapeset, data_type, query=None):
-    export_format = unicode.lower(unicode(data_type))
-
-    # Make a filename that we are reasonably sure to be unique and not occupied by anyone else.
-    sacrifice_file = tempfile.NamedTemporaryFile()
-    export_path = sacrifice_file.name
-    sacrifice_file.close()  # Removes file from system.
-
-    try:
-        # Write to that filename.
-        OgrExport(export_format, export_path, shapeset.name, query).write_file()
-        # Dump it in the response.
-        with open(export_path, 'r') as to_export:
-            resp = make_response(to_export.read(), 200)
-
-        extension = _shape_format_to_file_extension(export_format)
-
-        # Make the downloaded filename look nice
-        shapemeta = ShapeMetadata.get_by_dataset_name(shapeset.name)
-        resp.headers['Content-Type'] = _shape_format_to_content_header(export_format)
-        resp.headers['Content-Disposition'] = 'attachment; filename={}.{}'.format(shapemeta.human_name, extension)
-        return resp
-
-    except Exception as e:
-        error_message = 'Failed to export shape dataset {}'.format(shapeset.name)
-        print repr(e)
-        return make_response(error_message, 500)
-    finally:
-        # Don't leave that file hanging around.
-        if os.path.isfile(export_path):
-            os.remove(export_path)

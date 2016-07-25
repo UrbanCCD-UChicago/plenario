@@ -200,7 +200,7 @@ class TestValidator(unittest.TestCase):
         response = self.test_client.get(query)
         data = json.loads(response.data)
 
-        self.assertGreaterEqual(len(data['objects']), 120)
+        self.assertGreaterEqual(len(data['objects']), 100)
 
     def tearDown(self):
 
