@@ -40,20 +40,20 @@ class TestETLTask(unittest.TestCase):
 
     def test_01_add_task(self):
 
-        add_task('foo_dset_name', 'foo_status', 'foo_error', 'foo_type')
+        add_task('foo_dset_name', 'foo_type')
 
         task = session.execute(
             "select * from etl_task where dataset_name = 'foo_dset_name'"
         ).first()
 
         self.assertEqual(task.dataset_name, 'foo_dset_name')
-        self.assertEqual(task.status, 'foo_status')
-        self.assertEqual(task.error, 'foo_error')
+        self.assertEqual(task.status, ETLStatus['pending'])
+        self.assertEqual(task.error, None)
         self.assertEqual(task.type, 'foo_type')
 
     def test_02_update_task(self):
 
-        add_task('foo_dset_name', 'foo_status', 'foo_error', 'foo_type')
+        add_task('foo_dset_name', 'foo_type')
         update_task('foo_dset_name', '2000-01-01', 'new_status', 'terrible_error')
 
         task = session.execute(
@@ -67,7 +67,7 @@ class TestETLTask(unittest.TestCase):
 
     def test_03_fetch_task(self):
 
-        add_task('foo_dset_name', 'foo_status', 'foo_error', 'foo_type')
+        add_task('foo_dset_name', 'foo_type')
 
         expected_result = session.execute(
             "select * from etl_task where dataset_name = 'foo_dset_name'"
@@ -81,9 +81,9 @@ class TestETLTask(unittest.TestCase):
 
     def test_04_fetch_etl_status(self):
 
-        add_task('roadworks', ETLStatus['pending'], None, ETLType['dataset'])
-        add_task('flu_shot_clinics', ETLStatus['success'], None, ETLType['dataset'])
-        add_task('neighborhoods', ETLStatus['failure'], 'you goofed', ETLType['shapeset'])
+        add_task('roadworks', ETLType['dataset'])
+        add_task('flu_shot_clinics', ETLType['dataset'])
+        add_task('neighborhoods', ETLType['shapeset'])
 
         tasks = fetch_table_etl_status('master')
         for task in tasks:
@@ -94,11 +94,8 @@ class TestETLTask(unittest.TestCase):
         for task in tasks:
             self.assertEqual(task.type, 'master')
 
-        road_task = tasks[0]
-        flu_task = tasks[1]
-
-        self.assertEqual(road_task.status, 'Ingest Pending')
-        self.assertEqual(flu_task.status, 'SUCCESS')
+        self.assertEqual(tasks[0].status, 'Ingest Pending')
+        self.assertEqual(tasks[1].status, 'Ingest Pending')
 
     def test_05_task_submitted_with_approve_dataset(self):
         # Simulate a user submitting a request for roadworks.

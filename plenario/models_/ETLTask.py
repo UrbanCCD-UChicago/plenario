@@ -4,14 +4,6 @@ from sqlalchemy.exc import IntegrityError
 from plenario.database import app_engine, Base, session
 
 
-# Notes
-# -----
-# 1) Is there any point in offering a choice for add_task? No matter what,
-#    it means that a dataset has been newly approved and will be pending
-#    ingestion. There will never be a situation where you add a completed
-#    task. A change here will cause test_fetch_etl_status test to break.
-
-
 # These dictionaries help to keep me from making errors. If a message or
 # status is misspelled, it will cause a fast and loud KeyError, saving me
 # the trouble of weeding out the issue somewhere down the line.
@@ -41,20 +33,18 @@ class ETLTask(Base):
     type = Column(String)
 
 
-def add_task(dataset_name, status, error, type_):
+def add_task(dataset_name, type_):
     """Used primarily in the views, called whenever a dataset is added
     by an administrator or a dataset is approved. Used to create a new
     ETLTask record.
 
     :param dataset_name: (string)
-    :param status: (string) best to use a status from the ETLStatus dict
-    :param error: (string) printout of an exception and traceback
     :param type_: (string) differentiates between tables, best to use a type
                            from the ETLType dict"""
 
     task = ETLTask(dataset_name=dataset_name,
-                   status=status,
-                   error=error,
+                   status=ETLStatus['pending'],
+                   error=None,
                    type=type_)
 
     try:
