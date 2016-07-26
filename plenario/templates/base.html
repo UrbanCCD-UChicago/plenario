@@ -42,7 +42,7 @@
           	<li class="{% if request.path == '/' %}active{% endif %}"><a href="{{ url_for('views.index') }}">Home</a></li>
             <li class="{% if request.path == '/explore' %}active{% endif %}"><a href="{{ url_for('views.explore_view') }}">Explore</a></li>
             <li class="{% if request.path == '/api-docs' %}active{% endif %}"><a href="{{ url_for('views.api_docs_view') }}">API</a></li>
-            <li class="{% if request.path == '/examples' %}active{% endif %}"><a href="{{ url_for('views.examples_view') }}">Examples</a></li>
+            <li>                                                              <a href="https://medium.com/plenario-dev">Blog</a></li>
             <li class="{% if request.path == '/contribute' %}active{% endif %}"><a href="{{ url_for('views.user_add_dataset') }}">Add data</a></li>
             <li class="{% if request.path == '/about' %}active{% endif %}"><a href="{{ url_for('views.about_view') }}">About</a></li>
             {% if session.get('user_id') %}

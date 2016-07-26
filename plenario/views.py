@@ -38,15 +38,16 @@ def index():
 def explore_view():
     return render_template('explore.html')
 
+
 # If the user requests a nested URL within the Ember app,
 # we still just need to render the Ember app.
 @views.route('/explore/<path:path>')
 def explore_kludge(path):
     return render_template('explore.html')
 
+
 @views.route('/api-docs')
 def api_docs_view():
-    dt_now = datetime.now()
     return redirect("http://docs.plenar.io", code=302)
 
 
@@ -57,7 +58,7 @@ def about_view():
 
 @views.route('/examples')
 def examples_view():
-    return render_template('examples.html')
+    return redirect('https://medium.com/plenario-dev', code=302)
 
 
 @views.route('/maintenance')

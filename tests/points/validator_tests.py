@@ -5,8 +5,9 @@ from sqlalchemy.exc import ProgrammingError
 from plenario.database import app_engine
 from plenario.etl.point import PlenarioETL
 from plenario.models import MetaTable
-from tests.test_fixtures.base_test import BasePlenarioTest
+from api_tests import get_loop_rect
 from tests.test_fixtures.post_data import roadworks_post_data
+from tests.test_fixtures.base_test import BasePlenarioTest
 
 
 class TestValidator(BasePlenarioTest):
@@ -197,7 +198,31 @@ class TestValidator(BasePlenarioTest):
 
         self.assertGreaterEqual(len(data['objects']), 100)
 
-    def tearDown(self):
+    def test_approves_non_obs_date_datetime_args(self):
+
+        query = 'detail?dataset_name=landmarks&obs_date__ge=2000&landmark_designation_date__ge=2010-10-10'
+
+        resp_data = self.get_json_response_data(query)
+        self.assertEqual(len(resp_data['objects']), 24)
+
+    def test_approves_good_geom(self):
+
+        escaped_query_rect = get_loop_rect()
+        query = 'datasets?location_geom__within={}&obs_date__ge={}&obs_date__le={}' \
+            .format(escaped_query_rect, '2015-1-1', '2016-1-1')
+
+        r = self.get_json_response_data(query)
+        self.assertEqual(r['meta']['message'], [])
+
+    def test_rejects_bad_geom(self):
+        bad_geom = "I sure hope I don't pass as a geom"
+        query = 'datasets?location_geom__within={}&obs_date__ge={}&obs_date__le={}' \
+            .format(bad_geom, '2015-1-1', '2016-1-1')
+        r = self.get_json_response_data(query)
+        self.assertEqual(len(r['meta']['message']), 1)
+
+    @classmethod
+    def tearDownClass(cls):
 
         try:
             app_engine.execute("drop table roadworks")

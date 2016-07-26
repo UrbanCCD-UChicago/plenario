@@ -13,6 +13,10 @@ import response as api_response
 from collections import OrderedDict
 from datetime import datetime
 from flask import request, Response
+from dateutil import parser
+from flask import request, make_response
+from itertools import groupby
+from operator import itemgetter
 
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
 from plenario.api.common import make_cache_key, unknown_object_json_handler
@@ -755,6 +759,16 @@ def request_args_to_condition_tree(request_args, ignore=list()):
                 print converters["dataset"][request_args["dataset"]]
             k[0] = sqlalchemy.func.date_part('hour', request_args.get('dataset').c.point_date)
             k[1] = 'le' if 'le' in k[1] else 'ge'
+
+        # It made me nervous that you could pass the parser in the validator
+        # with values like 2000; or 2000' (because the parser strips them).
+        # Before letting those values get passed to psycopg, I'm
+        # just going to convert those values to datetimes here.
+        elif 'date' in k[0]:
+            try:
+                v = parser.parse(v)
+            except (AttributeError, TypeError):
+                pass
 
         if len(k) == 1:
             ctree['val'].append({"op": "eq", "col": k[0], "val": v})

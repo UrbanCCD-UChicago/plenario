@@ -6,7 +6,7 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 from dateutil import parser
 from marshmallow import fields, Schema
-from marshmallow.validate import Range, Length, OneOf, ValidationError
+from marshmallow.validate import Range, OneOf, ValidationError
 from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
@@ -24,6 +24,13 @@ def validate_dataset(dataset_name):
 def validate_many_datasets(list_of_datasets):
     for dataset in list_of_datasets:
         validate_dataset(dataset)
+
+
+def validate_geom(geojson_str):
+    try:
+        return extract_first_geometry_fragment(geojson_str)
+    except (ValueError, AttributeError):
+        raise ValidationError("Invalid geom: {}".format(geojson_str))
 
 
 class Validator(Schema):
@@ -51,7 +58,7 @@ class Validator(Schema):
     date__time_of_day_ge = fields.Integer(default=0, validate=Range(0, 23))
     date__time_of_day_le = fields.Integer(default=23, validate=Range(0, 23))
     data_type = fields.Str(default='json', validate=OneOf(valid_formats))
-    location_geom__within = fields.Str(default=None, dump_to='geom')
+    location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
     obs_date__ge = fields.Date(default=datetime.now() - timedelta(days=90))
     obs_date__le = fields.Date(default=datetime.now())
     limit = fields.Integer(default=1000)
@@ -296,7 +303,7 @@ def valid_tree(table, tree):
         col = tree.get('col')
         val = tree.get('val')
 
-        if not col or not val:
+        if col is None or val is None:
             err_msg = 'Missing or invalid keyword in {}'.format(tree)
             err_msg += ' -- use format "{\'op\': OP, \'col\': COL, \'val\', VAL}"'
             raise ValueError(err_msg)
@@ -315,13 +322,6 @@ def valid_column_condition(table, column_name, value):
     :param column_name: Name of the column
     :param value: target value"""
 
-    # This is mostly to deal with what a pain datetime is.
-    # I can't just use its type to cast a string. :(
-
-    condition = {column_name: value}
-    convert(condition)
-    value = condition[column_name]
-
     try:
         if type(table) != sqlalchemy.sql.schema.Table:
             table = converters['dataset'](table)
@@ -329,6 +329,21 @@ def valid_column_condition(table, column_name, value):
     except KeyError:
         raise KeyError("Invalid column name {}".format(column_name))
 
+    # Dates are trickier than other types, the check that follows this will
+    # not correctly approve string dates because they are usually coerced from
+    # int values.
+    if 'date' in column_name:
+        try:
+            parser.parse(value)
+            return True
+        except (AttributeError, TypeError):
+            raise ValueError("Invalid value type for {}. Was expecting {}"
+                             .format(value, 'datetime'))
+
+    # If the value is not a date, we can do a couple more checks to see if the
+    # value is usable. If the type of the value does not exactly match the
+    # column type, try and coerce it to the column type. If it can't be coerced
+    # it's not usable.
     try:
         if type(value) != column.type.python_type:
             column.type.python_type(value)  # Blessed Python.
