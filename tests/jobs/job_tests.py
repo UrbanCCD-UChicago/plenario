@@ -666,7 +666,7 @@ class TestJobs(unittest.TestCase):
 
     def test_datadump_csv_job(self):
         response = self.app.get(
-            prefix + '/datadump?obs_date__ge=2000-1-1&obs_date__le=2014-1-1&dataset_name=flu_shot_clinics&data_type=csv&' + str(
+            prefix + '/datadump?obs_date__ge=2000-1-1&obs_date__le=2014-1-1&dataset_name=flu_shot_clinics&' + str(
                 random.randrange(0, 1000000)))
         response = json.loads(response.get_data())
         ticket = response["ticket"]
@@ -688,10 +688,10 @@ class TestJobs(unittest.TestCase):
         response = json.loads(response.get_data())
         self.assertIsNotNone(response["status"]["progress"])
 
-        url = response["result"]["url"]
+        url = response["result"]["url"]+"?data_type=csv"
         response = self.app.get(url)
 
-        pprint(response.get_data())
+        print(response.get_data())
         response = response.get_data().split("\n")
 
         # 65 data lines, 4 meta lines, and 1 newline at the end.
