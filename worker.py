@@ -13,7 +13,7 @@ import plenario.database
 session = plenario.database.session
 
 worker_threads = 4
-max_wait_interval = 15
+wait_interval = 1
 
 if __name__ == "__main__":
 
@@ -238,10 +238,8 @@ if __name__ == "__main__":
 
                 else:
                     # No work! Idle for a bit to save compute cycles.
-                    # This interval is random in order to stagger workers
-                    idle = random.randrange(max_wait_interval)
-                    log("Ho hum nothing to do. Idling for {} seconds.".format(idle), worker_id)
-                    time.sleep(idle)
+                    log("Ho hum nothing to do. Idling for {} seconds.".format(wait_interval), worker_id)
+                    time.sleep(wait_interval)
 
         log("Exited run loop. Goodbye!", worker_id)
 
