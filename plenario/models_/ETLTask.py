@@ -130,7 +130,3 @@ def fetch_table_etl_status(type_, dataset_name=None):
         q += " and meta_{0}.dataset_name = '{1}'".format(type_, dataset_name)
 
     return app_engine.execute(q).fetchall()
-
-
-if __name__ == '__main__':
-    Base.metadata.create_all()

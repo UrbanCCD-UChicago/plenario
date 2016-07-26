@@ -10,7 +10,6 @@
 ###############################################################
 
 import plenario.database
-from pprint import pprint
 session = plenario.database.session
 
 worker_threads = 4
@@ -182,7 +181,7 @@ if __name__ == "__main__":
                             # print "{} worker.query_args: {}".format(ticket, query_args)
 
                             result = endpoint_logic[endpoint](query_args)
-                            pprint("worker.result: {}".format(result))
+                            # pprint("worker.result: {}".format(result))
 
                             # Check for metacommands
                             if "jobsframework_metacommands" in result:

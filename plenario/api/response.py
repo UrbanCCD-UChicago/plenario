@@ -153,7 +153,7 @@ def detail_aggregate_response(query_result, query_args):
     datatype = query_args.data['data_type']
 
     if datatype == 'csv':
-        resp = make_csv(query_result)
+        resp = form_csv_detail_response([], query_result)
         resp.headers['Content-Type'] = 'text/csv'
         filedate = datetime.now().strftime('%Y-%m-%d')
         resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate

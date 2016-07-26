@@ -1,3 +1,4 @@
+import subprocess
 import unittest
 import time
 
@@ -8,14 +9,16 @@ from plenario.database import session
 from plenario.models_.ETLTask import add_task, fetch_task, delete_task
 from plenario.models_.ETLTask import update_task, fetch_table_etl_status
 from plenario.models_.ETLTask import ETLStatus, ETLType
+from plenario.update import create_worker
 from plenario.views import approve_dataset
-from tests.test_fixtures.post_data import roadworks_post_data, roadworks_post_data_admin
+from tests.test_fixtures.post_data import roadworks_post_data
 
 
 def cleanup():
     try:
         session.execute('delete from etl_task')
         session.execute('drop table roadworks')
+        session.execute("delete from meta_master where dataset_name = 'roadworks'")
         session.commit()
     except:
         session.rollback()
@@ -37,6 +40,12 @@ class TestETLTask(unittest.TestCase):
         cls.app = create_app()
         cls.test = cls.app.test_client()
         cleanup()
+
+        cls.worker = create_worker().test_client()
+        # start worker
+        subprocess.Popen(["python", "worker.py"])
+        # give worker time to start up
+        time.sleep(3)
 
     def test_01_add_task(self):
 
@@ -121,33 +130,10 @@ class TestETLTask(unittest.TestCase):
         self.assertEqual(task.error, None)
         self.assertEqual(task.type, ETLType['dataset'])
 
-    # def test_task_submitted_with_admin_add_dataset(self):
-    #
-    #     session.execute('delete from etl_task')
-    #     session.commit()
-    #
-    #     # Simulate an admin submitting a dataset.
-    #     try:
-    #         response = self.test.post('/admin/add', data=roadworks_post_data, follow_redirects=False)
-    #     except IntegrityError:
-    #         pass
-    #
-    #     # An admin add should just create a task straight away without
-    #     # requiring approval.
-    #     task = fetch_task('roadworks')
-    #     self.assertEqual(task.dataset_name, 'roadworks')
-    #     self.assertEqual(task.status, ETLStatus['pending'])
-    #     self.assertEqual(task.error, None)
-    #     self.assertEqual(task.type, ETLType['dataset'])
-    #
-    #     # Clean up for the other tests.
-    #     session.execute('delete from etl_task')
-    #     session.commit()
-
     def test_07_task_updated_during_etl(self):
 
         # Give the worker some time to grab the job and update the status.
-        wait_for('roadworks', ETLStatus['started'], 7)
+        wait_for('roadworks', ETLStatus['started'], 14)
 
         task = fetch_task('roadworks')
         self.assertEqual(task.dataset_name, 'roadworks')
@@ -186,4 +172,6 @@ class TestETLTask(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
 
+        subprocess.Popen(["pkill", "-f", "worker.py"])
+        session.close()
         cleanup()

@@ -35,7 +35,7 @@ def fetch_table(identifier):
         except AttributeError:
             return meta.shape_table
     else:
-        raise ValueError(identifier + " ")
+        raise ValueError(identifier + " table does not exist.")
 
 
 def table_exists(table_name):

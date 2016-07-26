@@ -2,8 +2,10 @@ import datetime
 import subprocess
 from argparse import ArgumentParser
 
+# Imports cause the meta tables to be created and added to Base.
 import plenario.models
-import plenario.settings
+import plenario.models_
+
 from plenario.database import session, app_engine, Base
 from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DEFAULT_USER
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
@@ -32,16 +34,17 @@ def init_tables():
 
 
 def init_meta():
-    #Reset concept of a metadata table
+    # Reset concept of a metadata table
     print [table.name for table in Base.metadata.sorted_tables]
     non_meta_tables = [table for table in Base.metadata.sorted_tables
                        if table.name not in
-                       {'meta_master', 'meta_shape', 'plenario_user', 'plenario_datadump'}]
+                       {'meta_master', 'meta_shape', 'plenario_user', 'plenario_datadump', 'etl_task'}]
     for t in non_meta_tables:
         Base.metadata.remove(t)
-    
-    #Create databases (if they don't exist)
+
+    # Create databases (if they don't exist)
     Base.metadata.create_all(bind=app_engine)
+
 
 def init_user():
     if DEFAULT_USER['name']:
@@ -59,12 +62,14 @@ def init_user():
     else:
         print 'No default user specified. Skipping this step.'
 
+
 def init_weather():
     print 'initializing NOAA weather stations'
     s = WeatherStationsETL()
     s.initialize()
 
-    print 'initializing NOAA daily and hourly weather observations for %s/%s' % (datetime.datetime.now().month, datetime.datetime.now().year)
+    print 'initializing NOAA daily and hourly weather observations for %s/%s' % (
+    datetime.datetime.now().month, datetime.datetime.now().year)
     print 'this will take a few minutes ...'
     e = WeatherETL()
     try:
@@ -76,12 +81,13 @@ def init_weather():
 
 def add_functions():
     def add_function(script_path):
-        args = 'PGPASSWORD='+DB_PASSWORD+' psql -h '+DB_HOST+' -U '+DB_USER+' -d '+DB_NAME+' -f '+script_path
+        args = 'PGPASSWORD=' + DB_PASSWORD + ' psql -h ' + DB_HOST + ' -U ' + DB_USER + ' -d ' + DB_NAME + ' -f ' + script_path
         subprocess.check_output(args, shell=True)
-        #Using shell=True otherwise it seems that aws doesn't have the proper paths.
+        # Using shell=True otherwise it seems that aws doesn't have the proper paths.
 
     add_function("./plenario/dbscripts/audit_trigger.sql")
     add_function("./plenario/dbscripts/point_from_location.sql")
+
 
 def build_arg_parser():
     """Creates an argument parser for this script. This is helpful in the event
@@ -104,6 +110,7 @@ def build_arg_parser():
     parser.add_argument('-f', '--functions', action='store_true',
                         help='Add plenario-specific functions to database.')
     return parser
+
 
 if __name__ == "__main__":
     parser = build_arg_parser()

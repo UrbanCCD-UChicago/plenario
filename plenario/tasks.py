@@ -40,8 +40,6 @@ def etl_report(fn):
     @wraps(fn)
     def wrapper(identifier):
 
-        print "etl_report.wrapper.identifier: {}".format(identifier)
-
         meta = session.query(MetaTable).get(identifier)
         if meta is None:
             meta = session.query(ShapeMetadata).get(identifier)
