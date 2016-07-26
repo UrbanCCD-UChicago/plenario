@@ -37,6 +37,12 @@ else:
 # routes
 # ======
 
+# The get_job method in jobs.py does not have crossdomain, and is out of the
+# Flask context. So we define a wrapper here to access it.
+@crossdomain(origin="*")
+def get_job_view(ticket):
+    return get_job(ticket)
+
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def timeseries():

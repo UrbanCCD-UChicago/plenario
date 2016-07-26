@@ -1,12 +1,11 @@
 import json
 from flask import make_response, Blueprint
-from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump
+from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
 from common import cache, make_cache_key
 from shape import get_all_shape_datasets,\
                     export_shape, aggregate_point_data
 from time import sleep
 from sensor import weather_stations, weather
-from jobs import get_job
 
 API_VERSION = '/v1'
 
@@ -27,7 +26,7 @@ api.add_url_rule(prefix + '/shapes/', 'shape_index', get_all_shape_datasets)
 api.add_url_rule(prefix + '/shapes/<dataset_name>', 'shape_export', export_shape)
 api.add_url_rule(prefix + '/shapes/<polygon_dataset_name>/<point_dataset_name>', 'aggregate', aggregate_point_data)
 
-api.add_url_rule(prefix + '/jobs/<ticket>', view_func=get_job, methods=['GET'])
+api.add_url_rule(prefix + '/jobs/<ticket>', view_func=get_job_view, methods=['GET'])
 
 api.add_url_rule(prefix + '/datadump', 'datadump', datadump)
 api.add_url_rule(prefix + '/datadump/<ticket>', 'get_datadump', get_datadump)
