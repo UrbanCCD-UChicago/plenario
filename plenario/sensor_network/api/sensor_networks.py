@@ -12,13 +12,14 @@ from operator import itemgetter
 from shapely.geometry import mapping
 from shapely import wkb
 from geoalchemy2 import Geometry
+from sqlalchemy.exc import NoSuchTableError
 
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
-from plenario.api.common import make_cache_key, date_json_handler, unknown_object_json_handler
+from plenario.api.common import make_cache_key
 from plenario.api.condition_builder import parse_tree
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.sensor_network.api.sensor_validator import SensorNetworkValidator, validate
-from plenario.database import session, redshift_session
+from plenario.database import session, redshift_session, redshift_engine
 from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, Observation
 
 
@@ -89,8 +90,6 @@ def get_observations(network_name, node_id=None):
     validated_args = validate(validator, args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
-
-    raise ValueError(repr(validated_args.data))
 
     return _get_observations(validated_args)
 
@@ -166,55 +165,17 @@ def format_node_metadata(node):
     return node_response
 
 
-def format_observation(obs):
-    node_response = {
-        "nodeId": obs.node_id,
-        "datetime": obs.datetime.isoformat(),
-        "nodeVersion": "",
-        "results": {
-            "temperature": {
-                "temperature": float(obs.temperature_temperature)
-            },
-            "atmosphericPressure": {
-                "atmosphericPressure": float(obs.atmosphericPressure_atmosphericPressure)
-            },
-            "relativeHumidity": {
-                "relativeHumidity": float(obs.relativeHumidity_relativeHumidity)
-            },
-            "lightIntensity": {
-                "lightIntensity": float(obs.lightIntensity_lightIntensity)
-            },
-            "acceleration": {
-                "X": float(obs.acceleration_X),
-                "Y": float(obs.acceleration_Y),
-                "Z": float(obs.acceleration_Z)
-            },
-            "instantaneousSoundSample": {
-                "instantaneousSoundSample": float(obs.instantaneousSoundSample_instantaneousSoundSample)
-            },
-            "magneticFieldIntensity": {
-                "X": float(obs.magneticFieldIntensity_X),
-                "Y": float(obs.magneticFieldIntensity_Y),
-                "Z": float(obs.magneticFieldIntensity_Z)
-            },
-            "concentrationOf": {
-                "SO2": float(obs.concentrationOf_SO2),
-                "H2S": float(obs.concentrationOf_H2S),
-                "O3": float(obs.concentrationOf_O3),
-                "NO2": float(obs.concentrationOf_NO2),
-                "CO": float(obs.concentrationOf_CO),
-                "reducingGases": float(obs.concentrationOf_reducingGases),
-                "oxidizingGases": float(obs.concentrationOf_oxidizingGases)
-            },
-            "particulateMatter": {
-                "PM1": float(obs.particulateMatter_PM1),
-                "PM2.5": float(obs.particulateMatter_PM2_5),
-                "PM10": float(obs.particulateMatter_PM10)
-            }
-        }
-    }
+def format_observation(obs, table):
+    obs_response = {}
+    for col in table.columns.keys():
+        if '__' in col:
+            if col.split('__')[0] not in obs_response.keys():
+                obs_response[col.split('__')[0]] = {}
+            obs_response[col.split('__')[0]][col.split('__')[1]] = obs.col
+        else:
+            obs_response[col] = obs.col
 
-    return node_response
+    return obs_response
 
 
 def _get_network_metadata(args):
@@ -226,6 +187,7 @@ def _get_network_metadata(args):
     null_args = [field for field in args.data if args.data[field] is None]
     for null_arg in null_args:
         args.data.pop(null_arg)
+
     resp = json_response_base(args, data, args.data)
     resp = make_response(json.dumps(resp), 200)
     resp.headers['Content-Type'] = 'application/json'
@@ -244,6 +206,7 @@ def _get_node_metadata(args):
     # if the user didn't specify a 'nodes' filter, don't display nodes in the query output
     if 'nodes' not in request.args:
         args.data.pop('nodes')
+
     resp = json_response_base(args, data, args.data)
     resp = make_response(json.dumps(resp), 200)
     resp.headers['Content-Type'] = 'application/json'
@@ -258,14 +221,23 @@ def _get_observations(args):
     args.data['nodes'] = nodes_to_query
 
     q = observation_query(args)
-    data = [format_observation(obs) for obs in q.all()]
 
-    # if the user didn't specify a 'nodes' filter originally, don't display nodes in the query output
+    try:
+        meta = sqlalchemy.MetaData()
+        table_name = args.data['network_name']
+        table = sqlalchemy.Table(table_name, meta, autoload=True, autoload_with=redshift_engine)
+    except (AttributeError, NoSuchTableError):
+        msg = "Table name {} not found in Redshift".format(table_name)
+        return bad_request(msg)
+
+    data = [format_observation(obs, table) for obs in q.all()]
+
+    # if the user didn't specify a 'nodes' filter, don't display nodes in the query output
     if 'nodes' not in request.args:
         args.data.pop('nodes')
 
-    # 'location_geom__within' is encapsulated within 'nodes'
-    # and, for cleanliness, will not be displayed in the query output
+    # 'geom' is encapsulated within 'nodes'
+    # and will not be displayed in the query output
     if 'geom' in args.data:
         args.data.pop('geom')
 

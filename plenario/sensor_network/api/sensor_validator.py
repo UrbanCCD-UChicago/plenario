@@ -1,5 +1,4 @@
 import json
-import ast
 
 from collections import namedtuple
 from datetime import datetime, timedelta
@@ -8,11 +7,12 @@ from marshmallow import fields, Schema
 from marshmallow.validate import OneOf, ValidationError
 from psycopg2 import Error
 from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
+from sqlalchemy import MetaData, Table
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
 from plenario.api.condition_builder import field_ops
-from plenario.database import session
-from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, Observation
+from plenario.database import session, redshift_engine
+from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta
 
 
 def validate_nodes(nodes):
@@ -29,10 +29,9 @@ def validate_geom(geom):
     """Custom validator for geom parameter."""
 
     try:
-        fragment = extract_first_geometry_fragment(geom)
+        return extract_first_geometry_fragment(geom)
     except Error:
-        return False
-    return True
+        raise ValidationError("Could not parse geojson: {}.".format(geom))
 
 
 class Validator(Schema):
@@ -92,7 +91,7 @@ ValidatorResult = namedtuple('ValidatorResult', 'data errors warnings')
 converters = {
     'geom': lambda x: make_fragment_str(extract_first_geometry_fragment(x)),
     'start_datetime': lambda x: x.isoformat().split('+')[0],
-    'end_datetime': lambda x: x.isoformat().split('+')[0],
+    'end_datetime': lambda x: x.isoformat().split('+')[0]
 }
 
 
@@ -154,20 +153,33 @@ def validate(validator, request_args):
 
     if 'filter' in request_args.keys():
 
+        try:
+            meta = MetaData()
+            table_name = result.data['network_name']
+            table = Table(table_name, meta, autoload=True, autoload_with=redshift_engine)
+        except (AttributeError, NoSuchTableError):
+            result.errors[table_name] = "Table name {} not found in Redshift".format(table_name)
+            return result
+
         # Report a tree which causes the JSON parser to fail.
         # Or a tree whose value is not valid.
         try:
             cond_tree = json.loads(request_args['filter'])
-            if valid_tree(cond_tree):
+            if valid_tree(table, cond_tree):
                 result.data['filter'] = cond_tree
         except (ValueError, KeyError) as err:
             result.errors['filter'] = "Bad tree: {} -- causes error {}.".format(request_args['filter'], err)
             return result
 
+    if unchecked:
+        for param in unchecked:
+            result.errors[param] = 'Not a valid filter'.format(param)
+
     # ValidatorResult(dict, dict, list)
     return ValidatorResult(result.data, result.errors, warnings)
 
-def valid_tree(tree):
+
+def valid_tree(table, tree):
     """Given a dictionary containing a condition tree, validate all conditions
     nestled in the tree.
 
@@ -195,12 +207,12 @@ def valid_tree(tree):
             err_msg += ' -- use format "{\'op\': OP, \'col\': COL, \'val\', VAL}"'
             raise ValueError(err_msg)
 
-        return valid_column_condition(col, val)
+        return valid_column_condition(table, col, val)
 
     else:
         raise ValueError("Invalid operation {}".format(op))
 
-def valid_column_condition(column_name, value):
+def valid_column_condition(table, column_name, value):
     """Establish whether or not a set of components is able to make a valid
     condition for the provided table.
 
@@ -215,8 +227,8 @@ def valid_column_condition(column_name, value):
     convert(condition)
     value = condition[column_name]
 
-    if column_name in Observation.__dict__.keys():
-        column = Observation.__table__.c[column_name]
+    if column_name in table.columns.keys():
+        column = table.columns[column_name]
     else:
         raise KeyError("Invalid column name {}".format(column_name))
 
