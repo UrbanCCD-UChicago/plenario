@@ -1,3 +1,9 @@
+from hashlib import md5
+from itertools import groupby
+from operator import itemgetter
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from plenario import db
+
 import json
 import sqlalchemy as sa
 
@@ -5,53 +11,43 @@ from collections import namedtuple
 from datetime import datetime
 from flask_bcrypt import Bcrypt
 from geoalchemy2 import Geometry
-from hashlib import md5
-from itertools import groupby
-from operator import itemgetter
-from sqlalchemy import Column, String, Boolean, Date, DateTime, Text, func
-from sqlalchemy import Table, select, Integer
-from sqlalchemy.exc import NoSuchTableError
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from sqlalchemy.orm import synonym
-from sqlalchemy.types import NullType
-from uuid import uuid4
+from sqlalchemy import Table, select, func
 
-from plenario.database import session, Base
 from plenario.utils.helpers import get_size_in_degrees, slugify
 
 bcrypt = Bcrypt()
 
 
-class MetaTable(Base):
+class MetaTable(db.Model):
     __tablename__ = 'meta_master'
     # limited to 50 chars elsewhere
-    dataset_name = Column(String(100), nullable=False)
-    human_name = Column(String(255), nullable=False)
-    description = Column(Text)
-    source_url = Column(String(255))
-    source_url_hash = Column(String(32), primary_key=True)
-    view_url = Column(String(255))
-    attribution = Column(String(255))
+    dataset_name = db.Column(db.String(100), nullable=False)
+    human_name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text)
+    source_url = db.Column(db.String(255))
+    source_url_hash = db.Column(db.String(32), primary_key=True)
+    view_url = db.Column(db.String(255))
+    attribution = db.Column(db.String(255))
     # Spatial and temporal boundaries of observations in this dataset
-    obs_from = Column(Date)
-    obs_to = Column(Date)
-    bbox = Column(Geometry('POLYGON', srid=4326))
+    obs_from = db.Column(db.Date)
+    obs_to = db.Column(db.Date)
+    bbox = db.Column(Geometry('POLYGON', srid=4326))
     # TODO: Add restriction list ['daily' etc.]
-    update_freq = Column(String(100), nullable=False)
-    last_update = Column(DateTime)
-    date_added = Column(DateTime)
+    update_freq = db.Column(db.String(100), nullable=False)
+    last_update = db.Column(db.DateTime)
+    date_added = db.Column(db.DateTime)
     # The names of our "special" fields
-    observed_date = Column(String, nullable=False)
-    latitude = Column(String)
-    longitude = Column(String)
-    location = Column(String)
+    observed_date = db.Column(db.String, nullable=False)
+    latitude = db.Column(db.String)
+    longitude = db.Column(db.String)
+    location = db.Column(db.String)
     # if False, then do not display without first getting administrator approval
-    approved_status = Column(Boolean)
-    contributor_name = Column(String)
-    contributor_organization = Column(String)
-    contributor_email = Column(String)
-    result_ids = Column(ARRAY(String))
-    column_names = Column(JSONB)  # storage format {'<COLUMN_NAME>': '<COLUMN_TYPE>'}
+    approved_status = db.Column(db.Boolean)
+    contributor_name = db.Column(db.String)
+    contributor_organization = db.Column(db.String)
+    contributor_email = db.Column(db.String)
+    result_ids = db.Column(ARRAY(db.String))
+    column_names = db.Column(JSONB)  # storage format {'<COLUMN_NAME>': '<COLUMN_TYPE>'}
 
     def __init__(self, url, human_name, observed_date,
                  approved_status=False, update_freq='yearly',
@@ -179,7 +175,7 @@ class MetaTable(Base):
         attrs = as_is_attrs + [bbox]
 
         # Make the DB call
-        result = session.query(*attrs).\
+        result = db.session.query(*attrs). \
             filter(cls.dataset_name.in_(dataset_names))
         meta_list = [dict(zip(attr_names, row)) for row in result]
 
@@ -217,10 +213,10 @@ class MetaTable(Base):
             selects.append(ts_select)
 
         # Union the time series selects to get a panel
-        panel_query = sa.union(*selects)\
-                        .order_by('dataset_name')\
-                        .order_by('time_bucket')
-        panel_vals = session.execute(panel_query)
+        panel_query = sa.union(*selects) \
+            .order_by('dataset_name') \
+            .order_by('time_bucket')
+        panel_vals = db.session.execute(panel_query)
 
         panel = []
         for dataset_name, ts in groupby(panel_vals, lambda row: row.dataset_name):
@@ -238,7 +234,7 @@ class MetaTable(Base):
             for row in rows:
                 ts_dict['items'].append({
                     'datetime': row.time_bucket.date(),  # UTC time
-                    'count':    row.count
+                    'count': row.count
                 })
                 # Aggregate top-level count across all time slices.
                 ts_dict['count'] = sum([i['count'] for i in ts_dict['items']])
@@ -249,8 +245,8 @@ class MetaTable(Base):
     # Information about all point datasets
     @classmethod
     def index(cls):
-        results = session.query(cls.dataset_name)\
-                        .filter(cls.approved_status == True)
+        results = db.session.query(cls.dataset_name) \
+            .filter(cls.approved_status == True)
         names = [result.dataset_name for result in results]
         return names
 
@@ -262,7 +258,7 @@ class MetaTable(Base):
                        interesects with the given bounds.
         """
         # Filter out datsets that don't intersect the time boundary
-        q = session.query(cls.dataset_name)\
+        q = db.session.query(cls.dataset_name) \
             .filter(cls.dataset_name.in_(dataset_names), cls.date_added != None,
                     cls.obs_from < end,
                     cls.obs_to > start)
@@ -276,12 +272,12 @@ class MetaTable(Base):
 
     @classmethod
     def get_by_dataset_name(cls, name):
-        foo = session.query(cls).filter(cls.dataset_name == name).first()
+        foo = db.session.query(cls).filter(cls.dataset_name == name).first()
         return foo
 
     def get_bbox_center(self):
         sel = select([func.ST_AsGeoJSON(func.ST_centroid(self.bbox))])
-        result = session.execute(sel)
+        result = db.session.execute(sel)
         # returns [lon, lat]
         return json.loads(result.first()[0])['coordinates']
 
@@ -316,10 +312,10 @@ class MetaTable(Base):
 
         # Generate a count for each resolution by resolution square
         t = self.point_table
-        q = session.query(func.count(t.c.hash),
+        q = db.session.query(func.count(t.c.hash),
                           func.ST_SnapToGrid(t.c.geom, size_x, size_y)
-                          .label('squares'))\
-            .filter(*conditions)\
+                          .label('squares')) \
+            .filter(*conditions) \
             .group_by('squares')
 
         if obs_dates:
@@ -329,8 +325,7 @@ class MetaTable(Base):
         if geom:
             q = q.filter(t.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geom)))
 
-        return session.execute(q), size_x, size_y
-
+        return db.session.execute(q), size_x, size_y
 
     # Return select statement to execute or union
     def timeseries(self, agg_unit, start, end, geom=None, column_filters=None):
@@ -348,7 +343,7 @@ class MetaTable(Base):
                                              func.date_trunc(agg_unit, end),
                                              step)
         defaults = select([sa.literal_column("0").label('count'),
-                           day_generator.label('time_bucket')])\
+                           day_generator.label('time_bucket')]) \
             .alias('defaults')
 
         where_filters = [t.c.point_date >= start, t.c.point_date <= end]
@@ -363,8 +358,8 @@ class MetaTable(Base):
         # bucket. Will only have rows for buckets with records.
         actuals = select([func.count(t.c.hash).label('count'),
                           func.date_trunc(agg_unit, t.c.point_date).
-                         label('time_bucket')])\
-            .where(sa.and_(*where_filters))\
+                         label('time_bucket')]) \
+            .where(sa.and_(*where_filters)) \
             .group_by('time_bucket')
 
         # Also filter by geometry if requested
@@ -378,278 +373,20 @@ class MetaTable(Base):
         # Outer join the default and observed values
         # to create the timeseries select statement.
         # If no observed value in a bucket, use the default.
-        name = sa.literal_column("'{}'".format(self.dataset_name))\
+        name = sa.literal_column("'{}'".format(self.dataset_name)) \
             .label('dataset_name')
         bucket = defaults.c.time_bucket.label('time_bucket')
         count = func.coalesce(actuals.c.count, defaults.c.count).label('count')
-        ts = select([name, bucket, count]).\
+        ts = select([name, bucket, count]). \
             select_from(defaults.outerjoin(actuals, actuals.c.time_bucket == defaults.c.time_bucket))
 
         return ts
 
     def timeseries_one(self, agg_unit, start, end, geom=None, column_filters=None):
         ts_select = self.timeseries(agg_unit, start, end, geom, column_filters)
-        rows = session.execute(ts_select.order_by('time_bucket'))
+        rows = db.session.execute(ts_select.order_by('time_bucket'))
 
         header = [['count', 'datetime']]
         # Discard the name attribute.
         rows = [[count, time_bucket.date()] for _, time_bucket, count in rows]
         return header + rows
-
-
-class ShapeMetadata(Base):
-    __tablename__ = 'meta_shape'
-    dataset_name = Column(String, primary_key=True)
-    human_name = Column(String, nullable=False)
-    source_url = Column(String)
-    view_url = Column(String)
-    date_added = Column(Date, nullable=False)
-
-    # Organization that published this dataset
-    attribution = Column(String)
-    description = Column(Text)
-    update_freq = Column(String(100), nullable=False)
-
-    # Who submitted this dataset?
-    contributor_name = Column(String)
-    contributor_organization = Column(String)
-    contributor_email = Column(String)
-
-    # Has an admin signed off on it?
-    approved_status = Column(Boolean)
-
-    # We always ingest geometric data as 4326
-    bbox = Column(Geometry('POLYGON', srid=4326))
-    # How many shape records are present?
-    num_shapes = Column(Integer)
-    # False when admin first submits metadata.
-    # Will become true if ETL completes successfully.
-    is_ingested = Column(Boolean, nullable=False)
-    # foreign key of celery task responsible for shapefile's ingestion
-    celery_task_id = Column(String)
-
-    @classmethod
-    def get_by_dataset_name(cls, name):
-        shape_metatable = session.query(cls).filter(cls.dataset_name == name).first()
-        return shape_metatable
-
-    @classmethod
-    def get_all_with_etl_status(cls):
-        """
-        :return: Every row of meta_shape joined with celery task status.
-        """
-        shape_query = '''
-            SELECT meta.*, celery.status
-            FROM meta_shape as meta
-            LEFT JOIN celery_taskmeta as celery
-            ON celery.task_id = meta.celery_task_id
-            WHERE meta.approved_status = TRUE;
-        '''
-
-        return list(session.execute(shape_query))
-
-    @classmethod
-    def index(cls, geom=None):
-        # The attributes that we want to pass along as-is
-        as_is_attr_names = ['dataset_name', 'human_name', 'date_added',
-                            'attribution', 'description', 'update_freq',
-                            'view_url', 'source_url', 'num_shapes']
-
-        as_is_attrs = [getattr(cls, name) for name in as_is_attr_names]
-
-        # We need to apply some processing to the bounding box
-        bbox = func.ST_AsGeoJSON(cls.bbox)
-        attr_names = as_is_attr_names + ['bbox']
-        attrs = as_is_attrs + [bbox]
-
-        result = session.query(*attrs).filter(cls.is_ingested)
-        listing = [dict(zip(attr_names, row)) for row in result]
-
-        for dataset in listing:
-            dataset['date_added'] = str(dataset['date_added'])
-
-        if geom:
-            listing = cls.add_intersections_to_index(listing, geom)
-
-        listing = cls._add_fields_to_index(listing)
-
-        return listing
-
-    @classmethod
-    def _add_fields_to_index(cls, listing):
-        for dataset in listing:
-            name = dataset['dataset_name']
-            try:
-                # Reflect up the shape table
-                table = Table(name,
-                              Base.metadata,
-                              autoload=True,
-                              extend_existing=True)
-            except NoSuchTableError:
-                # If that table doesn't exist (?!?!)
-                # don't try to form the fields.
-                continue
-
-            finally:
-                # Extract every column's info.
-                fields_list = []
-                for col in table.columns:
-                    if not isinstance(col.type, NullType):
-                        # Don't report our internal-use columns
-                        if col.name in {'geom', 'ogc_fid', 'hash'}:
-                            continue
-                        field_object = {
-                            'field_name': col.name,
-                            'field_type': str(col.type)
-                        }
-                        fields_list.append(field_object)
-                dataset['columns'] = fields_list
-        return listing
-
-    @classmethod
-    def tablenames(cls):
-        return [x.dataset_name for x in session.query(ShapeMetadata.dataset_name).all()]
-
-    @staticmethod
-    def add_intersections_to_index(listing, geom):
-        # For each dataset_name in the listing,
-        # get a count of intersections
-        # and replace num_geoms
-
-        for row in listing:
-            name = row['dataset_name']
-            num_intersections_query = '''
-            SELECT count(g.geom) as num_geoms
-            FROM "{dataset_name}" as g
-            WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
-            '''.format(dataset_name=name, geojson_fragment=geom)
-
-            num_intersections = session.execute(num_intersections_query)\
-                                       .first().num_geoms
-            row['num_shapes'] = num_intersections
-
-        intersecting_rows = [row for row in listing if row['num_shapes'] > 0]
-        return intersecting_rows
-
-    @classmethod
-    def get_metadata_with_etl_result(cls, table_name):
-        query = '''
-            SELECT meta.*, celery.status, celery.traceback, celery.date_done
-            FROM meta_shape as meta
-            LEFT JOIN celery_taskmeta as celery
-            ON celery.task_id = meta.celery_task_id
-            WHERE meta.dataset_name='{}';
-        '''.format(table_name)
-
-        metadata = session.execute(query).first()
-        return metadata
-
-    @classmethod
-    def get_by_human_name(cls, human_name):
-        return session.query(cls).get(cls.make_table_name(human_name))
-
-    @classmethod
-    def make_table_name(cls, human_name):
-        return slugify(human_name)
-
-    @classmethod
-    def add(cls, human_name, source_url, approved_status, **kwargs):
-        table_name = ShapeMetadata.make_table_name(human_name)
-        new_shape_dataset = ShapeMetadata(
-            # Required params
-            dataset_name=table_name,
-            human_name=human_name,
-            source_url=source_url,
-            approved_status=approved_status,
-            # Params that reflect just-submitted, not yet ingested status.
-            is_ingested=False,
-            bbox=None,
-            num_shapes=None,
-            date_added=datetime.now().date(),
-            # The rest
-            **kwargs)
-        session.add(new_shape_dataset)
-        return new_shape_dataset
-
-    @property
-    def shape_table(self):
-        try:
-            return self._shape_table
-        except AttributeError:
-            self._shape_table = Table(self.dataset_name, Base.metadata,
-                                      autoload=True, extend_existing=True)
-            return self._shape_table
-
-    def remove_table(self):
-        if self.is_ingested:
-            drop = "DROP TABLE {};".format(self.dataset_name)
-            session.execute(drop)
-        session.delete(self)
-
-    def update_after_ingest(self):
-        self.is_ingested = True
-        self.bbox = self._make_bbox()
-        self.num_shapes = self._get_num_shapes()
-
-    def _make_bbox(self):
-        bbox_query = 'SELECT ST_Envelope(ST_Union(geom)) FROM {};'.\
-            format(self.dataset_name)
-        box = session.execute(bbox_query).first().st_envelope
-        return box
-
-    def _get_num_shapes(self):
-        table = self.shape_table
-        # Arbitrarily select the first column of the table to count against
-        count_query = select([func.count(table.c.geom)])
-        # Should return only one row.
-        # And we want the 0th and only attribute of that row (the count).
-        return session.execute(count_query).fetchone()[0]
-
-
-def get_uuid():
-    return unicode(uuid4())
-
-
-class User(Base):
-    __tablename__ = 'plenario_user'
-    id = Column(String(36), default=get_uuid, primary_key=True)
-    name = Column(String, nullable=False, unique=True)
-    email = Column(String, nullable=False)
-    _password = Column('password', String(60), nullable=False)
-
-    def _get_password(self):
-        return self._password
-
-    def _set_password(self, value):
-        self._password = bcrypt.generate_password_hash(value)
-
-    password = property(_get_password, _set_password)
-    password = synonym('_password', descriptor=password)
-
-    def __init__(self, name, password, email):
-        self.name = name
-        self.password = password
-        self.email = email
-
-    @classmethod
-    def get_by_username(cls, name):
-        return session.query(cls).filter(cls.name == name).first()
-
-    @classmethod
-    def check_password(cls, name, value):
-        user = cls.get_by_username(name)
-        if not user:
-            return False
-        return bcrypt.check_password_hash(user.password, value)
-
-    def is_authenticated(self):
-        return True
-    
-    def is_active(self):
-        return True
-
-    def is_anonymous(self):
-        return False
-
-    def get_id(self):
-        return self.id

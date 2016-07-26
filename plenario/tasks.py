@@ -7,7 +7,7 @@ from sqlalchemy.exc import NoSuchTableError, InternalError
 from plenario.celery_app import celery_app
 from plenario.database import session as session, app_engine as engine
 from plenario.etl.shape import ShapeETL
-from plenario.models import MetaTable, ShapeMetadata
+from plenario.models import ShapeMetadata, MetaTable
 from plenario.settings import CELERY_SENTRY_URL
 from plenario.etl.point import PlenarioETL
 from plenario.utils.weather import WeatherETL

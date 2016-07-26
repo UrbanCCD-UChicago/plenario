@@ -5,13 +5,13 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 from dateutil import parser
 from marshmallow import fields, Schema
-from marshmallow.validate import Range, Length, OneOf, ValidationError
+from marshmallow.validate import Range, OneOf, ValidationError
 from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
 from plenario.api.condition_builder import field_ops
 from plenario.database import session
-from plenario.models import MetaTable, ShapeMetadata
+from plenario.models import ShapeMetadata, MetaTable
 from plenario.utils.model_helpers import table_exists
 
 

@@ -1,13 +1,12 @@
 from flask import make_response, request, redirect, url_for, render_template, \
     Blueprint, flash, session as flask_session
-from plenario.models import MetaTable, User, ShapeMetadata
+from plenario.models import ShapeMetadata, MetaTable, User
 from plenario.database import session, Base, app_engine as engine
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 from plenario.tasks import update_dataset as update_dataset_task, \
     delete_dataset as delete_dataset_task, add_dataset as add_dataset_task, \
     add_shape as add_shape_task, delete_shape as delete_shape_task
 from flask_login import login_required
-from datetime import datetime, timedelta
 from urlparse import urlparse
 import requests
 from flask_wtf import Form
@@ -565,14 +564,14 @@ def view_datasets():
         all()
 
     try:
-        q = text(''' 
+        q = text('''
             SELECT m.*, c.status, c.task_id
-            FROM meta_master AS m 
-            LEFT JOIN celery_taskmeta AS c 
+            FROM meta_master AS m
+            LEFT JOIN celery_taskmeta AS c
               ON c.id = (
-                SELECT id FROM celery_taskmeta 
-                WHERE task_id = ANY(m.result_ids) 
-                ORDER BY date_done DESC 
+                SELECT id FROM celery_taskmeta
+                WHERE task_id = ANY(m.result_ids)
+                ORDER BY date_done DESC
                 LIMIT 1
               )
             WHERE m.approved_status = 'true'
@@ -603,17 +602,17 @@ def dataset_status():
 
     source_url_hash = request.args.get("source_url_hash")
 
-    q = ''' 
-        SELECT 
-          m.human_name, 
+    q = '''
+        SELECT
+          m.human_name,
           m.source_url_hash,
-          c.status, 
+          c.status,
           c.date_done,
           c.traceback,
           c.task_id
-        FROM meta_master AS m, 
-        UNNEST(m.result_ids) AS ids 
-        LEFT JOIN celery_taskmeta AS c 
+        FROM meta_master AS m,
+        UNNEST(m.result_ids) AS ids
+        LEFT JOIN celery_taskmeta AS c
           ON c.task_id = ids
         WHERE c.date_done IS NOT NULL
     '''
@@ -700,17 +699,17 @@ def edit_shape(dataset_name):
 
 
 class EditDatasetForm(Form):
-    """ 
+    """
     Form to edit meta_master information for a dataset
     """
     human_name = TextField('human_name', validators=[DataRequired()])
     description = TextField('description', validators=[DataRequired()])
     attribution = TextField('attribution', validators=[DataRequired()])
-    update_freq = SelectField('update_freq', 
+    update_freq = SelectField('update_freq',
                               choices=[('daily', 'Daily'),
                                        ('weekly', 'Weekly'),
                                        ('monthly', 'Monthly'),
-                                       ('yearly', 'Yearly')], 
+                                       ('yearly', 'Yearly')],
                               validators=[DataRequired()])
     observed_date = TextField('observed_date', validators=[DataRequired()])
     latitude = TextField('latitude')
@@ -721,17 +720,17 @@ class EditDatasetForm(Form):
         rv = Form.validate(self)
         if not rv:
             return False
-        
+
         valid = True
-        
+
         if not self.location.data and (not self.latitude.data or not self.longitude.data):
             valid = False
             self.location.errors.append('You must either provide a Latitude and Longitude field name or a Location field name')
-        
+
         if self.longitude.data and not self.latitude.data:
             valid = False
             self.latitude.errors.append('You must provide both a Latitude field name and a Longitude field name')
-        
+
         if self.latitude.data and not self.longitude.data:
             valid = False
             self.longitude.errors.append('You must provide both a Latitude field name and a Longitude field name')
@@ -746,7 +745,7 @@ def edit_dataset(source_url_hash):
     meta = session.query(MetaTable).get(source_url_hash)
     fieldnames = meta.column_names
     num_rows = 0
-    
+
     if meta.approved_status:
         try:
             table_name = meta.dataset_name
@@ -759,7 +758,7 @@ def edit_dataset(source_url_hash):
             pk_name = [p.name for p in table.primary_key][0]
             pk = table.c[pk_name]
             num_rows = session.query(pk).count()
-            
+
         except sqlalchemy.exc.NoSuchTableError:
             # dataset has been approved, but perhaps still processing.
             pass
@@ -782,7 +781,7 @@ def edit_dataset(source_url_hash):
 
         if not meta.approved_status:
             approve_dataset(source_url_hash)
-        
+
         flash('%s updated successfully!' % meta.human_name, 'success')
         return redirect(url_for('views.view_datasets'))
     else:
