@@ -10,7 +10,6 @@ from cStringIO import StringIO
 from plenario.utils.helpers import get_size_in_degrees
 from plenario.models import MetaTable
 from sqlalchemy.sql.schema import Table
-import geoalchemy2
 
 cache = Cache(config=CACHE_CONFIG)
 
@@ -35,7 +34,6 @@ def unknown_object_json_handler(obj):
     elif isinstance(obj, MetaTable):
         return obj.__tablename__
     else:
-        print obj
         raise ValueError
 
 

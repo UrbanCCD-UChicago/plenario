@@ -139,33 +139,46 @@ def delete_shape(table_name):
 
 
 def frequency_update(frequency):
-    # hourly, daily, weekly, monthly, yearly
+    """Execute a update task for all the tables whose corresponding meta info
+    is part of this frequency group.
+
+    :param frequency: (string) how often these tables are meant to be updated,
+                               can be: often, daily, weekly, monthly, yearly
+    :returns (string) confirmation message"""
+
     md = session.query(MetaTable)\
         .filter(MetaTable.update_freq == frequency)\
         .filter(MetaTable.date_added != None)\
         .all()
     for m in md:
-        update_dataset.delay(m.source_url_hash)
+        update_dataset(m.source_url_hash)
 
     md = session.query(ShapeMetadata)\
         .filter(ShapeMetadata.update_freq == frequency)\
         .filter(ShapeMetadata.is_ingested == True)\
         .all()
     for m in md:
-        update_shape.delay(m.dataset_name)
+        update_shape(m.dataset_name)
+
     return '%s update complete' % frequency
 
 
 def update_metar():
-    print "update_metar()"
+    """Run a METAR update.
+
+    :returns (string) confirmation message"""
+
     w = WeatherETL()
     w.metar_initialize_current()
     return 'Added current metars'
 
 
 def update_weather():
-    # This should do the current month AND the previous month, just in case.
+    """Run a weather update.
 
+    :returns (string) confirmation message"""
+
+    # This should do the current month AND the previous month, just in case.
     lastMonth_dt = datetime.now() - timedelta(days=1)
     lastMonth = lastMonth_dt.month
     lastYear = lastMonth_dt.year
