@@ -26,7 +26,7 @@ if __name__ == "__main__":
     from collections import namedtuple
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
     from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump_manager, _datadump
-    from plenario.api.jobs import get_status, set_status, get_request, set_result
+    from plenario.api.jobs import get_status, set_status, get_request, set_result, submit_job
     from plenario.api.shape import _aggregate_point_data, _export_shape
     from plenario.api.response import convert_result_geoms
     from plenario.api.validator import convert
@@ -209,6 +209,7 @@ if __name__ == "__main__":
                             # Check for metacommands
                             if "jobsframework_metacommands" in result:
                                 defer = False
+                                stop = False
                                 for command in result["jobsframework_metacommands"]:
                                     if "setTimeout" in command:
                                         job.change_visibility(command["setTimeout"])
@@ -219,6 +220,13 @@ if __name__ == "__main__":
                                         set_status(ticket, status)
                                         log("Deferred work on ticket {}.".format(ticket), worker_id)
                                         defer = True
+                                    elif "resubmit" in command:
+                                        submit_job(req)
+                                        log("Resubmitted job that was in ticket {}.".format(ticket), worker_id)
+                                        stop = True
+                                if stop:
+                                    JobsQueue.delete_message(job)
+                                    continue
                                 if defer:
                                     continue
 

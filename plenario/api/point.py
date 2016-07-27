@@ -425,7 +425,7 @@ def _datadump_manager(args):
     # If the flag expires, then the request has died.
     # Default timeout is 60 seconds if not bumped.
     set_flag(requestid + "_dowork", True)
-    set_flag(requestid + "_suppresscleanup", True, 3600)
+    set_flag(requestid + "_suppresscleanup", True, 10800)
 
     # Queue an initial set of jobs. This group should be small
     # so that the first job in the sequence will be done quickly
@@ -508,7 +508,7 @@ def _datadump_cleanup(args):
         cleanup_datadump(args.data["datadump_requestid"])
         return {"status": "success"}
     else:
-        return {"jobsframework_metacommands": ["defer"]}
+        return {"jobsframework_metacommands": ["resubmit"]}
 
 
 # Datadump utilities =======================
