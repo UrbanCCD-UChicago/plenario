@@ -30,11 +30,12 @@
         }
 
         .load {
-            background-color: yellow;
+            background-color: gold;
+            color: black;
         }
 
         .overload {
-            background-color: red;
+            background-color: crimson;
             color: white;
         }
 
@@ -67,6 +68,7 @@
 </head>
 <body>
 <h1 align="center">Plenario Worker Status</h1>
+<h2 align="center" style="color: gray">Current Queue Length: {{ queuelength }}</h2>
 <div id="grid">
     {% for worker in workers %}
         <div class="worker {{ worker.status }}">

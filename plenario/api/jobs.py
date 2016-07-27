@@ -28,6 +28,13 @@ from pprint import pprint
 redisPool = redis.ConnectionPool(host=CACHE_CONFIG["CACHE_REDIS_HOST"], port=6379, db=0)
 JobsDB = redis.Redis(connection_pool=redisPool)
 
+conn = boto.sqs.connect_to_region(
+    AWS_REGION_NAME,
+    aws_access_key_id=AWS_ACCESS_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY
+)
+JobsQueue = conn.get_queue(JOBS_QUEUE)
+
 
 def get_status(ticket):
     return json.loads(JobsDB.get(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_status_" + ticket))
@@ -176,13 +183,6 @@ def submit_job(req):
     # Quickly generate a random hash. Collisions are highly unlikely!
     # Seems safer than relying on a counter in the database.
     ticket = urandom(16).encode('hex')
-
-    conn = boto.sqs.connect_to_region(
-        AWS_REGION_NAME,
-        aws_access_key_id=AWS_ACCESS_KEY,
-        aws_secret_access_key=AWS_SECRET_KEY
-    )
-    JobsQueue = conn.get_queue(JOBS_QUEUE)
 
     set_request(ticket, req)
     set_result(ticket, "")

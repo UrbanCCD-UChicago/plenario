@@ -20,7 +20,7 @@ from sqlalchemy.exc import NoSuchTableError
 from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
-from plenario.api.jobs import submit_job, get_status, get_job
+from plenario.api.jobs import submit_job, get_status, get_job, JobsQueue
 from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata, Workers
 from plenario.models_.ETLTask import ETLStatus, ETLType, add_task
@@ -119,7 +119,7 @@ def workers():
                 "endpoint": job["request"]["endpoint"]
             }
     workerlist.sort(key=lambda worker: worker["name"])
-    return render_template('workers.html', workers=workerlist)
+    return render_template('workers.html', workers=workerlist, queuelength=JobsQueue.count())
 
 
 '''Approve a dataset'''
