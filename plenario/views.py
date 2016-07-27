@@ -2,6 +2,7 @@ import math
 import itertools
 import json
 import re
+import dateutil.relativedelta
 from cStringIO import StringIO
 from collections import namedtuple
 from datetime import datetime
@@ -79,23 +80,29 @@ def workers():
     workerlist = [row.__dict__ for row in q]
     now = datetime.now()
     for worker in workerlist:
-        age = (now - datetime.strptime(worker["timestamp"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds()
-        if age > 600:
+        lastseen = (now - datetime.strptime(worker["timestamp"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds()
+        if lastseen > 600:
             worker["status"] = "dead"
-        elif age > 300:
+        elif lastseen > 300:
             worker["status"] = "overload"
-        elif age > 60:
+        elif lastseen > 60:
             worker["status"] = "load"
         else:
             worker["status"] = "nominal"
-        days = int(math.floor(worker["uptime"] / 86400))
-        hours = int(math.floor((worker["uptime"] - days * 86400) / 3600))
-        minutes = int(math.floor((worker["uptime"] - days * 86400 - hours * 3600) / 60))
-        seconds = int(worker["uptime"] - days * 86400 - hours * 3600 - minutes * 60)
-        worker["humanized_uptime"] = "{}d {}h {}m {}s".format(days, hours, minutes, seconds)
+
+        diff = dateutil.relativedelta.relativedelta(datetime.fromtimestamp(worker["uptime"]),
+                                                      datetime.fromtimestamp(0))
+        worker["humanized_uptime"] = " {}d {}h {}m {}s".format(
+            diff.days, diff.hours, diff.minutes, diff.seconds).replace(
+            " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
+        diff = dateutil.relativedelta.relativedelta(datetime.fromtimestamp(lastseen),
+                                                      datetime.fromtimestamp(0))
+        worker["lastseen"] = " {}d {}h {}m {}s ago".format(
+            diff.days, diff.hours, diff.minutes, diff.seconds).replace(
+            " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
+
         if worker["job"]:
             job = json.loads(get_job(worker["job"]).get_data())
-            import dateutil.relativedelta
             if job["status"]["meta"].get("lastStartTime"):
                 diff = dateutil.relativedelta.relativedelta(datetime.now(),
                                                             datetime.strptime(job["status"]["meta"]["lastStartTime"],
