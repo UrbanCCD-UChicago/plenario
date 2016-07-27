@@ -20,7 +20,7 @@ from plenario.api.condition_builder import parse_tree
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.sensor_network.api.sensor_validator import SensorNetworkValidator, validate
 from plenario.database import session, redshift_session, redshift_engine
-from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, Observation
+from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -40,7 +40,7 @@ def get_network_metadata(network_name=None):
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def get_node_metadata(node_id=None, network_name=None):
-    fields = ('network_name', 'node_id',  'nodes',
+    fields = ('network_name', 'node_id', 'nodes',
               'location_geom__within',)
 
     args = request.args.to_dict()
@@ -60,6 +60,23 @@ def get_node_metadata(node_id=None, network_name=None):
         return bad_request(validated_args.errors)
 
     return _get_node_metadata(validated_args)
+
+
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def get_features(network_name=None, feature=None):
+    fields = ('network_name', 'feature')
+
+    args = {'network_name': network_name}
+    if feature:
+        args['feature'] = feature
+
+    validator = SensorNetworkValidator(only=fields)
+    validated_args = validate(validator, args)
+    if validated_args.errors:
+        return bad_request(validated_args.errors)
+
+    return _get_features(validated_args)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -142,8 +159,8 @@ def format_network_metadata(network):
     network_response = {
         'name': network.name,
         'nodeMetadata': network.nodeMetadata,
-        'nodes': [node.id for node in network.nodes],
-        'featuresOfInterest': network.featuresOfInterest
+        'featuresOfInterest': [feature.name for feature in network.featuresOfInterest],
+        'nodes': [node.id for node in network.nodes]
     }
 
     return network_response
@@ -158,11 +175,21 @@ def format_node_metadata(node):
             'lon': wkb.loads(bytes(node.location.data)).x
         },
         'version': node.version,
-        'featuresOfInterest': node.featuresOfInterest,
+        'featuresOfInterest': [foi.name for foi in node.featuresOfInterest],
         'procedures': node.procedures
     }
 
     return node_response
+
+
+def format_feature(feature):
+    feature_response = {
+        'name': feature.name,
+        'sensorNetwork': feature.sensorNetwork,
+        'observedProperties': feature.observedProperties['observedProperties']
+    }
+
+    return feature_response
 
 
 def format_observation(obs, table):
@@ -214,8 +241,25 @@ def _get_node_metadata(args):
     return resp
 
 
-def _get_observations(args):
+def _get_features(args):
+    q = session.query(FeatureOfInterest)
+    data = [format_feature(feature) for feature in q.all()
+            if (feature.sensorNetwork == args.data['network_name'] or args.data['network_name'] is None) and
+            (feature.name == args.data['feature'] or args.data['feature'] is None)]
 
+    # don't display null query arguments
+    null_args = [field for field in args.data if args.data[field] is None]
+    for null_arg in null_args:
+        args.data.pop(null_arg)
+
+    resp = json_response_base(args, data, args.data)
+    resp = make_response(json.dumps(resp), 200)
+    resp.headers['Content-Type'] = 'application/json'
+
+    return resp
+
+
+def _get_observations(args):
     nodes_to_query = [node.id for node in node_metadata_query(args).all()]
 
     args.data['nodes'] = nodes_to_query

@@ -12,7 +12,7 @@ from sqlalchemy import MetaData, Table
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
 from plenario.api.condition_builder import field_ops
 from plenario.database import session, redshift_engine
-from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta
+from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest
 
 
 def validate_nodes(nodes):
@@ -54,6 +54,7 @@ class Validator(Schema):
     nodes = fields.List(fields.Str(), default=NodeMeta.index(), validate=validate_nodes)
     start_datetime = fields.DateTime(default=datetime.now() - timedelta(days=90))
     end_datetime = fields.DateTime(default=datetime.now())
+    feature = fields.Str(allow_none=True, missing=None, default=None, validate=OneOf(FeatureOfInterest.index()))
 
 
 class NoGeoJSONValidator(Validator):

@@ -7,7 +7,7 @@ from shape import get_all_shape_datasets,\
 from time import sleep
 from sensor import weather_stations, weather
 
-from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, get_observations
+from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, get_observations, get_features
 
 API_VERSION = '/v1'
 
@@ -37,6 +37,10 @@ api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>', 'si
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/query', 'network_query', get_observations)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/query', 'network_query', get_observations)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>/query', 'node_query', get_observations)
+
+api.add_url_rule(prefix + '/sensor-networks/features-of-interest', 'features', get_features)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/features-of-interest', 'features', get_features)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/features-of-interest/<feature>', 'features', get_features)
 
 
 @api.route(prefix + '/flush-cache')
