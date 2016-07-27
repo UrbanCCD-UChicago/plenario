@@ -23,7 +23,6 @@ if __name__ == "__main__":
     import boto.sqs
     import threading
     import traceback
-    import random
     from collections import namedtuple
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
     from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump_manager, _datadump
@@ -33,6 +32,7 @@ if __name__ == "__main__":
     from plenario.api.validator import convert
     from plenario.tasks import add_dataset, delete_dataset, update_dataset
     from plenario.tasks import add_shape, update_shape, delete_shape
+    from plenario.tasks import update_weather, frequency_update
     from plenario.utils.name_generator import generate_name
     from flask import Flask
 
@@ -110,6 +110,8 @@ if __name__ == "__main__":
                 'add_shape': lambda args: add_shape(args),
                 'update_shape': lambda args: update_shape(args),
                 'delete_shape': lambda args: delete_shape(args),
+                "update_weather": lambda: update_weather(),
+                "frequency_update": lambda args: frequency_update(args)
             }
 
             log("Hello! I'm ready for anything.", worker_id)
@@ -208,8 +210,10 @@ if __name__ == "__main__":
 
                         elif endpoint in etl_logic:
 
-                            log("Ticket {} uses endpoint {}.".format(ticket, endpoint), worker_id)
-                            result = etl_logic[endpoint](query_args)
+                            if endpoint in ('update_weather', 'update_metar'):
+                                result = etl_logic[endpoint]()
+                            else:
+                                result = etl_logic[endpoint](query_args)
 
                         else:
 
