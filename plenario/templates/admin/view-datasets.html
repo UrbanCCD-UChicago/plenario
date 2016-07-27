@@ -154,6 +154,11 @@
                                 class="btn btn-success btn-sm">
                                 <i class='fa fa-check'></i> Approve
                             </a>
+                        {% else %}
+                            <a href="{{ url_for('views.update_dataset_view', source_url_hash=dataset.source_url_hash) }}"
+                               class="btn btn-info btn-sm">
+                                <i class='fa fa-navicon'></i> Update
+                            </a>
                         {% endif %}
                     </td>
                 </tr>
@@ -204,6 +209,11 @@
                                     class="btn btn-success btn-sm">
                                     <i class='fa fa-check'></i> Approve
                                 </a>
+                            {% else %}
+                            <a href="{{ url_for('views.update_shape_view', dataset_name=shape_dataset.dataset_name) }}"
+                               class="btn btn-info btn-sm">
+                                <i class='fa fa-navicon'></i> Update
+                            </a>
                             {% endif %}
                         </td>
                     </tr>
