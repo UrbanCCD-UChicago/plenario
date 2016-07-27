@@ -43,6 +43,8 @@
                             <span class="label
                                 {% if result.status == 'SUCCESS' %}
                                     label-success
+                                {% elif result.status == 'Ingest Pending' or result.status == 'Ingest Started' %}
+                                    label-default
                                 {% else %}
                                     label-primary
                                 {% endif %}">

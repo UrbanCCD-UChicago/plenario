@@ -45,6 +45,7 @@ def etl_report(fn):
             meta = session.query(ShapeMetadata).get(identifier)
 
         try:
+            meta.update_date_added()
             update_task(meta.dataset_name, None, ETLStatus['started'], None)
             completion_msg = fn(meta)
             update_task(meta.dataset_name, datetime.now(), ETLStatus['success'], None)
