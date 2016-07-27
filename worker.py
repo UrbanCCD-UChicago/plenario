@@ -23,7 +23,6 @@ if __name__ == "__main__":
     import boto.sqs
     import threading
     import traceback
-    import random
     from collections import namedtuple
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
     from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump_manager, _datadump
@@ -34,6 +33,7 @@ if __name__ == "__main__":
     from plenario.tasks import add_dataset, delete_dataset, update_dataset
     from plenario.tasks import add_shape, update_shape, delete_shape
     from plenario.utils.name_generator import generate_name
+    from plenario.models import Workers
     from flask import Flask
 
     do_work = True
@@ -66,6 +66,7 @@ if __name__ == "__main__":
 
     def worker():
         worker_id = generate_name()
+        birthtime = time.time()
 
         # Holds the methods which perform the work requested by an incoming job.
         app = Flask(__name__)
@@ -113,8 +114,21 @@ if __name__ == "__main__":
             }
 
             log("Hello! I'm ready for anything.", worker_id)
+            try:
+                session.add(Workers(worker_id, int(time.time()-birthtime)))
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                log("Problem updating worker registration: {}".format(e), worker_id)
 
             while do_work:
+                try:
+                    session.query(Workers).filter(Workers.name == worker_id).one().check_in(int(time.time()-birthtime))
+                    session.commit()
+                except Exception as e:
+                    session.rollback()
+                    log("Problem updating worker registration: {}".format(e), worker_id)
+
                 response = JobsQueue.get_messages(message_attributes=["ticket"])
                 if len(response) > 0:
                     job = response[0]
@@ -156,6 +170,12 @@ if __name__ == "__main__":
                     set_status(ticket, status)
 
                     log("Starting work on ticket {}.".format(ticket), worker_id)
+                    try:
+                        session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
+                        session.commit()
+                    except Exception as e:
+                        session.rollback()
+                        log("Problem updating worker registration: {}".format(e), worker_id)
 
                     # =========== Do work on query =========== #
                     try:
@@ -235,11 +255,25 @@ if __name__ == "__main__":
                         set_result(ticket, {"error": str(e)})
                         JobsQueue.delete_message(job)
                         traceback.print_exc()
+                    finally:
+                        try:
+                            session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
+                            session.commit()
+                        except Exception as e:
+                            session.rollback()
+                            log("Problem updating worker registration: {}".format(e), worker_id)
 
                 else:
                     # No work! Idle for a bit to save compute cycles.
                     log("Ho hum nothing to do. Idling for {} seconds.".format(wait_interval), worker_id)
                     time.sleep(wait_interval)
+
+        try:
+            session.query(Workers).filter(Workers.name == worker_id).delete()
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            log("Problem updating worker registration: {}".format(e), worker_id)
 
         log("Exited run loop. Goodbye!", worker_id)
 

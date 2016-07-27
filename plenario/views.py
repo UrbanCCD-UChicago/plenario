@@ -1,3 +1,4 @@
+import math
 import itertools
 import json
 import re
@@ -18,9 +19,9 @@ from sqlalchemy.exc import NoSuchTableError
 from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
-from plenario.api.jobs import submit_job, get_status
+from plenario.api.jobs import submit_job, get_status, get_job
 from plenario.database import session, Base, app_engine as engine
-from plenario.models import MetaTable, User, ShapeMetadata
+from plenario.models import MetaTable, User, ShapeMetadata, Workers
 from plenario.models_.ETLTask import ETLStatus, ETLType, add_task
 from plenario.models_.ETLTask import fetch_pending_tables, fetch_table_etl_status
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
@@ -28,6 +29,7 @@ from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 views = Blueprint('views', __name__)
 
 '''(Mostly) Static pages'''
+
 
 @views.route('/')
 def index():
@@ -70,6 +72,49 @@ def maintenance():
 def terms_view():
     return render_template('terms.html')
 
+
+@views.route('/workers')
+def workers():
+    q = session.query(Workers).all();
+    workerlist = [row.__dict__ for row in q]
+    now = datetime.now()
+    for worker in workerlist:
+        age = (now - datetime.strptime(worker["timestamp"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds()
+        if age > 600:
+            worker["status"] = "dead"
+        elif age > 300:
+            worker["status"] = "overload"
+        elif age > 60:
+            worker["status"] = "load"
+        else:
+            worker["status"] = "nominal"
+        days = int(math.floor(worker["uptime"] / 86400))
+        hours = int(math.floor((worker["uptime"] - days * 86400) / 3600))
+        minutes = int(math.floor((worker["uptime"] - days * 86400 - hours * 3600) / 60))
+        seconds = int(worker["uptime"] - days * 86400 - hours * 3600 - minutes * 60)
+        worker["humanized_uptime"] = "{}d {}h {}m {}s".format(days, hours, minutes, seconds)
+        if worker["job"]:
+            job = json.loads(get_job(worker["job"]).get_data())
+            import dateutil.relativedelta
+            if job["status"]["meta"].get("lastStartTime"):
+                diff = dateutil.relativedelta.relativedelta(datetime.now(),
+                                                            datetime.strptime(job["status"]["meta"]["lastStartTime"],
+                                                                              "%Y-%m-%d %H:%M:%S.%f"))
+            else:
+                diff = dateutil.relativedelta.relativedelta(datetime.now(),
+                                                            datetime.strptime(job["status"]["meta"]["startTime"],
+                                                                              "%Y-%m-%d %H:%M:%S.%f"))
+            worker["jobinfo"] = {
+                "status": job["status"]["status"],
+                "workers": ", ".join(job["status"]["meta"]["workers"]),
+                "queuetime": job["status"]["meta"]["queueTime"],
+                "worktime": "{}d {}h {}m {}s".format(diff.days, diff.hours, diff.minutes, diff.seconds),
+                "endpoint": job["request"]["endpoint"]
+            }
+    workerlist.sort(key=lambda worker: worker["name"])
+    return render_template('workers.html', workers=workerlist)
+
+
 '''Approve a dataset'''
 
 
@@ -83,7 +128,6 @@ def approve_shape_view(dataset_name):
 
 
 def approve_shape(dataset_name):
-
     meta = session.query(ShapeMetadata).get(dataset_name)
     meta.approved_status = True
     session.commit()
@@ -142,9 +186,12 @@ http://plenar.io""" % (contributor_name, dataset_name)
     send_mail(subject="Your dataset has been added to Plenar.io",
               recipient=contributor_email, body=msg_body)
 
+
 #
 ''' Submit a dataset (Add it to MetaData
     and try to ingest it now or later.) '''
+
+
 #
 
 
@@ -264,6 +311,7 @@ def suggest(context):
         suggestion_context.update(context)
         return render_with_context(suggestion_context)
 
+
 ''' Submission helpers '''
 
 
@@ -338,7 +386,6 @@ def point_meta_from_submit_form(form, is_approved):
 
 
 def shape_meta_from_submit_form(form, is_approved):
-
     md = ShapeMetadata.add(
         human_name=form['dataset_name'],
         source_url=form['file_url'],
@@ -355,7 +402,6 @@ def shape_meta_from_submit_form(form, is_approved):
 
 
 '''Suggestion helpers.'''
-
 
 ColumnMeta = namedtuple('ColumnMeta', 'name type_ description')
 DescriptionMeta = namedtuple("DescriptionMeta",
@@ -508,9 +554,9 @@ class SocrataSuggestion(object):
         # metadata['metadata'] and seeing if there's a 'geo' key there
         # that denotes the geospatial API is enabled.
 
-        blob_url = '{}/download/{}/application/zip'\
+        blob_url = '{}/download/{}/application/zip' \
             .format(self.url_prefix(), self.four_by_four)
-        map_url = '{}/api/geospatial/{}?method=export&format=Shapefile'.\
+        map_url = '{}/api/geospatial/{}?method=export&format=Shapefile'. \
             format(self.url_prefix(), self.four_by_four)
         try:
             display_type = self.metadata['displayType']
@@ -581,7 +627,6 @@ class SocrataSuggestion(object):
 @views.route('/admin/view-datasets')
 @login_required
 def view_datasets():
-
     datasets_pending = fetch_pending_tables(MetaTable)
     shapes_pending = fetch_pending_tables(ShapeMetadata)
     datasets = fetch_table_etl_status(ETLType['dataset'])
@@ -597,7 +642,6 @@ def view_datasets():
 @views.route('/admin/dataset-status/')
 @login_required
 def dataset_status():
-
     source_url_hash = request.args.get("source_url_hash")
 
     name = None
@@ -611,10 +655,10 @@ def dataset_status():
     for result in results:
         tb = None
         if result.error:
-            tb = result.error\
-                .replace('\r\n', '<br />')\
-                .replace('\n\r', '<br />')\
-                .replace('\n', '<br />')\
+            tb = result.error \
+                .replace('\r\n', '<br />') \
+                .replace('\n\r', '<br />') \
+                .replace('\n', '<br />') \
                 .replace('\r', '<br />')
         d = {
             'human_name': result.human_name,
@@ -663,8 +707,8 @@ def edit_shape(dataset_name):
             'attribution': form.attribution.data,
             'update_freq': form.update_freq.data,
         }
-        session.query(ShapeMetadata)\
-            .filter(ShapeMetadata.dataset_name == meta.dataset_name)\
+        session.query(ShapeMetadata) \
+            .filter(ShapeMetadata.dataset_name == meta.dataset_name) \
             .update(upd)
         session.commit()
 
@@ -699,11 +743,11 @@ class EditDatasetForm(Form):
     human_name = StringField('human_name', validators=[DataRequired()])
     description = StringField('description', validators=[DataRequired()])
     attribution = StringField('attribution', validators=[DataRequired()])
-    update_freq = SelectField('update_freq', 
+    update_freq = SelectField('update_freq',
                               choices=[('daily', 'Daily'),
                                        ('weekly', 'Weekly'),
                                        ('monthly', 'Monthly'),
-                                       ('yearly', 'Yearly')], 
+                                       ('yearly', 'Yearly')],
                               validators=[DataRequired()])
     observed_date = StringField('observed_date', validators=[DataRequired()])
     latitude = StringField('latitude')
@@ -714,17 +758,18 @@ class EditDatasetForm(Form):
         rv = Form.validate(self)
         if not rv:
             return False
-        
+
         valid = True
-        
+
         if not self.location.data and (not self.latitude.data or not self.longitude.data):
             valid = False
-            self.location.errors.append('You must either provide a Latitude and Longitude field name or a Location field name')
-        
+            self.location.errors.append(
+                'You must either provide a Latitude and Longitude field name or a Location field name')
+
         if self.longitude.data and not self.latitude.data:
             valid = False
             self.latitude.errors.append('You must provide both a Latitude field name and a Longitude field name')
-        
+
         if self.latitude.data and not self.longitude.data:
             valid = False
             self.longitude.errors.append('You must provide both a Latitude field name and a Longitude field name')
@@ -739,7 +784,7 @@ def edit_dataset(source_url_hash):
     meta = session.query(MetaTable).get(source_url_hash)
     fieldnames = meta.column_names
     num_rows = 0
-    
+
     if meta.approved_status:
         try:
             table_name = meta.dataset_name
@@ -752,7 +797,7 @@ def edit_dataset(source_url_hash):
             pk_name = [p.name for p in table.primary_key][0]
             pk = table.c[pk_name]
             num_rows = session.query(pk).count()
-            
+
         except sqlalchemy.exc.NoSuchTableError:
             # dataset has been approved, but perhaps still processing.
             pass
@@ -768,14 +813,14 @@ def edit_dataset(source_url_hash):
             'location': form.location.data,
             'observed_date': form.observed_date.data,
         }
-        session.query(MetaTable)\
-            .filter(MetaTable.source_url_hash == meta.source_url_hash)\
+        session.query(MetaTable) \
+            .filter(MetaTable.source_url_hash == meta.source_url_hash) \
             .update(upd)
         session.commit()
 
         if not meta.approved_status:
             approve_dataset(source_url_hash)
-        
+
         flash('%s updated successfully!' % meta.human_name, 'success')
         return redirect(url_for('views.view_datasets'))
     else:

@@ -675,3 +675,30 @@ def fast_count(q):
     count_q = q.statement.with_only_columns([func.count()]).order_by(None)
     count = q.session.execute(count_q).scalar()
     return count
+
+
+class Workers(Base):
+    __tablename__ = "plenario_workers"
+    name = Column(String(32), primary_key=True)
+    timestamp = Column(String(32), nullable=False)
+    uptime = Column(Integer, nullable=False)
+    job = Column(String(32), nullable=True)
+    jobcounter = Column(Integer, nullable=False)
+
+    def __init__(self, name, uptime):
+        self.name = name
+        self.timestamp = str(datetime.now())
+        self.uptime = uptime
+        self.jobcounter = 0
+
+    def check_in(self, uptime):
+        self.timestamp = str(datetime.now())
+        self.uptime = uptime
+
+    def register_job(self, job):
+        self.job = job
+
+    def deregister_job(self):
+        if self.job:
+            self.jobcounter += 1
+        self.job = None

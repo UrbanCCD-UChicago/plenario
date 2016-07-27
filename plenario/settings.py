@@ -27,9 +27,9 @@ CACHE_CONFIG = {
 
 # Load a default admin
 DEFAULT_USER = {
-    'name': get('DEFAULT_USER_NAME', 'jesse'),
-    'email': get('DEFAULT_USER_EMAIL', 'jesse@gmail.com'),
-    'password': get('DEFAULT_USER_PASSWORD', 'password')
+    'name': get('DEFAULT_USER_NAME', 'Plenario Admin'),
+    'email': get('DEFAULT_USER_EMAIL', 'plenario@email.com'),
+    'password': get('DEFAULT_USER_PASSWORD', 'changemeplz')
 }
 
 AWS_ACCESS_KEY = get('AWS_ACCESS_KEY_ID', '')

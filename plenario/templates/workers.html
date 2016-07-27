@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="5">
+    <title>Plenario Worker Status</title>
+    <style>
+        body, html {
+            margin: 0;
+        }
+
+        .worker {
+            display: inline-block;
+            vertical-align: top;
+            float: left;
+            padding: 1vw;
+            margin: 1vw;
+            border: 1px solid black;
+            box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            -webkit-box-sizing: border-box;
+            width: 23vw;
+            word-break: break-all;
+            overflow: hidden
+        }
+
+        .nominal {
+            background-color: green;
+            color: white;
+        }
+
+        .load {
+            background-color: yellow;
+        }
+
+        .overload {
+            background-color: red;
+            color: white;
+        }
+
+        .dead {
+            background-color: black;
+            color: white;
+        }
+
+        .job {
+            margin-left: 2vw;
+            background-color: rgba(255,255,255,0.2);
+            padding: 1vw;
+        }
+    </style>
+</head>
+<body>
+{% for worker in workers %}
+    <div class="worker {{ worker.status }}">
+        <h1>{{ worker.name }}</h1>
+        <p><b>Uptime:</b> {{ worker.humanized_uptime  }}</p>
+        <p><b>Last seen:</b> {{ worker.timestamp }}</p>
+        <p><b>Current job</b>: {{ worker.job }}</p>
+        {% if worker.job %}
+            <div class="job">
+                <p><b>Endpoint:</b> {{ worker.jobinfo.endpoint }}</p>
+                <p><b>Status:</b> {{ worker.jobinfo.status }}</p>
+                <p><b>Queue Time:</b> {{ worker.jobinfo.queuetime }}</p>
+                <p><b>Work Time:</b> {{ worker.jobinfo.worktime }}</p>
+                <p><b>Coworkers:</b> {{ worker.jobinfo.workers }}</p>
+            </div>
+        {% endif %}
+        <p><b>Experience:</b> {{ worker.jobcounter }} jobs</p>
+    </div>
+{% endfor %}
+</body>
+</html>

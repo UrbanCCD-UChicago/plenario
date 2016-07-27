@@ -38,7 +38,7 @@ def init_meta():
     print [table.name for table in Base.metadata.sorted_tables]
     non_meta_tables = [table for table in Base.metadata.sorted_tables
                        if table.name not in
-                       {'meta_master', 'meta_shape', 'plenario_user', 'plenario_datadump', 'etl_task'}]
+                       {'meta_master', 'meta_shape', 'plenario_user', 'plenario_workers', 'plenario_datadump', 'etl_task'}]
     for t in non_meta_tables:
         Base.metadata.remove(t)
 
