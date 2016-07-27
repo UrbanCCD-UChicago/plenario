@@ -676,11 +676,14 @@ def edit_shape(dataset_name):
     else:
         pass
 
+    num_rows = meta.num_shapes if meta.num_shapes else 0
+
     context = {
         'form': form,
         'meta': meta,
-        'num_rows': meta.num_shapes,
+        'num_rows': num_rows
     }
+
     return render_template('admin/edit-shape.html', **context)
 
 
