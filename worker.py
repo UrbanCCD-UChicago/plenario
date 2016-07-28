@@ -48,6 +48,49 @@ if __name__ == "__main__":
         logfile.write("{} - Worker {}: {}\n".format(datetime.datetime.now(), worker_id.ljust(24), msg))
         logfile.close()
 
+    def check_in(birthtime, worker_id):
+        try:
+            session.query(Workers).filter(Workers.name == worker_id).one().check_in(int(time.time() - birthtime))
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
+                register_worker(birthtime, worker_id)
+            else:
+                log("Problem updating worker registration: {}".format(e), worker_id)
+
+    def register_job(ticket, birthtime, worker_id):
+        check_in(birthtime, worker_id)
+        try:
+            session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
+                register_worker(birthtime, worker_id)
+            else:
+                log("Problem updating worker registration: {}".format(e), worker_id)
+
+    def deregister_job(birthtime, worker_id):
+        check_in(birthtime, worker_id)
+        try:
+            session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
+                register_worker(birthtime, worker_id)
+            else:
+                log("Problem updating worker registration: {}".format(e), worker_id)
+
+
+    def register_worker(birthtime, worker_id):
+        try:
+            session.add(Workers(worker_id, int(time.time() - birthtime)))
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            log("Problem updating worker registration: {}".format(e), worker_id)
 
     def stop_workers(signum, frame):
         global do_work
@@ -117,20 +160,14 @@ if __name__ == "__main__":
             }
 
             log("Hello! I'm ready for anything.", worker_id)
-            try:
-                session.add(Workers(worker_id, int(time.time()-birthtime)))
-                session.commit()
-            except Exception as e:
-                session.rollback()
-                log("Problem updating worker registration: {}".format(e), worker_id)
+            register_worker(birthtime, worker_id)
 
+            throttle = 5
             while do_work:
-                try:
-                    session.query(Workers).filter(Workers.name == worker_id).one().check_in(int(time.time()-birthtime))
-                    session.commit()
-                except Exception as e:
-                    session.rollback()
-                    log("Problem updating worker registration: {}".format(e), worker_id)
+                if throttle < 0:
+                    check_in(birthtime, worker_id)
+                    throttle = 5
+                throttle -= 1
 
                 response = JobsQueue.get_messages(message_attributes=["ticket"])
                 if len(response) > 0:
@@ -173,12 +210,7 @@ if __name__ == "__main__":
                     set_status(ticket, status)
 
                     log("Starting work on ticket {}.".format(ticket), worker_id)
-                    try:
-                        session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
-                        session.commit()
-                    except Exception as e:
-                        session.rollback()
-                        log("Problem updating worker registration: {}".format(e), worker_id)
+                    register_job(ticket, birthtime, worker_id)
 
                     # =========== Do work on query =========== #
                     try:
@@ -269,12 +301,7 @@ if __name__ == "__main__":
                         JobsQueue.delete_message(job)
                         traceback.print_exc()
                     finally:
-                        try:
-                            session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
-                            session.commit()
-                        except Exception as e:
-                            session.rollback()
-                            log("Problem updating worker registration: {}".format(e), worker_id)
+                        deregister_job(birthtime, worker_id)
 
                 else:
                     # No work! Idle for a bit to save compute cycles.

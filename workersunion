@@ -1,6 +1,6 @@
 #!/bin/bash
 # processname: workersunion
-# chkconfig: 2345 20 80
+# chkconfig: 2345 99 00
 # description: Securing the right for workers to finish the job.
 
 # Source function library.
@@ -26,7 +26,7 @@ stop() {
 	tail /opt/python/log/worker.log
 	echo "Workers Union: All workers have finished and left.";
 	
-	rm -f /var/lock/subsys/unionboss;
+	rm -f /var/lock/subsys/workersunion;
 }
 
 case "$1" in 

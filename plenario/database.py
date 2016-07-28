@@ -1,13 +1,12 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.declarative import declarative_base
 
 from plenario.settings import DATABASE_CONN
 
 if os.environ.get('WORKER'):
-    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=5)
+    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=4)
 else:
     app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=2)
 

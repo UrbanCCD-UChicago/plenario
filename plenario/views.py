@@ -2,6 +2,7 @@ import math
 import itertools
 import json
 import re
+import traceback
 import dateutil.relativedelta
 from cStringIO import StringIO
 from collections import namedtuple
@@ -76,19 +77,26 @@ def terms_view():
 
 @views.route('/workers')
 def workers():
-    q = session.query(Workers).all();
+    q = session.query(Workers).all()
     workerlist = [row.__dict__ for row in q]
     now = datetime.now()
+    nominal = 0
+    loaded = 0
+    dead = 0
     for worker in workerlist:
         lastseen = (now - datetime.strptime(worker["timestamp"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds()
         if lastseen > 600:
             worker["status"] = "dead"
+            dead+=1
         elif lastseen > 300:
             worker["status"] = "overload"
+            loaded+=1
         elif lastseen > 60:
             worker["status"] = "load"
+            loaded+=1
         else:
             worker["status"] = "nominal"
+            nominal+=1
 
         diff = dateutil.relativedelta.relativedelta(datetime.fromtimestamp(worker["uptime"]),
                                                       datetime.fromtimestamp(0))
@@ -103,24 +111,53 @@ def workers():
 
         if worker["job"]:
             job = json.loads(get_job(worker["job"]).get_data())
-            if job["status"]["meta"].get("lastStartTime"):
-                diff = dateutil.relativedelta.relativedelta(datetime.now(),
-                                                            datetime.strptime(job["status"]["meta"]["lastStartTime"],
-                                                                              "%Y-%m-%d %H:%M:%S.%f"))
+            if job.get("error"):
+                worker["status"] = "dead"
+                worker["jobinfo"] = {
+                    "status": "TIMED OUT",
+                    "workers": "",
+                    "queuetime": "",
+                    "worktime": "",
+                    "endpoint": ""
+                }
             else:
-                diff = dateutil.relativedelta.relativedelta(datetime.now(),
+                if job["status"]["meta"].get("lastStartTime"):
+                    diff = dateutil.relativedelta.relativedelta(datetime.now(),
+                                                            datetime.strptime(job["status"]["meta"]["lastStartTime"],
+                                                                    "%Y-%m-%d %H:%M:%S.%f"))
+                else:
+                    diff = dateutil.relativedelta.relativedelta(datetime.now(),
                                                             datetime.strptime(job["status"]["meta"]["startTime"],
-                                                                              "%Y-%m-%d %H:%M:%S.%f"))
-            worker["jobinfo"] = {
-                "status": job["status"]["status"],
-                "workers": ", ".join(job["status"]["meta"]["workers"]),
-                "queuetime": job["status"]["meta"]["queueTime"],
-                "worktime": "{}d {}h {}m {}s".format(diff.days, diff.hours, diff.minutes, diff.seconds),
-                "endpoint": job["request"]["endpoint"]
-            }
+                                                                                  "%Y-%m-%d %H:%M:%S.%f"))
+                worker["jobinfo"] = {
+                    "status": job["status"]["status"],
+                    "workers": ", ".join(job["status"]["meta"]["workers"]),
+                    "queuetime": job["status"]["meta"]["queueTime"],
+                    "worktime": " {}h {}m {}s".format(diff.hours, diff.minutes, diff.seconds).replace(
+                        " 0h ", "  ").replace(" 0m ", " ")[1:],
+                    "endpoint": job["request"]["endpoint"]
+                }
     workerlist.sort(key=lambda worker: worker["name"])
-    return render_template('workers.html', workers=workerlist, queuelength=JobsQueue.count())
+    jobs = JobsQueue.count()
+    workercounts = {
+        "total": len(workerlist),
+        "nominal": nominal,
+        "loaded": loaded,
+        "dead": dead
+    }
+    return render_template('workers.html', workers=workerlist,
+                           workercounts=workercounts, queuelength=jobs, overload=(jobs>=8))
 
+@views.route('/workers/purge')
+def purge_workers():
+    try:
+        session.query(Workers).delete()
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        traceback.print_exc()
+        print("Problem purging plenario_workers: {}".format(e))
+    return redirect(url_for('views.workers'))
 
 '''Approve a dataset'''
 

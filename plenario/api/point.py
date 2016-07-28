@@ -2,6 +2,7 @@ import os
 import json
 import re
 import math
+import random
 import shapely.geometry
 import shapely.wkb
 import copy
@@ -389,7 +390,7 @@ def _datadump(args):
 
 def _datadump_manager(args):
     requestid = args.data["jobsframework_ticket"]
-    chunksize = 10000
+    chunksize = 1000
     original_validated = copy.deepcopy(args)
 
     query = original_validated.data
@@ -468,7 +469,7 @@ def _datadump_manager(args):
             set_flag(requestid + "_dowork", True, 600)
 
             # Idle until later to save CPU cycles and let other threads do work.
-            return {"jobsframework_metacommands": [{"setTimeout": 5}, {"defer"}]}
+            return {"jobsframework_metacommands": [{"setTimeout": 1}, {"defer"}]}
 
         else:
             # Since a job just completed, queue a new job if there is
@@ -508,7 +509,10 @@ def _datadump_cleanup(args):
         cleanup_datadump(args.data["datadump_requestid"])
         return {"status": "success"}
     else:
-        return {"jobsframework_metacommands": ["resubmit"]}
+        if (datetime.now() - datetime.strptime(get_status(args.data["jobsframework_ticket"])["meta"]["queueTime"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > 1800:
+            return {"jobsframework_metacommands": ["resubmit"]}
+        else:
+            return {"jobsframework_metacommands": ["defer"]}
 
 
 # Datadump utilities =======================

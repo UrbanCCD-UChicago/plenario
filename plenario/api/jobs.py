@@ -70,10 +70,10 @@ def set_flag(flag, state, expire=60):
 
 
 def touch_ticket_expiry(ticket):
-    # Expire all job handles in 1 hour.
-    JobsDB.expire(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_query_" + ticket, 3600)
-    JobsDB.expire(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_result_" + ticket, 3600)
-    JobsDB.expire(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_status_" + ticket, 3600)
+    # Expire all job handles in 3 hours.
+    JobsDB.expire(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_query_" + ticket, 10800)
+    JobsDB.expire(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_result_" + ticket, 10800)
+    JobsDB.expire(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_status_" + ticket, 10800)
 
 
 def ticket_exists(ticket):
