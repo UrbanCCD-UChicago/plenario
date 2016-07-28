@@ -55,6 +55,7 @@ class Validator(Schema):
     start_datetime = fields.DateTime(default=datetime.now() - timedelta(days=90))
     end_datetime = fields.DateTime(default=datetime.now())
     feature = fields.Str(allow_none=True, missing=None, default=None, validate=OneOf(FeatureOfInterest.index()))
+    filter = fields.Str(allow_none=True, missing=None, default=None)
 
 
 class NoGeoJSONValidator(Validator):
@@ -151,12 +152,11 @@ def validate(validator, request_args):
 
     # If tree filters were provided, ignore ALL unchecked parameters that are
     # not tree filters or response format information.
-
     if 'filter' in request_args.keys():
 
         try:
             meta = MetaData()
-            table_name = result.data['network_name']
+            table_name = result.data['network_name'].lower()
             table = Table(table_name, meta, autoload=True, autoload_with=redshift_engine)
         except (AttributeError, NoSuchTableError):
             result.errors[table_name] = "Table name {} not found in Redshift".format(table_name)
@@ -197,7 +197,7 @@ def valid_tree(table, tree):
         raise ValueError("Invalid keyword in {}".format(tree))
 
     if op == "and" or op == "or":
-        return all([valid_tree(subtree) for subtree in tree['val']])
+        return all([valid_tree(table, subtree) for subtree in tree['val']])
 
     elif op in field_ops:
         col = tree.get('col')

@@ -104,6 +104,17 @@ mag_field = FeatureOfInterest(name='magneticField',
                                   }
                               ]})
 
+atm = FeatureOfInterest(name='atmosphericPressure',
+                         sensorNetwork='ArrayOfThings',
+                         observedProperties={'observedProperties': [
+                             {
+                                 "name": "pressure",
+                                 "type": "numeric",
+                                 "unit": "atms",
+                                 "description": "accurate"
+                             }
+                         ]})
+
 hum = FeatureOfInterest(name='humidity',
                         sensorNetwork='InternetOfStuff',
                         observedProperties={'observedProperties': [
@@ -116,24 +127,26 @@ hum = FeatureOfInterest(name='humidity',
                         ]})
 
 
-Base.metadata.create_all(app_engine)
-session.add(aot)
-session.add(ios)
+# Base.metadata.create_all(app_engine)
+# session.add(aot)
+# session.add(ios)
+# session.commit()
+#
+# for node in nodes:
+#     session.add(node)
+#     node.featuresOfInterest.append(temp)
+#     node.featuresOfInterest.append(mag_field)
+# session.add(iosnode)
+# iosnode.featuresOfInterest.append(hum)
+# session.commit()
+#
+# session.add(temp)
+# session.add(mag_field)
+# session.commit()
+#
+# for i in session.query(NetworkMeta).all()[0].nodes:
+#     print i.id
+
+session.add(atm)
 session.commit()
-
-for node in nodes:
-    session.add(node)
-    node.featuresOfInterest.append(temp)
-    node.featuresOfInterest.append(mag_field)
-session.add(iosnode)
-iosnode.featuresOfInterest.append(hum)
-session.commit()
-
-session.add(temp)
-session.add(mag_field)
-session.commit()
-
-for i in session.query(NetworkMeta).all()[0].nodes:
-    print i.id
-
 

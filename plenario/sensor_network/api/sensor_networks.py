@@ -84,7 +84,7 @@ def get_features(network_name=None, feature=None):
 def get_observations(network_name, node_id=None):
     fields = ('network_name', 'node_id', 'nodes',
               'start_datetime', 'end_datetime',
-              'location_geom__within'
+              'location_geom__within', 'filter'
               )
 
     args = request.args.to_dict()
@@ -140,17 +140,18 @@ def node_metadata_query(args):
 
 def observation_query(args):
     params = ('nodes', 'filter',
-              'start_datetime', 'end_datetime')
+              'start_datetime', 'end_datetime',
+              'table')
 
     vals = (args.data.get(k) for k in params)
-    nodes, filter, start_datetime, end_datetime = vals
+    nodes, filter, start_datetime, end_datetime, table = vals
 
-    q = redshift_session.query(Observation)
+    q = redshift_session.query(table)
 
-    q = q.filter(Observation.datetime.between(start_datetime, end_datetime))
-    q = q.filter(Observation.node_id.in_(nodes))
+    q = q.filter(table.c.datetime.between(start_datetime, end_datetime))
+    q = q.filter(table.c.nodeid.in_(nodes))
     if filter:
-        q = q.filter(parse_tree(Observation.__table__, filter))
+        q = q.filter(parse_tree(table, filter))
 
     return q
 
@@ -192,15 +193,23 @@ def format_feature(feature):
     return feature_response
 
 
-def format_observation(obs, table):
-    obs_response = {}
-    for col in table.columns.keys():
-        if '__' in col:
-            if col.split('__')[0] not in obs_response.keys():
-                obs_response[col.split('__')[0]] = {}
-            obs_response[col.split('__')[0]][col.split('__')[1]] = obs.col
-        else:
-            obs_response[col] = obs.col
+def format_observation(obs, feature_properties):
+    obs_response = {
+        'node_id': obs.nodeid,
+        'datetime': obs.datetime.isoformat(),
+        'featureOfInterest': obs.feature,
+        'sensor': obs.sensor,
+        'results': {
+            feature_properties[obs.feature][0]: obs.property1
+        }
+    }
+
+    if len(feature_properties[obs.feature]) > 1:
+        obs_response['results'][feature_properties[obs.feature][1]] = obs.property2
+    if len(feature_properties[obs.feature]) > 2:
+        obs_response['results'][feature_properties[obs.feature][2]] = obs.property3
+    if len(feature_properties[obs.feature]) > 3:
+        obs_response['results'][feature_properties[obs.feature][3]] = obs.property4
 
     return obs_response
 
@@ -264,17 +273,31 @@ def _get_observations(args):
 
     args.data['nodes'] = nodes_to_query
 
-    q = observation_query(args)
-
     try:
         meta = sqlalchemy.MetaData()
-        table_name = args.data['network_name']
+        table_name = args.data['network_name'].lower()
         table = sqlalchemy.Table(table_name, meta, autoload=True, autoload_with=redshift_engine)
     except (AttributeError, NoSuchTableError):
         msg = "Table name {} not found in Redshift".format(table_name)
         return bad_request(msg)
 
-    data = [format_observation(obs, table) for obs in q.all()]
+    args.data['table'] = table
+
+    # query observations
+    q = observation_query(args)
+
+    # determine the features returned in the query
+    all_features = set([obs.feature for obs in q.all()])
+
+    # create a dictionary containing all necessary features and their properties in order to format response
+    feature_properties = {}
+    for feature in all_features:
+        fq = session.query(FeatureOfInterest)
+        fq = fq.filter(FeatureOfInterest.name == feature)
+        properties_list = fq.first().observedProperties['observedProperties']
+        feature_properties[feature] = [properties_list[i]['name'] for i in range(0, len(properties_list))]
+
+    data = [format_observation(obs, feature_properties) for obs in q.all()]
 
     # if the user didn't specify a 'nodes' filter, don't display nodes in the query output
     if 'nodes' not in request.args:
@@ -284,6 +307,10 @@ def _get_observations(args):
     # and will not be displayed in the query output
     if 'geom' in args.data:
         args.data.pop('geom')
+
+    # the reflected table object used for querying should returned in the output
+    if 'table' in args.data:
+        args.data.pop('table')
 
     # don't display null query arguments
     null_args = [field for field in args.data if args.data[field] is None]
