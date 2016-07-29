@@ -87,9 +87,14 @@ def form_csv_detail_response(to_remove, rows):
     to_remove.append('geom')
     remove_columns_from_dict(rows, to_remove)
 
-    # Column headers from arbitrary row,
-    # then the values from all the others
-    csv_resp = [rows[0].keys()] + [row.values() for row in rows]
+    if len(rows) <= 0:
+        csv_resp = [["Sorry! Your query didn't return any results."]]
+        csv_resp += [["Try to modify your date or location parameters."]]
+    else:
+        # Column headers from arbitrary row,
+        # then the values from all the others
+        csv_resp = [rows[0].keys()] + [row.values() for row in rows]
+
     resp = make_response(make_csv(csv_resp), 200)
     dname = request.args.get('dataset_name')
     filedate = datetime.now().strftime('%Y-%m-%d')

@@ -267,7 +267,7 @@ def _detail_aggregate(args):
         resp.headers['Content-Type'] = 'application/json'
 
     elif datatype == 'csv':
-        resp = make_csv(time_counts)
+        resp = form_csv_detail_response(['point_date', 'hash'], time_counts)
         resp.headers['Content-Type'] = 'text/csv'
         filedate = datetime.now().strftime('%Y-%m-%d')
         resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
