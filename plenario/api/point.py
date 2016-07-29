@@ -476,7 +476,7 @@ def _datadump_manager(args):
             # still work to do
             if len(jobs) < chunks:
                 jobs.append(queue_part(len(jobs), query))
-            workerlist.add(*get_status(ticket)["meta"]["workers"])
+            workerlist.update(get_status(ticket)["meta"]["workers"])
             req = get_request(requestid)
             req["workarea"]["jobs"] = jobs
             req["workarea"]["workers"] = list(workerlist)
@@ -549,10 +549,6 @@ def detail_query(args, aggregate=False):
     # to make the general filters into an 'and' tree.
     if not has_tree_filters(args.data):
         # Creates an AND condition tree and adds it to args.
-        if type(dataset) == unicode:
-            print "ONE"
-            print dataset
-            print converters["dataset"][dataset]
         args.data[dataset.name + '__filter'] = request_args_to_condition_tree(
             request_args=args.data,
             ignore=['shapeset']
@@ -757,10 +753,6 @@ def request_args_to_condition_tree(request_args, ignore=list()):
         if k[0] == 'obs_date':
             k[0] = 'point_date'
         if k[0] == 'date' and 'time_of_day' in k[1]:
-            if type(request_args.get('dataset')) == unicode:
-                print "TWO"
-                print request_args["dataset"]
-                print converters["dataset"][request_args["dataset"]]
             k[0] = sqlalchemy.func.date_part('hour', request_args.get('dataset').c.point_date)
             k[1] = 'le' if 'le' in k[1] else 'ge'
 
