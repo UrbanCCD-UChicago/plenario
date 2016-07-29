@@ -257,19 +257,12 @@ def _detail_aggregate(args):
 
         time_counts += [{'count': c, 'datetime': d} for c, d in ts[1:]]
 
-    total_count = sum([c['count'] for c in time_counts])
-
-    if total_count <= 0:
-        return bad_request("Your request doesn't return any results. Try "
-                           "adjusting your time constraint or location "
-                           "parameters.")
-
     resp = None
 
     datatype = args.data['data_type']
     if datatype == 'json':
         resp = json_response_base(args, time_counts, request.args)
-        resp['count'] = total_count
+        resp['count'] = sum([c['count'] for c in time_counts])
         resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
         resp.headers['Content-Type'] = 'application/json'
 
@@ -304,11 +297,6 @@ def _detail(args):
         return internal_error("Failed to fetch records.", ex)
 
     to_remove = ['point_date', 'hash']
-
-    if not result_rows:
-        return bad_request("Your request doesn't return any results. Try "
-                           "adjusting your time constraint or location "
-                           "parameters.")
 
     if data_type == 'json':
         return form_json_detail_response(to_remove, args, result_rows)

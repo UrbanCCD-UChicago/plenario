@@ -370,7 +370,7 @@ class PointAPITests(BasePlenarioTest):
 
     def test_timeseries_with_a_tree_filter(self):
         endpoint = 'timeseries'
-        query = '?obs_date__ge=2005&agg=year'
+        query = '?obs_date__ge=2005-01-01&agg=year'
         qfilter = '&crimes__filter={"op": "eq", "col": "iucr", "val": 1150}'
 
         resp_data = self.get_api_response(endpoint + query + qfilter)
@@ -378,7 +378,7 @@ class PointAPITests(BasePlenarioTest):
         # Crimes is the only one that gets a filter applied.
         self.assertEqual(resp_data['objects'][0]['count'], 2)
         self.assertEqual(resp_data['objects'][1]['count'], 65)
-        self.assertEqual(resp_data['objects'][2]['count'], 85)
+        self.assertEqual(resp_data['objects'][2]['count'], 88)
 
     def test_timeseries_with_multiple_filters(self):
         endpoint = 'timeseries'
