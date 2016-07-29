@@ -159,8 +159,8 @@ def observation_query(args):
 def format_network_metadata(network):
     network_response = {
         'name': network.name,
-        'nodeMetadata': network.nodeMetadata,
-        'featuresOfInterest': [feature.name for feature in network.featuresOfInterest],
+        'node_metadata': network.nodeMetadata,
+        'features_of_interest': [feature.name for feature in network.featuresOfInterest],
         'nodes': [node.id for node in network.nodes]
     }
 
@@ -170,13 +170,13 @@ def format_network_metadata(network):
 def format_node_metadata(node):
     node_response = {
         'id': node.id,
-        'sensorNetwork': node.sensorNetwork,
+        'network_name': node.sensorNetwork,
         'location': {
             'lat': wkb.loads(bytes(node.location.data)).y,
             'lon': wkb.loads(bytes(node.location.data)).x
         },
         'version': node.version,
-        'featuresOfInterest': [foi.name for foi in node.featuresOfInterest],
+        'features_of_interest': [foi.name for foi in node.featuresOfInterest],
         'procedures': node.procedures
     }
 
@@ -186,8 +186,8 @@ def format_node_metadata(node):
 def format_feature(feature):
     feature_response = {
         'name': feature.name,
-        'sensorNetwork': feature.sensorNetwork,
-        'observedProperties': feature.observedProperties['observedProperties']
+        'network_name': feature.sensorNetwork,
+        'observed_properties': feature.observedProperties['observedProperties']
     }
 
     return feature_response
@@ -197,7 +197,7 @@ def format_observation(obs, feature_properties):
     obs_response = {
         'node_id': obs.nodeid,
         'datetime': obs.datetime.isoformat(),
-        'featureOfInterest': obs.feature,
+        'feature_of_interest': obs.feature,
         'sensor': obs.sensor,
         'results': {
             feature_properties[obs.feature][0]: obs.property1
@@ -289,7 +289,9 @@ def _get_observations(args):
     # determine the features returned in the query
     all_features = set([obs.feature for obs in q.all()])
 
-    # create a dictionary containing all necessary features and their properties in order to format response
+    # create a dictionary containing all necessary features
+    # this will be used to map col names in the query to redshift columns
+    # and to map the values returned to their corresponding properties in the response
     feature_properties = {}
     for feature in all_features:
         fq = session.query(FeatureOfInterest)
