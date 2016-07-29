@@ -263,13 +263,19 @@ def validate(validator, request_args):
             field = param.split('__')[0]
             if table is not None:
                 try:
-                    valid_column_condition(table, field, args[param])
+                    param = param.encode()
+                    value = args[param].encode()
+
+                    valid_column_condition(table, field, value)
                     result.data[param] = args[param]
+                except UnicodeEncodeError:
+                    result.errors['EncodeError'] = ['Either your column or your value cannot be encoded into unicode.']
+                    result.errors['EncodeError'] += (param, args[param])
                 except KeyError:
-                    warnings.append('Unused parameter value "{}={}"'.format(param, args[param]))
+                    warnings.append('Unused parameter value "{}={}"'.format(param, value))
                     warnings.append('{} is not a valid column for {}'.format(param, table))
                 except ValueError:
-                    warnings.append('Unused parameter value "{}={}"'.format(param, args[param]))
+                    warnings.append('Unused parameter value "{}={}"'.format(param, value))
                     warnings.append('{} is not a valid value for {}'.format(args[param], param))
 
     # ValidatorResult(dict, dict, list)
