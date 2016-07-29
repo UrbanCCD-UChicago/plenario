@@ -9,6 +9,7 @@ from sqlalchemy.exc import NoSuchTableError, InternalError
 from plenario.database import session as session, app_engine as engine
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
+from plenario.api.jobs import submit_job
 from plenario.models import MetaTable, ShapeMetadata
 from plenario.models_.ETLTask import update_task, ETLStatus, delete_task
 from plenario.settings import CELERY_SENTRY_URL
@@ -139,7 +140,7 @@ def delete_shape(table_name):
 
 
 def frequency_update(frequency):
-    """Execute a update task for all the tables whose corresponding meta info
+    """Queue an update task for all the tables whose corresponding meta info
     is part of this frequency group.
 
     :param frequency: (string) how often these tables are meant to be updated,
@@ -151,16 +152,18 @@ def frequency_update(frequency):
         .filter(MetaTable.date_added != None)\
         .all()
     for m in md:
-        update_dataset(m.source_url_hash)
+        print "submitted job"
+        submit_job({"endpoint": "update_dataset", "query": m.source_url_hash})
 
     md = session.query(ShapeMetadata)\
         .filter(ShapeMetadata.update_freq == frequency)\
         .filter(ShapeMetadata.is_ingested == True)\
         .all()
     for m in md:
-        update_shape(m.dataset_name)
+        print "submitted job"
+        submit_job({"endpoint": "update_shape", "query": m.dataset_name})
 
-    return '%s update complete' % frequency
+    return '%s updates queued.' % frequency
 
 
 def update_metar():

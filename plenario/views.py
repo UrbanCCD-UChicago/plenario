@@ -764,18 +764,24 @@ def edit_shape(dataset_name):
     else:
         pass
 
+    num_rows = meta.num_shapes if meta.num_shapes else 0
+
     context = {
         'form': form,
         'meta': meta,
+        'num_rows': num_rows
     }
+
     return render_template('admin/edit-shape.html', **context)
 
 
-# TODO: Currently not accessible from the admin views.
-# I added this because datasets have an analogous function.
-# Was this meant to be a feature? Or is this intentionally left out?
-def update_shape(source_url_hash):
-    job = {"endpoint": "update_shape", "query": source_url_hash}
+@views.route('/update-shape/<dataset_name>')
+def update_shape_view(dataset_name):
+    return update_dataset(dataset_name)
+
+
+def update_shape(dataset_name):
+    job = {"endpoint": "update_shape", "query": dataset_name}
     ticket = submit_job(job)
     return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
 
