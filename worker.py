@@ -23,7 +23,9 @@ if __name__ == "__main__":
     import boto.sqs
     import threading
     import traceback
+    import os
     from collections import namedtuple
+    # from subprocess import check_output
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
     from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump_manager, _datadump
     from plenario.api.jobs import get_status, set_status, get_request, set_result, submit_job
@@ -316,6 +318,13 @@ if __name__ == "__main__":
             log("Problem updating worker registration: {}".format(e), worker_id)
 
         log("Exited run loop. Goodbye!", worker_id)
+
+    # Each container should only have one worker.py running at all times.
+    # while len(check_output("pgrep -f worker.py", shell=True).split("\n"))-1 > 0:
+    #     print "There is already a worker process. Waiting for it to exit..."
+    #     time.sleep(5)
+
+    log("RUNNING FROM DIRECTORY: {}".format(os.getcwd()), "WORKER BOSS")
 
     threads = []
     for i in range(worker_threads):
