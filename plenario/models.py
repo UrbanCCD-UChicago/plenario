@@ -1,21 +1,21 @@
 import json
-import sqlalchemy as sa
-
 from collections import namedtuple
 from datetime import datetime
-from flask_bcrypt import Bcrypt
-from geoalchemy2 import Geometry
 from hashlib import md5
 from itertools import groupby
 from operator import itemgetter
+from uuid import uuid4
+
+import sqlalchemy as sa
+from flask_bcrypt import Bcrypt
+from geoalchemy2 import Geometry
 from sqlalchemy import Column, String, Boolean, Date, DateTime, Text, func
 from sqlalchemy import Table, select, Integer
-from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import synonym
 from sqlalchemy.types import NullType
-from uuid import uuid4
 
 from plenario.database import session, Base
 from plenario.utils.helpers import get_size_in_degrees, slugify
@@ -671,12 +671,6 @@ class DataDump(Base):
         return self.id
 
 
-def fast_count(q):
-    count_q = q.statement.with_only_columns([func.count()]).order_by(None)
-    count = q.session.execute(count_q).scalar()
-    return count
-
-
 class Workers(Base):
     __tablename__ = "plenario_workers"
     name = Column(String(32), primary_key=True)
@@ -691,9 +685,8 @@ class Workers(Base):
         self.uptime = uptime
         self.jobcounter = 0
 
-    def check_in(self, uptime):
+    def check_in(self):
         self.timestamp = str(datetime.now())
-        self.uptime = uptime
 
     def register_job(self, job):
         self.job = job

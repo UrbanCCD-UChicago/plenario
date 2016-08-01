@@ -1,4 +1,3 @@
-import math
 import itertools
 import json
 import re
@@ -91,15 +90,14 @@ def workers():
         elif lastseen > 300:
             worker["status"] = "overload"
             loaded+=1
-        elif lastseen > 60:
+        elif lastseen > 10:
             worker["status"] = "load"
             loaded+=1
         else:
             worker["status"] = "nominal"
             nominal+=1
 
-        diff = dateutil.relativedelta.relativedelta(datetime.fromtimestamp(worker["uptime"]),
-                                                      datetime.fromtimestamp(0))
+        diff = dateutil.relativedelta.relativedelta(now,datetime.fromtimestamp(worker["uptime"]))
         worker["humanized_uptime"] = " {}d {}h {}m {}s".format(
             diff.days, diff.hours, diff.minutes, diff.seconds).replace(
             " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
@@ -122,11 +120,11 @@ def workers():
                 }
             else:
                 if job["status"]["meta"].get("lastStartTime"):
-                    diff = dateutil.relativedelta.relativedelta(datetime.now(),
+                    diff = dateutil.relativedelta.relativedelta(now,
                                                             datetime.strptime(job["status"]["meta"]["lastStartTime"],
                                                                     "%Y-%m-%d %H:%M:%S.%f"))
                 else:
-                    diff = dateutil.relativedelta.relativedelta(datetime.now(),
+                    diff = dateutil.relativedelta.relativedelta(now,
                                                             datetime.strptime(job["status"]["meta"]["startTime"],
                                                                                   "%Y-%m-%d %H:%M:%S.%f"))
                 worker["jobinfo"] = {

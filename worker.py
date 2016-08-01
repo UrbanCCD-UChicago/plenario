@@ -10,11 +10,83 @@
 ###############################################################
 
 import plenario.database
+import traceback
+from plenario.models import Workers
 session = plenario.database.session
 
 worker_threads = 4
 wait_interval = 1
 
+
+# ======================= Worker Utilities ========================
+def log(msg, worker_id):
+    logfile = open('/opt/python/log/worker.log', "a")
+    logfile.write("{} - Worker {}: {}\n".format(datetime.datetime.now(), worker_id.ljust(24), msg))
+    logfile.close()
+
+
+def check_in(birthtime, worker_id):
+    try:
+        session.query(Workers).filter(Workers.name == worker_id).one().check_in()
+        session.commit()
+    except Exception as e:
+        traceback.print_exc()
+        session.rollback()
+        if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
+            register_worker(birthtime, worker_id)
+        else:
+            log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+
+
+def register_job(ticket, birthtime, worker_id):
+    check_in(birthtime, worker_id)
+    try:
+        session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
+        session.commit()
+    except Exception as e:
+        traceback.print_exc()
+        session.rollback()
+        if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
+            register_worker(birthtime, worker_id)
+        else:
+            log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+
+
+def deregister_job(birthtime, worker_id):
+    check_in(birthtime, worker_id)
+    try:
+        session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
+        session.commit()
+    except Exception as e:
+        traceback.print_exc()
+        session.rollback()
+        if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
+            register_worker(birthtime, worker_id)
+        else:
+            log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+
+
+def register_worker(birthtime, worker_id):
+    try:
+        session.add(Workers(worker_id, int(birthtime)))
+        session.commit()
+    except Exception as e:
+        traceback.print_exc()
+        session.rollback()
+        log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+
+
+def deregister_worker(worker_id):
+    try:
+        session.query(Workers).filter(Workers.name == worker_id).delete()
+        session.commit()
+    except Exception as e:
+        traceback.print_exc()
+        session.rollback()
+        log("Problem updating worker registration: {}".format(e), worker_id)
+
+
+# =========================== The Worker Process ===============================
 if __name__ == "__main__":
 
     import datetime
@@ -22,13 +94,12 @@ if __name__ == "__main__":
     import signal
     import boto.sqs
     import threading
-    import traceback
     import psycopg2
     import os
     from collections import namedtuple
     # from subprocess import check_output
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
-    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump_manager, _datadump
+    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump
     from plenario.api.jobs import get_status, set_status, get_request, set_result, submit_job
     from plenario.api.shape import _aggregate_point_data, _export_shape
     from plenario.api.response import convert_result_geoms
@@ -37,76 +108,11 @@ if __name__ == "__main__":
     from plenario.tasks import add_shape, update_shape, delete_shape
     from plenario.tasks import update_weather, frequency_update
     from plenario.utils.name_generator import generate_name
-    from plenario.models import Workers
     from flask import Flask
 
     do_work = True
 
     ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
-
-    def log(msg, worker_id):
-        # The constant opening and closing is meh, I know. But I'm feeling lazy
-        # right now.
-        logfile = open('/opt/python/log/worker.log', "a")
-        logfile.write("{} - Worker {}: {}\n".format(datetime.datetime.now(), worker_id.ljust(24), msg))
-        logfile.close()
-
-    def check_in(birthtime, worker_id):
-        try:
-            session.query(Workers).filter(Workers.name == worker_id).one().check_in(int(time.time() - birthtime))
-            session.commit()
-        except Exception as e:
-            traceback.print_exc()
-            session.rollback()
-            if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
-                register_worker(birthtime, worker_id)
-            else:
-                log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-
-    def register_job(ticket, birthtime, worker_id):
-        check_in(birthtime, worker_id)
-        try:
-            session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
-            session.commit()
-        except Exception as e:
-            traceback.print_exc()
-            session.rollback()
-            if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
-                register_worker(birthtime, worker_id)
-            else:
-                log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-
-    def deregister_job(birthtime, worker_id):
-        check_in(birthtime, worker_id)
-        try:
-            session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
-            session.commit()
-        except Exception as e:
-            traceback.print_exc()
-            session.rollback()
-            if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
-                register_worker(birthtime, worker_id)
-            else:
-                log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-
-
-    def register_worker(birthtime, worker_id):
-        try:
-            session.add(Workers(worker_id, int(time.time() - birthtime)))
-            session.commit()
-        except Exception as e:
-            traceback.print_exc()
-            session.rollback()
-            log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-
-    def deregister_worker(worker_id):
-        try:
-            session.query(Workers).filter(Workers.name == worker_id).delete()
-            session.commit()
-        except Exception as e:
-            traceback.print_exc()
-            session.rollback()
-            log("Problem updating worker registration: {}".format(e), worker_id)
 
     def stop_workers(signum, frame):
         global do_work
@@ -125,11 +131,11 @@ if __name__ == "__main__":
 
 
     def worker():
+        worker_id = generate_name()
+        birthtime = time.time()
+
         while do_work:
             try:
-                worker_id = generate_name()
-                birthtime = time.time()
-
                 # Holds the methods which perform the work requested by an incoming job.
                 app = Flask(__name__)
                 with app.app_context():
@@ -149,8 +155,7 @@ if __name__ == "__main__":
                         'fields': lambda args: _meta(args),
                         # /grid?<args>
                         'grid': lambda args: _grid(args),
-                        'datadump': lambda args: _datadump_manager(args),
-                        'datadump_work': lambda args: _datadump(args),
+                        'datadump': lambda args: _datadump(args),
                         # Health endpoint.
                         'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)},
                         # Utility tasks
@@ -241,6 +246,7 @@ if __name__ == "__main__":
                                     # Add worker metadata
                                     query_args["jobsframework_ticket"] = ticket
                                     query_args["jobsframework_workerid"] = worker_id
+                                    query_args["jobsframework_workerbirthtime"] = birthtime
 
                                     # Because we're getting serialized arguments from Redis,
                                     # we need to convert them back into a validated form.
@@ -310,7 +316,7 @@ if __name__ == "__main__":
                                 JobsQueue.delete_message(job)
                             except Exception as e:
                                 status = get_status(ticket)
-                                if status["meta"].get("retries") and status["meta"]["retries"] > 5:
+                                if status["meta"].get("tries") and status["meta"]["tries"] > 4:
                                     status["status"] = "error"
                                     status["meta"]["endTime"] = str(datetime.datetime.now())
                                     log("ERROR: Ticket {} errored with: {}.".format(ticket, e), worker_id)
@@ -320,7 +326,7 @@ if __name__ == "__main__":
                                 else:
                                     status["status"] = "queued"
                                     status["meta"]["lastDeferredTime"] = str(datetime.datetime.now())
-                                    status["meta"]["retries"] = status["meta"]["retries"]+1 if status["meta"].get("retries") else 1
+                                    status["meta"]["tries"] = status["meta"]["tries"]+1 if status["meta"].get("tries") else 1
                                     log("ERROR: Ticket {} errored with: {}...retrying.".format(ticket, e), worker_id)
                                     set_status(ticket, status)
                                 traceback.print_exc()
@@ -334,7 +340,7 @@ if __name__ == "__main__":
                     deregister_worker(worker_id)
             except Exception as e:
                 traceback.print_exc()
-                log("ERROR: {}. Retrying in 5 seconds.".format(e))
+                log("ERROR: {}. Retrying in 5 seconds.".format(e), worker_id)
                 time.sleep(5)
         log("Exited run loop. Goodbye!", worker_id)
 
