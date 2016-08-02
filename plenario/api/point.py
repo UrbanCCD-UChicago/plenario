@@ -13,9 +13,8 @@ import response as api_response
 
 from collections import OrderedDict
 from datetime import datetime
-from flask import request, Response
+from flask import request, Response, make_response
 from dateutil import parser
-from flask import request, make_response
 from itertools import groupby
 from operator import itemgetter
 

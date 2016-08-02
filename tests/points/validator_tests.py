@@ -1,22 +1,28 @@
 import json
+import unittest
 
 from sqlalchemy.exc import ProgrammingError
 
+from plenario import create_app
 from plenario.database import app_engine
 from plenario.etl.point import PlenarioETL
 from plenario.models import MetaTable
 from api_tests import get_loop_rect
 from tests.test_fixtures.post_data import roadworks_post_data
-from tests.test_fixtures.base_test import BasePlenarioTest
 
 
-class TestValidator(BasePlenarioTest):
+class TestValidator(unittest.TestCase):
 
     def get_json_response_data(self, endpoint):
         """A little util that does work I found myself repeating alot."""
 
-        response = self.app.get('/v1/api/' + endpoint)
+        response = self.test_client.get('/v1/api/' + endpoint)
         return json.loads(response.data)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = create_app()
+        cls.test_client = cls.app.test_client()
 
     def test_validator_bad_dataset_name(self):
         endpoint = 'detail'
@@ -185,7 +191,7 @@ class TestValidator(BasePlenarioTest):
     def test_updates_index_and_validates_correctly(self):
 
         # Adds a MetaTable record.
-        self.app.post('/add?is_shapefile=false', data=roadworks_post_data)
+        self.test_client.post('/add?is_shapefile=false', data=roadworks_post_data)
         meta = MetaTable.get_by_dataset_name('roadworks')
         # Creates the table.
         PlenarioETL(meta).add()
@@ -193,7 +199,7 @@ class TestValidator(BasePlenarioTest):
         # Perform a query on the newly added dataset (to check if the
         # validator allows the query through).
         query = '/v1/api/detail?dataset_name=roadworks&obs_date__ge=2000'
-        response = self.app.get(query)
+        response = self.test_client.get(query)
         data = json.loads(response.data)
 
         self.assertGreaterEqual(len(data['objects']), 100)

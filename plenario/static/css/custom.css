@@ -1,25 +1,30 @@
 /* Space out content a bit */
 body {
-  padding-bottom: 20px;
-  font-size: 17px;
+    height: 100%;
+    font-size: 17px;
+    padding-bottom: 0;
 }
 
-.label:hover { text-decoration: none; }
+.label:hover {
+    text-decoration: none;
+}
 
 .showmore-content {
     overflow: hidden;
     height: 165px;
 }
 
-.panel-group { margin-bottom: 5px;}
+.panel-group {
+    margin-bottom: 5px;
+}
 
 .panel-heading a {
-  display: block;
+    display: block;
 }
 
 .panel-heading a:hover,
 .panel-heading a:active {
-  text-decoration: none;
+    text-decoration: none;
 }
 
 .showmore-content p {
@@ -31,105 +36,172 @@ body {
     margin-top: 10px;
 }
 
-.well h2, .detail-header { margin-top: 0; }
+.well h2, .detail-header {
+    margin-top: 0;
+}
 
-.red { color: red; }
+.red {
+    color: red;
+}
 
-.examples { word-wrap: break-word; }
+.examples {
+    word-wrap: break-word;
+}
 
-.highcharts-sparkline { height: 80px; width: 350px;}
-#detail-chart { height: 150px;}
+.highcharts-sparkline {
+    height: 80px;
+    width: 350px;
+}
+
+#detail-chart {
+    height: 150px;
+}
 
 /* Everything but the jumbotron gets side spacing for mobile first views */
 .header,
 .marketing,
 .footer {
-  padding-left: 15px;
-  padding-right: 15px;
+    padding-left: 15px;
+    padding-right: 15px;
 }
 
 /* Custom page header */
 .header {
-  border-bottom: 1px solid #e5e5e5;
+    border-bottom: 1px solid #e5e5e5;
 }
+
 /* Make the masthead heading the same height as the navigation */
 .header h3 {
-  margin-top: 0;
-  margin-bottom: 0;
-  line-height: 40px;
-  padding-bottom: 19px;
+    margin-top: 0;
+    margin-bottom: 0;
+    line-height: 40px;
+    padding-bottom: 19px;
 }
+
+/*Sticky Footer Code*/
+
+#wrap {
+    min-height: 100%;
+}
+
+#main {
+    overflow: auto;
+    padding-bottom: 4em;
+}
+
+/* must be same height as the footer */
+
+#footer {
+    position: relative;
+    margin-top: -4em;
+    /* negative value of footer height */
+    padding-top: 1em;
+    height: 3em;
+    clear: both;
+    line-height: 1em;
+    text-align: center;
+    color: rgb(80, 80, 80);
+}
+
+/*Opera Fix*/
+
+body:before {
+    content: "";
+    height: 100%;
+    float: left;
+    width: 0;
+    margin-top: -32767px;
+}
+
+/*End Sticky Footer*/
 
 /* Custom page footer */
 .footer {
-  padding-top: 5px;
-  color: #777;
-  border-top: 1px solid #e5e5e5;
-  list-style: none;
-  background-color: #fff;
+    padding-top: 5px;
+    color: #777;
+    border-top: 1px solid #e5e5e5;
+    list-style: none;
+    background-color: #fff;
 }
+
 .footer li {
-  position: relative;
-  display: block;
-  padding: 10px 10px;
-  float: right;
-  font-size: 0.8em;
+    position: relative;
+    display: block;
+    padding: 10px 10px;
+    float: right;
+    font-size: 0.8em;
 }
 
 /* Customize container */
 .container-narrow > hr {
-  margin: 30px 0;
+    margin: 30px 0;
 }
 
 /* Main marketing message and sign up button */
 .jumbotron {
-  text-align: center;
-  border-bottom: 1px solid #e5e5e5;
+    text-align: center;
+    border-bottom: 1px solid #e5e5e5;
 }
+
 .jumbotron .btn {
-  font-size: 21px;
-  padding: 14px 24px;
+    font-size: 21px;
+    padding: 14px 24px;
 }
 
 .jumbotron li {
-  font-size: 16px;
+    font-size: 16px;
 }
 
 /* Responsive: Portrait tablets and up */
 @media screen and (min-width: 768px) {
-  /* Remove the padding we set earlier */
-  .header,
-  .marketing,
-  .footer {
-    padding-left: 0;
-    padding-right: 0;
-  }
-  /* Space out the masthead */
-  .header {
-    margin-bottom: 30px;
-  }
-  /* Remove the bottom border on the jumbotron for visual effect */
-  .jumbotron {
-    border-bottom: 0;
-  }
+    /* Remove the padding we set earlier */
+    .header,
+    .marketing,
+    .footer {
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    /* Space out the masthead */
+    .header {
+        margin-bottom: 30px;
+    }
+
+    /* Remove the bottom border on the jumbotron for visual effect */
+    .jumbotron {
+        border-bottom: 0;
+    }
 }
 
-.nowrap { white-space:nowrap; }
+.nowrap {
+    white-space: nowrap;
+}
 
 /* MAP styles */
-#map { min-height: 400px; }
+#map {
+    min-height: 400px;
+}
 
-#list-view { min-height: 100px; }
-#detail-view { min-height: 100px; }
+#list-view {
+    min-height: 100px;
+}
 
-.leaflet-top.leaflet-left{
+#detail-view {
+    min-height: 100px;
+}
+
+.leaflet-top.leaflet-left {
     margin-left: 20px;
 }
+
 .row.filters {
     margin-left: 5px;
 }
 
-#drawing-tools-img { margin-right: 10px; margin-top: 5px;}
+#drawing-tools-img {
+    margin-right: 10px;
+    margin-top: 5px;
+}
 
 /* Dataset table styles */
 .jqsfield {
@@ -139,9 +211,9 @@ body {
 }
 
 .jqstooltip {
-  -webkit-box-sizing: content-box;
-  -moz-box-sizing: content-box;
-  box-sizing: content-box;
+    -webkit-box-sizing: content-box;
+    -moz-box-sizing: content-box;
+    box-sizing: content-box;
 }
 
 /* Datepicker styles */
@@ -192,7 +264,7 @@ body {
 
 .ui-datepicker-next:after {
     content: "";
-    border-color: rgba(0,0,0,0) rgba(0, 0, 0, 0) rgba(0, 0, 0, 0) #333;
+    border-color: rgba(0, 0, 0, 0) rgba(0, 0, 0, 0) rgba(0, 0, 0, 0) #333;
     border-image: none;
     border-style: solid;
     border-width: 9px;
@@ -201,9 +273,10 @@ body {
     margin-top: 5px;
     width: 0;
 }
+
 .ui-datepicker-prev:before {
     content: "";
-    border-color: rgba(0,0,0,0) #333 rgba(0, 0, 0, 0) rgba(0, 0, 0, 0);
+    border-color: rgba(0, 0, 0, 0) #333 rgba(0, 0, 0, 0) rgba(0, 0, 0, 0);
     border-image: none;
     border-style: solid;
     border-width: 9px;
@@ -224,6 +297,7 @@ body {
     text-align: center;
     padding: 3px 0;
 }
+
 .ui-datepicker tbody tr {
     border-bottom: 1px solid #bbb;
 }
@@ -246,8 +320,8 @@ body {
 .legend {
     line-height: 18px;
     color: #555;
-    background: rgba(255,255,255,0.8);
-    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
     border-radius: 5px;
 }
 
@@ -263,38 +337,39 @@ body {
     opacity: 0.7;
 }
 
-
 /* branding styles */
 .navbar-brand {
-  font-size: 21px;
+    font-size: 21px;
 }
+
 .navbar-brand img {
-	position:relative; 
-	top: -2px; 
-	margin-right: 6px;
-	opacity: 0.85;
+    display: inline;
+    position: relative;
+    top: -2px;
+    margin-right: 6px;
+    opacity: 0.85;
 }
 
 .navbar-brand:hover img {
-	opacity: 1;
+    opacity: 1;
 }
 
 /* examples page */
 .example textarea {
-  max-width: 100%;
-  min-width: 100%;
+    max-width: 100%;
+    min-width: 100%;
 }
 
 .example .try-url {
-  position: relative;
-  top: 38px;
-  left: -2px;
-  margin-top:-36px;
+    position: relative;
+    top: 38px;
+    left: -2px;
+    margin-top: -36px;
 }
 
 .example .label {
-  font-size: 90%;
-  margin-left: 30px;
+    font-size: 90%;
+    margin-left: 30px;
 }
 
 
