@@ -12,6 +12,7 @@
 import plenario.database
 import traceback
 from plenario.models import Workers
+
 session = plenario.database.session
 
 worker_threads = 4
@@ -114,10 +115,12 @@ if __name__ == "__main__":
 
     ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
 
+
     def stop_workers(signum, frame):
         global do_work
         log("Got termination signal. Finishing job...", "WORKER BOSS")
         do_work = False
+
 
     signal.signal(signal.SIGINT, stop_workers)
     signal.signal(signal.SIGTERM, stop_workers)
@@ -148,7 +151,8 @@ if __name__ == "__main__":
                         # /detail?<args>
                         # emulating row-removal features of _detail_response. Not very DRY, but it's the cleanest option.
                         'detail': lambda args: [{key: row[key] for key in row.keys()
-                                                 if key not in ['point_date', 'hash', 'geom']} for row in _detail(args)],
+                                                 if key not in ['point_date', 'hash', 'geom']} for row in
+                                                _detail(args)],
                         # /datasets?<args>
                         'meta': lambda args: _meta(args),
                         # /fields/<dataset>
@@ -294,14 +298,12 @@ if __name__ == "__main__":
                                         result = convert_result_geoms(result)
 
                                 elif endpoint in etl_logic:
-
                                     if endpoint in ('update_weather', 'update_metar'):
                                         result = etl_logic[endpoint]()
                                     else:
                                         result = etl_logic[endpoint](query_args)
 
                                 else:
-
                                     raise ValueError("Attempting to send a job to an "
                                                      "invalid endpoint ->> {}"
                                                      .format(endpoint))
@@ -326,7 +328,8 @@ if __name__ == "__main__":
                                 else:
                                     status["status"] = "queued"
                                     status["meta"]["lastDeferredTime"] = str(datetime.datetime.now())
-                                    status["meta"]["tries"] = status["meta"]["tries"]+1 if status["meta"].get("tries") else 1
+                                    status["meta"]["tries"] = status["meta"]["tries"] + 1 if status["meta"].get(
+                                        "tries") else 1
                                     log("ERROR: Ticket {} errored with: {}...retrying.".format(ticket, e), worker_id)
                                     set_status(ticket, status)
                                 traceback.print_exc()
@@ -343,6 +346,7 @@ if __name__ == "__main__":
                 log("ERROR: {}. Retrying in 5 seconds.".format(e), worker_id)
                 time.sleep(5)
         log("Exited run loop. Goodbye!", worker_id)
+
 
     # Each container should only have one worker.py running at all times.
     # while len(check_output("pgrep -f worker.py", shell=True).split("\n"))-1 > 0:

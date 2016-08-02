@@ -149,7 +149,6 @@ def get_datadump(ticket):
                         # Make headers for JSON and CSV.
                         metadata = json.loads(row.get_data())
                         columns = [str(c) for c in metadata["columns"]]
-                        print(metadata)
                         if datatype == "json":
                             yield """{{"startTime": "{}", "endTime": "{}", "workers": {}, "data": [""".format(
                                 metadata["startTime"], metadata["endTime"], json.dumps(metadata["workers"]))
@@ -162,9 +161,7 @@ def get_datadump(ticket):
                             yield row.get_data()[1:-1]
                             if counter < get_status(ticket)["progress"]["total"]: yield ","
                         elif datatype == "csv":
-                            print("\n\n\n\n\n" + str(json.loads(row.get_data())) + "\n\n\n\n\n")
                             for csvrow in json.loads(row.get_data()):
-                                print("\n\n\n\n\n"+str(csvrow)+"\n\n\n\n\n")
                                 yield ",".join(
                                     [json.dumps(csvrow[key].encode("utf-8")) if type(csvrow[key]) is unicode else json.dumps(str(csvrow[key]))
                                      for key in columns]) + "\n"
@@ -396,7 +393,7 @@ def _datadump(args):
     def add_chunk(chunk):
         if os.environ.get('WORKER'):
             check_in(args.data["jobsframework_workerbirthtime"], args.data["jobsframework_workerid"])
-        chunk = [dict(zip(columns, row)) for row in chunk]
+        chunk = [OrderedDict(zip(columns, row)) for row in chunk]
         chunk = [{column: row[column] for column in columns} for row in chunk]
         dump = DataDump(os.urandom(16).encode('hex'), requestid, part, chunks, json.dumps(chunk, default=unknown_object_json_handler))
         session.add(dump)

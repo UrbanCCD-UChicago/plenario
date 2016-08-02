@@ -15,7 +15,6 @@ from plenario.models_.ETLTask import update_task, ETLStatus, delete_task
 from plenario.settings import CELERY_SENTRY_URL
 from plenario.utils.weather import WeatherETL
 
-
 if CELERY_SENTRY_URL:
     handler = SentryHandler(CELERY_SENTRY_URL)
     setup_logging(handler)
@@ -46,7 +45,13 @@ def etl_report(fn):
             meta = session.query(ShapeMetadata).get(identifier)
 
         try:
-            meta.update_date_added()
+            try:
+                # This method updates the last_update attribute, and does
+                # not modify date_added unless it does not exist.
+                meta.update_date_added()
+            except AttributeError:
+                # ShapeMetadata has no last_update attribute.
+                pass
             update_task(meta.dataset_name, None, ETLStatus['started'], None)
             completion_msg = fn(meta)
             update_task(meta.dataset_name, datetime.now(), ETLStatus['success'], None)
@@ -147,17 +152,17 @@ def frequency_update(frequency):
                                can be: often, daily, weekly, monthly, yearly
     :returns (string) confirmation message"""
 
-    md = session.query(MetaTable)\
-        .filter(MetaTable.update_freq == frequency)\
-        .filter(MetaTable.date_added != None)\
+    md = session.query(MetaTable) \
+        .filter(MetaTable.update_freq == frequency) \
+        .filter(MetaTable.date_added != None) \
         .all()
     for m in md:
         print "submitted job"
         submit_job({"endpoint": "update_dataset", "query": m.source_url_hash})
 
-    md = session.query(ShapeMetadata)\
-        .filter(ShapeMetadata.update_freq == frequency)\
-        .filter(ShapeMetadata.is_ingested == True)\
+    md = session.query(ShapeMetadata) \
+        .filter(ShapeMetadata.update_freq == frequency) \
+        .filter(ShapeMetadata.is_ingested == True) \
         .all()
     for m in md:
         print "submitted job"

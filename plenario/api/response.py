@@ -90,7 +90,6 @@ def add_geojson_feature(geojson_response, feature_geom, feature_properties):
 
 
 def form_json_detail_response(to_remove, validator, rows):
-    print(rows)
     to_remove.append('geom')
     remove_columns_from_dict(rows, to_remove)
     resp = json_response_base(validator, rows)
@@ -106,7 +105,6 @@ def form_json_detail_response(to_remove, validator, rows):
 
 def form_csv_detail_response(to_remove, rows):
     to_remove.append('geom')
-    print "rows ->> " + str(rows)
     remove_columns_from_dict(rows, to_remove)
 
     if len(rows) <= 0:

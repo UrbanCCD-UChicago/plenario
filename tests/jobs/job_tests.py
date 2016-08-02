@@ -328,6 +328,19 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["ticket"], ticket)
         self.assertIsNotNone(response["error"])
 
+    # =======================
+    # ACCEPTANCE TEST: Get worker statuspage
+    # =======================
+
+    def test_worker_statuspage(self):
+        # Get page
+        response = self.app.get("/workers")
+        self.assertEqual(response.status_code, 200)
+
+        # Purge workers
+        response = self.app.get("/workers/purge")
+        self.assertEqual("class=\"worker" in response.get_data(), False)
+
     # ============================ ENDPOINT TESTS ============================ #
 
     # =======================
@@ -655,7 +668,7 @@ class TestJobs(unittest.TestCase):
         response = json.loads(response.get_data())
 
         self.assertEqual(len(response["data"]), 65)
-        self.assertEqual(response["data"][0]["date"], "2013-12-14")
+        self.assertEqual(response["data"][0]["date"], "2013-09-22")
         self.assertIsNotNone(response["startTime"])
         self.assertIsNotNone(response["endTime"])
         self.assertIsNotNone(response["workers"])
@@ -700,8 +713,8 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response[1][:9], "# ENDTIME")
         self.assertEqual(response[2][:9], "# WORKERS")
         self.assertEqual(response[3],
-                         '"city","community_area_number","event_type","zip","latitude","start_time","longitude","event","phone","state","end_time","address","date","community_area_name","ward","day","location"')
-        self.assertEqual(response[4].split(",")[12], '"2013-12-14"')
+                         '"date","start_time","end_time","day","event","event_type","address","city","state","zip","phone","community_area_number","community_area_name","ward","latitude","longitude","location"')
+        self.assertEqual(response[4].split(",")[0], '"2013-09-22"')
 
     # ============================ TEARDOWN ============================ #
 
