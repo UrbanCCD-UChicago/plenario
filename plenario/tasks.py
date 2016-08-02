@@ -2,8 +2,7 @@ import traceback
 
 from datetime import datetime, timedelta
 from functools import wraps
-from raven.conf import setup_logging
-from raven.handlers.logging import SentryHandler
+from raven import Client
 from sqlalchemy.exc import NoSuchTableError, InternalError
 
 from plenario.database import session as session, app_engine as engine
@@ -12,12 +11,10 @@ from plenario.etl.shape import ShapeETL
 from plenario.api.jobs import submit_job
 from plenario.models import MetaTable, ShapeMetadata
 from plenario.models_.ETLTask import update_task, ETLStatus, delete_task
-from plenario.settings import CELERY_SENTRY_URL
+from plenario.settings import PLENARIO_SENTRY_URL
 from plenario.utils.weather import WeatherETL
 
-if CELERY_SENTRY_URL:
-    handler = SentryHandler(CELERY_SENTRY_URL)
-    setup_logging(handler)
+client = Client(PLENARIO_SENTRY_URL)
 
 
 def task_complete_msg(task_name, mt):
@@ -52,13 +49,23 @@ def etl_report(fn):
             except AttributeError:
                 # ShapeMetadata has no last_update attribute.
                 pass
+
+            if PLENARIO_SENTRY_URL:
+                client.captureMessage("Started work '{}' on {}.".format(fn.__name__, meta.dataset_name))
+
             update_task(meta.dataset_name, None, ETLStatus['started'], None)
             completion_msg = fn(meta)
             update_task(meta.dataset_name, datetime.now(), ETLStatus['success'], None)
+
+            if PLENARIO_SENTRY_URL:
+                client.captureMessage("Finished work '{}' on {}.".format(fn.__name__, meta.dataset_name))
+
             return completion_msg
+
         except Exception:
             update_task(meta.dataset_name, datetime.now(), ETLStatus['failure'], traceback.format_exc())
-            # TODO: Report to Sentry.
+            if PLENARIO_SENTRY_URL:
+                client.captureException()
 
     return wrapper
 
