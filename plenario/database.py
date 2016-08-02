@@ -35,7 +35,6 @@ def column_windows(session, column, windowsize):
 
     """
     def int_for_range(start_id, end_id):
-        print("##################", column, start_id, end_id)
         if end_id:
             return and_(
                 column>=start_id,
@@ -51,7 +50,11 @@ def column_windows(session, column, windowsize):
     if windowsize > 1:
         q = q.filter(text("rownum %% %d=1" % windowsize))
 
-    intervals = [id for id, in q]
+    # Changed this line from the original implementation
+    # For some reason our query results in several extra Nones
+    # at the end. Inserted a condition here to remove those,
+    # and it seems to work.
+    intervals = [id for id, in q if id is not None]
 
     while intervals:
         start = intervals.pop(0)
@@ -61,12 +64,14 @@ def column_windows(session, column, windowsize):
             end = None
         yield int_for_range(start, end)
 
+
 def windowed_query(q, column, windowsize):
     """"Break a Query into windows on a given column."""
 
     for whereclause in column_windows(q.session, column, windowsize):
         for row in q.filter(whereclause).order_by(column):
             yield row
+
 
 # Fast Counting of large datasets (for use with DataDump).
 # Referenced from https://gist.github.com/hest/8798884

@@ -335,7 +335,7 @@ if __name__ == "__main__":
 
                         else:
                             # No work! Idle for a bit to save compute cycles.
-                            log("Ho hum nothing to do. Idling for {} seconds.".format(wait_interval), worker_id)
+                            # log("Ho hum nothing to do. Idling for {} seconds.".format(wait_interval), worker_id)
                             time.sleep(wait_interval)
                     deregister_worker(worker_id)
             except Exception as e:
