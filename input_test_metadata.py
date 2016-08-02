@@ -1,78 +1,53 @@
-from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest
+from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
 from plenario.database import session, Base, app_engine
 from geoalchemy2.elements import WKTElement
 import random
 
-
-aot = NetworkMeta(name='ArrayOfThings', nodeMetadata={
-    "height": "meters",
-    "direction": "Cardinal directions. One of N, NE, E, SE, S, SW, W, NW"
+aot = NetworkMeta(name='ArrayOfThings', info={
+    "website": "aot.org",
+    "contact": "aot@chicago.org"
 })
 
-ios = NetworkMeta(name='InternetOfStuff', nodeMetadata={
-    "height": "inches",
-    "direction": "Cardinal directions. One of waffles"
+ios = NetworkMeta(name='InternetOfStuff', info={
+    "website": "ios.org",
+    "contact": "ios@seattle.org"
 })
 
 nodes = []
 for i in range(1, 31):
-    nodes.append(NodeMeta(id='ArrayOfThings'+str(i),
+    nodes.append(NodeMeta(id='ArrayOfThings' + str(i),
                           sensorNetwork='ArrayOfThings',
-                          location=WKTElement('POINT('+str(random.randrange(-5,5))+' '+str(random.randrange(-5,5))+')', srid=4326),
-                          version=random.randrange(3,8),
-                          procedures={
-                              "temperature":{
-                                  "sensors":[
-                                      {
-                                          "sensorType":"temperature sensor DS18B20+",
-                                          "datasheet":"arrayofthings.github.io/datasheets/DS18B20"
-                                      },
-                                      {
-                                          "sensorType":"temperature sensor TMP36",
-                                          "datasheet":"arrayofthings.github.io/datasheets/TMP36"
-                                      }
-                                  ]
+                          location=WKTElement(
+                              'POINT(' + str(random.randrange(-5, 5)) + ' ' + str(random.randrange(-5, 5)) + ')',
+                              srid=4326),
+                          info={
+                              "height": {
+                                  "value": random.randrange(3, 7),
+                                  "unit": "meters"
                               },
-                              "numPeople":{
-                                  "sensors":[
-                                      {
-                                          "sensorType":"OV7670 300KP camera",
-                                          "datasheet":"arrayofthings.github.io/datasheets/OV7670"
-                                      }
-                                  ],
-                                  "algorithms":[
-                                      {
-                                          "algorithm":"Szeliski 2.5.46",
-                                          "datasheet":"arrayofthings.github.io/datasheets/Szeliski"
-                                      }
-                                  ]
+                              "orientation": {
+                                  "value": "NE",
+                                  "unit": "Cardinal directions. One of N, NE, E, SE, S, SW, W, NW"
                               }
                           }))
 
 iosnode = NodeMeta(id='InternetOfStuff1',
                    sensorNetwork='InternetOfStuff',
                    location=WKTElement(
-                       'POINT(' + str(random.randrange(-5, 5)) + ' ' + str(random.randrange(-5, 5)) + ')',
-                       srid=4326),
-                   version=random.randrange(3, 8),
-                   procedures={
-                       "humidity": {
-                           "sensors": [
-                               {
-                                   "sensorType": "BAD",
-                                   "datasheet": "FAKE"
-                               },
-                               {
-                                   "sensorType": "BAD",
-                                   "datasheet": "STUFF"
-                               }
-                           ]
+                       'POINT(' + str(random.randrange(-5, 5)) + ' ' + str(random.randrange(-5, 5)) + ')', srid=4326),
+                   info={
+                       "height": {
+                           "value": 5,
+                           "unit": "meters"
                        },
+                       "orientation": {
+                           "value": "NE",
+                           "unit": "Cardinal directions. One of N, NE, E, SE, S, SW, W, NW"
+                       }
                    })
 
 temp = FeatureOfInterest(name='temperature',
-                         sensorNetwork='ArrayOfThings',
-                         observedProperties={'observedProperties':[
+                         observedProperties={'observedProperties': [
                              {
                                  "name": "temperature",
                                  "type": "numeric",
@@ -82,7 +57,6 @@ temp = FeatureOfInterest(name='temperature',
                          ]})
 
 mag_field = FeatureOfInterest(name='magneticField',
-                              sensorNetwork='ArrayOfThings',
                               observedProperties={'observedProperties': [
                                   {
                                       "name": "X",
@@ -105,18 +79,16 @@ mag_field = FeatureOfInterest(name='magneticField',
                               ]})
 
 atm = FeatureOfInterest(name='atmosphericPressure',
-                         sensorNetwork='ArrayOfThings',
-                         observedProperties={'observedProperties': [
-                             {
-                                 "name": "pressure",
-                                 "type": "numeric",
-                                 "unit": "atms",
-                                 "description": "accurate"
-                             }
-                         ]})
+                        observedProperties={'observedProperties': [
+                            {
+                                "name": "pressure",
+                                "type": "numeric",
+                                "unit": "atms",
+                                "description": "accurate"
+                            }
+                        ]})
 
 hum = FeatureOfInterest(name='humidity',
-                        sensorNetwork='InternetOfStuff',
                         observedProperties={'observedProperties': [
                             {
                                 "name": "humidity",
@@ -126,27 +98,61 @@ hum = FeatureOfInterest(name='humidity',
                             }
                         ]})
 
+tmp112 = Sensor(name='TMP112',
+                properties=['temperature.temperature', ],
+                info={"datasheet": "TMP112.datashe.et"})
 
-# Base.metadata.create_all(app_engine)
-# session.add(aot)
-# session.add(ios)
-# session.commit()
-#
-# for node in nodes:
-#     session.add(node)
-#     node.featuresOfInterest.append(temp)
-#     node.featuresOfInterest.append(mag_field)
-# session.add(iosnode)
-# iosnode.featuresOfInterest.append(hum)
-# session.commit()
-#
-# session.add(temp)
-# session.add(mag_field)
-# session.commit()
-#
-# for i in session.query(NetworkMeta).all()[0].nodes:
-#     print i.id
+bmp340 = Sensor(name='BMP340',
+                properties=['temperature.temperature', 'humidity.humidity'],
+                info={"datasheet": "BMP340.datashe.et"})
 
+ubq120 = Sensor(name='UBQ120',
+                properties=['magneticField.X', 'magneticField.Y', 'magneticField.Z'],
+                info={"datasheet": "UBQ120.datashe.et"})
+
+pre450 = Sensor(name='PRE450',
+                properties=['atmosphericPressure.pressure', ],
+                info={"datasheet": "PRE450.datashe.et"})
+
+# init db
+Base.metadata.create_all(app_engine)
+
+# networks
+session.add(aot)
+session.add(ios)
+session.commit()
+
+# nodes
+for node in nodes:
+    session.add(node)
+session.add(iosnode)
+session.commit()
+
+# foi
+session.add(temp)
+session.add(mag_field)
 session.add(atm)
+session.add(hum)
+aot.featuresOfInterest.append(temp)
+aot.featuresOfInterest.append(mag_field)
+aot.featuresOfInterest.append(hum)
+ios.featuresOfInterest.append(atm)
+ios.featuresOfInterest.append(temp)
+session.commit()
+
+# sensors
+session.add(tmp112)
+session.add(bmp340)
+session.add(ubq120)
+temp.sensors.append(tmp112)
+temp.sensors.append(bmp340)
+mag_field.sensors.append(ubq120)
+hum.sensors.append(bmp340)
+atm.sensors.append(pre450)
+tmp112.sensorNetworks.append(aot)
+tmp112.sensorNetworks.append(ios)
+bmp340.sensorNetworks.append(aot)
+ubq120.sensorNetworks.append(aot)
+pre450.sensorNetworks.append(ios)
 session.commit()
 

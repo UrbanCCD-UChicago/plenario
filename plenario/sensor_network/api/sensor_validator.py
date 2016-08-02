@@ -4,24 +4,36 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 from dateutil import parser
 from marshmallow import fields, Schema
-from marshmallow.validate import OneOf, ValidationError
+from marshmallow.validate import Range, OneOf, ValidationError
 from psycopg2 import Error
 from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 from sqlalchemy import MetaData, Table
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
-from plenario.api.condition_builder import field_ops
+from plenario.sensor_network.api.sensor_condition_builder import field_ops
 from plenario.database import session, redshift_engine
-from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest
+from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest, Sensor
 
 
 def validate_nodes(nodes):
-    """Custom validator for nodes parameter."""
-
     valid_nodes = NodeMeta.index()
     for node in nodes:
         if node not in valid_nodes:
             raise ValidationError("Invalid node ID: {}.".format(node))
+
+
+def validate_features(features):
+    valid_features = FeatureOfInterest.index()
+    for feature in features:
+        if feature not in valid_features:
+            raise ValidationError("Invalid feature name: {}.".format(feature))
+
+
+def validate_sensors(sensors):
+    valid_sensors = Sensor.index()
+    for sensor in sensors:
+        if sensor not in valid_sensors:
+            raise ValidationError("Invalid sensor name: {}.".format(sensor))
 
 
 # not working...
@@ -45,37 +57,36 @@ class Validator(Schema):
     dictionary of arguments, where keys correspond to <FIELD_NAME>. The validator
     has a default <TYPE> checker, that along with extra <VALIDATOR FN>s will
     accept or reject the value associated with the key. If the value is missing
-    or rejected, the validator will substitue it with the value specified by
+    or rejected, the validator will substitute it with the value specified by
     <DEFAULT_VALUE>."""
 
-    location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
-    network_name = fields.Str(allow_none=True, missing=None, default=None, validate=OneOf(NetworkMeta.index()))
+    network_name = fields.Str(allow_none=True, missing=None, default='ArrayOfThings', validate=OneOf(NetworkMeta.index()))
+
+    # For observations:
+    #
+    # only validates that nodes, features, and sensors exist, not that they are part of the correct network
+    # fills in None as default, handled by validate(),
+    # which fills in all nodes, features, and sensors in the correct network
+    nodes = fields.List(fields.Str(), default=None, validate=validate_nodes)
+    features = fields.List(fields.Str(), default=None, validate=validate_features)
+    sensors = fields.List(fields.Str(), default=None, validate=validate_sensors)
+
+    # For metadata:
     node_id = fields.Str(default=None, validate=OneOf(NodeMeta.index()))
-    nodes = fields.List(fields.Str(), default=NodeMeta.index(), validate=validate_nodes)
+    feature = fields.Str(default=None, validate=OneOf(FeatureOfInterest.index()))
+    sensor = fields.Str(default=None, validate=OneOf(Sensor.index()))
+
+    location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
     start_datetime = fields.DateTime(default=datetime.now() - timedelta(days=90))
     end_datetime = fields.DateTime(default=datetime.now())
-    feature = fields.Str(allow_none=True, missing=None, default=None, validate=OneOf(FeatureOfInterest.index()))
     filter = fields.Str(allow_none=True, missing=None, default=None)
-
-
-class NoGeoJSONValidator(Validator):
-    """Some endpoints, like /timeseries, should not allow GeoJSON as a valid
-    response format."""
-
-    valid_formats = {'csv', 'json'}
-    # Validator re-initialized so that it doesn't use old valid_formats.
-    data_type = fields.Str(default='json', validate=OneOf(valid_formats))
-
-
-class ExportFormatsValidator(Validator):
-    """For /shapes/<shapeset_name>?data_type=<format>"""
-
-    valid_formats = {'shapefile', 'kml', 'json'}
-    data_type = fields.Str(default='json', validate=OneOf(valid_formats))
+    limit = fields.Integer(default=1000)
+    offset = fields.Integer(default=0, validate=Range(0))
 
 
 class SensorNetworkValidator(Validator):
-    """For sensor networks"""
+    """Validator for retrieving sensor network metadata"""
+
 
 # ValidatorResult
 # ===============
@@ -123,8 +134,8 @@ def validate(validator, request_args):
     """Validate a dictionary of arguments. Substitute all missing fields with
     defaults if not explicitly told to do otherwise.
 
-    :param validator: what kind of validator to use
-    :param args: dictionary of arguments from a request object
+    :param validator: type of validator to use
+    :param request_args: dictionary of arguments from a request object
 
     :returns: ValidatorResult namedtuple"""
 
@@ -137,6 +148,19 @@ def validate(validator, request_args):
 
     # If all arguments are valid, fill in validator defaults.
     result = validator.dump(result.data)
+
+    # fill in all nodes, sensors, and features within the network as a default
+    # if this is not an observation query, KeyErrors will result
+    try:
+        network_name = result.data['network_name']
+        if result.data['nodes'] is None:
+            result.data['nodes'] = NodeMeta.index(network_name)
+        if result.data['features'] is None:
+            result.data['features'] = FeatureOfInterest.index(network_name)
+        if result.data['sensors'] is None:
+            result.data['sensors'] = Sensor.index(network_name)
+    except KeyError:
+        pass
 
     # Certain values will be dumped as strings. This conversion
     # makes them into their corresponding type. (ex. Table)
@@ -152,21 +176,14 @@ def validate(validator, request_args):
 
     # If tree filters were provided, ignore ALL unchecked parameters that are
     # not tree filters or response format information.
-    if 'filter' in request_args.keys():
-
-        try:
-            meta = MetaData()
-            table_name = result.data['network_name'].lower()
-            table = Table(table_name, meta, autoload=True, autoload_with=redshift_engine)
-        except (AttributeError, NoSuchTableError):
-            result.errors[table_name] = "Table name {} not found in Redshift".format(table_name)
-            return result
+    if 'filter NOT FUNCTIONAL' in request_args:
 
         # Report a tree which causes the JSON parser to fail.
         # Or a tree whose value is not valid.
         try:
             cond_tree = json.loads(request_args['filter'])
-            if valid_tree(table, cond_tree):
+            meta = MetaData()
+            if valid_tree(meta, cond_tree):
                 result.data['filter'] = cond_tree
         except (ValueError, KeyError) as err:
             result.errors['filter'] = "Bad tree: {} -- causes error {}.".format(request_args['filter'], err)
@@ -180,7 +197,7 @@ def validate(validator, request_args):
     return ValidatorResult(result.data, result.errors, warnings)
 
 
-def valid_tree(table, tree):
+def valid_tree(meta, tree):
     """Given a dictionary containing a condition tree, validate all conditions
     nestled in the tree.
 
@@ -197,7 +214,7 @@ def valid_tree(table, tree):
         raise ValueError("Invalid keyword in {}".format(tree))
 
     if op == "and" or op == "or":
-        return all([valid_tree(table, subtree) for subtree in tree['val']])
+        return all([valid_tree(meta, subtree) for subtree in tree['val']])
 
     elif op in field_ops:
         col = tree.get('col')
@@ -208,10 +225,18 @@ def valid_tree(table, tree):
             err_msg += ' -- use format "{\'op\': OP, \'col\': COL, \'val\', VAL}"'
             raise ValueError(err_msg)
 
-        return valid_column_condition(table, col, val)
+        try:
+            (table_name, col_name) = col.split('.')
+            table_name = table_name.lower()
+            table = Table(table_name, meta, autoload=True, autoload_with=redshift_engine)
+        except (AttributeError, NoSuchTableError):
+            raise ValueError("Invalid feature of interest {} in filter".format(table_name))
+
+        return valid_column_condition(table, col_name, val)
 
     else:
         raise ValueError("Invalid operation {}".format(op))
+
 
 def valid_column_condition(table, column_name, value):
     """Establish whether or not a set of components is able to make a valid
