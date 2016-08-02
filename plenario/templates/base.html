@@ -8,9 +8,11 @@
 
     <title>{% block title %}{% endblock %}</title>
 
-    <!-- Bootstrap core CSS -->
-    <link href="{{ url_for('static', filename='css/bootstrap.simplex.min.css') }}" rel="stylesheet">
-    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+    {% block override_css %}
+        <!-- Bootstrap core CSS -->
+        <link href="{{ url_for('static', filename='css/bootstrap.simplex.min.css') }}" rel="stylesheet">
+        <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+    {% endblock %}
 
     <!-- Custom styles for this template -->
     {% block extra_styles %}{% endblock %}
@@ -111,12 +113,12 @@
 <!-- Bootstrap core JavaScript
 ================================================== -->
 <!-- Placed at the end of the document so the pages load faster -->
-<script src="{{ url_for('static', filename='js/jquery-1.11.1.min.js') }}"></script>
-{% block override_bootstrap_js %}
+{% block override_js %}
+    <script src="{{ url_for('static', filename='js/jquery-1.11.1.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/analytics_lib.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/moment.min.js') }}"></script>
 {% endblock %}
-<script src="{{ url_for('static', filename='js/analytics_lib.js') }}"></script>
-<script src="{{ url_for('static', filename='js/moment.min.js') }}"></script>
 {% block extra_javascript %}{% endblock %}
 
 </body>

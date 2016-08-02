@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Plenario Explorer{% endblock %}
-{% block extra_styles %}
+{% block override_css %}
     <base href="/explore"/>
     <link href="https://d1hdt0a9t6ezfj.cloudfront.net/assets/vendor.css" rel="stylesheet">
     <link href="https://d1hdt0a9t6ezfj.cloudfront.net/assets/plenario-explorer.css" rel="stylesheet">
@@ -8,8 +8,7 @@
 {% block content %}
     <div id="ember-app"></div>
 {% endblock %}
-{% block extra_javascript %}
+{% block override_js %}
     <script type="text/javascript" src="https://d1hdt0a9t6ezfj.cloudfront.net/assets/vendor.js"></script>
     <script type="text/javascript" src="https://d1hdt0a9t6ezfj.cloudfront.net/assets/plenario-explorer.js"></script>
 {% endblock %}
-{% block override_bootstrap_js %}{% endblock %}
