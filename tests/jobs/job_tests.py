@@ -258,7 +258,40 @@ class TestJobs(unittest.TestCase):
         count = len(session.query(table).all())
         self.assertEqual(count, 98)
 
-    def admin_test_06_delete_shapeset(self):
+    def admin_test_06_update_makes_new_task_if_not_exists(self):
+
+        # Grab the source url hash.
+        shape_name = 'boundaries_neighborhoods'
+
+        # Check if the record already exists.
+        rp = app_engine.execute("select from etl_task where dataset_name = 'boundaries_neighborhoods'")
+        self.assertEqual(len(rp.fetchall()), 1)
+
+        # Delete the ETLTask record.
+        app_engine.execute("delete from etl_task where dataset_name = 'boundaries_neighborhoods'")
+        rp = app_engine.execute("select from etl_task where dataset_name = 'boundaries_neighborhoods'")
+        self.assertEqual(rp.fetchall(), [])
+
+        # Queue the update job.
+        with self.other_app.test_request_context():
+            ticket = update_shape(shape_name).data
+            ticket = json.loads(ticket)['ticket']
+
+        wait_on(ticket, 15)
+
+        # Check that the record was recreated.
+        rp = app_engine.execute("select from etl_task where dataset_name = 'boundaries_neighborhoods'")
+        self.assertEqual(len(rp.fetchall()), 1)
+
+        status = get_status(ticket)['status']
+        self.assertIn(status, {'error', 'success'})
+        self.assertEqual(status, 'success')
+
+        table = ShapeMetadata.get_by_dataset_name(shape_name).shape_table
+        count = len(session.query(table).all())
+        self.assertEqual(count, 98)
+
+    def admin_test_07_delete_shapeset(self):
 
         # Get source url hash.
         shape_name = 'boundaries_neighborhoods'
@@ -276,6 +309,7 @@ class TestJobs(unittest.TestCase):
 
         table = ShapeMetadata.get_by_dataset_name(shape_name)
         self.assertTrue(table is None)
+
 
     # =======================
     # ACCEPTANCE TEST: Job submission
