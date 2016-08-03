@@ -113,7 +113,7 @@ def workers():
                 }
 
         lastseen = (now - datetime.strptime(worker["timestamp"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds()
-        if lastseen > 600 or worker["status"]:
+        if lastseen > 600 or worker.get("status"):
             worker["status"] = "dead"
             dead += 1
         elif lastseen > 300:

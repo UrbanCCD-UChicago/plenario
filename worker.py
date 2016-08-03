@@ -16,7 +16,7 @@ import datetime
 
 session = plenario.database.session
 
-worker_threads = 4
+worker_threads = 8
 wait_interval = 1
 
 
@@ -223,14 +223,19 @@ if __name__ == "__main__":
                                 continue
 
                             # Handle orphaned jobs
-                            if status["status"] == "processing" \
-                                    and (datetime.datetime.now()-datetime.datetime.strptime(status["meta"]["queueTime"],
-                                    "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > 600 \
-                                    and (datetime.datetime.now()-datetime.datetime.strptime(status["meta"]["queueTime"],
-                                    "%Y-%m-%d %H:%M:%S.%f")).total_seconds() < 1200:
+                            if status["status"] == "processing" and "longrunning" not in get_request(ticket) and \
+                                    ((not status["meta"].get("lastStartTime") and
+                                                  (datetime.datetime.now()-
+                                                       datetime.datetime.strptime(status["meta"]["startTime"],
+                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > 3600) or
+                                    (status["meta"].get("lastStartTime") and
+                                                  (datetime.datetime.now()-
+                                                       datetime.datetime.strptime(status["meta"]["lastStartTime"],
+                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > 3600)):
 
                                 status["meta"]["tries"] = status["meta"]["tries"] + 1 \
                                     if status["meta"].get("tries") else 1
+
                                 # Only try orphaned jobs again once
                                 if status["meta"]["tries"] > 1:
                                     status["status"] = "error"
@@ -239,6 +244,7 @@ if __name__ == "__main__":
                                     set_status(ticket, status)
                                     set_result(ticket, {"error": "Job stalled."})
                                     JobsQueue.delete_message(job)
+                                    deregister_job(birthtime, worker_id)
                                     continue
                                 else:
                                     log("WARNING: Ticket {} has been orphaned...retrying.".format(ticket), worker_id)
