@@ -370,9 +370,14 @@ def _detail(args):
         return api_response.make_raw_error("{}: {}".format(msg, e))
 
 def _datadump(args):
+
     requestid = args.data["jobsframework_ticket"]
     chunksize = 1000
     original_validated = copy.deepcopy(args)
+
+    # Number of rows to exceed in order to start
+    # deferring job (to allow other jobs to complete first)
+    row_threshold = 100000
 
     query = original_validated.data
 
@@ -381,6 +386,16 @@ def _datadump(args):
     log("-> Query: {}".format(json.dumps(query, default=unknown_object_json_handler)))
     rows = fast_count(detail_query(args))
     log("-> Dump contains {} rows.".format(rows))
+
+    if rows > row_threshold:
+        # Bake-in "niceness" in datadump;
+        # Since datadumps can be time-consuming,
+        # throttle them by deferring 50% of them for
+        # 10 seconds later (letting other jobs run).
+        if random.random() < 0.5:
+            log("-> Deferring dump due to size.")
+            return {"jobsframework_metacommands": ["defer", {"setTimeout": 10}]}
+
     chunks = int(math.ceil(rows / float(chunksize)))
 
     status = get_status(requestid)
