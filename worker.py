@@ -28,6 +28,7 @@ def log(msg, worker_id):
 
 
 def check_in(birthtime, worker_id):
+    log("INFO: Checking in.", worker_id)
     try:
         session.query(Workers).filter(Workers.name == worker_id).one().check_in()
         session.commit()
@@ -101,7 +102,7 @@ if __name__ == "__main__":
     from collections import namedtuple
     from subprocess import check_output
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
-    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump
+    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump
     from plenario.api.jobs import get_status, set_status, get_request, set_result, submit_job
     from plenario.api.shape import _aggregate_point_data, _export_shape
     from plenario.api.response import convert_result_geoms
@@ -162,9 +163,7 @@ if __name__ == "__main__":
                         'grid': lambda args: _grid(args),
                         'datadump': lambda args: _datadump(args),
                         # Health endpoint.
-                        'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)},
-                        # Utility tasks
-                        'datadump_cleanup': lambda args: _datadump_cleanup(args)
+                        'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)}
                     }
 
                     shape_logic = {
