@@ -31,12 +31,12 @@ def create_worker():
         except KeyError:
             abort(400)
 
-    @app.route('/health')
+    @app.route('/health', methods=['GET', 'POST'])
     def check_health():
         if worker_ready():
             return "Workers are available."
         else:
-            abort(503)
+            return "All workers are occupied."
 
     return app
 
