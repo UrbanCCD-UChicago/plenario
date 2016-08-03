@@ -3,18 +3,18 @@ import traceback
 from datetime import datetime, timedelta
 from functools import wraps
 from raven import Client
-from sqlalchemy.exc import NoSuchTableError, InternalError
+from sqlalchemy.exc import NoSuchTableError, InternalError, DBAPIError
 
 from plenario.database import session as session, app_engine as engine
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.api.jobs import submit_job
 from plenario.models import MetaTable, ShapeMetadata
-from plenario.models_.ETLTask import update_task, ETLStatus, delete_task
+from plenario.models_.ETLTask import update_task, ETLStatus, delete_task, add_task
 from plenario.settings import PLENARIO_SENTRY_URL
 from plenario.utils.weather import WeatherETL
 
-client = Client(PLENARIO_SENTRY_URL)
+client = Client(PLENARIO_SENTRY_URL) if PLENARIO_SENTRY_URL else None
 
 
 def task_complete_msg(task_name, mt):
@@ -50,19 +50,23 @@ def etl_report(fn):
                 # ShapeMetadata has no last_update attribute.
                 pass
 
-            if PLENARIO_SENTRY_URL:
-                client.captureMessage("Started work '{}' on {}.".format(fn.__name__, meta.dataset_name))
-
+            # Attempt to create the ETLTask record if it doesn't exist.
+            # In the event of an IntegrityError, add_task handles itself so
+            # that it does not break the rest of the method.
+            task_type = 'master' if hasattr(meta, 'source_url_hash') else 'shape'
+            add_task(meta.dataset_name, task_type)
             update_task(meta.dataset_name, None, ETLStatus['started'], None)
-            completion_msg = fn(meta)
-            update_task(meta.dataset_name, datetime.now(), ETLStatus['success'], None)
 
-            if PLENARIO_SENTRY_URL:
-                client.captureMessage("Finished work '{}' on {}.".format(fn.__name__, meta.dataset_name))
+            # Perform the actual work for some add or update task.
+            completion_msg = fn(meta)
+            # Update the task status that belongs to this dataset.
+            update_task(meta.dataset_name, datetime.now(), ETLStatus['success'], None)
 
             return completion_msg
 
         except Exception:
+            # If anything at all goes wrong, save the traceback for this ETLTask
+            # and report the exception to Sentry.
             update_task(meta.dataset_name, datetime.now(), ETLStatus['failure'], traceback.format_exc())
             if PLENARIO_SENTRY_URL:
                 client.captureException()
