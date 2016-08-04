@@ -28,7 +28,6 @@ from plenario.api.jobs import make_job_response, submit_job, get_job, set_status
 from plenario.models import MetaTable, DataDump
 from plenario.database import fast_count, windowed_query
 
-
 # Use the standard pool if this is just the app,
 # but use the shared connection pool if this
 # is the worker. It's more efficient!
@@ -47,6 +46,7 @@ else:
 @crossdomain(origin="*")
 def get_job_view(ticket):
     return get_job(ticket)
+
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
@@ -133,7 +133,8 @@ def get_datadump(ticket):
     job = get_job(ticket)
     try:
         if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
-            datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get("data_type") in ["json", "csv"] else "json"
+            datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get(
+                "data_type") in ["json", "csv"] else "json"
 
             # Send data from Postgres in sequence in JSON format
             def stream_json():
@@ -190,7 +191,8 @@ def get_datadump(ticket):
                 stream_data = stream_csv
 
             response = Response(stream_data(), mimetype="text/{}".format(datatype))
-            response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(get_request(ticket)["query"]["dataset"], datatype)
+            response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(
+                get_request(ticket)["query"]["dataset"], datatype)
             return response
         else:
             return job
@@ -306,8 +308,8 @@ def _timeseries(args):
     # to return and inform them that the request wouldn't have found anything.
     if not table_names:
         return api_response.bad_request("Your request doesn't return any results. Try "
-                                       "adjusting your time constraint or location "
-                                       "parameters.")
+                                        "adjusting your time constraint or location "
+                                        "parameters.")
 
     try:
         panel = MetaTable.timeseries_all(
@@ -388,8 +390,8 @@ def _detail(args):
         msg = "Failed to fetch records."
         return api_response.make_raw_error("{}: {}".format(msg, e))
 
-def _datadump(args):
 
+def _datadump(args):
     requestid = args.data["jobsframework_ticket"]
     chunksize = 1000
     original_validated = copy.deepcopy(args)
@@ -429,7 +431,8 @@ def _datadump(args):
             check_in(args.data["jobsframework_workerbirthtime"], args.data["jobsframework_workerid"])
         chunk = [OrderedDict(zip(columns, row)) for row in chunk]
         chunk = [{column: row[column] for column in columns} for row in chunk]
-        dump = DataDump(os.urandom(16).encode('hex'), requestid, part, chunks, json.dumps(chunk, default=unknown_object_json_handler))
+        dump = DataDump(os.urandom(16).encode('hex'), requestid, part, chunks,
+                        json.dumps(chunk, default=unknown_object_json_handler))
         session.add(dump)
         try:
             session.commit()
@@ -463,7 +466,8 @@ def _datadump(args):
         add_chunk(chunk)
 
     metadata = """{{"startTime": "{}", "endTime": "{}", "workers": {}, "columns": {}}}""".format(
-        get_status(requestid)["meta"]["startTime"], str(datetime.now()), json.dumps([args.data["jobsframework_workerid"]]),
+        get_status(requestid)["meta"]["startTime"], str(datetime.now()),
+        json.dumps([args.data["jobsframework_workerid"]]),
         json.dumps(columns))
     dump = DataDump(requestid, requestid, 0, chunks, metadata)
     session.add(dump)
@@ -482,7 +486,6 @@ def _datadump(args):
 
 # Datadump utilities =======================
 def cleanup_datadump():
-
     def _cleanup_datadump(requestid):
         try:
             session.query(DataDump).filter(DataDump.request == requestid).delete()
@@ -494,11 +497,11 @@ def cleanup_datadump():
             log("---> Problem while clearing datadump request: {}".format(e))
             print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
 
-
     for requestid, in session.query(DataDump.request).distinct():
-            print(requestid)
-            if get_flag(requestid + "_suppresscleanup"):
-                _cleanup_datadump(requestid)
+        print(requestid)
+        if get_flag(requestid + "_suppresscleanup"):
+            _cleanup_datadump(requestid)
+
 
 def log(msg):
     # The constant opening and closing is meh, I know. But I'm feeling lazy
