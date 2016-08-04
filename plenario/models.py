@@ -1,4 +1,5 @@
 import json
+import traceback
 from collections import namedtuple
 from datetime import datetime
 from hashlib import md5
@@ -695,3 +696,13 @@ class Workers(Base):
         if self.job:
             self.jobcounter += 1
         self.job = None
+
+    @classmethod
+    def purge(cls):
+        try:
+            session.query(cls).delete()
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            traceback.print_exc()
+            print("Problem purging plenario_workers: {}".format(e))

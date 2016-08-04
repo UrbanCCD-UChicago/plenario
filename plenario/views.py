@@ -83,30 +83,6 @@ def workers():
     loaded = 0
     dead = 0
     for worker in workerlist:
-        lastseen = (now - datetime.strptime(worker["timestamp"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds()
-        if lastseen > 600:
-            worker["status"] = "dead"
-            dead+=1
-        elif lastseen > 300:
-            worker["status"] = "overload"
-            loaded+=1
-        elif lastseen > 10:
-            worker["status"] = "load"
-            loaded+=1
-        else:
-            worker["status"] = "nominal"
-            nominal+=1
-
-        diff = dateutil.relativedelta.relativedelta(now,datetime.fromtimestamp(worker["uptime"]))
-        worker["humanized_uptime"] = " {}d {}h {}m {}s".format(
-            diff.days, diff.hours, diff.minutes, diff.seconds).replace(
-            " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
-        diff = dateutil.relativedelta.relativedelta(datetime.fromtimestamp(lastseen),
-                                                      datetime.fromtimestamp(0))
-        worker["lastseen"] = " {}d {}h {}m {}s ago".format(
-            diff.days, diff.hours, diff.minutes, diff.seconds).replace(
-            " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
-
         if worker["job"]:
             job = json.loads(get_job(worker["job"]).get_data())
             if job.get("error"):
@@ -135,6 +111,31 @@ def workers():
                         " 0h ", "  ").replace(" 0m ", " ")[1:],
                     "endpoint": job["request"]["endpoint"]
                 }
+
+        lastseen = (now - datetime.strptime(worker["timestamp"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds()
+        if lastseen > 600 or worker.get("status"):
+            worker["status"] = "dead"
+            dead += 1
+        elif lastseen > 300:
+            worker["status"] = "overload"
+            loaded += 1
+        elif lastseen > 10:
+            worker["status"] = "load"
+            loaded += 1
+        else:
+            worker["status"] = "nominal"
+            nominal += 1
+
+        diff = dateutil.relativedelta.relativedelta(now, datetime.fromtimestamp(worker["uptime"]))
+        worker["humanized_uptime"] = " {}d {}h {}m {}s".format(
+            diff.days, diff.hours, diff.minutes, diff.seconds).replace(
+            " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
+        diff = dateutil.relativedelta.relativedelta(datetime.fromtimestamp(lastseen),
+                                                    datetime.fromtimestamp(0))
+        worker["lastseen"] = " {}d {}h {}m {}s ago".format(
+            diff.days, diff.hours, diff.minutes, diff.seconds).replace(
+            " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
+
     workerlist.sort(key=lambda worker: worker["name"])
     jobs = JobsQueue.count()
     workercounts = {
@@ -148,13 +149,7 @@ def workers():
 
 @views.route('/workers/purge')
 def purge_workers():
-    try:
-        session.query(Workers).delete()
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        traceback.print_exc()
-        print("Problem purging plenario_workers: {}".format(e))
+    Workers.purge()
     return redirect(url_for('views.workers'))
 
 '''Approve a dataset'''

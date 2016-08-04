@@ -4,6 +4,7 @@ from flask import Flask, abort
 
 import plenario.tasks as tasks
 from plenario.api.jobs import submit_job, worker_ready
+from plenario.api.point import cleanup_datadump
 
 """
 Task server that runs in AWS Elastic Beanstalk worker environment.
@@ -37,6 +38,11 @@ def create_worker():
             return "Workers are available."
         else:
             return "All workers are occupied."
+
+    @app.route('/purge/datadump', methods=['POST'])
+    def purge_datadump():
+        cleanup_datadump()
+        return "Cleaned datadump table."
 
     return app
 

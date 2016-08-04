@@ -14,10 +14,11 @@ import plenario.database
 import traceback
 
 from plenario.models import Workers
+import datetime
 
 session = plenario.database.session
 
-worker_threads = 4
+worker_threads = 8
 wait_interval = 1
 
 # While the worker is performing a task it pulled
@@ -44,6 +45,7 @@ def log(msg, worker_id):
 
 
 def check_in(birthtime, worker_id):
+    log("INFO: Checking in.", worker_id)
     try:
         session.query(Workers).filter(Workers.name == worker_id).one().check_in()
         session.commit()
@@ -87,6 +89,7 @@ def deregister_job(birthtime, worker_id):
 
 
 def register_worker(birthtime, worker_id):
+    log("INFO: Registering worker.", worker_id)
     try:
         session.add(Workers(worker_id, int(birthtime)))
         session.commit()
@@ -109,17 +112,16 @@ def deregister_worker(worker_id):
 # =========================== The Worker Process ===============================
 if __name__ == "__main__":
 
-    import datetime
     import time
     import signal
     import boto.sqs
     import threading
-    import psycopg2
     import os
+    from subprocess import check_output
     from collections import namedtuple
-    # from subprocess import check_output
+    from subprocess import check_output
     from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
-    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump_cleanup, _datadump
+    from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump
     from plenario.api.jobs import get_status, set_status, get_request, set_result, submit_job
     from plenario.api.shape import _aggregate_point_data, _export_shape
     from plenario.api.response import convert_result_geoms
@@ -180,9 +182,7 @@ if __name__ == "__main__":
                         'grid': lambda args: _grid(args),
                         'datadump': lambda args: _datadump(args),
                         # Health endpoint.
-                        'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)},
-                        # Utility tasks
-                        'datadump_cleanup': lambda args: _datadump_cleanup(args)
+                        'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)}
                     }
 
                     shape_logic = {
@@ -241,7 +241,38 @@ if __name__ == "__main__":
                                 JobsQueue.delete_message(job)
                                 continue
 
-                            if status["status"] != "queued":
+                            # Handle orphaned jobs
+                            if status["status"] == "processing" and "longrunning" not in get_request(ticket) and \
+                                    ((not status["meta"].get("lastStartTime") and
+                                                  (datetime.datetime.now()-
+                                                       datetime.datetime.strptime(status["meta"]["startTime"],
+                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > 3600) or
+                                    (status["meta"].get("lastStartTime") and
+                                                  (datetime.datetime.now()-
+                                                       datetime.datetime.strptime(status["meta"]["lastStartTime"],
+                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > 3600)):
+
+                                status["meta"]["tries"] = status["meta"]["tries"] + 1 \
+                                    if status["meta"].get("tries") else 1
+
+                                # Only try orphaned jobs again once
+                                if status["meta"]["tries"] > 1:
+                                    status["status"] = "error"
+                                    status["meta"]["endTime"] = str(datetime.datetime.now())
+                                    log("ERROR: ALERT! Ticket {} has been stalling workers. Removing.".format(ticket), worker_id)
+                                    set_status(ticket, status)
+                                    set_result(ticket, {"error": "Job stalled."})
+                                    JobsQueue.delete_message(job)
+                                    deregister_job(birthtime, worker_id)
+                                    continue
+                                else:
+                                    log("WARNING: Ticket {} has been orphaned...retrying.".format(ticket), worker_id)
+                                    status["meta"]["lastDeferredTime"] = str(datetime.datetime.now())
+                                    set_status(ticket, status)
+                                traceback.print_exc()
+
+                            # Standard job mutex
+                            elif status["status"] != "queued":
                                 log("Job has already been started. Skipping.", worker_id)
                                 continue
 
@@ -338,7 +369,11 @@ if __name__ == "__main__":
                                 JobsQueue.delete_message(job)
                             except Exception as e:
                                 status = get_status(ticket)
-                                if status["meta"].get("tries") and status["meta"]["tries"] > 4:
+                                status["meta"]["tries"] = status["meta"]["tries"] + 1 \
+                                    if status["meta"].get("tries") else 1
+
+                                # Try failed jobs twice
+                                if status["meta"]["tries"] > 2:
                                     status["status"] = "error"
                                     status["meta"]["endTime"] = str(datetime.datetime.now())
                                     log("ERROR: Ticket {} errored with: {}.".format(ticket, e), worker_id)
@@ -348,8 +383,6 @@ if __name__ == "__main__":
                                 else:
                                     status["status"] = "queued"
                                     status["meta"]["lastDeferredTime"] = str(datetime.datetime.now())
-                                    status["meta"]["tries"] = status["meta"]["tries"] + 1 if status["meta"].get(
-                                        "tries") else 1
                                     log("ERROR: Ticket {} errored with: {}...retrying.".format(ticket, e), worker_id)
                                     set_status(ticket, status)
                                 traceback.print_exc()
@@ -365,8 +398,9 @@ if __name__ == "__main__":
 
                         else:
                             # No work! Idle for a bit to save compute cycles.
-                            # log("Ho hum nothing to do. Idling for {} seconds.".format(wait_interval), worker_id)
+                            #log("Ho hum nothing to do. Idling for {} seconds.".format(wait_interval), worker_id)
                             time.sleep(wait_interval)
+
                     deregister_worker(worker_id)
 
             except Exception as e:
@@ -391,11 +425,27 @@ if __name__ == "__main__":
         threads.append(t)
         t.start()
 
-    for t in threads:
-        while True:
-            t.join(60)
-            if not t.is_alive():
-                break
+    # Join threads back into main loop
+    looper = 0
+    while len(threads) > 0:
+        looper = (looper + 1) % len(threads)
+        t = threads[looper]
+        t.join(5)
+        if not t.is_alive():
+            threads.pop(looper)
+            # If threads exit prematurely, then replace it.
+            if do_work:
+                log("ERROR: A WORKER DIED PREMATURELY! REPLACING.".format(len(threads)), "WORKER BOSS")
+                print("====================== WORKER BOSS STATUS: ======================")
+                print check_output(["cat", "/proc/{}/status".format(os.getpid())])
+                print("====================== WORKER BOSS MEMDUMP: ======================")
+                print check_output(["cat", "/proc/{}/maps".format(os.getpid())])
+                log("INFO: Purging worker database.", "WORKER BOSS")
+                Workers.purge()
+                t = threading.Thread(target=worker, name="plenario-worker-thread")
+                t.daemon = False
+                threads.append(t)
+                t.start()
 
     session.close()
     log("All workers have exited.", "WORKER BOSS")

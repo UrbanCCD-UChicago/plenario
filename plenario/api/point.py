@@ -370,9 +370,14 @@ def _detail(args):
         return api_response.make_raw_error("{}: {}".format(msg, e))
 
 def _datadump(args):
+
     requestid = args.data["jobsframework_ticket"]
     chunksize = 1000
     original_validated = copy.deepcopy(args)
+
+    # Number of rows to exceed in order to start
+    # deferring job (to allow other jobs to complete first)
+    row_threshold = 100000
 
     query = original_validated.data
 
@@ -381,6 +386,16 @@ def _datadump(args):
     log("-> Query: {}".format(json.dumps(query, default=unknown_object_json_handler)))
     rows = fast_count(detail_query(args))
     log("-> Dump contains {} rows.".format(rows))
+
+    if rows > row_threshold:
+        # Bake-in "niceness" in datadump;
+        # Since datadumps can be time-consuming,
+        # throttle them by deferring 50% of them for
+        # 10 seconds later (letting other jobs run).
+        if random.random() < 0.5:
+            log("-> Deferring dump due to size.")
+            return {"jobsframework_metacommands": ["defer", {"setTimeout": 10}]}
+
     chunks = int(math.ceil(rows / float(chunksize)))
 
     status = get_status(requestid)
@@ -409,6 +424,9 @@ def _datadump(args):
         status["progress"] = {"done": part, "total": chunks}
         set_status(requestid, status)
 
+        # Supress datadump cleanup
+        set_flag(requestid + "_suppresscleanup", True, 10800)
+
     part = 0
     chunk = []
     count = 0
@@ -424,11 +442,6 @@ def _datadump(args):
     if len(chunk) > 0:
         part += 1
         add_chunk(chunk)
-
-    # Queue a cleanup job
-    req = {"endpoint": "datadump_cleanup", "query": {"datadump_requestid": requestid}}
-    set_flag(requestid + "_suppresscleanup", True, 10800)
-    submit_job(req)
 
     metadata = """{{"startTime": "{}", "endTime": "{}", "workers": {}, "columns": {}}}""".format(
         get_status(requestid)["meta"]["startTime"], str(datetime.now()), json.dumps([args.data["jobsframework_workerid"]]),
@@ -447,30 +460,26 @@ def _datadump(args):
 
     return {"url": args.data["datadump_urlroot"] + "v1/api/datadump/" + requestid}
 
-def _datadump_cleanup(args):
-    if not get_flag(args.data["datadump_requestid"] + "_dowork") and not get_flag(
-                    args.data["datadump_requestid"] + "_suppresscleanup"):
-        cleanup_datadump(args.data["datadump_requestid"])
-        return {"status": "success"}
-    else:
-        if (datetime.now() - datetime.strptime(get_status(args.data["jobsframework_ticket"])["meta"]["queueTime"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > 1800:
-            return {"jobsframework_metacommands": ["resubmit"]}
-        else:
-            return {"jobsframework_metacommands": ["defer"]}
-
 
 # Datadump utilities =======================
-def cleanup_datadump(requestid):
-    log("-> Removed request {} from database.".format(requestid))
-    try:
-        session.query(DataDump).filter(DataDump.request == requestid).delete()
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        traceback.print_exc()
-        log("---> Problem while clearing datadump request: {}".format(e))
-        print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
+def cleanup_datadump():
 
+    def _cleanup_datadump(requestid):
+        try:
+            session.query(DataDump).filter(DataDump.request == requestid).delete()
+            session.commit()
+            log("---> Removed request {} from database.".format(requestid))
+        except Exception as e:
+            session.rollback()
+            traceback.print_exc()
+            log("---> Problem while clearing datadump request: {}".format(e))
+            print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
+
+
+    for requestid, in session.query(DataDump.request).distinct():
+            print(requestid)
+            if get_flag(requestid + "_suppresscleanup"):
+                _cleanup_datadump(requestid)
 
 def log(msg):
     # The constant opening and closing is meh, I know. But I'm feeling lazy
