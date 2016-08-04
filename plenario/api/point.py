@@ -135,41 +135,59 @@ def get_datadump(ticket):
         if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
             datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get("data_type") in ["json", "csv"] else "json"
 
-            # Send data from Postgres in sequence
-            def stream_data():
+            # Send data from Postgres in sequence in JSON format
+            def stream_json():
                 counter = 0
+                row = session.query(DataDump).filter(
+                    sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
+                # Make headers for JSON.
+                metadata = json.loads(row.get_data())
+                yield """{{"startTime": "{}", "endTime": "{}", "workers": {}, "data": [""".format(
+                    metadata["startTime"], metadata["endTime"], json.dumps(metadata["workers"]))
+                counter += 1
                 # The "total" in the status lists the largest part number.
                 # In reality, there are total+1 parts because the header occupies part 0.
                 # So we also want to go up to the total as well. Don't worry,
                 # logic in the _datadump ensures that total is the largest part number.
                 while counter <= get_status(ticket)["progress"]["total"]:
+                    # Using one() here in order to assert quality data
+                    # If one() fails (not that it should) then that means
+                    # that the datadump is bad and should not be served.
                     row = session.query(DataDump).filter(
                         sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
-                    if counter == 0:
-                        # Make headers for JSON and CSV.
-                        metadata = json.loads(row.get_data())
-                        columns = [str(c) for c in metadata["columns"]]
-                        if datatype == "json":
-                            yield """{{"startTime": "{}", "endTime": "{}", "workers": {}, "data": [""".format(
-                                metadata["startTime"], metadata["endTime"], json.dumps(metadata["workers"]))
-                        elif datatype == "csv":
-                            # Uncomment to enable CSV metadata
-                            # yield "# STARTTIME: {}\n# ENDTIME: {}\n# WORKERS: {}\n".format(metadata["startTime"], metadata["endTime"], ", ".join(metadata["workers"]))
-                            yield ",".join([json.dumps(column) for column in columns]) + "\n"
-                    else:
-                        if datatype == "json":
-                            # Return result with the list brackets [] sliced off.
-                            yield row.get_data()[1:-1]
-                            if counter < get_status(ticket)["progress"]["total"]: yield ","
-                        elif datatype == "csv":
-                            for csvrow in json.loads(row.get_data()):
-                                yield ",".join(
-                                    [json.dumps(csvrow[key].encode("utf-8")) if type(csvrow[key]) is unicode else json.dumps(str(csvrow[key]))
-                                     for key in columns]) + "\n"
+                    # Return result with the list brackets [] sliced off.
+                    yield row.get_data()[1:-1]
+                    if counter < get_status(ticket)["progress"]["total"]: yield ","
                     counter += 1
-                if datatype == "json":
-                        # Finish off JSON syntax
-                        yield "]}"
+                # Finish off JSON syntax
+                yield "]}"
+
+            # Send data from Postgres in sequence in CSV format
+            def stream_csv():
+                counter = 0
+                row = session.query(DataDump).filter(
+                    sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
+                # Make headers for CSV.
+                metadata = json.loads(row.get_data())
+                columns = [str(c) for c in metadata["columns"]]
+                # Uncomment to enable CSV metadata
+                # yield "# STARTTIME: {}\n# ENDTIME: {}\n# WORKERS: {}\n".format(metadata["startTime"], metadata["endTime"], ", ".join(metadata["workers"]))
+                yield ",".join([json.dumps(column) for column in columns]) + "\n"
+                counter += 1
+                while counter <= get_status(ticket)["progress"]["total"]:
+                    row = session.query(DataDump).filter(
+                        sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
+                    for csvrow in json.loads(row.get_data()):
+                        yield ",".join(
+                            [json.dumps(csvrow[key].encode("utf-8")) if type(
+                                csvrow[key]) is unicode else json.dumps(str(csvrow[key]))
+                             for key in columns]) + "\n"
+                    counter += 1
+
+            # Set the streaming generator (JSON by default)
+            stream_data = stream_json
+            if datatype == "csv":
+                stream_data = stream_csv
 
             response = Response(stream_data(), mimetype="text/{}".format(datatype))
             response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(get_request(ticket)["query"]["dataset"], datatype)
