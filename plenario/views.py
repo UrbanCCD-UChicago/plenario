@@ -775,10 +775,10 @@ def edit_shape(dataset_name):
 
 @views.route('/update-shape/<dataset_name>')
 def update_shape_view(dataset_name):
-    return update_dataset(dataset_name)
+    return queue_update_shape(dataset_name)
 
 
-def update_shape(dataset_name):
+def queue_update_shape(dataset_name):
     job = {"endpoint": "update_shape", "query": dataset_name}
     ticket = submit_job(job)
     return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
@@ -896,10 +896,10 @@ def delete_dataset(source_url_hash):
 
 @views.route('/update-dataset/<source_url_hash>')
 def update_dataset_view(source_url_hash):
-    return update_dataset(source_url_hash)
+    return queue_update_dataset(source_url_hash)
 
 
-def update_dataset(source_url_hash):
+def queue_update_dataset(source_url_hash):
     job = {"endpoint": "update_dataset", "query": source_url_hash}
     ticket = submit_job(job)
     return make_response(json.dumps({'status': 'success', 'ticket': ticket}))

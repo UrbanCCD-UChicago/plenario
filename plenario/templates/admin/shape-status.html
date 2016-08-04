@@ -22,6 +22,8 @@
                 <span class="label
                     {% if shape.status == 'SUCCESS' %}
                         label-success
+                    {% elif shape.status == 'Ingest Pending' or shape.status == 'Ingest Started' %}
+                        label-default
                     {% else %}
                         label-primary
                     {% endif %}">
