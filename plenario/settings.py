@@ -1,5 +1,6 @@
+import boto.ec2
+import boto.utils
 from os import environ
-from subprocess import check_output
 get = environ.get
 
 SECRET_KEY = get('SECRET_KEY', 'abcdefghijklmnop')
@@ -60,8 +61,21 @@ MAINTENANCE = False
 # SQS Jobs Queue
 JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-queue-test-2')
 
-#Get instance ID and autoscaling group
-INSTANCE_ID = check_output("curl http://instance-data/latest/meta-data/instance-id")
-AUTOSCALING_GROUP = check_output("ec2-describe-instances {} -O {} -W {} | \
- grep aws:autoscaling:groupName | \
-  awk -F $'\t' '{{ print $NF }}'".format(INSTANCE_ID, AWS_ACCESS_KEY, AWS_SECRET_KEY))
+# Get Instance ID and Autoscaling Group Name
+instance_metadata = boto.utils.get_instance_metadata()
+INSTANCE_ID = instance_metadata["instance-id"]
+
+AUTOSCALING_GROUP = ""
+ec2 = boto.ec2.connect_to_region(
+    AWS_REGION_NAME,
+    aws_access_key_id=AWS_ACCESS_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY
+)
+reservations = ec2.get_all_instances()
+for res in reservations:
+    for inst in res.instances:
+        if inst.id == INSTANCE_ID:
+            AUTOSCALING_GROUP = inst.tags["aws:autoscaling:groupName"]
+            break
+    if AUTOSCALING_GROUP:
+        break

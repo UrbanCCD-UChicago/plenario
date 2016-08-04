@@ -49,59 +49,6 @@ def check_in(birthtime, worker_id):
             log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
 
 
-def register_job(ticket, birthtime, worker_id):
-    global active_worker_count
-    check_in(birthtime, worker_id)
-    active_worker_count += 1
-    try:
-        session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
-        session.commit()
-    except Exception as e:
-        traceback.print_exc()
-        session.rollback()
-        if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
-            register_worker(birthtime, worker_id)
-        else:
-            log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-
-
-def deregister_job(birthtime, worker_id):
-    global active_worker_count
-    check_in(birthtime, worker_id)
-    active_worker_count -= 1
-    try:
-        session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
-        session.commit()
-    except Exception as e:
-        traceback.print_exc()
-        session.rollback()
-        if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
-            register_worker(birthtime, worker_id)
-        else:
-            log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-
-
-def register_worker(birthtime, worker_id):
-    log("INFO: Registering worker.", worker_id)
-    try:
-        session.add(Workers(worker_id, int(birthtime)))
-        session.commit()
-    except Exception as e:
-        traceback.print_exc()
-        session.rollback()
-        log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-
-
-def deregister_worker(worker_id):
-    try:
-        session.query(Workers).filter(Workers.name == worker_id).delete()
-        session.commit()
-    except Exception as e:
-        traceback.print_exc()
-        session.rollback()
-        log("Problem updating worker registration: {}".format(e), worker_id)
-
-
 # =========================== The Worker Process ===============================
 if __name__ == "__main__":
 
@@ -125,21 +72,14 @@ if __name__ == "__main__":
     from plenario.utils.name_generator import generate_name
     from flask import Flask
 
-    # =========================== DEBUG ======================== #
-    log("Instance ID: {}".format(INSTANCE_ID), "WORKER BOSS")
-    log("Autoscaling Name: {}".format(AUTOSCALING_GROUP), "WORKER BOSS")
-
-
     do_work = True
 
     ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
-
 
     def stop_workers(signum, frame):
         global do_work
         log("Got termination signal. Finishing job...", "WORKER BOSS")
         do_work = False
-
 
     signal.signal(signal.SIGINT, stop_workers)
     signal.signal(signal.SIGTERM, stop_workers)
@@ -154,21 +94,84 @@ if __name__ == "__main__":
     # While the worker is performing a task it pulled
     # off SQS, protect its host EC2 instance from being
     # scaled in.
-    autoscaling_client = boto3.client('autoscaling')
+    autoscaling_client = boto3.client('autoscaling', region_name=AWS_REGION_NAME,
+          aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
+
+    protected = False
 
     def update_instance_protection():
-        if active_worker_count > 0:
+        global protected
+        if active_worker_count > 0 and not protected:
+            log("INSTANCE PROTECTION ENABLED", "WORKER BOSS")
             autoscaling_client.set_instance_protection(
                 InstanceIds=[INSTANCE_ID],
                 AutoScalingGroupName=AUTOSCALING_GROUP,
                 ProtectedFromScaleIn=True
             )
-        else:
+            protected = True
+        elif active_worker_count <= 0 and protected:
+            log("INSTANCE PROTECTION DISABLED", "WORKER BOSS")
             autoscaling_client.set_instance_protection(
                 InstanceIds=[INSTANCE_ID],
                 AutoScalingGroupName=AUTOSCALING_GROUP,
                 ProtectedFromScaleIn=False
             )
+            protected = False
+
+
+    def register_job(ticket, birthtime, worker_id):
+        global active_worker_count
+        check_in(birthtime, worker_id)
+        active_worker_count += 1
+        try:
+            session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
+            session.commit()
+        except Exception as e:
+            traceback.print_exc()
+            session.rollback()
+            if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
+                register_worker(birthtime, worker_id)
+            else:
+                log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+        update_instance_protection()
+
+
+    def deregister_job(birthtime, worker_id):
+        global active_worker_count
+        check_in(birthtime, worker_id)
+        active_worker_count -= 1
+        try:
+            session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
+            session.commit()
+        except Exception as e:
+            traceback.print_exc()
+            session.rollback()
+            if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
+                register_worker(birthtime, worker_id)
+            else:
+                log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+        update_instance_protection()
+
+
+    def register_worker(birthtime, worker_id):
+        log("INFO: Registering worker.", worker_id)
+        try:
+            session.add(Workers(worker_id, int(birthtime)))
+            session.commit()
+        except Exception as e:
+            traceback.print_exc()
+            session.rollback()
+            log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+
+
+    def deregister_worker(worker_id):
+        try:
+            session.query(Workers).filter(Workers.name == worker_id).delete()
+            session.commit()
+        except Exception as e:
+            traceback.print_exc()
+            session.rollback()
+            log("Problem updating worker registration: {}".format(e), worker_id)
 
 
     def worker():
@@ -227,8 +230,6 @@ if __name__ == "__main__":
 
                     throttle = 5
                     while do_work:
-
-                        update_instance_protection()
 
                         if throttle < 0:
                             check_in(birthtime, worker_id)
@@ -452,8 +453,6 @@ if __name__ == "__main__":
                 print check_output(["cat", "/proc/{}/status".format(os.getpid())])
                 print("====================== WORKER BOSS MEMDUMP: ======================")
                 print check_output(["cat", "/proc/{}/maps".format(os.getpid())])
-                log("INFO: Purging worker database.", "WORKER BOSS")
-                Workers.purge()
                 t = threading.Thread(target=worker, name="plenario-worker-thread")
                 t.daemon = False
                 threads.append(t)
