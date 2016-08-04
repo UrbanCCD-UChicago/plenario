@@ -1,4 +1,5 @@
 from os import environ
+from subprocess import check_output
 get = environ.get
 
 SECRET_KEY = get('SECRET_KEY', 'abcdefghijklmnop')
@@ -56,5 +57,11 @@ MAIL_PASSWORD = get('MAIL_PASSWORD', '')
 # Toggle maintenence mode
 MAINTENANCE = False
 
-#SQS Jobs Queue
+# SQS Jobs Queue
 JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-queue-test-2')
+
+#Get instance ID and autoscaling group
+INSTANCE_ID = check_output("curl http://instance-data/latest/meta-data/instance-id")
+AUTOSCALING_GROUP = check_output("ec2-describe-instances {} -O {} -W {} | \
+ grep aws:autoscaling:groupName | \
+  awk -F $'\t' '{{ print $NF }}'".format(INSTANCE_ID, AWS_ACCESS_KEY, AWS_SECRET_KEY))

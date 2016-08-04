@@ -13,11 +13,8 @@ import response as api_response
 
 from collections import OrderedDict
 from datetime import datetime
-from flask import request, Response, make_response
+from flask import request, Response
 from dateutil import parser
-from itertools import groupby
-from operator import itemgetter
-
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
 from plenario.api.common import make_cache_key, unknown_object_json_handler
 from plenario.api.condition_builder import parse_tree

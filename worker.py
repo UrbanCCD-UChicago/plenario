@@ -22,16 +22,6 @@ worker_threads = 8
 wait_interval = 1
 job_timeout = 3600
 
-# While the worker is performing a task it pulled
-# off SQS, protect its host EC2 instance from being
-# scaled in.
-autoscaling_client = boto3.client('autoscaling')
-autoscaling_client.set_instance_protection(
-    InstanceIds=['my_instance_id'],
-    AutoScalingGroupName='auto_scaling_group_name',
-    ProtectedFromScaleIn=True
-)
-
 # Used in deciding when to remove aforementioned
 # scale-in protection. A count of the workers
 # actively performing a job.
@@ -60,6 +50,7 @@ def check_in(birthtime, worker_id):
 
 
 def register_job(ticket, birthtime, worker_id):
+    global active_worker_count
     check_in(birthtime, worker_id)
     active_worker_count += 1
     try:
@@ -75,6 +66,7 @@ def register_job(ticket, birthtime, worker_id):
 
 
 def deregister_job(birthtime, worker_id):
+    global active_worker_count
     check_in(birthtime, worker_id)
     active_worker_count -= 1
     try:
@@ -121,7 +113,7 @@ if __name__ == "__main__":
     from subprocess import check_output
     from collections import namedtuple
     from subprocess import check_output
-    from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
+    from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE, INSTANCE_ID, AUTOSCALING_GROUP
     from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump
     from plenario.api.jobs import get_status, set_status, get_request, set_result, submit_job
     from plenario.api.shape import _aggregate_point_data, _export_shape
@@ -132,6 +124,11 @@ if __name__ == "__main__":
     from plenario.tasks import update_weather, frequency_update
     from plenario.utils.name_generator import generate_name
     from flask import Flask
+
+    # =========================== DEBUG ======================== #
+    log("Instance ID: {}".format(INSTANCE_ID), "WORKER BOSS")
+    log("Autoscaling Name: {}".format(AUTOSCALING_GROUP), "WORKER BOSS")
+
 
     do_work = True
 
@@ -153,6 +150,25 @@ if __name__ == "__main__":
         aws_secret_access_key=AWS_SECRET_KEY
     )
     JobsQueue = conn.get_queue(JOBS_QUEUE)
+
+    # While the worker is performing a task it pulled
+    # off SQS, protect its host EC2 instance from being
+    # scaled in.
+    autoscaling_client = boto3.client('autoscaling')
+
+    def update_instance_protection():
+        if active_worker_count > 0:
+            autoscaling_client.set_instance_protection(
+                InstanceIds=[INSTANCE_ID],
+                AutoScalingGroupName=AUTOSCALING_GROUP,
+                ProtectedFromScaleIn=True
+            )
+        else:
+            autoscaling_client.set_instance_protection(
+                InstanceIds=[INSTANCE_ID],
+                AutoScalingGroupName=AUTOSCALING_GROUP,
+                ProtectedFromScaleIn=False
+            )
 
 
     def worker():
@@ -211,6 +227,9 @@ if __name__ == "__main__":
 
                     throttle = 5
                     while do_work:
+
+                        update_instance_protection()
+
                         if throttle < 0:
                             check_in(birthtime, worker_id)
                             throttle = 5
@@ -389,13 +408,6 @@ if __name__ == "__main__":
                             finally:
                                 deregister_job(birthtime, worker_id)
 
-                            if active_worker_count <= 0:
-                                autoscaling_client.set_instance_protection(
-                                    InstanceIds=['my_instance_id'],
-                                    AutoScalingGroupName='auto_scaling_group_name',
-                                    ProtectedFromScaleIn=False
-                                )
-
                         else:
                             # No work! Idle for a bit to save compute cycles.
                             #log("Ho hum nothing to do. Idling for {} seconds.".format(wait_interval), worker_id)
@@ -433,7 +445,7 @@ if __name__ == "__main__":
         t.join(5)
         if not t.is_alive():
             threads.pop(looper)
-            # If threads exit prematurely, then replace it.
+            # If threads exit prematurely, then replace them.
             if do_work:
                 log("ERROR: A WORKER DIED PREMATURELY! REPLACING.".format(len(threads)), "WORKER BOSS")
                 print("====================== WORKER BOSS STATUS: ======================")
@@ -446,6 +458,8 @@ if __name__ == "__main__":
                 t.daemon = False
                 threads.append(t)
                 t.start()
+
+                # TODO: Make active_worker_count account for workers which may die in the middle of the run loop.
 
     session.close()
     log("All workers have exited.", "WORKER BOSS")
