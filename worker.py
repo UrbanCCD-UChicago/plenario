@@ -118,8 +118,8 @@ if __name__ == "__main__":
                     ProtectedFromScaleIn=False
                 )
                 protected = False
-        except:
-            log("Could not apply INSTANCE PROTECTION (I have failed as a boss D: )", "WORKER BOSS")
+        except Exception as e:
+            log("Could not apply INSTANCE PROTECTION: {}".format(e), "WORKER BOSS")
 
 
     def register_job(ticket, birthtime, worker_id):

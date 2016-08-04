@@ -148,7 +148,6 @@ def workers():
                            workercounts=workercounts, queuelength=jobs, overload=(jobs>=8))
 
 @views.route('/workers/purge')
-@login_required
 def purge_workers():
     Workers.purge()
     return redirect(url_for('views.workers'))
