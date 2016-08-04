@@ -13,8 +13,8 @@ from plenario.models import MetaTable, ShapeMetadata
 from plenario.update import create_worker
 from plenario.utils.shapefile import Shapefile
 from plenario.utils.model_helpers import fetch_table, table_exists
-from plenario.views import approve_dataset, update_dataset, delete_dataset
-from plenario.views import approve_shape, update_shape, delete_shape
+from plenario.views import approve_dataset, queue_update_dataset, delete_dataset
+from plenario.views import approve_shape, queue_update_shape, delete_shape
 from tests.points.api_tests import get_loop_rect
 
 
@@ -161,7 +161,7 @@ class TestJobs(unittest.TestCase):
         # Queue the ingestion job.
         ticket = approve_dataset(source_url_hash)
 
-        wait_on(ticket, 15)
+        wait_on(ticket, 30)
         status = get_status(ticket)['status']
 
         # First check if it finished correctly.
@@ -173,7 +173,7 @@ class TestJobs(unittest.TestCase):
         count = len(session.query(table).all())
         self.assertEqual(count, 356)
 
-    def admin_test_02_update_dataset(self):
+    def admin_test_02_queue_update_dataset(self):
 
         # Grab source url hash.
         dname = 'restaurant_applications'
@@ -184,9 +184,9 @@ class TestJobs(unittest.TestCase):
 
         # Queue the update job.
         with self.other_app.test_request_context():
-            ticket = update_dataset(source_url_hash).data
+            ticket = queue_update_dataset(source_url_hash).data
             ticket = json.loads(ticket)['ticket']
-        wait_on(ticket, 15)
+        wait_on(ticket, 30)
         status = get_status(ticket)['status']
         self.assertIn(status, {'error', 'success'})
         self.assertEqual(status, 'success')
@@ -207,7 +207,7 @@ class TestJobs(unittest.TestCase):
         with self.other_app.test_request_context():
             ticket = delete_dataset(source_url_hash)
             ticket = json.loads(ticket.data)['ticket']
-        wait_on(ticket, 10)
+        wait_on(ticket, 30)
         status = get_status(ticket)['status']
         self.assertIn(status, {'error', 'success'})
         self.assertEqual(status, 'success')
@@ -228,7 +228,7 @@ class TestJobs(unittest.TestCase):
 
         print "shape_test.ticket: {}".format(ticket)
 
-        wait_on(ticket, 20)
+        wait_on(ticket, 30)
         status = get_status(ticket)['status']
 
         # First check if it finished correctly.
@@ -241,7 +241,7 @@ class TestJobs(unittest.TestCase):
         count = len(session.query(table).all())
         self.assertEqual(count, 98)
 
-    def admin_test_05_update_shapeset(self):
+    def admin_test_05_queue_update_shapeset(self):
         # Grab source url hash.
         shape_name = 'boundaries_neighborhoods'
 
@@ -249,9 +249,9 @@ class TestJobs(unittest.TestCase):
 
         # Queue the update job.
         with self.other_app.test_request_context():
-            ticket = update_shape(shape_name).data
+            ticket = queue_update_shape(shape_name).data
             ticket = json.loads(ticket)['ticket']
-        wait_on(ticket, 15)
+        wait_on(ticket, 30)
         status = get_status(ticket)['status']
         self.assertIn(status, {'error', 'success'})
         self.assertEqual(status, 'success')
@@ -274,10 +274,10 @@ class TestJobs(unittest.TestCase):
 
         # Queue the update job.
         with self.other_app.test_request_context():
-            ticket = update_shape(shape_name).data
+            ticket = queue_update_shape(shape_name).data
             ticket = json.loads(ticket)['ticket']
 
-        wait_on(ticket, 15)
+        wait_on(ticket, 30)
 
         # Check that the record was recreated.
         rp = app_engine.execute("select from etl_task where dataset_name = 'boundaries_neighborhoods'")
@@ -301,7 +301,7 @@ class TestJobs(unittest.TestCase):
             ticket = delete_shape(shape_name)
             ticket = json.loads(ticket.data)['ticket']
 
-        wait_on(ticket, 10)
+        wait_on(ticket, 30)
 
         status = get_status(ticket)['status']
         self.assertIn(status, {'error', 'success'})
@@ -608,7 +608,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["request"]["query"]["shapeset"], "chicago_neighborhoods")
         self.assertEqual(response["request"]["query"]["job"], True)
 
-        wait_on(ticket, 10)
+        wait_on(ticket, 30)
 
         url = response["url"]
         response = self.app.get(url)
@@ -629,7 +629,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["request"]["query"]["data_type"], "shapefile")
         self.assertEqual(response["request"]["query"]["job"], True)
 
-        wait_on(ticket, 10)
+        wait_on(ticket, 30)
 
         url = response["url"]
         response = self.app.get(url)
@@ -658,7 +658,7 @@ class TestJobs(unittest.TestCase):
         self.assertEqual(response["request"]["query"]["data_type"], "json")
         self.assertEqual(response["request"]["query"]["job"], True)
 
-        wait_on(ticket, 10)
+        wait_on(ticket, 30)
 
         url = response["url"]
         response = self.app.get(url)
@@ -741,14 +741,20 @@ class TestJobs(unittest.TestCase):
         print(response.get_data())
         response = response.get_data().split("\n")
 
+        # 65 data lines, 1 column line, and 1 newline at the end.
+        self.assertEqual(len(response), 65 + 1 + 1)
+        # Uncomment to enable tests for CSV metadata
         # 65 data lines, 4 meta lines, and 1 newline at the end.
-        self.assertEqual(len(response), 65 + 4 + 1)
-        self.assertEqual(response[0][:11], "# STARTTIME")
-        self.assertEqual(response[1][:9], "# ENDTIME")
-        self.assertEqual(response[2][:9], "# WORKERS")
-        self.assertEqual(response[3],
+        # self.assertEqual(len(response), 65 + 4 + 1)
+        # self.assertEqual(response[0][:11], "# STARTTIME")
+        # self.assertEqual(response[1][:9], "# ENDTIME")
+        # self.assertEqual(response[2][:9], "# WORKERS")
+        # self.assertEqual(response[3],
+        self.assertEqual(response[0],
                          '"date","start_time","end_time","day","event","event_type","address","city","state","zip","phone","community_area_number","community_area_name","ward","latitude","longitude","location"')
-        self.assertEqual(response[4].split(",")[0], '"2013-09-22"')
+        # Uncomment to enable tests for CSV metadata
+        # self.assertEqual(response[4].split(",")[0], '"2013-09-22"')
+        self.assertEqual(response[1].split(",")[0], '"2013-09-22"')
 
     # ============================ TEARDOWN ============================ #
 

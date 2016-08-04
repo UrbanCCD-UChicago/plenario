@@ -20,21 +20,7 @@ session = plenario.database.session
 
 worker_threads = 8
 wait_interval = 1
-
-# While the worker is performing a task it pulled
-# off SQS, protect its host EC2 instance from being
-# scaled in.
-autoscaling_client = boto3.client('autoscaling')
-autoscaling_client.set_instance_protection(
-    InstanceIds=['my_instance_id'],
-    AutoScalingGroupName='auto_scaling_group_name',
-    ProtectedFromScaleIn=True
-)
-
-# Used in deciding when to remove aforementioned
-# scale-in protection. A count of the workers
-# actively performing a job.
-active_worker_count = 0
+job_timeout = 3600
 
 
 # ======================= Worker Utilities ========================
@@ -58,57 +44,6 @@ def check_in(birthtime, worker_id):
             log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
 
 
-def register_job(ticket, birthtime, worker_id):
-    check_in(birthtime, worker_id)
-    active_worker_count += 1
-    try:
-        session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
-        session.commit()
-    except Exception as e:
-        traceback.print_exc()
-        session.rollback()
-        if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
-            register_worker(birthtime, worker_id)
-        else:
-            log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-
-
-def deregister_job(birthtime, worker_id):
-    check_in(birthtime, worker_id)
-    active_worker_count -= 1
-    try:
-        session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
-        session.commit()
-    except Exception as e:
-        traceback.print_exc()
-        session.rollback()
-        if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
-            register_worker(birthtime, worker_id)
-        else:
-            log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-
-
-def register_worker(birthtime, worker_id):
-    log("INFO: Registering worker.", worker_id)
-    try:
-        session.add(Workers(worker_id, int(birthtime)))
-        session.commit()
-    except Exception as e:
-        traceback.print_exc()
-        session.rollback()
-        log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-
-
-def deregister_worker(worker_id):
-    try:
-        session.query(Workers).filter(Workers.name == worker_id).delete()
-        session.commit()
-    except Exception as e:
-        traceback.print_exc()
-        session.rollback()
-        log("Problem updating worker registration: {}".format(e), worker_id)
-
-
 # =========================== The Worker Process ===============================
 if __name__ == "__main__":
 
@@ -120,7 +55,7 @@ if __name__ == "__main__":
     from subprocess import check_output
     from collections import namedtuple
     from subprocess import check_output
-    from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE
+    from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME, JOBS_QUEUE, INSTANCE_ID, AUTOSCALING_GROUP
     from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta, _grid, _datadump
     from plenario.api.jobs import get_status, set_status, get_request, set_result, submit_job
     from plenario.api.shape import _aggregate_point_data, _export_shape
@@ -136,12 +71,10 @@ if __name__ == "__main__":
 
     ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
 
-
     def stop_workers(signum, frame):
         global do_work
         log("Got termination signal. Finishing job...", "WORKER BOSS")
         do_work = False
-
 
     signal.signal(signal.SIGINT, stop_workers)
     signal.signal(signal.SIGTERM, stop_workers)
@@ -152,6 +85,96 @@ if __name__ == "__main__":
         aws_secret_access_key=AWS_SECRET_KEY
     )
     JobsQueue = conn.get_queue(JOBS_QUEUE)
+
+    # While the worker is performing a task it pulled
+    # off SQS, protect its host EC2 instance from being
+    # scaled in.
+    autoscaling_client = boto3.client('autoscaling', region_name=AWS_REGION_NAME,
+          aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
+
+    # Used in deciding when to remove aforementioned
+    # scale-in protection. A count of the workers
+    # actively performing a job.
+    active_worker_count = 0
+
+    protected = False
+
+    def update_instance_protection():
+        global protected
+        try:
+            if active_worker_count > 0 and not protected:
+                log("INSTANCE PROTECTION ENABLED", "WORKER BOSS")
+                autoscaling_client.set_instance_protection(
+                    InstanceIds=[INSTANCE_ID],
+                    AutoScalingGroupName=AUTOSCALING_GROUP,
+                    ProtectedFromScaleIn=True
+                )
+                protected = True
+            elif active_worker_count <= 0 and protected:
+                log("INSTANCE PROTECTION DISABLED", "WORKER BOSS")
+                autoscaling_client.set_instance_protection(
+                    InstanceIds=[INSTANCE_ID],
+                    AutoScalingGroupName=AUTOSCALING_GROUP,
+                    ProtectedFromScaleIn=False
+                )
+                protected = False
+        except Exception as e:
+            log("Could not apply INSTANCE PROTECTION: {}".format(e), "WORKER BOSS")
+
+
+    def register_job(ticket, birthtime, worker_id):
+        global active_worker_count
+        check_in(birthtime, worker_id)
+        active_worker_count += 1
+        try:
+            session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
+            session.commit()
+        except Exception as e:
+            traceback.print_exc()
+            session.rollback()
+            if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
+                register_worker(birthtime, worker_id)
+            else:
+                log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+        update_instance_protection()
+
+
+    def deregister_job(birthtime, worker_id):
+        global active_worker_count
+        check_in(birthtime, worker_id)
+        active_worker_count -= 1
+        try:
+            session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
+            session.commit()
+        except Exception as e:
+            traceback.print_exc()
+            session.rollback()
+            if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
+                register_worker(birthtime, worker_id)
+            else:
+                log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+        update_instance_protection()
+
+
+    def register_worker(birthtime, worker_id):
+        log("INFO: Registering worker.", worker_id)
+        try:
+            session.add(Workers(worker_id, int(birthtime)))
+            session.commit()
+        except Exception as e:
+            traceback.print_exc()
+            session.rollback()
+            log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+
+
+    def deregister_worker(worker_id):
+        try:
+            session.query(Workers).filter(Workers.name == worker_id).delete()
+            session.commit()
+        except Exception as e:
+            traceback.print_exc()
+            session.rollback()
+            log("Problem updating worker registration: {}".format(e), worker_id)
 
 
     def worker():
@@ -210,6 +233,7 @@ if __name__ == "__main__":
 
                     throttle = 5
                     while do_work:
+
                         if throttle < 0:
                             check_in(birthtime, worker_id)
                             throttle = 5
@@ -246,11 +270,11 @@ if __name__ == "__main__":
                                     ((not status["meta"].get("lastStartTime") and
                                                   (datetime.datetime.now()-
                                                        datetime.datetime.strptime(status["meta"]["startTime"],
-                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > 3600) or
+                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > job_timeout) or
                                     (status["meta"].get("lastStartTime") and
                                                   (datetime.datetime.now()-
                                                        datetime.datetime.strptime(status["meta"]["lastStartTime"],
-                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > 3600)):
+                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > job_timeout)):
 
                                 status["meta"]["tries"] = status["meta"]["tries"] + 1 \
                                     if status["meta"].get("tries") else 1
@@ -288,7 +312,6 @@ if __name__ == "__main__":
 
                             # =========== Do work on query =========== #
                             try:
-
                                 log("Starting work on ticket {}.".format(ticket), worker_id)
                                 register_job(ticket, birthtime, worker_id)
 
@@ -389,13 +412,6 @@ if __name__ == "__main__":
                             finally:
                                 deregister_job(birthtime, worker_id)
 
-                            if active_worker_count <= 0:
-                                autoscaling_client.set_instance_protection(
-                                    InstanceIds=['my_instance_id'],
-                                    AutoScalingGroupName='auto_scaling_group_name',
-                                    ProtectedFromScaleIn=False
-                                )
-
                         else:
                             # No work! Idle for a bit to save compute cycles.
                             #log("Ho hum nothing to do. Idling for {} seconds.".format(wait_interval), worker_id)
@@ -433,19 +449,20 @@ if __name__ == "__main__":
         t.join(5)
         if not t.is_alive():
             threads.pop(looper)
-            # If threads exit prematurely, then replace it.
+            # If threads exit prematurely, then replace them.
             if do_work:
                 log("ERROR: A WORKER DIED PREMATURELY! REPLACING.".format(len(threads)), "WORKER BOSS")
                 print("====================== WORKER BOSS STATUS: ======================")
                 print check_output(["cat", "/proc/{}/status".format(os.getpid())])
                 print("====================== WORKER BOSS MEMDUMP: ======================")
                 print check_output(["cat", "/proc/{}/maps".format(os.getpid())])
-                log("INFO: Purging worker database.", "WORKER BOSS")
-                Workers.purge()
+                active_worker_count -= 1
                 t = threading.Thread(target=worker, name="plenario-worker-thread")
                 t.daemon = False
                 threads.append(t)
                 t.start()
+
+                # TODO: Make active_worker_count account for workers which may die in the middle of the run loop.
 
     session.close()
     log("All workers have exited.", "WORKER BOSS")

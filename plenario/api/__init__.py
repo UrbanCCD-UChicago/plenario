@@ -6,6 +6,7 @@ from shape import get_all_shape_datasets,\
                     export_shape, aggregate_point_data
 from time import sleep
 from sensor import weather_stations, weather
+from flask_login import login_required
 
 API_VERSION = '/v1'
 
@@ -32,6 +33,7 @@ api.add_url_rule(prefix + '/datadump', 'datadump', datadump)
 api.add_url_rule(prefix + '/datadump/<ticket>', 'get_datadump', get_datadump)
 
 @api.route(prefix + '/flush-cache')
+@login_required
 def flush_cache():
     cache.clear()
     resp = make_response(json.dumps({'status': 'ok', 'message': 'cache flushed!'}))

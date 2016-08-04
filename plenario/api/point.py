@@ -13,11 +13,8 @@ import response as api_response
 
 from collections import OrderedDict
 from datetime import datetime
-from flask import request, Response, make_response
+from flask import request, Response
 from dateutil import parser
-from itertools import groupby
-from operator import itemgetter
-
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
 from plenario.api.common import make_cache_key, unknown_object_json_handler
 from plenario.api.condition_builder import parse_tree
@@ -27,7 +24,6 @@ from plenario.api.jobs import make_job_response, submit_job, get_job, set_status
     get_result, set_flag, get_flag
 from plenario.models import MetaTable, DataDump
 from plenario.database import fast_count, windowed_query
-
 
 # Use the standard pool if this is just the app,
 # but use the shared connection pool if this
@@ -47,6 +43,7 @@ else:
 @crossdomain(origin="*")
 def get_job_view(ticket):
     return get_job(ticket)
+
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
@@ -133,45 +130,66 @@ def get_datadump(ticket):
     job = get_job(ticket)
     try:
         if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
-            datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get("data_type") in ["json", "csv"] else "json"
+            datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get(
+                "data_type") in ["json", "csv"] else "json"
 
-            # Send data from Postgres in sequence
-            def stream_data():
+            # Send data from Postgres in sequence in JSON format
+            def stream_json():
                 counter = 0
+                row = session.query(DataDump).filter(
+                    sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
+                # Make headers for JSON.
+                metadata = json.loads(row.get_data())
+                yield """{{"startTime": "{}", "endTime": "{}", "workers": {}, "data": [""".format(
+                    metadata["startTime"], metadata["endTime"], json.dumps(metadata["workers"]))
+                counter += 1
                 # The "total" in the status lists the largest part number.
                 # In reality, there are total+1 parts because the header occupies part 0.
                 # So we also want to go up to the total as well. Don't worry,
                 # logic in the _datadump ensures that total is the largest part number.
                 while counter <= get_status(ticket)["progress"]["total"]:
+                    # Using one() here in order to assert quality data
+                    # If one() fails (not that it should) then that means
+                    # that the datadump is bad and should not be served.
                     row = session.query(DataDump).filter(
                         sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
-                    if counter == 0:
-                        # Make headers for JSON and CSV.
-                        metadata = json.loads(row.get_data())
-                        columns = [str(c) for c in metadata["columns"]]
-                        if datatype == "json":
-                            yield """{{"startTime": "{}", "endTime": "{}", "workers": {}, "data": [""".format(
-                                metadata["startTime"], metadata["endTime"], json.dumps(metadata["workers"]))
-                        elif datatype == "csv":
-                            yield "# STARTTIME: {}\n# ENDTIME: {}\n# WORKERS: {}\n".format(metadata["startTime"], metadata["endTime"], ", ".join(metadata["workers"]))
-                            yield ",".join([json.dumps(column) for column in columns]) + "\n"
-                    else:
-                        if datatype == "json":
-                            # Return result with the list brackets [] sliced off.
-                            yield row.get_data()[1:-1]
-                            if counter < get_status(ticket)["progress"]["total"]: yield ","
-                        elif datatype == "csv":
-                            for csvrow in json.loads(row.get_data()):
-                                yield ",".join(
-                                    [json.dumps(csvrow[key].encode("utf-8")) if type(csvrow[key]) is unicode else json.dumps(str(csvrow[key]))
-                                     for key in columns]) + "\n"
+                    # Return result with the list brackets [] sliced off.
+                    yield row.get_data()[1:-1]
+                    if counter < get_status(ticket)["progress"]["total"]: yield ","
                     counter += 1
-                if datatype == "json":
-                        # Finish off JSON syntax
-                        yield "]}"
+                # Finish off JSON syntax
+                yield "]}"
+
+            # Send data from Postgres in sequence in CSV format
+            def stream_csv():
+                counter = 0
+                row = session.query(DataDump).filter(
+                    sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
+                # Make headers for CSV.
+                metadata = json.loads(row.get_data())
+                columns = [str(c) for c in metadata["columns"]]
+                # Uncomment to enable CSV metadata
+                # yield "# STARTTIME: {}\n# ENDTIME: {}\n# WORKERS: {}\n".format(metadata["startTime"], metadata["endTime"], ", ".join(metadata["workers"]))
+                yield ",".join([json.dumps(column) for column in columns]) + "\n"
+                counter += 1
+                while counter <= get_status(ticket)["progress"]["total"]:
+                    row = session.query(DataDump).filter(
+                        sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
+                    for csvrow in json.loads(row.get_data()):
+                        yield ",".join(
+                            [json.dumps(csvrow[key].encode("utf-8")) if type(
+                                csvrow[key]) is unicode else json.dumps(str(csvrow[key]))
+                             for key in columns]) + "\n"
+                    counter += 1
+
+            # Set the streaming generator (JSON by default)
+            stream_data = stream_json
+            if datatype == "csv":
+                stream_data = stream_csv
 
             response = Response(stream_data(), mimetype="text/{}".format(datatype))
-            response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(get_request(ticket)["query"]["dataset"], datatype)
+            response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(
+                get_request(ticket)["query"]["dataset"], datatype)
             return response
         else:
             return job
@@ -287,8 +305,8 @@ def _timeseries(args):
     # to return and inform them that the request wouldn't have found anything.
     if not table_names:
         return api_response.bad_request("Your request doesn't return any results. Try "
-                                       "adjusting your time constraint or location "
-                                       "parameters.")
+                                        "adjusting your time constraint or location "
+                                        "parameters.")
 
     try:
         panel = MetaTable.timeseries_all(
@@ -369,8 +387,8 @@ def _detail(args):
         msg = "Failed to fetch records."
         return api_response.make_raw_error("{}: {}".format(msg, e))
 
-def _datadump(args):
 
+def _datadump(args):
     requestid = args.data["jobsframework_ticket"]
     chunksize = 1000
     original_validated = copy.deepcopy(args)
@@ -410,7 +428,8 @@ def _datadump(args):
             check_in(args.data["jobsframework_workerbirthtime"], args.data["jobsframework_workerid"])
         chunk = [OrderedDict(zip(columns, row)) for row in chunk]
         chunk = [{column: row[column] for column in columns} for row in chunk]
-        dump = DataDump(os.urandom(16).encode('hex'), requestid, part, chunks, json.dumps(chunk, default=unknown_object_json_handler))
+        dump = DataDump(os.urandom(16).encode('hex'), requestid, part, chunks,
+                        json.dumps(chunk, default=unknown_object_json_handler))
         session.add(dump)
         try:
             session.commit()
@@ -444,7 +463,8 @@ def _datadump(args):
         add_chunk(chunk)
 
     metadata = """{{"startTime": "{}", "endTime": "{}", "workers": {}, "columns": {}}}""".format(
-        get_status(requestid)["meta"]["startTime"], str(datetime.now()), json.dumps([args.data["jobsframework_workerid"]]),
+        get_status(requestid)["meta"]["startTime"], str(datetime.now()),
+        json.dumps([args.data["jobsframework_workerid"]]),
         json.dumps(columns))
     dump = DataDump(requestid, requestid, 0, chunks, metadata)
     session.add(dump)
@@ -463,7 +483,6 @@ def _datadump(args):
 
 # Datadump utilities =======================
 def cleanup_datadump():
-
     def _cleanup_datadump(requestid):
         try:
             session.query(DataDump).filter(DataDump.request == requestid).delete()
@@ -475,11 +494,11 @@ def cleanup_datadump():
             log("---> Problem while clearing datadump request: {}".format(e))
             print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
 
-
     for requestid, in session.query(DataDump.request).distinct():
-            print(requestid)
-            if get_flag(requestid + "_suppresscleanup"):
-                _cleanup_datadump(requestid)
+        print(requestid)
+        if get_flag(requestid + "_suppresscleanup"):
+            _cleanup_datadump(requestid)
+
 
 def log(msg):
     # The constant opening and closing is meh, I know. But I'm feeling lazy
