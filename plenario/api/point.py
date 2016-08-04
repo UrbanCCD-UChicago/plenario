@@ -1,55 +1,84 @@
+import os
 import json
 import re
+import math
+import random
 import shapely.geometry
 import shapely.wkb
+import copy
 import sqlalchemy
+import traceback
+
+import response as api_response
 
 from collections import OrderedDict
 from datetime import datetime
+from flask import request, Response
 from dateutil import parser
-from flask import request, make_response
-from itertools import groupby
-from operator import itemgetter
-
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
-from plenario.api.common import make_cache_key, date_json_handler, unknown_object_json_handler
+from plenario.api.common import make_cache_key, unknown_object_json_handler
 from plenario.api.condition_builder import parse_tree
-from plenario.api.response import internal_error, bad_request, json_response_base, make_csv
-from plenario.api.response import geojson_response_base, form_csv_detail_response, form_json_detail_response
-from plenario.api.response import form_geojson_detail_response, add_geojson_feature
 from plenario.api.validator import DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
-from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters
-from plenario.database import session
-from plenario.models import MetaTable
+from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters, converters
+from plenario.api.jobs import make_job_response, submit_job, get_job, set_status, get_status, set_request, get_request, \
+    get_result, set_flag, get_flag
+from plenario.models import MetaTable, DataDump
+from plenario.database import fast_count, windowed_query
+
+# Use the standard pool if this is just the app,
+# but use the shared connection pool if this
+# is the worker. It's more efficient!
+if os.environ.get('WORKER'):
+    from worker import session
+else:
+    from plenario.database import session
 
 
 # ======
 # routes
 # ======
 
+# The get_job method in jobs.py does not have crossdomain, and is out of the
+# Flask context. So we define a wrapper here to access it.
+@crossdomain(origin="*")
+def get_job_view(ticket):
+    return get_job(ticket)
+
+
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def timeseries():
     fields = ('location_geom__within', 'dataset_name', 'dataset_name__in',
-              'agg', 'obs_date__ge', 'obs_date__le', 'data_type')
+              'agg', 'obs_date__ge', 'obs_date__le', 'data_type', 'job')
     validator = NoGeoJSONValidator(only=fields)
-    validated_args = validate(validator, request.args.to_dict())
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
+    validator_result = validate(validator, request.args.to_dict())
 
-    return _timeseries(validated_args)
+    if validator_result.errors:
+        return api_response.bad_request(validator_result.errors)
+
+    if validator_result.data.get('job'):
+        return make_job_response("timeseries", validator_result)
+    else:
+        panel = _timeseries(validator_result)
+        return api_response.timeseries_response(panel, validator_result)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def detail_aggregate():
     fields = ('location_geom__within', 'dataset_name', 'agg', 'obs_date__ge',
-              'obs_date__le', 'data_type')
+              'obs_date__le', 'data_type', 'job')
     validator = NoGeoJSONDatasetRequiredValidator(only=fields)
-    validated_args = validate(validator, request.args.to_dict())
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
-    return _detail_aggregate(validated_args)
+    validator_result = validate(validator, request.args.to_dict())
+
+    if validator_result.errors:
+        return api_response.bad_request(validator_result.errors)
+
+    if validator_result.data.get('job'):
+        return make_job_response("detail-aggregate", validator_result)
+    else:
+        time_counts = _detail_aggregate(validator_result)
+        return api_response.detail_aggregate_response(time_counts, validator_result)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -57,25 +86,133 @@ def detail_aggregate():
 def detail():
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
               'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
-              'date__time_of_day_le', 'limit')
+              'date__time_of_day_le', 'limit', 'job')
     validator = DatasetRequiredValidator(only=fields)
-    validated_args = validate(validator, request.args.to_dict())
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
+    validator_result = validate(validator, request.args.to_dict())
 
-    return _detail(validated_args)
+    if validator_result.errors:
+        return api_response.bad_request(validator_result.errors)
+
+    if validator_result.data.get('job'):
+        return make_job_response("detail", validator_result)
+    else:
+        result_rows = _detail(validator_result)
+        return api_response.detail_response(result_rows, validator_result)
+
+
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def datadump():
+    fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
+              'obs_date__le', 'offset', 'date__time_of_day_ge',
+              'date__time_of_day_le', 'limit', 'job')
+    validator = DatasetRequiredValidator(only=fields)
+    validator_result = validate(validator, request.args.to_dict())
+
+    # Get origin IP for Denial-of-Service protection
+    origin_ip = request.headers.get("X-Forwarded-For")
+    if not origin_ip:
+        origin_ip = request.remote_addr
+
+    # Keep URL root to form download link later
+    validator_result.data["datadump_urlroot"] = request.url_root
+
+    # Set job to True just to be canonical
+    validator_result.data["job"] = True
+
+    job = make_job_response("datadump", validator_result)
+    log("===== DATADUMP {} REQUESTED BY {} =====".format(json.loads(job.get_data())["ticket"], origin_ip))
+    return job
+
+
+@crossdomain(origin="*")
+def get_datadump(ticket):
+    job = get_job(ticket)
+    try:
+        if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
+            datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get(
+                "data_type") in ["json", "csv"] else "json"
+
+            # Send data from Postgres in sequence in JSON format
+            def stream_json():
+                counter = 0
+                row = session.query(DataDump).filter(
+                    sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
+                # Make headers for JSON.
+                metadata = json.loads(row.get_data())
+                yield """{{"startTime": "{}", "endTime": "{}", "workers": {}, "data": [""".format(
+                    metadata["startTime"], metadata["endTime"], json.dumps(metadata["workers"]))
+                counter += 1
+                # The "total" in the status lists the largest part number.
+                # In reality, there are total+1 parts because the header occupies part 0.
+                # So we also want to go up to the total as well. Don't worry,
+                # logic in the _datadump ensures that total is the largest part number.
+                while counter <= get_status(ticket)["progress"]["total"]:
+                    # Using one() here in order to assert quality data
+                    # If one() fails (not that it should) then that means
+                    # that the datadump is bad and should not be served.
+                    row = session.query(DataDump).filter(
+                        sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
+                    # Return result with the list brackets [] sliced off.
+                    yield row.get_data()[1:-1]
+                    if counter < get_status(ticket)["progress"]["total"]: yield ","
+                    counter += 1
+                # Finish off JSON syntax
+                yield "]}"
+
+            # Send data from Postgres in sequence in CSV format
+            def stream_csv():
+                counter = 0
+                row = session.query(DataDump).filter(
+                    sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
+                # Make headers for CSV.
+                metadata = json.loads(row.get_data())
+                columns = [str(c) for c in metadata["columns"]]
+                # Uncomment to enable CSV metadata
+                # yield "# STARTTIME: {}\n# ENDTIME: {}\n# WORKERS: {}\n".format(metadata["startTime"], metadata["endTime"], ", ".join(metadata["workers"]))
+                yield ",".join([json.dumps(column) for column in columns]) + "\n"
+                counter += 1
+                while counter <= get_status(ticket)["progress"]["total"]:
+                    row = session.query(DataDump).filter(
+                        sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
+                    for csvrow in json.loads(row.get_data()):
+                        yield ",".join(
+                            [json.dumps(csvrow[key].encode("utf-8")) if type(
+                                csvrow[key]) is unicode else json.dumps(str(csvrow[key]))
+                             for key in columns]) + "\n"
+                    counter += 1
+
+            # Set the streaming generator (JSON by default)
+            stream_data = stream_json
+            if datatype == "csv":
+                stream_data = stream_csv
+
+            response = Response(stream_data(), mimetype="text/{}".format(datatype))
+            response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(
+                get_request(ticket)["query"]["dataset"], datatype)
+            return response
+        else:
+            return job
+    except:
+        traceback.print_exc()
+        return job
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def grid():
     fields = ('dataset_name', 'resolution', 'buffer', 'obs_date__le', 'obs_date__ge',
-              'location_geom__within')
-    validated_args = validate(DatasetRequiredValidator(only=fields), request.args.to_dict())
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
+              'location_geom__within', 'job')
+    validator_result = validate(DatasetRequiredValidator(only=fields), request.args.to_dict())
 
-    return _grid(validated_args)
+    if validator_result.errors:
+        return api_response.bad_request(validator_result.errors)
+
+    if validator_result.data.get('job'):
+        return make_job_response("grid", validator_result)
+    else:
+        result_data = _grid(validator_result)
+        return api_response.grid_response(result_data)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -83,38 +220,42 @@ def grid():
 def dataset_fields(dataset_name):
     request_args = request.args.to_dict()
     request_args['dataset_name'] = dataset_name
-    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name')
+    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name', 'job')
     validator = DatasetRequiredValidator(only=fields)
-    validated_args = validate(validator, request_args)
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
+    validator_result = validate(validator, request_args)
 
-    response = _meta(validated_args)
+    if validator_result.errors:
+        return api_response.bad_request(validator_result.errors)
 
-    # API defines column values to be in the 'objects' list.
-    resp_dict = json.loads(response.data)
-    resp_dict['objects'] = resp_dict['objects'][0]['columns']
-    response.data = json.dumps(resp_dict)
-    return response
+    if validator_result.data.get('job'):
+        return make_job_response("fields", validator_result)
+    else:
+        result_data = _meta(validator_result)
+        return api_response.fields_response(result_data, validator_result)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def meta():
-    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name', 'location_geom__within')
-    validated_args = validate(NoDefaultDatesValidator(only=fields), request.args.to_dict())
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
+    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name', 'location_geom__within', 'job')
+    validator_result = validate(NoDefaultDatesValidator(only=fields), request.args.to_dict())
 
-    return _meta(validated_args)
+    if validator_result.errors:
+        return api_response.bad_request(validator_result.errors)
+
+    if validator_result.data.get('job'):
+        return make_job_response("meta", validator_result)
+    else:
+        result_data = _meta(validator_result)
+        return api_response.meta_response(result_data, validator_result)
 
 
 # ============
 # _route logic
 # ============
 
-def _timeseries(args):
 
+def _timeseries(args):
     meta_params = ['geom', 'dataset', 'dataset_name__in', 'obs_date__ge', 'obs_date__le', 'agg']
     meta_vals = [args.data.get(k) for k in meta_params]
     geom, dataset, table_names, start_date, end_date, agg = meta_vals
@@ -154,15 +295,18 @@ def _timeseries(args):
     try:
         table_names = MetaTable.narrow_candidates(table_names, start_date, end_date, geom)
     except Exception as e:
+        traceback.print_exc()
         msg = 'Failed to gather candidate tables.'
-        return internal_error(msg, e)
+        return api_response.make_raw_error("{}: {}".format(msg, e))
+        # TODO: Correctly handle _timeseries (and all the other endpoints)
+        # TODO: so that make_error is called when there is an error.
 
     # If there aren't any table names, it causes an error down the code. Better
     # to return and inform them that the request wouldn't have found anything.
     if not table_names:
-        return bad_request("Your request doesn't return any results. Try "
-                           "adjusting your time constraint or location "
-                           "parameters.")
+        return api_response.bad_request("Your request doesn't return any results. Try "
+                                        "adjusting your time constraint or location "
+                                        "parameters.")
 
     try:
         panel = MetaTable.timeseries_all(
@@ -170,48 +314,9 @@ def _timeseries(args):
         )
     except Exception as e:
         msg = 'Failed to construct timeseries.'
-        return internal_error(msg, e)
+        return api_response.make_raw_error("{}: {}".format(msg, e))
 
-    panel = MetaTable.attach_metadata(panel)
-    resp = json_response_base(args, panel, args.data)
-
-    datatype = args.data['data_type']
-    if datatype == 'json':
-        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
-        resp.headers['Content-Type'] = 'application/json'
-    elif datatype == 'csv':
-
-        # response format
-        # temporal_group,dataset_name_1,dataset_name_2
-        # 2014-02-24 00:00:00,235,653
-        # 2014-03-03 00:00:00,156,624
-
-        fields = ['temporal_group']
-        for o in resp['objects']:
-            fields.append(o['dataset_name'])
-
-        csv_resp = []
-        i = 0
-        for k, g in groupby(resp['objects'], key=itemgetter('dataset_name')):
-            l_g = list(g)[0]
-
-            j = 0
-            for row in l_g['items']:
-                # first iteration, populate the first column with temporal_groups
-                if i == 0:
-                    csv_resp.append([row['datetime']])
-                csv_resp[j].append(row['count'])
-                j += 1
-            i += 1
-
-        csv_resp.insert(0, fields)
-        csv_resp = make_csv(csv_resp)
-        resp = make_response(csv_resp, 200)
-        resp.headers['Content-Type'] = 'text/csv'
-        filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
-
-    return resp
+    return MetaTable.attach_metadata(panel)
 
 
 def _detail_aggregate(args):
@@ -253,35 +358,20 @@ def _detail_aggregate(args):
                 agg, start_date, end_date, geom, conditions
             )
         except Exception as e:
-            return internal_error('Failed to construct timeseries', e)
+            msg = 'Failed to construct timeseries'
+            return api_response.make_raw_error("{}: {}".format(msg, e))
 
         time_counts += [{'count': c, 'datetime': d} for c, d in ts[1:]]
 
-    resp = None
-
-    datatype = args.data['data_type']
-    if datatype == 'json':
-        resp = json_response_base(args, time_counts, request.args)
-        resp['count'] = sum([c['count'] for c in time_counts])
-        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
-        resp.headers['Content-Type'] = 'application/json'
-
-    elif datatype == 'csv':
-        resp = form_csv_detail_response(['point_date', 'hash'], time_counts)
-        resp.headers['Content-Type'] = 'text/csv'
-        filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
-
-    return resp
+    return time_counts
 
 
 def _detail(args):
-
     meta_params = ('dataset', 'shape', 'data_type', 'limit', 'offset')
     meta_vals = (args.data.get(k) for k in meta_params)
     dataset, shapeset, data_type, limit, offset = meta_vals
 
-    q = detail_query(args)
+    q = detail_query(args).order_by(dataset.c.point_date.desc())
 
     # Apply limit and offset.
     q = q.limit(limit)
@@ -291,25 +381,135 @@ def _detail(args):
         columns = [c.name for c in dataset.columns]
         if shapeset:
             columns += [c.name for c in shapeset.columns]
-        result_rows = [OrderedDict(zip(columns, row)) for row in q.all()]
-    except Exception as ex:
+        return [OrderedDict(zip(columns, row)) for row in q.all()]
+    except Exception as e:
         session.rollback()
-        return internal_error("Failed to fetch records.", ex)
+        msg = "Failed to fetch records."
+        return api_response.make_raw_error("{}: {}".format(msg, e))
 
-    to_remove = ['point_date', 'hash']
 
-    if data_type == 'json':
-        return form_json_detail_response(to_remove, args, result_rows)
+def _datadump(args):
+    requestid = args.data["jobsframework_ticket"]
+    chunksize = 1000
+    original_validated = copy.deepcopy(args)
 
-    elif data_type == 'csv':
-        return form_csv_detail_response(to_remove, result_rows)
+    # Number of rows to exceed in order to start
+    # deferring job (to allow other jobs to complete first)
+    row_threshold = 100000
 
-    elif data_type == 'geojson':
-        return form_geojson_detail_response(to_remove, args, result_rows)
+    query = original_validated.data
+
+    # Calculate query parameters
+    log("===== STARTING WORK ON DATADUMP {} =====".format(args.data["jobsframework_ticket"]))
+    log("-> Query: {}".format(json.dumps(query, default=unknown_object_json_handler)))
+    rows = fast_count(detail_query(args))
+    log("-> Dump contains {} rows.".format(rows))
+
+    if rows > row_threshold:
+        # Bake-in "niceness" in datadump;
+        # Since datadumps can be time-consuming,
+        # throttle them by deferring 50% of them for
+        # 10 seconds later (letting other jobs run).
+        if random.random() < 0.5:
+            log("-> Deferring dump due to size.")
+            return {"jobsframework_metacommands": ["defer", {"setTimeout": 10}]}
+
+    chunks = int(math.ceil(rows / float(chunksize)))
+
+    status = get_status(requestid)
+    status["progress"] = {"done": 0, "total": chunks}
+    set_status(requestid, status)
+
+    q = detail_query(args)
+    columns = [c.name for c in args.data.get('dataset').columns if c.name not in ['point_date', 'hash', 'geom']]
+
+    def add_chunk(chunk):
+        chunk = [OrderedDict(zip(columns, row)) for row in chunk]
+        chunk = [{column: row[column] for column in columns} for row in chunk]
+        dump = DataDump(os.urandom(16).encode('hex'), requestid, part, chunks,
+                        json.dumps(chunk, default=unknown_object_json_handler))
+        session.add(dump)
+        try:
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            print "DATADUMP ERROR: {}".format(e)
+            traceback.print_exc()
+            raise e
+
+        status = get_status(requestid)
+        status["progress"] = {"done": part, "total": chunks}
+        set_status(requestid, status)
+
+        # Supress datadump cleanup
+        set_flag(requestid + "_suppresscleanup", True, 10800)
+
+    part = 0
+    chunk = []
+    count = 0
+    for row in windowed_query(q, args.data.get('dataset').c.point_date, chunksize):
+        chunk.append(row)
+        count += 1
+        if count >= chunksize:
+            count = 0
+            part += 1
+            add_chunk(chunk)
+            chunk = []
+    # Finish leftovers
+    if len(chunk) > 0:
+        part += 1
+        add_chunk(chunk)
+
+    metadata = """{{"startTime": "{}", "endTime": "{}", "workers": {}, "columns": {}}}""".format(
+        get_status(requestid)["meta"]["startTime"], str(datetime.now()),
+        json.dumps([args.data["jobsframework_workerid"]]),
+        json.dumps(columns))
+    dump = DataDump(requestid, requestid, 0, chunks, metadata)
+    session.add(dump)
+    try:
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        print "DATADUMP ERROR: {}".format(e)
+        traceback.print_exc()
+        raise e
+
+    log("===== DATADUMP COMPLETE =====")
+
+    return {"url": args.data["datadump_urlroot"] + "v1/api/datadump/" + requestid}
+
+
+# Datadump utilities =======================
+def cleanup_datadump():
+    def _cleanup_datadump(requestid):
+        try:
+            session.query(DataDump).filter(DataDump.request == requestid).delete()
+            session.commit()
+            log("---> Removed request {} from database.".format(requestid))
+        except Exception as e:
+            session.rollback()
+            traceback.print_exc()
+            log("---> Problem while clearing datadump request: {}".format(e))
+            print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
+
+    for requestid, in session.query(DataDump.request).distinct():
+        print(requestid)
+        if not get_flag(requestid + "_suppresscleanup"):
+            _cleanup_datadump(requestid)
+
+
+def log(msg):
+    # The constant opening and closing is meh, I know. But I'm feeling lazy
+    # right now.
+    logfile = open('/opt/python/log/api.log', "a")
+    logfile.write("{} - {}\n".format(datetime.now(), msg))
+    logfile.close()
+
+
+# ==========================================
 
 
 def detail_query(args, aggregate=False):
-
     meta_params = ('dataset', 'shapeset', 'data_type', 'geom', 'obs_date__ge',
                    'obs_date__le')
     meta_vals = (args.data.get(k) for k in meta_params)
@@ -329,7 +529,7 @@ def detail_query(args, aggregate=False):
 
     # Get upset if they specify more than a dataset and shapeset filter.
     if len(filters) > 2:
-        return bad_request("Too many table filters provided.")
+        return api_response.bad_request("Too many table filters provided.")
 
     # Query the point dataset.
     q = session.query(dataset)
@@ -373,7 +573,6 @@ def detail_query(args, aggregate=False):
 
 
 def _grid(args):
-
     meta_params = ('dataset', 'geom', 'resolution', 'buffer', 'obs_date__ge',
                    'obs_date__le')
     meta_vals = (args.data.get(k) for k in meta_params)
@@ -410,9 +609,10 @@ def _grid(args):
             )
             result_rows += grid_rows
         except Exception as e:
-            return internal_error('Could not make grid aggregation.', e)
+            msg = 'Could not make grid aggregation.'
+            return api_response.make_raw_error("{}: {}".format(msg, e))
 
-    resp = geojson_response_base()
+    resp = api_response.geojson_response_base()
     for value in result_rows:
         if value[1]:
             pt = shapely.wkb.loads(value[1].decode('hex'))
@@ -421,11 +621,9 @@ def _grid(args):
             new_geom = shapely.geometry.box(south, west, north, east).__geo_interface__
         else:
             new_geom = None
-        new_property = {'count': value[0], }
-        add_geojson_feature(resp, new_geom, new_property)
+        new_property = {'count': value[0],}
+        api_response.add_geojson_feature(resp, new_geom, new_property)
 
-    resp = make_response(json.dumps(resp, default=date_json_handler), 200)
-    resp.headers['Content-Type'] = 'application/json'
     return resp
 
 
@@ -492,12 +690,7 @@ def _meta(args):
         # clear column_names off the json, users don't need to see it
         del record['column_names']
 
-    resp = json_response_base(args, metadata_records, request.args)
-    resp['meta']['total'] = len(resp['objects'])
-    status_code = 200
-    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
+    return metadata_records
 
 
 # =====
@@ -513,14 +706,15 @@ def request_args_to_condition_tree(request_args, ignore=list()):
 
     :returns: condition tree"""
 
-    ignored = {'agg', 'data_type', 'dataset', 'geom', 'limit', 'offset', 'shape', 'shapeset'}
+    ignored = {'agg', 'data_type', 'dataset', 'geom', 'limit', 'offset',
+               'shape', 'shapeset', 'job', 'all', 'datadump_part', 'datadump_total',
+               "datadump_requestid", "datadump_urlroot", "jobsframework_ticket", "jobsframework_workerid",
+               "jobsframework_workerbirthtime"}
     for val in ignore:
         ignored.add(val)
 
-    args = request_args.copy()
-
     # If the key wasn't convertable, it meant that it was a column key.
-    columns = {k: v for k, v in args.items() if k not in ignored}
+    columns = {k: v for k, v in request_args.items() if k not in ignored}
 
     ctree = {"op": "and", "val": []}
 
@@ -530,7 +724,7 @@ def request_args_to_condition_tree(request_args, ignore=list()):
         if k[0] == 'obs_date':
             k[0] = 'point_date'
         if k[0] == 'date' and 'time_of_day' in k[1]:
-            k[0] = sqlalchemy.func.date_part('hour', args['dataset'].c.point_date)
+            k[0] = sqlalchemy.func.date_part('hour', request_args.get('dataset').c.point_date)
             k[1] = 'le' if 'le' in k[1] else 'ge'
 
         # It made me nervous that you could pass the parser in the validator

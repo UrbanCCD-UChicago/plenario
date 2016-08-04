@@ -5,7 +5,7 @@
     <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.2/css/jquery.dataTables.css">
 {% endblock %}
 {% block content %}
-    <p><a href='{{ url_for('views.view_datasets') }}'>&laquo; view datasets</a></p>
+    <p><a href="{{ url_for('views.view_datasets') }}">&laquo; view datasets</a></p>
 
     {% if results|length > 0 %}
         {% if request.args.get("source_url_hash") %}
@@ -43,6 +43,8 @@
                             <span class="label
                                 {% if result.status == 'SUCCESS' %}
                                     label-success
+                                {% elif result.status == 'Ingest Pending' or result.status == 'Ingest Started' %}
+                                    label-default
                                 {% else %}
                                     label-primary
                                 {% endif %}">

@@ -1,5 +1,6 @@
 import json
 import re
+import sqlalchemy
 
 from collections import namedtuple
 from datetime import datetime, timedelta
@@ -63,6 +64,8 @@ class Validator(Schema):
     limit = fields.Integer(default=1000)
     offset = fields.Integer(default=0, validate=Range(0))
     resolution = fields.Integer(default=500, validate=Range(0))
+    job = fields.Bool(default=False)
+    all = fields.Bool(default=False)
 
 
 class DatasetRequiredValidator(Validator):
@@ -150,6 +153,7 @@ def convert(request_args):
         try:
             request_args[key] = converters[key](value)
         except (KeyError, TypeError, AttributeError, NoSuchTableError):
+            # print "UNABLE TO CONVERT {} {}".format(key, value)
             pass
         except (DatabaseError, ProgrammingError):
             # Failed transactions, which we do expect, can cause
@@ -325,6 +329,8 @@ def valid_column_condition(table, column_name, value):
     :param value: target value"""
 
     try:
+        if type(table) != sqlalchemy.sql.schema.Table:
+            table = converters['dataset'](table)
         column = table.columns[column_name]
     except KeyError:
         raise KeyError("Invalid column name {}".format(column_name))

@@ -1,22 +1,23 @@
 import os
-
 import unittest
 
-from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta, \
-    flu_path, landmarks_path, crime_meta, crime_path
-from plenario.models import MetaTable
-from plenario.etl.point import PlenarioETL
+from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta
+from tests.test_fixtures.point_meta import flu_path, landmarks_path
+from tests.test_fixtures.point_meta import crime_meta, crime_path
 
-from init_db import init_meta
 from plenario import create_app
 from plenario.database import session
+from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
-from plenario.models import ShapeMetadata
+from plenario.models import MetaTable, ShapeMetadata
+
+from init_db import init_meta
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 
 fixtures_path = pwd
 FIXTURE_PATH = pwd
+
 
 def ingest_from_fixture(fixture_meta, fname):
     md = MetaTable(**fixture_meta)
@@ -41,6 +42,7 @@ class Fixture(object):
         self.path = os.path.join(FIXTURE_PATH, file_name)
         self.update_freq = 'yearly'
 
+
 fixtures = {
     'city': Fixture(human_name=u'Chicago City Limits',
                     file_name='chicago_city_limits.zip'),
@@ -51,19 +53,17 @@ fixtures = {
     'neighborhoods': Fixture(human_name=u'Chicago Neighborhoods',
                              file_name='chicago_neighborhoods.zip'),
     'changed_neighborhoods': Fixture(human_name=u'Chicago Neighborhoods',
-        file_name='chicago_neighborhoods_changed.zip',)
+                                     file_name='chicago_neighborhoods_changed.zip', )
 }
 
 
 class BasePlenarioTest(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls, shutdown=False):
-
         # Remove tables that we're about to recreate.
         # This doesn't happen in teardown because I find it helpful
         # to inspect them in the DB after running the tests.
-        meta_table_names = ['meta_shape']
+        meta_table_names = ['meta_master', 'meta_shape', 'etl_task']
         fixture_table_names = [fixture.table_name for key, fixture in fixtures.iteritems()]
 
         drop_tables(meta_table_names + fixture_table_names)
@@ -89,6 +89,7 @@ class BasePlenarioTest(unittest.TestCase):
             'landmarks',
             'crimes',
             'meta_master'
+            'etl_task'
         ]
         drop_tables(tables_to_drop)
 
@@ -114,3 +115,6 @@ class BasePlenarioTest(unittest.TestCase):
         ShapeETL(meta=shape_meta, source_path=fixture.path).add()
         return shape_meta
 
+    @classmethod
+    def tearDownClass(cls):
+        session.close()

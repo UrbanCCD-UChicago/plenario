@@ -22,6 +22,8 @@
                 <span class="label
                     {% if shape.status == 'SUCCESS' %}
                         label-success
+                    {% elif shape.status == 'Ingest Pending' or shape.status == 'Ingest Started' %}
+                        label-default
                     {% else %}
                         label-primary
                     {% endif %}">
@@ -39,8 +41,8 @@
           {% endif %}
         </td>
         <td>
-            {% if shape.traceback %}
-                <code>{{ shape.traceback|safe }}</code>
+            {% if shape.error %}
+                <code>{{ shape.error|safe }}</code>
             {% endif %}
         </td>
     </table>

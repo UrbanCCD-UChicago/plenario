@@ -1,10 +1,5 @@
 from flask import Flask, render_template, redirect, url_for, request
 from raven.contrib.flask import Sentry
-from plenario.database import session as db_session
-from plenario.models import bcrypt
-from plenario.auth import auth, login_manager
-from plenario.views import views
-from plenario.utils.helpers import slugify as slug
 from plenario.settings import PLENARIO_SENTRY_URL
 
 
@@ -16,10 +11,19 @@ if PLENARIO_SENTRY_URL:
 
 def create_app():
 
-    #API depends on the tables in the database to exist.
-    #Don't import until we really need it to create the app
-    #Since otherwise it may be called before init_db.py runs.
+    # API depends on the tables in the database to exist.
+    # Don't import until we really need it to create the app
+    # Since otherwise it may be called before init_db.py runs.
     from plenario.api import api, cache
+
+    # These other imports might eventually use API as well.
+    # plenario.views does now. So we'll put them here like
+    # API and not import them until they're really needed.
+    from plenario.database import session as db_session
+    from plenario.models import bcrypt
+    from plenario.auth import auth, login_manager
+    from plenario.views import views
+    from plenario.utils.helpers import slugify as slug
 
     app = Flask(__name__)
     app.config.from_object('plenario.settings')

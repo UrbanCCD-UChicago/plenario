@@ -1,8 +1,10 @@
-from flask import Flask, abort
-import plenario.tasks as tasks
-from plenario.tasks import celery_app
 from multiprocessing import Process
 
+from flask import Flask, abort
+
+import plenario.tasks as tasks
+from plenario.api.jobs import submit_job, worker_ready
+from plenario.api.point import cleanup_datadump
 
 """
 Task server that runs in AWS Elastic Beanstalk worker environment.
@@ -19,7 +21,7 @@ def create_worker():
 
     @app.route('/update/weather', methods=['POST'])
     def weather():
-        tasks.update_weather.delay()
+        tasks.update_weather()
         return "Sent off weather task"
 
     @app.route('/update/<frequency>', methods=['POST'])
@@ -30,12 +32,17 @@ def create_worker():
         except KeyError:
             abort(400)
 
-    @app.route('/health')
+    @app.route('/health', methods=['GET', 'POST'])
     def check_health():
-        if celery_app.control.ping():
-            return "Someone is listening."
+        if worker_ready():
+            return "Workers are available."
         else:
-            abort(503)
+            return "All workers are occupied."
+
+    @app.route('/purge/datadump', methods=['POST'])
+    def purge_datadump():
+        cleanup_datadump()
+        return "Cleaned datadump table."
 
     return app
 
@@ -51,20 +58,21 @@ def often_update():
 
 
 def daily_update():
-    tasks.update_weather.delay()
-    tasks.frequency_update.delay('daily')
+    submit_job({"endpoint": "update_weather", "query": None})
+    submit_job({"endpoint": "frequency_update", "query": "daily"})
 
 
 def weekly_update():
-    tasks.frequency_update.delay('weekly')
+    submit_job({"endpoint": "frequency_update", "query": "weekly"})
 
 
 def monthly_update():
-    tasks.frequency_update.delay('monthly')
+    submit_job({"endpoint": "frequency_update", "query": "monthly"})
 
 
 def yearly_update():
-    tasks.frequency_update.delay('yearly')
+    submit_job({"endpoint": "frequency_update", "query": "yearly"})
+
 
 dispatch = {
     'often': often_update,

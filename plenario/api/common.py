@@ -1,5 +1,5 @@
 import json
-from flask.ext.cache import Cache
+from flask_cache import Cache
 from plenario.settings import CACHE_CONFIG
 from datetime import timedelta, date, datetime, time
 from functools import update_wrapper
@@ -103,6 +103,8 @@ def make_cache_key(*args, **kwargs):
 
 
 def make_csv(data):
+    print "data.type: {}".format(type(data))
+    print "data.firstrow: {}".format(data[0])
     outp = StringIO()
     writer = csv.writer(outp)
     writer.writerows(data)

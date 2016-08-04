@@ -1,151 +1,203 @@
+import traceback
+
 from datetime import datetime, timedelta
+from functools import wraps
+from raven import Client
+from sqlalchemy.exc import NoSuchTableError, InternalError, DBAPIError
 
-from raven.conf import setup_logging
-from raven.handlers.logging import SentryHandler
-from sqlalchemy.exc import NoSuchTableError, InternalError
-
-from plenario.celery_app import celery_app
 from plenario.database import session as session, app_engine as engine
-from plenario.etl.shape import ShapeETL
-from plenario.models import MetaTable, ShapeMetadata
-from plenario.settings import CELERY_SENTRY_URL
 from plenario.etl.point import PlenarioETL
+from plenario.etl.shape import ShapeETL
+from plenario.api.jobs import submit_job
+from plenario.models import MetaTable, ShapeMetadata
+from plenario.models_.ETLTask import update_task, ETLStatus, delete_task, add_task
+from plenario.settings import PLENARIO_SENTRY_URL
 from plenario.utils.weather import WeatherETL
 
-if CELERY_SENTRY_URL:
-    handler = SentryHandler(CELERY_SENTRY_URL)
-    setup_logging(handler)
+client = Client(PLENARIO_SENTRY_URL) if PLENARIO_SENTRY_URL else None
 
 
-@celery_app.task(bind=True)
-def delete_dataset(self, source_url_hash):
-    md = session.query(MetaTable).get(source_url_hash)
+def task_complete_msg(task_name, mt):
+    """Create a confirmation message for a completed task.
+
+    :param task_name: (string) task name, like 'update' or 'delete'
+    :param mt: (MetaTable Record) meta info about the target dataset
+    :returns: (string) confirmation message"""
+
+    # Check for attributes which differentiate MetaTable from ShapeTable.
+    tname = mt.human_name if hasattr(mt, 'human_name') else mt.dataset_name
+    source = mt.source_url if hasattr(mt, 'source_url') else mt.source_url_hash
+    return "Finished {} for {} ({})".format(task_name, tname, source)
+
+
+def etl_report(fn):
+    """Decorator for ETL task methods. Takes care of recording the status of
+    each task to PostgreSQL. Also reports failed tasks to Sentry."""
+
+    @wraps(fn)
+    def wrapper(identifier):
+
+        meta = session.query(MetaTable).get(identifier)
+        if meta is None:
+            meta = session.query(ShapeMetadata).get(identifier)
+
+        try:
+            try:
+                # This method updates the last_update attribute, and does
+                # not modify date_added unless it does not exist.
+                meta.update_date_added()
+            except AttributeError:
+                # ShapeMetadata has no last_update attribute.
+                pass
+
+            # Attempt to create the ETLTask record if it doesn't exist.
+            # In the event of an IntegrityError, add_task handles itself so
+            # that it does not break the rest of the method.
+            task_type = 'master' if hasattr(meta, 'source_url_hash') else 'shape'
+            add_task(meta.dataset_name, task_type)
+            update_task(meta.dataset_name, None, ETLStatus['started'], None)
+
+            # Perform the actual work for some add or update task.
+            completion_msg = fn(meta)
+            # Update the task status that belongs to this dataset.
+            update_task(meta.dataset_name, datetime.now(), ETLStatus['success'], None)
+
+            return completion_msg
+
+        except Exception:
+            # If anything at all goes wrong, save the traceback for this ETLTask
+            # and report the exception to Sentry.
+            update_task(meta.dataset_name, datetime.now(), ETLStatus['failure'], traceback.format_exc())
+            if PLENARIO_SENTRY_URL:
+                client.captureException()
+
+    return wrapper
+
+
+@etl_report
+def add_dataset(meta):
+    """Ingest the row information for an approved dataset.
+
+    :param meta: (MetaTable record) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
+
+    PlenarioETL(meta).add()
+    return task_complete_msg('ingest', meta)
+
+
+@etl_report
+def update_dataset(meta):
+    """Update the row information for an approved dataset.
+
+    :param meta: (MetaTable record) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
+
+    PlenarioETL(meta).update()
+    return task_complete_msg('update', meta)
+
+
+def delete_dataset(source_url_hash):
+    """Delete the row information and meta table for an approved dataset.
+
+    :param source_url_hash: (string) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
+
+    meta = session.query(MetaTable).get(source_url_hash)
     try:
-        dat_table = md.point_table
+        dat_table = meta.point_table
         dat_table.drop(engine, checkfirst=True)
     except NoSuchTableError:
         # Move on so we can get rid of the metadata
         pass
-    session.delete(md)
+    session.delete(meta)
+
     try:
         session.commit()
-    except InternalError, e:
-        raise delete_dataset.retry(exc=e)
-    return 'Deleted {0} ({1})'.format(md.human_name, md.source_url_hash)
+        delete_task(meta.dataset_name)
+    except InternalError:
+        session.rollback()
+
+    return task_complete_msg('deletion', meta)
 
 
-@celery_app.task(bind=True)
-def add_dataset(self, source_url_hash, data_types=None):
-    md = session.query(MetaTable).get(source_url_hash)
-    session.close()
-    if md.result_ids:
-        ids = md.result_ids
-        ids.append(self.request.id)
-    else:
-        ids = [self.request.id]
-    with engine.begin() as c:
-        c.execute(MetaTable.__table__.update()\
-            .where(MetaTable.source_url_hash == source_url_hash)\
-            .values(result_ids=ids))
+@etl_report
+def add_shape(meta):
+    """Ingest the row information for an approved shapeset.
 
-    etl = PlenarioETL(md)
-    etl.add()
-    return 'Finished adding {0} ({1})'.format(md.human_name, md.source_url_hash)
+    :param meta: (MetaTable record) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
+
+    ShapeETL(meta).add()
+    return task_complete_msg('ingest', meta)
 
 
-@celery_app.task(bind=True)
-def add_shape(self, table_name):
-    # Associate the dataset with this celery task
-    # so we can check on the task's status
-    meta = session.query(ShapeMetadata).get(table_name)
-    meta.celery_task_id = self.request.id
-    session.commit()
+@etl_report
+def update_shape(meta):
+    """Update the row information for an approved shapeset.
 
-    # Ingest the shapefile
-    ShapeETL(meta=meta).add()
-    return 'Finished adding shape dataset {} from {}.'.format(meta.dataset_name,
-                                                              meta.source_url)
+    :param meta: (MetaTable record) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
+
+    ShapeETL(meta).update()
+    return task_complete_msg('update', meta)
 
 
-@celery_app.task(bind=True)
-def update_shape(self, table_name):
-    # Associate the dataset with this celery task
-    # so we can check on the task's status
-    meta = session.query(ShapeMetadata).get(table_name)
-    meta.celery_task_id = self.request.id
-    session.commit()
+def delete_shape(table_name):
+    """Delete the row and meta information for an approved shapeset.
 
-    # Update the shapefile
-    ShapeETL(meta=meta).update()
-    return 'Finished updating shape dataset {} from {}.'.\
-        format(meta.dataset_name, meta.source_url)
+    :param table_name: (string) identifier used to grab target table info
+    :returns: (string) a helpful confirmation message"""
 
-
-@celery_app.task(bind=True)
-def delete_shape(self, table_name):
     shape_meta = session.query(ShapeMetadata).get(table_name)
     shape_meta.remove_table()
+    delete_task(shape_meta.dataset_name)
     session.commit()
-    return 'Removed {}'.format(table_name)
+    return task_complete_msg('deletion', shape_meta)
 
 
-@celery_app.task
 def frequency_update(frequency):
-    # hourly, daily, weekly, monthly, yearly
-    md = session.query(MetaTable)\
-        .filter(MetaTable.update_freq == frequency)\
-        .filter(MetaTable.date_added != None)\
+    """Queue an update task for all the tables whose corresponding meta info
+    is part of this frequency group.
+
+    :param frequency: (string) how often these tables are meant to be updated,
+                               can be: often, daily, weekly, monthly, yearly
+    :returns (string) confirmation message"""
+
+    md = session.query(MetaTable) \
+        .filter(MetaTable.update_freq == frequency) \
+        .filter(MetaTable.date_added != None) \
         .all()
     for m in md:
-        update_dataset.delay(m.source_url_hash)
+        print "submitted job"
+        submit_job({"endpoint": "update_dataset", "query": m.source_url_hash})
 
-    md = session.query(ShapeMetadata)\
-        .filter(ShapeMetadata.update_freq == frequency)\
-        .filter(ShapeMetadata.is_ingested == True)\
+    md = session.query(ShapeMetadata) \
+        .filter(ShapeMetadata.update_freq == frequency) \
+        .filter(ShapeMetadata.is_ingested == True) \
         .all()
     for m in md:
-        update_shape.delay(m.dataset_name)
-    return '%s update complete' % frequency
+        print "submitted job"
+        submit_job({"endpoint": "update_shape", "query": m.dataset_name})
+
+    return '%s updates queued.' % frequency
 
 
-@celery_app.task(bind=True)
-def update_dataset(self, source_url_hash):
-    md = session.query(MetaTable).get(source_url_hash)
-    if md.result_ids:
-        ids = md.result_ids
-        ids.append(self.request.id)
-    else:
-        ids = [self.request.id]
-    with engine.begin() as c:
-        c.execute(MetaTable.__table__.update()\
-            .where(MetaTable.source_url_hash == source_url_hash)\
-            .values(result_ids=ids))
-    etl = PlenarioETL(md)
-    etl.update()
-    return 'Finished updating {0} ({1})'.format(md.human_name, md.source_url_hash)
-
-
-@celery_app.task
 def update_metar():
-    print "update_metar()"
+    """Run a METAR update.
+
+    :returns (string) confirmation message"""
+
     w = WeatherETL()
     w.metar_initialize_current()
     return 'Added current metars'
 
 
-@celery_app.task()
-def hello_world():
-    """
-    Used in init_db for its side effect.
-    Just running a task will create the celery_taskmeta tables in the database/
-    """
-    print "Hello from celery!"
-
-
-@celery_app.task
 def update_weather():
-    # This should do the current month AND the previous month, just in case.
+    """Run a weather update.
 
+    :returns (string) confirmation message"""
+
+    # This should do the current month AND the previous month, just in case.
     lastMonth_dt = datetime.now() - timedelta(days=1)
     lastMonth = lastMonth_dt.month
     lastYear = lastMonth_dt.year

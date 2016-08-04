@@ -1,20 +1,22 @@
 import json
-import sqlalchemy as sa
-
+import traceback
 from collections import namedtuple
 from datetime import datetime
-from flask_bcrypt import Bcrypt
-from geoalchemy2 import Geometry
 from hashlib import md5
 from itertools import groupby
 from operator import itemgetter
+from uuid import uuid4
+
+import sqlalchemy as sa
+from flask_bcrypt import Bcrypt
+from geoalchemy2 import Geometry
 from sqlalchemy import Column, String, Boolean, Date, DateTime, Text, func
 from sqlalchemy import Table, select, Integer
-from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.exc import NoSuchTableError
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import synonym
 from sqlalchemy.types import NullType
-from uuid import uuid4
 
 from plenario.database import session, Base
 from plenario.utils.helpers import get_size_in_degrees, slugify
@@ -249,9 +251,15 @@ class MetaTable(Base):
     # Information about all point datasets
     @classmethod
     def index(cls):
-        results = session.query(cls.dataset_name)\
-                        .filter(cls.approved_status == True)
-        names = [result.dataset_name for result in results]
+        try:
+            q = session.query(cls.dataset_name)
+            q = q.filter(cls.approved_status == True)
+            names = [result.dataset_name for result in q.all()]
+        except ProgrammingError:
+            # Handles a case that causes init_db to crash.
+            # Validator calls index when initializing, prevents this call
+            # from raising an error when the database is empty.
+            names = []
         return names
 
     @classmethod
@@ -532,19 +540,6 @@ class ShapeMetadata(Base):
         return intersecting_rows
 
     @classmethod
-    def get_metadata_with_etl_result(cls, table_name):
-        query = '''
-            SELECT meta.*, celery.status, celery.traceback, celery.date_done
-            FROM meta_shape as meta
-            LEFT JOIN celery_taskmeta as celery
-            ON celery.task_id = meta.celery_task_id
-            WHERE meta.dataset_name='{}';
-        '''.format(table_name)
-
-        metadata = session.execute(query).first()
-        return metadata
-
-    @classmethod
     def get_by_human_name(cls, human_name):
         return session.query(cls).get(cls.make_table_name(human_name))
 
@@ -644,7 +639,7 @@ class User(Base):
 
     def is_authenticated(self):
         return True
-    
+
     def is_active(self):
         return True
 
@@ -653,3 +648,61 @@ class User(Base):
 
     def get_id(self):
         return self.id
+
+
+class DataDump(Base):
+    __tablename__ = "plenario_datadump"
+    id = Column(String(32), primary_key=True)
+    request = Column(String(32), nullable=False)
+    part = Column(Integer, nullable=False)
+    total = Column(Integer, nullable=False)
+    data = Column(Text)
+
+    def __init__(self, id, request, part, total, data):
+        self.id = id
+        self.request = request
+        self.part = part
+        self.total = total
+        self.data = data
+
+    def get_data(self):
+        return self.data
+
+    def get_id(self):
+        return self.id
+
+
+class Workers(Base):
+    __tablename__ = "plenario_workers"
+    name = Column(String(32), primary_key=True)
+    timestamp = Column(String(32), nullable=False)
+    uptime = Column(Integer, nullable=False)
+    job = Column(String(32), nullable=True)
+    jobcounter = Column(Integer, nullable=False)
+
+    def __init__(self, name, uptime):
+        self.name = name
+        self.timestamp = str(datetime.now())
+        self.uptime = uptime
+        self.jobcounter = 0
+
+    def check_in(self):
+        self.timestamp = str(datetime.now())
+
+    def register_job(self, job):
+        self.job = job
+
+    def deregister_job(self):
+        if self.job:
+            self.jobcounter += 1
+        self.job = None
+
+    @classmethod
+    def purge(cls):
+        try:
+            session.query(cls).delete()
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            traceback.print_exc()
+            print("Problem purging plenario_workers: {}".format(e))
