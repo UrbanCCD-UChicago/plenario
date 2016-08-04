@@ -22,11 +22,6 @@ worker_threads = 8
 wait_interval = 1
 job_timeout = 3600
 
-# Used in deciding when to remove aforementioned
-# scale-in protection. A count of the workers
-# actively performing a job.
-active_worker_count = 0
-
 
 # ======================= Worker Utilities ========================
 def log(msg, worker_id):
@@ -97,26 +92,34 @@ if __name__ == "__main__":
     autoscaling_client = boto3.client('autoscaling', region_name=AWS_REGION_NAME,
           aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
 
+    # Used in deciding when to remove aforementioned
+    # scale-in protection. A count of the workers
+    # actively performing a job.
+    active_worker_count = 0
+
     protected = False
 
     def update_instance_protection():
         global protected
-        if active_worker_count > 0 and not protected:
-            log("INSTANCE PROTECTION ENABLED", "WORKER BOSS")
-            autoscaling_client.set_instance_protection(
-                InstanceIds=[INSTANCE_ID],
-                AutoScalingGroupName=AUTOSCALING_GROUP,
-                ProtectedFromScaleIn=True
-            )
-            protected = True
-        elif active_worker_count <= 0 and protected:
-            log("INSTANCE PROTECTION DISABLED", "WORKER BOSS")
-            autoscaling_client.set_instance_protection(
-                InstanceIds=[INSTANCE_ID],
-                AutoScalingGroupName=AUTOSCALING_GROUP,
-                ProtectedFromScaleIn=False
-            )
-            protected = False
+        try:
+            if active_worker_count > 0 and not protected:
+                log("INSTANCE PROTECTION ENABLED", "WORKER BOSS")
+                autoscaling_client.set_instance_protection(
+                    InstanceIds=[INSTANCE_ID],
+                    AutoScalingGroupName=AUTOSCALING_GROUP,
+                    ProtectedFromScaleIn=True
+                )
+                protected = True
+            elif active_worker_count <= 0 and protected:
+                log("INSTANCE PROTECTION DISABLED", "WORKER BOSS")
+                autoscaling_client.set_instance_protection(
+                    InstanceIds=[INSTANCE_ID],
+                    AutoScalingGroupName=AUTOSCALING_GROUP,
+                    ProtectedFromScaleIn=False
+                )
+                protected = False
+        except:
+            log("Could not apply INSTANCE PROTECTION (I have failed as a boss D: )", "WORKER BOSS")
 
 
     def register_job(ticket, birthtime, worker_id):
@@ -453,6 +456,7 @@ if __name__ == "__main__":
                 print check_output(["cat", "/proc/{}/status".format(os.getpid())])
                 print("====================== WORKER BOSS MEMDUMP: ======================")
                 print check_output(["cat", "/proc/{}/maps".format(os.getpid())])
+                active_worker_count -= 1
                 t = threading.Thread(target=worker, name="plenario-worker-thread")
                 t.daemon = False
                 threads.append(t)
