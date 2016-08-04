@@ -18,7 +18,7 @@ session = plenario.database.session
 
 worker_threads = 8
 wait_interval = 1
-
+job_timeout = 3600
 
 # ======================= Worker Utilities ========================
 def log(msg, worker_id):
@@ -227,11 +227,11 @@ if __name__ == "__main__":
                                     ((not status["meta"].get("lastStartTime") and
                                                   (datetime.datetime.now()-
                                                        datetime.datetime.strptime(status["meta"]["startTime"],
-                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > 3600) or
+                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > job_timeout) or
                                     (status["meta"].get("lastStartTime") and
                                                   (datetime.datetime.now()-
                                                        datetime.datetime.strptime(status["meta"]["lastStartTime"],
-                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > 3600)):
+                                                        "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > job_timeout)):
 
                                 status["meta"]["tries"] = status["meta"]["tries"] + 1 \
                                     if status["meta"].get("tries") else 1
