@@ -1,7 +1,6 @@
 import itertools
 import json
 import re
-import traceback
 import dateutil.relativedelta
 from cStringIO import StringIO
 from collections import namedtuple
@@ -21,9 +20,9 @@ from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
 from plenario.api.jobs import submit_job, get_status, get_job, JobsQueue
-from plenario.database import session, Base, app_engine as engine
+from plenario.database import session, Base, app_engine as engine, fast_count
 from plenario.models import MetaTable, User, ShapeMetadata, Workers
-from plenario.models_.ETLTask import ETLStatus, ETLType, add_task
+from plenario.models_.ETLTask import ETLType, add_task
 from plenario.models_.ETLTask import fetch_pending_tables, fetch_table_etl_status
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 
@@ -839,7 +838,7 @@ def edit_dataset(source_url_hash):
             fieldnames = table.columns.keys()
             pk_name = [p.name for p in table.primary_key][0]
             pk = table.c[pk_name]
-            num_rows = session.query(pk).count()
+            num_rows = fast_count(session.query(pk))
 
         except sqlalchemy.exc.NoSuchTableError:
             # dataset has been approved, but perhaps still processing.
