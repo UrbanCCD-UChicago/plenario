@@ -187,6 +187,10 @@
                                         <i class='fa fa-check'></i>
                                         {{ shape_dataset.status|title }}
                                     </a>
+                                {% elif shape_dataset.status == 'Ingest Pending' or shape_dataset.status == 'Ingest Started' %}
+                                    <a href="{{url_for('views.shape_status', dataset_name=shape_dataset.dataset_name) }}" class='btn btn-default btn-sm dataset-running'>
+                                        {{ shape_dataset.status|title }}
+                                    </a>
                                 {% else %}
                                     <a href="{{url_for('views.shape_status', dataset_name=shape_dataset.dataset_name) }}" class='btn btn-primary btn-sm dataset-error'>
                                         <i class='fa fa-exclamation'></i>

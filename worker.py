@@ -9,8 +9,10 @@
 # appropriate number of worker threads and watches over them. #
 ###############################################################
 
+import boto3
 import plenario.database
 import traceback
+
 from plenario.models import Workers
 import datetime
 
@@ -19,6 +21,22 @@ session = plenario.database.session
 worker_threads = 8
 wait_interval = 1
 job_timeout = 3600
+
+# While the worker is performing a task it pulled
+# off SQS, protect its host EC2 instance from being
+# scaled in.
+autoscaling_client = boto3.client('autoscaling')
+autoscaling_client.set_instance_protection(
+    InstanceIds=['my_instance_id'],
+    AutoScalingGroupName='auto_scaling_group_name',
+    ProtectedFromScaleIn=True
+)
+
+# Used in deciding when to remove aforementioned
+# scale-in protection. A count of the workers
+# actively performing a job.
+active_worker_count = 0
+
 
 # ======================= Worker Utilities ========================
 def log(msg, worker_id):
@@ -43,6 +61,7 @@ def check_in(birthtime, worker_id):
 
 def register_job(ticket, birthtime, worker_id):
     check_in(birthtime, worker_id)
+    active_worker_count += 1
     try:
         session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
         session.commit()
@@ -57,6 +76,7 @@ def register_job(ticket, birthtime, worker_id):
 
 def deregister_job(birthtime, worker_id):
     check_in(birthtime, worker_id)
+    active_worker_count -= 1
     try:
         session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
         session.commit()
@@ -369,17 +389,26 @@ if __name__ == "__main__":
                             finally:
                                 deregister_job(birthtime, worker_id)
 
+                            if active_worker_count <= 0:
+                                autoscaling_client.set_instance_protection(
+                                    InstanceIds=['my_instance_id'],
+                                    AutoScalingGroupName='auto_scaling_group_name',
+                                    ProtectedFromScaleIn=False
+                                )
+
                         else:
                             # No work! Idle for a bit to save compute cycles.
                             #log("Ho hum nothing to do. Idling for {} seconds.".format(wait_interval), worker_id)
                             time.sleep(wait_interval)
 
                     deregister_worker(worker_id)
+
             except Exception as e:
                 traceback.print_exc()
                 log("ERROR: {}. Retrying in 5 seconds.".format(e), worker_id)
                 time.sleep(5)
         log("Exited run loop. Goodbye!", worker_id)
+
 
 
     # Each container should only have one worker.py running at all times.
