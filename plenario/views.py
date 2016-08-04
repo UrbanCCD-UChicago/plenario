@@ -838,7 +838,7 @@ def edit_dataset(source_url_hash):
             fieldnames = table.columns.keys()
             pk_name = [p.name for p in table.primary_key][0]
             pk = table.c[pk_name]
-            num_rows = fast_count(session.query(pk))
+            num_rows = session.query(pk).count()
 
         except sqlalchemy.exc.NoSuchTableError:
             # dataset has been approved, but perhaps still processing.

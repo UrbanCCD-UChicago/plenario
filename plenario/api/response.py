@@ -103,7 +103,7 @@ def form_json_detail_response(to_remove, validator, rows):
     return resp
 
 
-def form_csv_detail_response(to_remove, rows):
+def form_csv_detail_response(to_remove, rows, dataset_names=None):
     to_remove.append('geom')
     remove_columns_from_dict(rows, to_remove)
 
@@ -116,7 +116,14 @@ def form_csv_detail_response(to_remove, rows):
         csv_resp = [rows[0].keys()] + [row.values() for row in rows]
 
     resp = make_response(make_csv(csv_resp), 200)
+
     dname = request.args.get('dataset_name')
+    # For queries where the dataset name is not provided as a query argument
+    # (ex. shapes/<shapeset>/<dataset>), the dataset names can be manually
+    # assigned.
+    if dname is None:
+        dname = reduce(lambda name1, name2: name1 + "_and_" + name2, dataset_names)
+
     filedate = datetime.now().strftime('%Y-%m-%d')
     resp.headers['Content-Type'] = 'text/csv'
     resp.headers['Content-Disposition'] = 'attachment; filename=%s_%s.csv' % (dname, filedate)
@@ -257,9 +264,9 @@ def timeseries_response(query_result, query_args):
 
 # Shape Endpoint Responses ====================================================
 
-def aggregate_point_data_response(data_type, rows):
+def aggregate_point_data_response(data_type, rows, dataset_names):
     if data_type == 'csv':
-        return form_csv_detail_response(['hash', 'ogc_fid'], rows)
+        return form_csv_detail_response(['hash', 'ogc_fid'], rows, dataset_names)
     else:
         return form_geojson_detail_response(['hash', 'ogc_fid'], rows)
 
