@@ -153,7 +153,8 @@ def get_datadump(ticket):
                             yield """{{"startTime": "{}", "endTime": "{}", "workers": {}, "data": [""".format(
                                 metadata["startTime"], metadata["endTime"], json.dumps(metadata["workers"]))
                         elif datatype == "csv":
-                            yield "# STARTTIME: {}\n# ENDTIME: {}\n# WORKERS: {}\n".format(metadata["startTime"], metadata["endTime"], ", ".join(metadata["workers"]))
+                            # Uncomment to enable CSV metadata
+                            # yield "# STARTTIME: {}\n# ENDTIME: {}\n# WORKERS: {}\n".format(metadata["startTime"], metadata["endTime"], ", ".join(metadata["workers"]))
                             yield ",".join([json.dumps(column) for column in columns]) + "\n"
                     else:
                         if datatype == "json":
