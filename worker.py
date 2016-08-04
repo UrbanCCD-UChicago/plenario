@@ -29,21 +29,6 @@ def log(msg, worker_id):
     logfile.write("{} - Worker {}: {}\n".format(datetime.datetime.now(), worker_id.ljust(24), msg))
     logfile.close()
 
-
-def check_in(birthtime, worker_id):
-    log("INFO: Checking in.", worker_id)
-    try:
-        session.query(Workers).filter(Workers.name == worker_id).one().check_in()
-        session.commit()
-    except Exception as e:
-        traceback.print_exc()
-        session.rollback()
-        if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
-            register_worker(birthtime, worker_id)
-        else:
-            log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-
-
 # =========================== The Worker Process ===============================
 if __name__ == "__main__":
 
@@ -100,7 +85,7 @@ if __name__ == "__main__":
     protected = False
 
     def update_instance_protection():
-        global protected
+        global protected, do_work
         try:
             if active_worker_count > 0 and not protected:
                 log("INSTANCE PROTECTION ENABLED", "WORKER BOSS")
@@ -119,41 +104,57 @@ if __name__ == "__main__":
                 )
                 protected = False
         except Exception as e:
+            if "is not in InService or EnteringStandby or Standby" in e:
+                log("Could not apply INSTANCE PROTECTION: INSTANCE IS TERMINATING!", "WORKER BOSS")
+                log("Stopping work in the face of imminent termination...", "WORKER BOSS")
+                do_work = False
             log("Could not apply INSTANCE PROTECTION: {}".format(e), "WORKER BOSS")
 
 
+    def check_in(birthtime, worker_id):
+        log("INFO: Hi! Just checking in.", worker_id)
+        try:
+            session.query(Workers).filter(Workers.name == worker_id).one().check_in()
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
+                register_worker(birthtime, worker_id)
+            else:
+                traceback.print_exc()
+                log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+
+
     def register_job(ticket, birthtime, worker_id):
+        log("INFO: Registering job {}.".format(ticket), worker_id)
         global active_worker_count
         check_in(birthtime, worker_id)
-        active_worker_count += 1
         try:
             session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
             session.commit()
         except Exception as e:
-            traceback.print_exc()
             session.rollback()
             if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
                 register_worker(birthtime, worker_id)
             else:
+                traceback.print_exc()
                 log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-        update_instance_protection()
 
 
     def deregister_job(birthtime, worker_id):
+        log("INFO: Deregistering job.", worker_id)
         global active_worker_count
         check_in(birthtime, worker_id)
-        active_worker_count -= 1
         try:
             session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
             session.commit()
         except Exception as e:
-            traceback.print_exc()
             session.rollback()
             if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
                 register_worker(birthtime, worker_id)
             else:
+                traceback.print_exc()
                 log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-        update_instance_protection()
 
 
     def register_worker(birthtime, worker_id):
@@ -180,6 +181,8 @@ if __name__ == "__main__":
     def worker():
         worker_id = generate_name()
         birthtime = time.time()
+
+        global active_worker_count
 
         while do_work:
             try:
@@ -266,7 +269,7 @@ if __name__ == "__main__":
                                 continue
 
                             # Handle orphaned jobs
-                            if status["status"] == "processing" and "longrunning" not in get_request(ticket) and \
+                            if status["status"] == "processing" and \
                                     ((not status["meta"].get("lastStartTime") and
                                                   (datetime.datetime.now()-
                                                        datetime.datetime.strptime(status["meta"]["startTime"],
@@ -300,6 +303,13 @@ if __name__ == "__main__":
                                 log("Job has already been started. Skipping.", worker_id)
                                 continue
 
+                            active_worker_count += 1
+                            update_instance_protection()
+                            if not do_work:
+                                deregister_job(birthtime, worker_id)
+                                continue
+                            register_job(ticket, birthtime, worker_id)
+
                             status["status"] = "processing"
                             if "lastDeferredTime" in status["meta"]:
                                 status["meta"]["lastResumeTime"] = str(datetime.datetime.now())
@@ -313,7 +323,6 @@ if __name__ == "__main__":
                             # =========== Do work on query =========== #
                             try:
                                 log("Starting work on ticket {}.".format(ticket), worker_id)
-                                register_job(ticket, birthtime, worker_id)
 
                                 req = get_request(ticket)
                                 endpoint = req['endpoint']
@@ -410,6 +419,8 @@ if __name__ == "__main__":
                                     set_status(ticket, status)
                                 traceback.print_exc()
                             finally:
+                                active_worker_count -= 1
+                                update_instance_protection()
                                 deregister_job(birthtime, worker_id)
 
                         else:
