@@ -424,8 +424,6 @@ def _datadump(args):
     columns = [c.name for c in args.data.get('dataset').columns if c.name not in ['point_date', 'hash', 'geom']]
 
     def add_chunk(chunk):
-        if os.environ.get('WORKER'):
-            check_in(args.data["jobsframework_workerbirthtime"], args.data["jobsframework_workerid"])
         chunk = [OrderedDict(zip(columns, row)) for row in chunk]
         chunk = [{column: row[column] for column in columns} for row in chunk]
         dump = DataDump(os.urandom(16).encode('hex'), requestid, part, chunks,
@@ -496,7 +494,7 @@ def cleanup_datadump():
 
     for requestid, in session.query(DataDump.request).distinct():
         print(requestid)
-        if get_flag(requestid + "_suppresscleanup"):
+        if not get_flag(requestid + "_suppresscleanup"):
             _cleanup_datadump(requestid)
 
 

@@ -50,39 +50,40 @@ def deregister_worker(worker_id):
         log("Problem updating worker registration: {}".format(e), worker_id)
 
 
-def register_job(ticket, birthtime, worker_id):
-    global active_worker_count
+def register_worker_job_status(ticket, birthtime, worker_id):
+    log("INFO: Registering job for worker {}.", worker_id)
     check_in(birthtime, worker_id)
-    active_worker_count += 1
     try:
         session.query(Workers).filter(Workers.name == worker_id).one().register_job(ticket)
         session.commit()
     except Exception as e:
-        traceback.print_exc()
         session.rollback()
         if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
             register_worker(birthtime, worker_id)
         else:
             log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+            traceback.print_exc()
     update_instance_protection()
 
 
-def deregister_job(birthtime, worker_id):
-    global active_worker_count
+def deregister_worker_job_status(birthtime, worker_id):
+    log("INFO: Deregistering job for worker {}.", worker_id)
     check_in(birthtime, worker_id)
     try:
         session.query(Workers).filter(Workers.name == worker_id).one().deregister_job()
         session.commit()
     except Exception as e:
-        traceback.print_exc()
         session.rollback()
         if session.query(Workers).filter(Workers.name == worker_id).count() == 0:
             register_worker(birthtime, worker_id)
         else:
             log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
+            traceback.print_exc()
+    update_instance_protection()
 
 
 def update_instance_protection(worker_boss, autoscaling_client):
+
     try:
         if worker_boss['active_worker_count'] > 0 and not worker_boss['protected']:
             log("INSTANCE PROTECTION ENABLED", "WORKER BOSS")
@@ -100,6 +101,11 @@ def update_instance_protection(worker_boss, autoscaling_client):
                 ProtectedFromScaleIn=False
             )
             worker_boss['protected'] = False
-    except Exception as e:
-        log("Could not apply INSTANCE PROTECTION: {}".format(e), "WORKER BOSS")
 
+    except Exception as e:
+        if "is not in InService or EnteringStandby or Standby" in e:
+            log("Could not apply INSTANCE PROTECTION: {}".format(e), "WORKER BOSS")
+            log("INSTANCE TERMINATING!")
+            worker_boss['do_work'] = False
+        else:
+            log("Could not apply INSTANCE PROTECTION: {}".format(e), "WORKER BOSS")
