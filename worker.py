@@ -40,8 +40,7 @@ if __name__ == "__main__":
     from plenario_worker.utilities import deregister_worker_job_status, register_worker_job_status
     from plenario_worker.utilities import deregister_worker, register_worker, increment_job_trial_count
     from plenario_worker.utilities import check_in, log, update_instance_protection
-    from plenario_worker.validators import available_jobs, has_plenario_job, has_valid_ticket
-    from plenario_worker.validators import is_job_status_orphaned
+    from plenario_worker.validators import has_valid_ticket, is_job_status_orphaned
 
     worker_boss = {
         'active_worker_count': 0,
@@ -83,24 +82,26 @@ if __name__ == "__main__":
                     check_in(birthtime, worker_id)
                     loop_count = 0
 
+                # Poll Amazon SQS for messages containing a job.
                 response = JobsQueue.get_messages(message_attributes=["ticket"])
-                job = response[0]
+                job = response[0] if len(response) > 0 else None
 
-                if not available_jobs(response):
+                if not job:
                     time.sleep(wait_interval)
                     continue
 
-                if not has_plenario_job(response):
+                if not job.get_body() == "plenario_job":
                     log("Message is not a Plenario Job. Skipping.", worker_id)
                     continue
 
-                if not has_valid_ticket(response):
+                if not has_valid_ticket(job):
                     log("ERROR: Job does not contain a valid ticket! Removing.", worker_id)
                     JobsQueue.delete_message(job)
                     continue
 
                 # All checks passed, this is a valid ticket.
                 ticket = str(job.message_attributes["ticket"]["string_value"])
+                status = get_status(ticket)
                 log("Received job with ticket {}.".format(ticket), worker_id)
 
                 # Now we have to determine if the job itself is a valid job to

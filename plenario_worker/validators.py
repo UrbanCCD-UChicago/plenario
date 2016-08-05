@@ -2,18 +2,7 @@ from datetime import datetime
 from plenario.api.jobs import get_status
 
 
-def available_jobs(response):
-    return len(response) > 0
-
-
-def has_plenario_job(response):
-    job = response[0]
-    body = job.get_body()
-    return body == "plenario_job"
-
-
-def has_valid_ticket(response):
-    job = response[0]
+def has_valid_ticket(job):
     try:
         ticket = str(job.message_attributes["ticket"]["string_value"])
         status = get_status(ticket)
