@@ -18,7 +18,6 @@ import traceback
 from collections import namedtuple
 from datetime import datetime
 from flask import Flask
-from subprocess import check_output
 
 
 worker_threads = 8
@@ -28,7 +27,6 @@ job_timeout = 3600
 if __name__ == "__main__":
 
     from plenario.api.jobs import get_status, set_status, get_request
-    from plenario.api.jobs import set_result, submit_job
     from plenario.api.response import convert_result_geoms
     from plenario.api.validator import convert
     from plenario.database import session
@@ -36,11 +34,14 @@ if __name__ == "__main__":
 
     from plenario_worker.clients import autoscaling_client, sqs_client
     from plenario_worker.endpoints import endpoint_logic, etl_logic, shape_logic
+    from plenario_worker.metacommands import process_metacommands
     from plenario_worker.names import generate_name
-    from plenario_worker.ticket import set_ticket_error
+    from plenario_worker.ticket import set_ticket_error, set_ticket_success, set_ticket_queued
     from plenario_worker.utilities import deregister_worker_job_status, register_worker_job_status
-    from plenario_worker.utilities import deregister_worker, register_worker
+    from plenario_worker.utilities import deregister_worker, register_worker, increment_job_trial_count
     from plenario_worker.utilities import check_in, log, update_instance_protection
+    from plenario_worker.validators import available_jobs, has_plenario_job, has_valid_ticket
+    from plenario_worker.validators import is_job_status_orphaned
 
     worker_boss = {
         'active_worker_count': 0,
@@ -73,61 +74,40 @@ if __name__ == "__main__":
 
         with app.app_context():
 
-            throttle = 5
+            loop_count = 0
             while worker_boss['do_work']:
 
-                if throttle < 0:
+                # Reduce log noise by only checking in every ten loops.
+                loop_count += 1
+                if loop_count % 10 == 0:
                     check_in(birthtime, worker_id)
-                    throttle = 5
-                throttle -= 1
+                    loop_count = 0
 
                 response = JobsQueue.get_messages(message_attributes=["ticket"])
-                # Check the length of the available queue messages to determine
-                # if there's work. If there's no work, sleep and do not attempt
-                # to perform any query logic.
-                if not len(response) > 0:
+                job = response[0]
+
+                if not available_jobs(response):
                     time.sleep(wait_interval)
                     continue
 
-                job = response[0]
-                body = job.get_body()
-
-                # Check to avoid extraneous jobs submitted by AWS Elastic Beanstalk.
-                if not body == "plenario_job":
+                if not has_plenario_job(response):
                     log("Message is not a Plenario Job. Skipping.", worker_id)
                     continue
 
-                # Check that the job contains a valid ticket.
-                try:
-                    ticket = str(job.message_attributes["ticket"]["string_value"])
-                except KeyError:
-                    log("ERROR: Job does not contain a ticket! Removing.", worker_id)
-                    JobsQueue.delete_message(job)
-                    continue
-
-                # Test that the ticket is not malformed in some way.
-                try:
-                    status = get_status(ticket)
-                    assert status["status"] is not None
-                    assert status["meta"] is not None
-                except Exception as e:
-                    log("ERROR: Job is malformed ({}). Removing.".format(e), worker_id)
+                if not has_valid_ticket(response):
+                    log("ERROR: Job does not contain a valid ticket! Removing.", worker_id)
                     JobsQueue.delete_message(job)
                     continue
 
                 # All checks passed, this is a valid ticket.
+                ticket = str(job.message_attributes["ticket"]["string_value"])
                 log("Received job with ticket {}.".format(ticket), worker_id)
 
-                # Booleans about the jobs state to determine if it is a valid
-                # job to work on.
+                # Now we have to determine if the job itself is a valid job to
+                # perform, taking into consideration whether it has been orphaned
+                # or has undergone many retries.
                 is_processing = status["status"] == "processing"
-                is_deferred = status["meta"].get("lastStartTime") is not None
-                is_orphaned = False
-
-                if is_processing:
-                    is_expired = (datetime.now() - datetime.strptime(status["meta"]["startTime"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > job_timeout
-                    deferral_expired = (datetime.now() - datetime.strptime(status["meta"]["lastResumeTime"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > job_timeout
-                    is_orphaned = (not is_deferred and is_expired) or (is_deferred and deferral_expired)
+                is_orphaned = is_job_status_orphaned(status, job_timeout)
 
                 # Check if the job was an orphan (meaning that the parent worker
                 # process died and failed to complete it).
@@ -181,7 +161,6 @@ if __name__ == "__main__":
 
                 set_status(ticket, status)
 
-                # =========== Do work on query =========== #
                 try:
                     log("Starting work on ticket {}.".format(ticket), worker_id)
 
@@ -205,32 +184,15 @@ if __name__ == "__main__":
 
                         result = endpoint_logic[endpoint](query_args)
 
-                        # The enables workers to modify a job's priority
-                        # through a variety of methods (deferral, set_timeout,
-                        # resubmission) Metacommands are recieved from work done
-                        # in the endpoint logics.
-                        if "jobsframework_metacommands" in result:
-                            defer = False
-                            stop = False
-                            for command in result["jobsframework_metacommands"]:
-                                if "setTimeout" in command:
-                                    job.change_visibility(command["setTimeout"])
-                                elif "defer" in command:
-                                    status = get_status(ticket)
-                                    status["status"] = "queued"
-                                    status["meta"]["lastDeferredTime"] = str(datetime.now())
-                                    set_status(ticket, status)
-                                    log("Deferred work on ticket {}.".format(ticket), worker_id)
-                                    defer = True
-                                elif "resubmit" in command:
-                                    submit_job(req)
-                                    log("Resubmitted job that was in ticket {}.".format(ticket), worker_id)
-                                    stop = True
-                            if stop:
-                                JobsQueue.delete_message(job)
-                                continue
-                            if defer:
-                                continue
+                        # Metacommands enable workers to modify a job's priority through a variety
+                        # of methods (deferral, set_timeout, resubmission). Metacommands are recieved
+                        # from work done in the endpoint logics.
+                        metacommand = process_metacommands(result, job, ticket, worker_id, req, JobsQueue)
+                        if metacommand == "STOP":
+                            JobsQueue.delete_message(job)
+                            continue
+                        if metacommand == "DEFER":
+                            continue
 
                     elif endpoint in shape_logic:
                         convert(query_args)
@@ -252,34 +214,25 @@ if __name__ == "__main__":
 
                     # By this point, we have successfully completed a task.
                     # Update the status meta information to indicate so.
-                    set_result(ticket, result)
-                    status = get_status(ticket)
-                    status["status"] = "success"
-                    status["meta"]["endTime"] = str(datetime.now())
-                    set_status(ticket, status)
+                    set_ticket_success(ticket, result)
                     # Cleanup the leftover SQS message.
                     JobsQueue.delete_message(job)
+
                     log("Finished work on ticket {}.".format(ticket), worker_id)
 
                 except Exception as e:
                     traceback.print_exc()
 
                     status = get_status(ticket)
-                    if status['meta'].get('tries'):
-                        status['meta']['tries'] += 1
-                    else:
-                        status['meta']['tries'] = 1
+                    increment_job_trial_count(status)
 
-                    # Try failed jobs twice
-                    if status["meta"]["tries"] > 2:
+                    # We want to try failed jobs twice.
+                    if status["meta"]["tries"] <= 2:
+                        set_ticket_queued(status, ticket, str(e), worker_id)
+                    else:
                         error_msg = "{} errored with {}.".format(ticket, e)
                         set_ticket_error(status, ticket, error_msg, worker_id)
                         JobsQueue.delete_message(job)
-                    else:
-                        status["status"] = "queued"
-                        status["meta"]["lastDeferredTime"] = str(datetime.now())
-                        log("ERROR: Ticket {} errored with: {}...retrying.".format(ticket, e), worker_id)
-                        set_status(ticket, status)
 
                 finally:
                     worker_boss['active_worker_count'] -= 1

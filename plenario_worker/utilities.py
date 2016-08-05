@@ -63,7 +63,6 @@ def register_worker_job_status(ticket, birthtime, worker_id):
         else:
             log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
             traceback.print_exc()
-    update_instance_protection()
 
 
 def deregister_worker_job_status(birthtime, worker_id):
@@ -78,8 +77,6 @@ def deregister_worker_job_status(birthtime, worker_id):
             register_worker(birthtime, worker_id)
         else:
             log("ERROR: Problem updating worker registration: {}".format(e), worker_id)
-            traceback.print_exc()
-    update_instance_protection()
 
 
 def update_instance_protection(worker_boss, autoscaling_client):
@@ -105,7 +102,14 @@ def update_instance_protection(worker_boss, autoscaling_client):
     except Exception as e:
         if "is not in InService or EnteringStandby or Standby" in e:
             log("Could not apply INSTANCE PROTECTION: {}".format(e), "WORKER BOSS")
-            log("INSTANCE TERMINATING!")
+            log("INSTANCE TERMINATING!", "WORKER BOSS")
             worker_boss['do_work'] = False
         else:
             log("Could not apply INSTANCE PROTECTION: {}".format(e), "WORKER BOSS")
+
+
+def increment_job_trial_count(job_status):
+    if job_status["meta"].get("tries"):
+        job_status["meta"]["tries"] += 1
+    else:
+        job_status["meta"]["tries"] = 0
