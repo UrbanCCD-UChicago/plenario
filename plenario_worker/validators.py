@@ -6,10 +6,11 @@ def has_valid_ticket(job):
     try:
         ticket = str(job.message_attributes["ticket"]["string_value"])
         status = get_status(ticket)
+        assert status is not None
         assert status["status"] is not None
         assert status["meta"] is not None
         return True
-    except (AssertionError, KeyError):
+    except (AssertionError, KeyError, TypeError):
         return False
 
 
