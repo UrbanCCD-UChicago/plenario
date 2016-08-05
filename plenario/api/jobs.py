@@ -81,6 +81,7 @@ def ticket_exists(ticket):
 def worker_ready():
     try:
         job = {"endpoint" : "ping", "query" : {}}
+        submit_job(job)
         ticket = submit_job(job)
         time.sleep(1)   # Wait for worker to get started. Modify as necessary.
         return "hello" in get_result(ticket).keys()
