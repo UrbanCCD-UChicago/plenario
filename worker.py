@@ -122,12 +122,16 @@ if __name__ == "__main__":
                 # job to work on.
                 is_processing = status["status"] == "processing"
                 is_deferred = status["meta"].get("lastStartTime") is not None
-                is_expired = (datetime.now() - datetime.strptime(status["meta"]["startTime"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > job_timeout
-                deferral_expired = (datetime.now() - datetime.strptime(status["meta"]["lastResumeTime"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > job_timeout
+                is_orphaned = False
+
+                if is_processing:
+                    is_expired = (datetime.now() - datetime.strptime(status["meta"]["startTime"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > job_timeout
+                    deferral_expired = (datetime.now() - datetime.strptime(status["meta"]["lastResumeTime"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds() > job_timeout
+                    is_orphaned = (not is_deferred and is_expired) or (is_deferred and deferral_expired)
 
                 # Check if the job was an orphan (meaning that the parent worker
                 # process died and failed to complete it).
-                if is_processing and ((not is_deferred and is_expired) or (is_deferred and deferral_expired)):
+                if is_processing and is_orphaned:
 
                     if status["meta"].get("tries"):
                         status["meta"]["tries"] += 1
