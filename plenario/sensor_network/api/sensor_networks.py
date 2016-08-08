@@ -2,6 +2,7 @@ import json
 import shapely.geometry
 import sqlalchemy
 import ast
+import threading
 import dateutil.parser
 
 from collections import OrderedDict
@@ -372,21 +373,18 @@ def _get_observations(args):
     tables = []
     meta = sqlalchemy.MetaData()
     for feature in features:
+        table_name = feature.lower()
         try:
-            table_name = feature.lower()
             tables.append(sqlalchemy.Table(table_name, meta, autoload=True, autoload_with=redshift_engine))
         except (AttributeError, NoSuchTableError):
             return bad_request("Table {} not found".format(table_name))
 
-    # TODO: add threading
     data = []
+    threads = []
     for table in tables:
-        args.data['table'] = table
-        q = observation_query(args)
-        q = q.limit(args.data['limit']/len(tables))
-        q = q.offset(args.data['offset']) if args.data['offset'] else q
-        for obs in q.all():
-            data.append(format_observation(obs, table))
+        t = threading.Thread(target=_thread_query, args=(table, len(tables), data, args))
+        threads.append(t)
+        t.start()
 
     # if the user didn't specify a 'nodes' filter, don't display nodes in the query output
     if 'nodes' not in request.args:
@@ -430,3 +428,12 @@ def _get_observations(args):
     resp.headers['Content-Type'] = 'application/json'
 
     return resp
+
+
+def _thread_query(table, num_tables, data, args):
+    args.data['table'] = table
+    q = observation_query(args)
+    q = q.limit(args.data['limit'] / num_tables)
+    q = q.offset(args.data['offset'] / num_tables) if args.data['offset'] else q
+    for obs in q.all():
+        data.append(format_observation(obs, table))
