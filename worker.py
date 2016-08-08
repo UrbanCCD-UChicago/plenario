@@ -19,8 +19,10 @@ from collections import namedtuple
 from datetime import datetime
 from flask import Flask
 
+# Exists out here because of its use in session.
+from plenario.database import session
 
-worker_threads = 8
+worker_threads = 3
 wait_interval = 1
 job_timeout = 3600
 
@@ -29,10 +31,8 @@ if __name__ == "__main__":
     from plenario.api.jobs import get_status, set_status, get_request
     from plenario.api.response import convert_result_geoms
     from plenario.api.validator import convert
-    from plenario.database import session
-    from plenario.settings import JOBS_QUEUE
 
-    from plenario_worker.clients import autoscaling_client, sqs_client
+    from plenario_worker.clients import autoscaling_client, job_queue
     from plenario_worker.endpoints import endpoint_logic, etl_logic, shape_logic
     from plenario_worker.metacommands import process_metacommands
     from plenario_worker.names import generate_name
@@ -49,8 +49,6 @@ if __name__ == "__main__":
     }
 
     ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
-
-    JobsQueue = sqs_client.get_queue(JOBS_QUEUE)
 
 
     def stop_workers(signum, frame):
@@ -83,7 +81,7 @@ if __name__ == "__main__":
                     loop_count = 0
 
                 # Poll Amazon SQS for messages containing a job.
-                response = JobsQueue.get_messages(message_attributes=["ticket"])
+                response = job_queue.receive_messages(MessageAttributeNames=["ticket"])
                 job = response[0] if len(response) > 0 else None
 
                 if not job:
@@ -96,7 +94,7 @@ if __name__ == "__main__":
 
                 if not has_valid_ticket(job):
                     log("ERROR: Job does not contain a valid ticket! Removing.", worker_id)
-                    JobsQueue.delete_message(job)
+                    job_queue.delete_message(job)
                     continue
 
                 # All checks passed, this is a valid ticket.
@@ -123,7 +121,7 @@ if __name__ == "__main__":
                     if status["meta"]["tries"] > 1:
                         error_msg = "Stalled task {}. Removing.".format(ticket)
                         set_ticket_error(status, ticket, error_msg, worker_id)
-                        JobsQueue.delete_message(job)
+                        job_queue.delete_message(job)
                         continue
                     else:
                         log("WARNING: Ticket {} has been orphaned...retrying.".format(ticket), worker_id)
@@ -188,9 +186,9 @@ if __name__ == "__main__":
                         # Metacommands enable workers to modify a job's priority through a variety
                         # of methods (deferral, set_timeout, resubmission). Metacommands are recieved
                         # from work done in the endpoint logics.
-                        metacommand = process_metacommands(result, job, ticket, worker_id, req, JobsQueue)
+                        metacommand = process_metacommands(result, job, ticket, worker_id, req, job_queue)
                         if metacommand == "STOP":
-                            JobsQueue.delete_message(job)
+                            job_queue.delete_message(job)
                             continue
                         if metacommand == "DEFER":
                             continue
@@ -217,7 +215,7 @@ if __name__ == "__main__":
                     # Update the status meta information to indicate so.
                     set_ticket_success(ticket, result)
                     # Cleanup the leftover SQS message.
-                    JobsQueue.delete_message(job)
+                    job_queue.delete_message(job)
 
                     log("Finished work on ticket {}.".format(ticket), worker_id)
 
@@ -233,7 +231,7 @@ if __name__ == "__main__":
                     else:
                         error_msg = "{} errored with {}.".format(ticket, e)
                         set_ticket_error(status, ticket, error_msg, worker_id)
-                        JobsQueue.delete_message(job)
+                        job_queue.delete_message(job)
 
                 finally:
                     worker_boss['active_worker_count'] -= 1

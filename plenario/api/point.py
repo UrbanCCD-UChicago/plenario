@@ -29,7 +29,7 @@ from plenario.database import fast_count, windowed_query
 # but use the shared connection pool if this
 # is the worker. It's more efficient!
 if os.environ.get('WORKER'):
-    from worker import session, check_in
+    from worker import session
 else:
     from plenario.database import session
 

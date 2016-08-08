@@ -19,7 +19,7 @@ from sqlalchemy.exc import NoSuchTableError
 from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
-from plenario.api.jobs import submit_job, get_status, get_job, JobsQueue
+from plenario.api.jobs import submit_job, get_status, get_job, job_queue
 from plenario.database import session, Base, app_engine as engine, fast_count
 from plenario.models import MetaTable, User, ShapeMetadata, Workers
 from plenario.models_.ETLTask import ETLType, add_task
@@ -136,7 +136,7 @@ def workers():
             " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
 
     workerlist.sort(key=lambda worker: worker["name"])
-    jobs = JobsQueue.count()
+    jobs = job_queue.count()
     workercounts = {
         "total": len(workerlist),
         "nominal": nominal,

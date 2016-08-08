@@ -10,14 +10,13 @@ from boto.sqs.message import Message
 from flask import request, make_response
 from os import urandom
 
-from plenario.settings import CACHE_CONFIG, JOBS_QUEUE
+from plenario.settings import CACHE_CONFIG
 from plenario.api.common import unknown_object_json_handler
 from plenario.utils.model_helpers import fetch_table
-from plenario_worker.clients import sqs_client
+from plenario_worker.clients import job_queue
 
 redisPool = redis.ConnectionPool(host=CACHE_CONFIG["CACHE_REDIS_HOST"], port=6379, db=0)
 JobsDB = redis.Redis(connection_pool=redisPool)
-JobsQueue = sqs_client.get_queue(JOBS_QUEUE)
 
 
 def get_status(ticket):
@@ -155,7 +154,7 @@ def submit_job(req):
     touch_ticket_expiry(ticket)
 
     # Send this *last* after everything is ready.
-    JobsQueue.write(message)
+    job_queue.write(message)
 
     file_ = open("/opt/python/log/sender.log", "a")
     file_.write("{}: Sent job with ticket {}...\n".format(datetime.datetime.now(), ticket))
@@ -166,8 +165,8 @@ def submit_job(req):
 
 def cancel_job(ticket):
 
-    response = JobsQueue.get_messages(message_attributes=[ticket])
+    response = job_queue.receive_messages(message_attributes=[ticket])
     if len(response) > 0:
-        JobsQueue.delete_message(response[0])
+        job_queue.delete_message(response[0])
         return ticket
     return None
