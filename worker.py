@@ -88,17 +88,17 @@ if __name__ == "__main__":
                     time.sleep(wait_interval)
                     continue
 
-                if not job.get_body() == "plenario_job":
+                if not job.body == "plenario_job":
                     log("Message is not a Plenario Job. Skipping.", worker_id)
                     continue
 
                 if not has_valid_ticket(job):
                     log("ERROR: Job does not contain a valid ticket! Removing.", worker_id)
-                    job_queue.delete_message(job)
+                    job.delete()
                     continue
 
                 # All checks passed, this is a valid ticket.
-                ticket = str(job.message_attributes["ticket"]["string_value"])
+                ticket = str(job.message_attributes["ticket"]["StringValue"])
                 status = get_status(ticket)
                 log("Received job with ticket {}.".format(ticket), worker_id)
 
@@ -121,7 +121,7 @@ if __name__ == "__main__":
                     if status["meta"]["tries"] > 1:
                         error_msg = "Stalled task {}. Removing.".format(ticket)
                         set_ticket_error(status, ticket, error_msg, worker_id)
-                        job_queue.delete_message(job)
+                        job.delete()
                         continue
                     else:
                         log("WARNING: Ticket {} has been orphaned...retrying.".format(ticket), worker_id)
@@ -188,7 +188,7 @@ if __name__ == "__main__":
                         # from work done in the endpoint logics.
                         metacommand = process_metacommands(result, job, ticket, worker_id, req, job_queue)
                         if metacommand == "STOP":
-                            job_queue.delete_message(job)
+                            job.delete()
                             continue
                         if metacommand == "DEFER":
                             continue
@@ -215,7 +215,7 @@ if __name__ == "__main__":
                     # Update the status meta information to indicate so.
                     set_ticket_success(ticket, result)
                     # Cleanup the leftover SQS message.
-                    job_queue.delete_message(job)
+                    job.delete()
 
                     log("Finished work on ticket {}.".format(ticket), worker_id)
 
@@ -231,7 +231,7 @@ if __name__ == "__main__":
                     else:
                         error_msg = "{} errored with {}.".format(ticket, e)
                         set_ticket_error(status, ticket, error_msg, worker_id)
-                        job_queue.delete_message(job)
+                        job.delete()
 
                 finally:
                     worker_boss['active_worker_count'] -= 1

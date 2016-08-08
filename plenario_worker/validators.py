@@ -4,7 +4,8 @@ from plenario.api.jobs import get_status
 
 def has_valid_ticket(job):
     try:
-        ticket = str(job.message_attributes["ticket"]["string_value"])
+        print "has_valid_ticket.job.message_attributes: {}".format(job.message_attributes)
+        ticket = str(job.message_attributes["ticket"]["StringValue"])
         status = get_status(ticket)
         assert status is not None
         assert status["status"] is not None

@@ -136,7 +136,7 @@ def workers():
             " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
 
     workerlist.sort(key=lambda worker: worker["name"])
-    jobs = job_queue.count()
+    jobs = job_queue.attributes['ApproximateNumberOfMessages']
     workercounts = {
         "total": len(workerlist),
         "nominal": nominal,

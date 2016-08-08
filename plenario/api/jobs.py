@@ -6,7 +6,6 @@ import redis
 import response as api_response
 import time
 
-from boto.sqs.message import Message
 from flask import request, make_response
 from os import urandom
 
@@ -137,25 +136,22 @@ def submit_job(req):
     set_request(ticket, req)
     set_result(ticket, "")
 
-    message = Message()
-    message.set_body("plenario_job")
-    message.message_attributes = {
-        "ticket": {
-            "data_type": "String",
-            "string_value": str(ticket)
-        },
-        # For getting job by ticket
-        str(ticket): {
-            "data_type": "String",
-            "string_value": "ticket"
-        }
-    }
-
     set_status(ticket, {"status": "queued", "meta": {"queueTime": str(datetime.datetime.now())}})
     touch_ticket_expiry(ticket)
 
     # Send this *last* after everything is ready.
-    job_queue.write(message)
+    job_queue.send_message(
+        MessageBody="plenario_job",
+        MessageAttributes={
+            "ticket": {
+                "DataType": "String",
+                "StringValue": str(ticket)
+            }, str(ticket): {
+                "DataType": "String",
+                "StringValue": "ticket"
+            }
+        }
+    )
 
     file_ = open("/opt/python/log/sender.log", "a")
     file_.write("{}: Sent job with ticket {}...\n".format(datetime.datetime.now(), ticket))
