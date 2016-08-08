@@ -378,11 +378,11 @@ def _get_observations(args):
         except (AttributeError, NoSuchTableError):
             return bad_request("Table {} not found".format(table_name))
 
+    # TODO: add threading
     data = []
     for table in tables:
         args.data['table'] = table
         q = observation_query(args)
-        # Apply limit and offset
         q = q.limit(args.data['limit']/len(tables))
         q = q.offset(args.data['offset']) if args.data['offset'] else q
         for obs in q.all():
