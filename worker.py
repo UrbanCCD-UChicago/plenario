@@ -22,7 +22,7 @@ from flask import Flask
 # Exists out here because of its use in session.
 from plenario.database import session
 
-worker_threads = 3
+worker_threads = 4
 wait_interval = 1
 job_timeout = 3600
 
