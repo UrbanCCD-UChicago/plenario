@@ -61,7 +61,7 @@ class Validator(Schema):
     location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
     obs_date__ge = fields.Date(default=datetime.now() - timedelta(days=90))
     obs_date__le = fields.Date(default=datetime.now())
-    limit = fields.Integer(default=1000)
+    limit = fields.Integer(default=1000, validate=Range(0, 10000))
     offset = fields.Integer(default=0, validate=Range(0))
     resolution = fields.Integer(default=500, validate=Range(0))
     job = fields.Bool(default=False)
