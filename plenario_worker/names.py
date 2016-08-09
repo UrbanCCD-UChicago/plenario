@@ -6,6 +6,8 @@ def generate_name():
     # References so far:
     # - The Hitchhiker's Guide to the Galaxy
     # - Rick and Morty
+    # - Pokemon
+    # - Ourselves
 
     firstnames = [
         "7dimensional", "abhorrent", "aldebaran", "algorithmic", "alphacentauri", "altair", "amusing", "antares",

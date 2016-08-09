@@ -81,35 +81,43 @@ def workers():
     nominal = 0
     loaded = 0
     dead = 0
+
     for worker in workerlist:
-        if worker["job"]:
-            job = json.loads(get_job(worker["job"]).get_data())
-            if job.get("error"):
-                worker["status"] = "dead"
-                worker["jobinfo"] = {
-                    "status": "TIMED OUT",
-                    "workers": "",
-                    "queuetime": "",
-                    "worktime": "",
-                    "endpoint": ""
-                }
-            else:
-                if job["status"]["meta"].get("lastStartTime"):
-                    diff = dateutil.relativedelta.relativedelta(now,
-                                                            datetime.strptime(job["status"]["meta"]["lastStartTime"],
-                                                                    "%Y-%m-%d %H:%M:%S.%f"))
-                else:
-                    diff = dateutil.relativedelta.relativedelta(now,
-                                                            datetime.strptime(job["status"]["meta"]["startTime"],
-                                                                                  "%Y-%m-%d %H:%M:%S.%f"))
-                worker["jobinfo"] = {
-                    "status": job["status"]["status"],
-                    "workers": ", ".join(job["status"]["meta"]["workers"]),
-                    "queuetime": job["status"]["meta"]["queueTime"],
-                    "worktime": " {}h {}m {}s".format(diff.hours, diff.minutes, diff.seconds).replace(
-                        " 0h ", "  ").replace(" 0m ", " ")[1:],
-                    "endpoint": job["request"]["endpoint"]
-                }
+
+        if not worker["job"]:
+            continue
+
+        job = json.loads(get_job(worker["job"]).get_data())
+
+        if job.get("error"):
+            worker["status"] = "dead"
+            worker["jobinfo"] = {
+                "status": "TIMED OUT",
+                "workers": "",
+                "queuetime": "",
+                "worktime": "",
+                "endpoint": ""
+            }
+            continue
+
+        if job["status"]["meta"].get("lastStartTime"):
+            diff = dateutil.relativedelta.relativedelta(
+                now,
+                datetime.strptime(job["status"]["meta"]["lastStartTime"],
+                                  "%Y-%m-%d %H:%M:%S.%f"))
+
+        else:
+            diff = dateutil.relativedelta.relativedelta(now,
+                                                    datetime.strptime(job["status"]["meta"]["startTime"],
+                                                                          "%Y-%m-%d %H:%M:%S.%f"))
+        worker["jobinfo"] = {
+            "status": job["status"]["status"],
+            "workers": ", ".join(job["status"]["meta"]["workers"]),
+            "queuetime": job["status"]["meta"]["queueTime"],
+            "worktime": " {}h {}m {}s".format(diff.hours, diff.minutes, diff.seconds).replace(
+                " 0h ", "  ").replace(" 0m ", " ")[1:],
+            "endpoint": job["request"]["endpoint"]
+        }
 
         lastseen = (now - datetime.strptime(worker["timestamp"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds()
         if lastseen > 1200 or worker.get("status"):

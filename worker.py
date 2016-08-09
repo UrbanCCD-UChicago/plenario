@@ -17,13 +17,12 @@ import traceback
 
 from collections import namedtuple
 from datetime import datetime
-from flask import Flask
 
 # Exists out here because of its use in session.
 from plenario.database import session
 
 worker_threads = 4
-wait_interval = 1
+wait_interval = 5
 job_timeout = 3600
 
 if __name__ == "__main__":
@@ -41,29 +40,21 @@ if __name__ == "__main__":
     from plenario_worker.utilities import deregister_worker, register_worker, increment_job_trial_count
     from plenario_worker.utilities import check_in, log, update_instance_protection
     from plenario_worker.validators import has_valid_ticket, is_job_status_orphaned
+    from plenario_worker.worker_boss import WorkerBoss
 
-    worker_boss = {
-        'active_worker_count': 0,
-        'do_work': True,
-        'protected': False,
-    }
+    from runserver import application as app
 
+    # Holds the boolean which determines if the workers are running or not.
+    worker_boss = WorkerBoss()
+    # Listen for termination signals telling us to break the worker run loop.
+    signal.signal(signal.SIGINT, worker_boss.stop_working)
+    signal.signal(signal.SIGTERM, worker_boss.stop_working)
+    # Emulate a ValidatorResult, used to play nice with some endpoint logic.
     ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
 
 
-    def stop_workers(signum, frame):
-        global worker_boss
-        log("Got termination signal. Finishing job...", "WORKER BOSS")
-        worker_boss['do_work'] = False
+    def worker(worker_id):
 
-    signal.signal(signal.SIGINT, stop_workers)
-    signal.signal(signal.SIGTERM, stop_workers)
-
-
-    def worker():
-
-        app = Flask(__name__)
-        worker_id = generate_name()
         birthtime = time.time()
 
         log("Hello! I'm ready for anything.", worker_id)
@@ -71,28 +62,25 @@ if __name__ == "__main__":
 
         with app.app_context():
 
-            loop_count = 0
-            while worker_boss['do_work']:
-
-                # Reduce log noise by only checking in every ten loops.
-                loop_count += 1
-                if loop_count % 10 == 0:
-                    check_in(birthtime, worker_id)
-                    loop_count = 0
-
+            while worker_boss.do_work:
+                # Report to the worker boss.
+                worker_boss.workers[worker_id] = "alive"
+                # Report to the status page.
+                check_in(birthtime, worker_id)
                 # Poll Amazon SQS for messages containing a job.
                 response = job_queue.receive_messages(MessageAttributeNames=["ticket"])
+                # Grab the first message as the job to be considered.
                 job = response[0] if len(response) > 0 else None
 
+                # Run checks on the validity of the message. If any of the
+                # checks fail, do a tiny amount of work then skip the loop.
                 if not job:
                     time.sleep(wait_interval)
                     continue
-
-                if not job.body == "plenario_job":
+                elif not job.body == "plenario_job":
                     log("Message is not a Plenario Job. Skipping.", worker_id)
                     continue
-
-                if not has_valid_ticket(job):
+                elif not has_valid_ticket(job):
                     log("ERROR: Job does not contain a valid ticket! Removing.", worker_id)
                     job.delete()
                     continue
@@ -104,14 +92,13 @@ if __name__ == "__main__":
 
                 # Now we have to determine if the job itself is a valid job to
                 # perform, taking into consideration whether it has been orphaned
-                # or has undergone many retries.
+                # or has undergone too many retries.
                 is_processing = status["status"] == "processing"
                 is_orphaned = is_job_status_orphaned(status, job_timeout)
 
                 # Check if the job was an orphan (meaning that the parent worker
                 # process died and failed to complete it).
                 if is_processing and is_orphaned:
-
                     if status["meta"].get("tries"):
                         status["meta"]["tries"] += 1
                     else:
@@ -134,16 +121,16 @@ if __name__ == "__main__":
                     continue
 
                 register_worker_job_status(ticket, birthtime, worker_id)
-                worker_boss['active_worker_count'] += 1
+                worker_boss.active_worker_count += 1
                 # Once we have established that both the ticket and the job
                 # are valid and able to be worked upon, give the EC2 instance
                 # that contains this worker scale-in protection.
                 update_instance_protection(worker_boss, autoscaling_client)
                 # There is a chance that the do_work switch is False due to
                 # an immenent instance termination.
-                if not worker_boss["do_work"]:
+                if not worker_boss.do_work:
                     deregister_worker_job_status(birthtime, worker_id)
-                    worker_boss['active_worker_count'] -= 1
+                    worker_boss.active_worker_count -= 1
                     continue
 
                 status["status"] = "processing"
@@ -166,6 +153,8 @@ if __name__ == "__main__":
                     req = get_request(ticket)
                     endpoint = req['endpoint']
                     query_args = req['query']
+
+                    worker_boss.workers[worker_id] = "working on {}".format(endpoint)
 
                     if endpoint in endpoint_logic:
 
@@ -234,30 +223,40 @@ if __name__ == "__main__":
                         job.delete()
 
                 finally:
-                    worker_boss['active_worker_count'] -= 1
+                    worker_boss.workers[worker_id] = "alive"
+                    worker_boss.active_worker_count -= 1
                     update_instance_protection(worker_boss, autoscaling_client)
                     deregister_worker_job_status(birthtime, worker_id)
+                    time.sleep(wait_interval)
 
         log("Exited run loop. Goodbye!", worker_id)
         deregister_worker(worker_id)
 
     log("RUNNING FROM DIRECTORY: {}".format(os.getcwd()), "WORKER BOSS")
 
-    threads = []
+    threads = {}
+    # Start up all the threads.
     for i in range(worker_threads):
-        t = threading.Thread(target=worker, name="plenario-worker-thread")
+        # Give it a memorable name.
+        worker_name = generate_name()
+        # Name the thread and pass the name to the worker.
+        t = threading.Thread(target=worker, name=worker_name, args=[worker_name])
         t.daemon = False
-        threads.append(t)
+        threads[worker_name] = t
         t.start()
 
-    # Join threads back into main loop
-    looper = 0
-    while len(threads) > 0:
-        looper = (looper + 1) % len(threads)
-        t = threads[looper]
-        t.join(5)
-        if not t.is_alive():
-            threads.pop(looper)
+    # Stay busy on the main thread by reporting on overall worker health
+    while worker_boss.do_work:
+        # Records dead threads for the following log report
+        worker_boss.check_on_worker_threads(threads)
+        # Report information about this process to /opt/python/log/worker.log
+        worker_boss.report()
+        # Revive dead workers if we come across any during our check
+        worker_boss.rescue(threads, worker)
+        time.sleep(10)
+    # When the termination signal is received, kindly wait for all the
+    # threads to finish working by calling thread.join()
+    worker_boss.terminate(threads)
 
     session.close()
     log("All workers have exited.", "WORKER BOSS")

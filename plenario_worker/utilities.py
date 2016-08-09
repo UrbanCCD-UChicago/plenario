@@ -82,28 +82,28 @@ def deregister_worker_job_status(birthtime, worker_id):
 def update_instance_protection(worker_boss, autoscaling_client):
 
     try:
-        if worker_boss['active_worker_count'] > 0 and not worker_boss['protected']:
+        if worker_boss.active_worker_count > 0 and not worker_boss.protected:
             log("INSTANCE PROTECTION ENABLED", "WORKER BOSS")
             autoscaling_client.set_instance_protection(
                 InstanceIds=[INSTANCE_ID],
                 AutoScalingGroupName=AUTOSCALING_GROUP,
                 ProtectedFromScaleIn=True
             )
-            worker_boss['protected'] = True
-        elif worker_boss['active_worker_count'] <= 0 and worker_boss['protected']:
+            worker_boss.protected = True
+        elif worker_boss.active_worker_count <= 0 and worker_boss.protected:
             log("INSTANCE PROTECTION DISABLED", "WORKER BOSS")
             autoscaling_client.set_instance_protection(
                 InstanceIds=[INSTANCE_ID],
                 AutoScalingGroupName=AUTOSCALING_GROUP,
                 ProtectedFromScaleIn=False
             )
-            worker_boss['protected'] = False
+            worker_boss.protected = False
 
     except Exception as e:
         if "is not in InService or EnteringStandby or Standby" in e:
             log("Could not apply INSTANCE PROTECTION: {}".format(e), "WORKER BOSS")
             log("INSTANCE TERMINATING!", "WORKER BOSS")
-            worker_boss['do_work'] = False
+            worker_boss.do_work = False
         else:
             log("Could not apply INSTANCE PROTECTION: {}".format(e), "WORKER BOSS")
 
