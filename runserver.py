@@ -15,4 +15,4 @@ else:
 
 if __name__ == "__main__":
     should_run_debug = os.environ.get('DEBUG') is not None
-    application.run(debug=should_run_debug)
+    application.run(debug=should_run_debug, port=5001)

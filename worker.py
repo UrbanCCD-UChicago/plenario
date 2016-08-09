@@ -15,8 +15,9 @@ import threading
 import time
 import traceback
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import datetime
+from flask import Flask
 
 # Exists out here because of its use in session.
 from plenario.database import session
@@ -37,12 +38,10 @@ if __name__ == "__main__":
     from plenario_worker.names import generate_name
     from plenario_worker.ticket import set_ticket_error, set_ticket_success, set_ticket_queued
     from plenario_worker.utilities import deregister_worker_job_status, register_worker_job_status
-    from plenario_worker.utilities import deregister_worker, register_worker, increment_job_trial_count
+    from plenario_worker.utilities import deregister_worker, register_worker
     from plenario_worker.utilities import check_in, log, update_instance_protection
     from plenario_worker.validators import has_valid_ticket, is_job_status_orphaned
     from plenario_worker.worker_boss import WorkerBoss
-
-    from runserver import application as app
 
     # Holds the boolean which determines if the workers are running or not.
     worker_boss = WorkerBoss()
@@ -51,7 +50,8 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, worker_boss.stop_working)
     # Emulate a ValidatorResult, used to play nice with some endpoint logic.
     ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
-
+    # Need this to perform operations which require an application context.
+    app = Flask(__name__)
 
     def worker(worker_id):
 
@@ -90,32 +90,27 @@ if __name__ == "__main__":
                 status = get_status(ticket)
                 log("Received job with ticket {}.".format(ticket), worker_id)
 
+                # Keep track of the last 1000 tickets we've seen, these counts
+                # help to determine how many times to retry jobs if they fail
+                if len(worker_boss.tickets) > 1000:
+                    worker_boss.tickets = defaultdict(int)
+                worker_boss.tickets[ticket] += 1
+
                 # Now we have to determine if the job itself is a valid job to
-                # perform, taking into consideration whether it has been orphaned
-                # or has undergone too many retries.
+                # perform, taking into consideration whether it has been
+                # orphaned or has undergone too many retries.
                 is_processing = status["status"] == "processing"
                 is_orphaned = is_job_status_orphaned(status, job_timeout)
 
                 # Check if the job was an orphan (meaning that the parent worker
-                # process died and failed to complete it).
+                # process died and failed to complete it). If it was orphaned,
+                # give it another try.
                 if is_processing and is_orphaned:
-                    if status["meta"].get("tries"):
-                        status["meta"]["tries"] += 1
-                    else:
-                        status["meta"]["tries"] = 0
-
-                    # Only try orphaned jobs again once
-                    if status["meta"]["tries"] > 1:
-                        error_msg = "Stalled task {}. Removing.".format(ticket)
-                        set_ticket_error(status, ticket, error_msg, worker_id)
-                        job.delete()
-                        continue
-                    else:
-                        log("WARNING: Ticket {} has been orphaned...retrying.".format(ticket), worker_id)
-                        status["meta"]["lastDeferredTime"] = str(datetime.now())
-                        set_status(ticket, status)
-
-                # Standard job mutex
+                    log("Retrying orphan ticket {}".format(ticket), worker_id)
+                    status["meta"]["lastDeferredTime"] = str(datetime.now())
+                    set_status(ticket, status)
+                # If the job isn't an orphan, check its status to make sure no
+                # other worker has started work on it.
                 elif status["status"] != "queued":
                     log("Job has already been started. Skipping.", worker_id)
                     continue
@@ -142,7 +137,6 @@ if __name__ == "__main__":
 
                 if "workers" not in status["meta"]:
                     status["meta"]["workers"] = []
-
                 status["meta"]["workers"].append(worker_id)
 
                 set_status(ticket, status)
@@ -211,11 +205,8 @@ if __name__ == "__main__":
                 except Exception as e:
                     traceback.print_exc()
 
-                    status = get_status(ticket)
-                    increment_job_trial_count(status)
-
-                    # We want to try failed jobs twice.
-                    if status["meta"]["tries"] <= 2:
+                    times_ticket_was_seen = worker_boss.tickets[ticket]
+                    if times_ticket_was_seen < 3:
                         set_ticket_queued(status, ticket, str(e), worker_id)
                     else:
                         error_msg = "{} errored with {}.".format(ticket, e)

@@ -109,7 +109,9 @@ def update_instance_protection(worker_boss, autoscaling_client):
 
 
 def increment_job_trial_count(job_status):
+
     if job_status["meta"].get("tries"):
         job_status["meta"]["tries"] += 1
     else:
         job_status["meta"]["tries"] = 0
+    return job_status

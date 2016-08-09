@@ -1,5 +1,6 @@
 import threading
 import time
+from collections import defaultdict
 from plenario_worker.utilities import log
 
 
@@ -11,6 +12,7 @@ class WorkerBoss(object):
         self.do_work = True
         self.protected = False
         self.workers = dict()
+        self.tickets = defaultdict(int)
 
     def check_on_worker_threads(self, worker_threads):
 
