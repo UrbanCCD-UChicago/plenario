@@ -23,7 +23,7 @@ redshift_session = scoped_session(sessionmaker(bind=redshift_engine,
                                       autocommit=False,
                                       autoflush=False, expire_on_commit=False))
 redshift_Base = declarative_base(bind=redshift_engine)
-redshift_Base.query = session.query_property()
+redshift_Base.query = redshift_session.query_property()
 
 
 # Efficient query of large datasets (for use in DataDump)
