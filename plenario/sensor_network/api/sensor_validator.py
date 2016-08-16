@@ -68,7 +68,7 @@ class Validator(Schema):
     # fills in None as default, handled by validate(),
     # which fills in all nodes, features, and sensors in the correct network
     nodes = fields.List(fields.Str(), default=None, validate=validate_nodes)
-    features = fields.List(fields.Str(), default=None, validate=validate_features)
+    features_of_interest = fields.List(fields.Str(), default=None, validate=validate_features)
     sensors = fields.List(fields.Str(), default=None, validate=validate_sensors)
 
     # For metadata:
@@ -77,8 +77,8 @@ class Validator(Schema):
     sensor = fields.Str(default=None, validate=OneOf(Sensor.index()))
 
     location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
-    start_datetime = fields.DateTime(default=datetime.now() - timedelta(days=90))
-    end_datetime = fields.DateTime(default=datetime.now())
+    start_datetime = fields.DateTime(default=datetime.utcnow() - timedelta(days=90))
+    end_datetime = fields.DateTime(default=datetime.utcnow())
     filter = fields.Str(allow_none=True, missing=None, default=None)
     limit = fields.Integer(default=1000)
     offset = fields.Integer(default=0, validate=Range(0))
@@ -155,8 +155,8 @@ def validate(validator, request_args):
         network_name = result.data['network_name']
         if result.data['nodes'] is None:
             result.data['nodes'] = NodeMeta.index(network_name)
-        if result.data['features'] is None:
-            result.data['features'] = FeatureOfInterest.index(network_name)
+        if result.data['features_of_interest'] is None:
+            result.data['features_of_interest'] = FeatureOfInterest.index(network_name)
         if result.data['sensors'] is None:
             result.data['sensors'] = Sensor.index(network_name)
     except KeyError:

@@ -117,7 +117,7 @@ def get_observations(network_name=None, node_id=None):
     fields = ('network_name', 'node_id', 'nodes',
               'start_datetime', 'end_datetime',
               'location_geom__within', 'filter',
-              'features', 'sensors',
+              'features_of_interest', 'sensors',
               'limit', 'offset'
               )
 
@@ -131,23 +131,13 @@ def get_observations(network_name=None, node_id=None):
         args['node_id'] = node_id
 
     if 'nodes' in args:
-        try:
-            args['nodes'] = ast.literal_eval(args['nodes'])
-        except (SyntaxError, ValueError) as e:
-            return bad_request("Cannot parse 'nodes' filter. Causes error {}".format(e))
+        args['nodes'] = args['nodes'].split(',')
 
     if 'features_of_interest' in args:
-        try:
-            args['features'] = ast.literal_eval(args['features_of_interest'])
-            args.pop('features_of_interest')
-        except (SyntaxError, ValueError) as e:
-            return bad_request("Cannot parse 'features_of_interest' filter. Causes error {}".format(e))
+        args['features_of_interest'] = args['features_of_interest'].split(',')
 
     if 'sensors' in args:
-        try:
-            args['sensors'] = ast.literal_eval(args['sensors'])
-        except (SyntaxError, ValueError) as e:
-            return bad_request("Cannot parse 'sensors' filter. Causes error {}".format(e))
+        args['sensors'] = args['sensors'].split(',')
 
     # do we want to allow these?
     if 'nodes' in args and 'node_id' in args:
@@ -353,7 +343,7 @@ def _get_observations(args):
 
     args.data['nodes'] = nodes_to_query
 
-    features = args.data['features']
+    features = args.data['features_of_interest']
 
     # if the user specified a sensor list,
     # only query feature tables that those sensors report on
@@ -385,6 +375,7 @@ def _get_observations(args):
         t = threading.Thread(target=_thread_query, args=(table, len(tables), data, args))
         threads.append(t)
         t.start()
+        t.join()
 
     # if the user didn't specify a 'nodes' filter, don't display nodes in the query output
     if 'nodes' not in request.args:
@@ -392,7 +383,7 @@ def _get_observations(args):
 
     # if the user didn't specify a 'features_of_interest' filter, don't display features in the query output
     if 'features_of_interest' not in request.args:
-        args.data.pop('features')
+        args.data.pop('features_of_interest')
 
     # if the user didn't specify a 'sensors' filter, don't display sensors in the query output
     if 'sensors' not in request.args:
