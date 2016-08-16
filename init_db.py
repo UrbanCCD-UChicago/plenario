@@ -1,20 +1,20 @@
-import plenario.models
-import plenario.settings
-from plenario.database import session, app_engine, Base
-from plenario.tasks import hello_world
-from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DEFAULT_USER
-from plenario.utils.weather import WeatherETL, WeatherStationsETL
-from argparse import ArgumentParser
-import os
 import datetime
 import subprocess
+from argparse import ArgumentParser
+
+# Imports cause the meta tables to be created and added to Base.
+import plenario.models
+import plenario.models_
+
+from plenario.database import session, app_engine, Base
+from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DEFAULT_USER
+from plenario.utils.weather import WeatherETL, WeatherStationsETL
 
 
 def init_db(args):
     if not any(vars(args).values()):
         # No specific arguments specified. Run it all!
-        init_master_meta_user()
-        init_celery()
+        init_tables()
         add_functions()
     else:
         if args.meta:
@@ -23,28 +23,28 @@ def init_db(args):
             init_user()
         if args.weather:
             init_weather()
-        if args.celery:
-            init_celery()
         if args.functions:
             add_functions()
 
 
-def init_master_meta_user():
-    print 'creating master, meta and user tables'
+def init_tables():
+    print 'creating master, meta, data, and user tables'
     init_meta()
     init_user()
 
 
 def init_meta():
-    #Reset concept of a metadata table
+    # Reset concept of a metadata table
+    print [table.name for table in Base.metadata.sorted_tables]
     non_meta_tables = [table for table in Base.metadata.sorted_tables
                        if table.name not in
-                       {'meta_master', 'meta_shape', 'plenario_user'}]
+                       {'meta_master', 'meta_shape', 'plenario_user', 'plenario_workers', 'plenario_datadump', 'etl_task'}]
     for t in non_meta_tables:
         Base.metadata.remove(t)
-    
-    #Create databases (if they don't exist)
+
+    # Create databases (if they don't exist)
     Base.metadata.create_all(bind=app_engine)
+
 
 def init_user():
     if DEFAULT_USER['name']:
@@ -68,7 +68,8 @@ def init_weather():
     s = WeatherStationsETL()
     s.initialize()
 
-    print 'initializing NOAA daily and hourly weather observations for %s/%s' % (datetime.datetime.now().month, datetime.datetime.now().year)
+    print 'initializing NOAA daily and hourly weather observations for %s/%s' % (
+    datetime.datetime.now().month, datetime.datetime.now().year)
     print 'this will take a few minutes ...'
     e = WeatherETL()
     try:
@@ -80,15 +81,12 @@ def init_weather():
 
 def add_functions():
     def add_function(script_path):
-        args = 'PGPASSWORD='+DB_PASSWORD+' psql -h '+DB_HOST+' -U '+DB_USER+' -d '+DB_NAME+' -f '+script_path
+        args = 'PGPASSWORD=' + DB_PASSWORD + ' psql -h ' + DB_HOST + ' -U ' + DB_USER + ' -d ' + DB_NAME + ' -f ' + script_path
         subprocess.check_output(args, shell=True)
-        #Using shell=True otherwise it seems that aws doesn't have the proper paths.
+        # Using shell=True otherwise it seems that aws doesn't have the proper paths.
 
     add_function("./plenario/dbscripts/audit_trigger.sql")
     add_function("./plenario/dbscripts/point_from_location.sql")
-
-def init_celery():
-    hello_world.delay()
 
 
 def build_arg_parser():
@@ -109,11 +107,10 @@ def build_arg_parser():
                         help='Set up NOAA weather station data.\
                               This includes the daily and hourly weather \
                               observations.')
-    parser.add_argument('-cl', '--celery', action="store_true",
-                        help='Say hello world from Celery')
     parser.add_argument('-f', '--functions', action='store_true',
                         help='Add plenario-specific functions to database.')
     return parser
+
 
 if __name__ == "__main__":
     parser = build_arg_parser()

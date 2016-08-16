@@ -1,3 +1,5 @@
+import boto.ec2
+import boto.utils
 from os import environ
 get = environ.get
 

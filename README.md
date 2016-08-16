@@ -1,13 +1,16 @@
+[![Join the chat at https://gitter.im/UrbanCCD-UChicago/plenario](https://badges.gitter.im/UrbanCCD-UChicago/plenario.svg)](https://gitter.im/UrbanCCD-UChicago/plenario?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Code Climate](https://codeclimate.com/github/UrbanCCD-UChicago/plenario/badges/gpa.svg)](https://codeclimate.com/github/UrbanCCD-UChicago/plenario)
 [![Build Status](https://travis-ci.org/UrbanCCD-UChicago/plenario.svg?branch=master)](https://travis-ci.org/UrbanCCD-UChicago/plenario)
 
 # Plenar.io
 
-RESTful API for geospatial and time aggregation across multiple open datasets.
+API for geospatial and time aggregation across multiple open datasets.
 
-This project is funded by the [NSF Computer and Information Science and Engineering (CISE) Directorate](http://www.nsf.gov/dir/index.jsp?org=CISE) through a grant to the [Urban Center for Computation and Data](https://urbanccd.org/) (UrbanCCD) at the [Computation Institute](http://ci.uchicago.edu) of the [University of Chicago](http://uchicago.edu) and [Argonne National Laboratory](http://www.anl.gov). It is being implemented by [DataMade](http://datamade.us) and UrbanCCD.
-
-For more details, see the presentation slides from [Exploring Open Civic Data Through Time and Space](https://docs.google.com/presentation/d/1Une-A1k0mUAIYac5UlmeSDLw4VyHYsaw1NW5f4YKWas/edit#slide=id.p) given in June 2014.
+This project is funded by the [NSF Computer and Information Science and Engineering (CISE) Directorate](http://www.nsf.gov/dir/index.jsp?org=CISE)
+through a grant to the [Urban Center for Computation and Data](https://urbanccd.org/) (UrbanCCD)
+at the [Computation Institute](http://ci.uchicago.edu)
+of the [University of Chicago](http://uchicago.edu) and [Argonne National Laboratory](http://www.anl.gov).
+It is maintained by UrbanCCD and was prototyped by [DataMade](http://datamade.us).
 
 ## Running locally
 
@@ -70,10 +73,6 @@ You will want to change, at the minimum, the following `settings.py` fields:
 
 * `DEFAULT_USER`: change the username, email and password on the administrator account you will use on Plenario locally.
 
-If you want your datasets hosted on an S3 bucket, edit the fields
-`AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, and `S3_BUCKET`. Otherwise,
-datasets will be downloaded locally to the directory in the `DATA_DIR`
-field.
 
 Additionally, create your own `celery_settings.py` file:
 
@@ -135,26 +134,15 @@ Many thanks for the following hosted services that have given us free academic/o
 
 ## Team
 
-### UrbanCCD
 * Charlie Catlett
 * Brett Goldstein
-* Svetlozar Nestorov
-* Jonathan Giuffrida
-* Maggie King
-* Jiajun Shen
 * Will Engler
-
-### DataMade
-* Derek Eder
-* Eric van Zanten
-* Forest Gregg
-* Michael Castelle
 
 ## Join Our Community
 
-Join our community to hear about platform updates, new features and discuss the potential uses of Plenario. We want to start a conversation with you, the users, about what Plenario can do for you - whether you're a city manager, an app developer, a researcher, or a citizen interested in exploring open data.
+Join us on Gitter for technical help with the Plenario API,
 
-[Join our Google Group](https://groups.google.com/forum/#!forum/plenariodataportal)
+[![Join the chat at https://gitter.im/UrbanCCD-UChicago/plenario](https://badges.gitter.im/UrbanCCD-UChicago/plenario.svg)](https://gitter.im/UrbanCCD-UChicago/plenario?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## Testing
 
@@ -167,10 +155,13 @@ Report it here: https://github.com/UrbanCCD-UChicago/plenario/issues
 
 ## Note on Patches/Pull Requests
 
-* Fork the project.
-* Make your feature addition or bug fix.
-* Send us a pull request. Bonus points for topic branches.
+Pull requests make us very happy.
+If you're interested in contributing, come chat with us on Gitter
+to discuss what you'd like to do.
+Then follow [common best practices](http://www.contribution-guide.org/)
+to send us a PR.
 
 ## Copyright
 
-Copyright (c) 2014 University of Chicago and DataMade. Released under the [MIT License](https://github.com/UrbanCCD-UChicago/plenario/blob/master/LICENSE).
+Copyright (c) 2014 University of Chicago and DataMade.
+Released under the [MIT License](https://github.com/UrbanCCD-UChicago/plenario/blob/master/LICENSE).

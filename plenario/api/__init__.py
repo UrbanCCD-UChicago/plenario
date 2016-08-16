@@ -1,11 +1,12 @@
 import json
 from flask import make_response, Blueprint
-from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate
+from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
 from common import cache, make_cache_key
 from shape import get_all_shape_datasets,\
                     export_shape, aggregate_point_data
 from time import sleep
 from sensor import weather_stations, weather
+from flask_login import login_required
 
 from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, \
     get_observations, get_features, get_sensors
@@ -29,6 +30,10 @@ api.add_url_rule(prefix + '/shapes/', 'shape_index', get_all_shape_datasets)
 api.add_url_rule(prefix + '/shapes/<dataset_name>', 'shape_export', export_shape)
 api.add_url_rule(prefix + '/shapes/<polygon_dataset_name>/<point_dataset_name>', 'aggregate', aggregate_point_data)
 
+api.add_url_rule(prefix + '/jobs/<ticket>', view_func=get_job_view, methods=['GET'])
+
+api.add_url_rule(prefix + '/datadump', 'datadump', datadump)
+api.add_url_rule(prefix + '/datadump/<ticket>', 'get_datadump', get_datadump)
 # sensor networks
 api.add_url_rule(prefix + '/sensor-networks', 'sensor_networks', get_network_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>', 'sensor_network', get_network_metadata)
@@ -57,6 +62,7 @@ api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>/query
 
 
 @api.route(prefix + '/flush-cache')
+@login_required
 def flush_cache():
     cache.clear()
     resp = make_response(json.dumps({'status': 'ok', 'message': 'cache flushed!'}))

@@ -13,17 +13,38 @@ services:
 sudo: required
 dist: trusty
 cache: pip
+env:
+  global:
+  - JOBS_QUEUE=Plenario-Testing-Queue
+  - secure: G1RWlnwPIPSW2XRD7IItotgzTw41IAktyt2VurJwOp3xCIrmeHOtby6ox1x3Ph80Tzp3m3zLENof/sPsgOwRQgUOQ0nScpVGBGsUTAc26LL4SSs+7LGUAohm3EFTHPWU+78ZZMe3njK2fT86XP19FH1CupxgQ1vTpQI1iFChDD0=
+  - secure: bnBfgN5eIAsCVdo+tMhjO88GRfUAEIkD0HFcOMEezP1YQv1bIFU71l5v4aT348RD2kuu6kihWApIqsEe0HjW8u0umPV6aLHuEuUrKGyxwk1x81bhP0KpgQgx+/Qbai4Q6gk+U4TWk713Ezu0j0GJH8jxixvyXgrJjfA/1yvHCdg=
 before_install:
-- pip install celery
 - pip install -r requirements.txt
+- sudo mkdir -p /opt/python/log/
+- sudo chmod 777 /opt/python/log/
+- touch /opt/python/log/worker.log
+- touch /opt/python/log/sender.log
 install:
 - sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
 - sudo -u postgres psql -c "CREATE DATABASE plenario_test;"
 - sudo -u postgres psql -c "CREATE EXTENSION postgis;" plenario_test
-- celery -A plenario.celery_app worker --loglevel=info &
 - python init_db.py
 script:
-- nosetests tests/points/ tests/shapes/ tests/submission/ -v
+###
+# Something strange is up with our tests
+# running these tests together causes them
+# to error and fail...but they work when
+# run separately. Probably something to
+# do with test fixure setup and tear down
+###
+# Furthermore, don't run the jobs test first.
+# Points (etc?) does some kind of setup that 
+# is useful to jobs (it fails otherwise)
+###
+- nosetests tests/points/ -v
+- nosetests tests/shapes/ -v
+- nosetests tests/submission/ -v
+- nosetests tests/jobs -v
 deploy:
 - provider: elasticbeanstalk
   access_key_id:
