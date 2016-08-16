@@ -67,7 +67,7 @@ MAIL_PASSWORD = get('MAIL_PASSWORD', '')
 MAINTENANCE = False
 
 # SQS Jobs Queue
-JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-test-queue')
+JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-queue-test')
 
 # Get Instance ID and Autoscaling Group Name
 
