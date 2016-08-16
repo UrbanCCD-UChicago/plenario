@@ -11,13 +11,13 @@ DATA_DIR = '/tmp'
 DB_USER = get('DB_USER', '')
 DB_PASSWORD = get('DB_PASSWORD', '')
 DB_HOST = get('DB_HOST', '')
-DB_PORT = get('DB_PORT', '')
+DB_PORT = get('DB_PORT', 0)
 DB_NAME = get('DB_NAME', '')
 
 RS_USER = get('RS_USER', '')
 RS_PASSWORD = get('RS_PASSWORD', '')
 RS_HOST = get('RS_HOST', '')
-RS_PORT = get('RS_PORT', '')
+RS_PORT = get('RS_PORT', 0)
 RS_NAME = get('RS_NAME', '')
 
 DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.\
