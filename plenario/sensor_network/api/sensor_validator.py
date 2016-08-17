@@ -2,7 +2,6 @@ import json
 
 from collections import namedtuple
 from datetime import datetime, timedelta
-from dateutil import parser
 from marshmallow import fields, Schema
 from marshmallow.validate import Range, OneOf, ValidationError
 from psycopg2 import Error
@@ -16,6 +15,8 @@ from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, Feature
 
 
 def validate_nodes(nodes):
+    if isinstance(nodes, basestring):
+        nodes = [nodes]
     valid_nodes = NodeMeta.index()
     for node in nodes:
         if node not in valid_nodes:
@@ -23,6 +24,8 @@ def validate_nodes(nodes):
 
 
 def validate_features(features):
+    if isinstance(features, basestring):
+        features = [features]
     valid_features = FeatureOfInterest.index()
     for feature in features:
         if feature not in valid_features:
@@ -30,6 +33,8 @@ def validate_features(features):
 
 
 def validate_sensors(sensors):
+    if isinstance(sensors, basestring):
+        sensors = [sensors]
     valid_sensors = Sensor.index()
     for sensor in sensors:
         if sensor not in valid_sensors:
@@ -72,9 +77,9 @@ class Validator(Schema):
     sensors = fields.List(fields.Str(), default=None, validate=validate_sensors)
 
     # For metadata:
-    # node_id = fields.Str(default=None, validate=OneOf(NodeMeta.index()))
-    # feature = fields.Str(default=None, validate=OneOf(FeatureOfInterest.index()))
-    # sensor = fields.Str(default=None, validate=OneOf(Sensor.index()))
+    node_id = fields.Str(default=None, validate=validate_nodes)
+    feature = fields.Str(default=None, validate=validate_features)
+    sensor = fields.Str(default=None, validate=validate_sensors)
 
     location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
     start_datetime = fields.DateTime(default=datetime.utcnow() - timedelta(days=90))

@@ -57,7 +57,6 @@ api.add_url_rule(prefix + '/sensor-networks/features-of-interest/<feature>/senso
 
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/query', 'observations', get_observations)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/query', 'observations', get_observations)
-# do we want this?
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>/query', 'observations', get_observations)
 
 
