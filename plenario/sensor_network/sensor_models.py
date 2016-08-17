@@ -71,4 +71,4 @@ class Sensor(db.Model):
                 network_name in [node.sensor_network for node in session.query(NodeMeta).filter(sensor.in_(NodeMeta.sensors)).all()] or network_name is None]
 
 if __name__ == "__main__":
-    Base.metadata.create_all(app_engine)
+    Base.metadata.create_all(app_engine, extend_existing=True)
