@@ -22,7 +22,7 @@ def create_app():
     # Don't import until we really need it to create the app
     # Since otherwise it may be called before init_db.py runs.
     from plenario.api import api, cache
-    from plenario.admin import admin
+    from plenario.admin import admin, admin_views
 
     # These other imports might eventually use API as well.
     # plenario.views does now. So we'll put them here like
@@ -54,10 +54,10 @@ def create_app():
         db.create_all()
 
     admin.init_app(app)
-    admin.add_view(ModelView(FeatureOfInterest, db.session))
-    admin.add_view(ModelView(Sensor, db.session))
-    admin.add_view(ModelView(NetworkMeta, db.session))
-    admin.add_view(ModelView(NodeMeta, db.session))
+    admin.add_view(admin_views["FOI"](FeatureOfInterest, db.session))
+    admin.add_view(admin_views["Base"](Sensor, db.session))
+    admin.add_view(admin_views["Network"](NetworkMeta, db.session))
+    admin.add_view(admin_views["Node"](NodeMeta, db.session))
 
     @app.before_request
     def check_maintenance_mode():
