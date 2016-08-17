@@ -1,4 +1,5 @@
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 
 from plenario.database import redshift_engine
 
@@ -47,3 +48,16 @@ def insert_observation(foi_name, nodeid, datetime, sensor,
     op = text(op)
     redshift_engine.execute(op)
 
+
+def table_exists(table_name):
+    """Make an inexpensive query to the database. It the table does not exist,
+    the query will cause a ProgrammingError.
+
+    :param table_name: (string) table name
+    :returns (bool) true if the table exists, false otherwise"""
+
+    try:
+        redshift_engine.execute("select '{}'::regclass".format(table_name))
+        return True
+    except ProgrammingError:
+        return False

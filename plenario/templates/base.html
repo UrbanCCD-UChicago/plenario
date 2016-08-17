@@ -66,9 +66,6 @@
                                 <li><a href="{{ url_for('auth.reset_password') }}">Reset my password</a></li>
                             </ul>
                         </li>
-                        <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
-                    {% else %}
-                        <li><a href="{{ url_for('auth.login') }}">Login</a></li>
                     {% endif %}
                 </ul>
             </div><!--/.nav-collapse -->

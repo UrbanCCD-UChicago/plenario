@@ -165,7 +165,7 @@ def node_metadata_query(args):
     if node_id:
         q = q.filter(NodeMeta.id == node_id)
     if network_name:
-        q = q.filter(NodeMeta.sensorNetwork == network_name)
+        q = q.filter(NodeMeta.sensor_network == network_name)
 
     # if the user specified a node ID list, filter to those nodes
     if nodes:
@@ -217,7 +217,7 @@ def format_network_metadata(network):
 def format_node_metadata(node):
     node_response = {
         'id': node.id,
-        'network_name': node.sensorNetwork,
+        'network_name': node.sensor_network,
         'location': {
             'lat': wkb.loads(bytes(node.location.data)).y,
             'lon': wkb.loads(bytes(node.location.data)).x
@@ -300,7 +300,7 @@ def _get_node_metadata(args):
 def _get_features(args):
     q = session.query(FeatureOfInterest)
     data = [format_feature(feature) for feature in q.all()
-            if (args.data['network_name'] in [network.name for network in feature.sensorNetworks] or
+            if (feature.name in FeatureOfInterest.index(args.data['network_name']) or
                 args.data['network_name'] is None) and
             (feature.name == args.data['feature'] or args.data['feature'] is None)]
 
@@ -319,9 +319,9 @@ def _get_features(args):
 def _get_sensors(args):
     q = session.query(Sensor)
     data = [format_sensor(sensor) for sensor in q.all()
-            if (args.data['network_name'] in [network.name for network in sensor.sensorNetworks] or
+            if (sensor.name in Sensor.index(args.data['network_name']) or
                 args.data['network_name'] is None) and
-            (args.data['feature'] in [feature.name for feature in sensor.featuresOfInterest] or
+            (args.data['feature'] in [prop.split('.')[0] for prop in sensor.observed_properties] or
              args.data['feature'] is None) and
             (sensor.name == args.data['sensor'] or args.data['sensor'] is None)]
 
