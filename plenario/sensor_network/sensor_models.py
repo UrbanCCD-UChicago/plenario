@@ -28,7 +28,7 @@ class NodeMeta(Base):
     __tablename__ = 'sensor__node_metadata'
 
     id = Column(String, primary_key=True)
-    sensorNetwork = Column(String, ForeignKey('sensor__network_metadata.name'))
+    sensor_network = Column(String, ForeignKey('sensor__network_metadata.name'))
     location = Column(Geometry(geometry_type='POINT', srid=4326))
     sensors = relationship('Sensor', secondary='sensor__sensor_to_node')
     info = Column(JSONB)
@@ -43,7 +43,7 @@ class FeatureOfInterest(Base):
     __tablename__ = 'sensor__features_of_interest'
 
     name = Column(String, primary_key=True)
-    observedProperties = Column(JSONB)
+    observed_properties = Column(JSONB)
 
     @staticmethod
     def index(network_name=None):
@@ -60,7 +60,7 @@ class Sensor(Base):
     __tablename__ = 'sensor__sensors'
 
     name = Column(String, primary_key=True)
-    observedProperties = Column(ARRAY(String))
+    observed_properties = Column(ARRAY(String))
     info = Column(JSONB)
 
     @staticmethod

@@ -231,7 +231,7 @@ def format_node_metadata(node):
 def format_feature(feature):
     feature_response = {
         'name': feature.name,
-        'observed_properties': feature.observedProperties,
+        'observed_properties': feature.observed_properties,
     }
 
     return feature_response
@@ -240,7 +240,7 @@ def format_feature(feature):
 def format_sensor(sensor):
     sensor_response = {
         'name': sensor.name,
-        'observed_properties': sensor.observedProperties,
+        'observed_properties': sensor.observed_properties,
         'info': sensor.info
     }
 
