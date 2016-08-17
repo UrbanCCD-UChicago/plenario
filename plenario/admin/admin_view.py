@@ -17,14 +17,14 @@ class NetworkMetaView(BaseMetaView):
 
 class NodeMetaView(BaseMetaView):
 
-    column_list = ("id", "sensorNetwork", "location", "sensors", "info")
+    column_list = ("id", "sensor_network", "location", "sensors", "info")
     form_extra_fields = {}
 
 
 class FOIView(BaseMetaView):
 
-    column_list = ("name", "observedProperties", "info")
-    column_editable_list = ('observedProperties',)
+    column_list = ("name", "observed_properties", "info")
+    column_editable_list = ('observed_properties',)
     form_extra_fields = { 
         "name": StringField("Name"),
         "Info": StringField("Info"),

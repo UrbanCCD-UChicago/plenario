@@ -37,7 +37,7 @@ class NodeMeta(db.Model):
     @staticmethod
     def index(network_name=None):
         nodes = session.query(NodeMeta).all()
-        return [node.id for node in nodes if node.sensorNetwork == network_name or network_name is None]
+        return [node.id for node in nodes if node.sensor_network == network_name or network_name is None]
 
 
 class FeatureOfInterest(db.Model):
@@ -51,8 +51,8 @@ class FeatureOfInterest(db.Model):
         features = []
         for node in session.query(NodeMeta).all():
             for sensor in node.sensors:
-                for prop in sensor.observedProperties:
-                    if node.sensorNetwork == network_name or network_name is None:
+                for prop in sensor.observed_properties:
+                    if node.sensor_network == network_name or network_name is None:
                         features.append(prop.split('.')[0])
         return list(set(features))
 
@@ -68,7 +68,7 @@ class Sensor(db.Model):
     def index(network_name=None):
         sensors = session.query(Sensor).all()
         return [sensor.name for sensor in sensors if
-                network_name in [node.sensorNetwork for node in session.query(NodeMeta).filter(sensor.in_(NodeMeta.sensors)).all()] or network_name is None]
+                network_name in [node.sensor_network for node in session.query(NodeMeta).filter(sensor.in_(NodeMeta.sensors)).all()] or network_name is None]
 
 if __name__ == "__main__":
     Base.metadata.create_all(app_engine)
