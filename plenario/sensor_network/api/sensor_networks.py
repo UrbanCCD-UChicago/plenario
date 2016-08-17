@@ -206,7 +206,7 @@ def observation_query(args):
 def format_network_metadata(network):
     network_response = {
         'name': network.name,
-        'features_of_interest': [feature.name for feature in network.featuresOfInterest],
+        'features_of_interest': FeatureOfInterest.index(network.name),
         'nodes': [node.id for node in network.nodes],
         'info': network.info
     }
@@ -231,7 +231,7 @@ def format_node_metadata(node):
 def format_feature(feature):
     feature_response = {
         'name': feature.name,
-        'observed_properties': feature.observedProperties['observedProperties'],
+        'observed_properties': feature.observedProperties,
     }
 
     return feature_response
@@ -240,8 +240,7 @@ def format_feature(feature):
 def format_sensor(sensor):
     sensor_response = {
         'name': sensor.name,
-        'features_of_interest': [feature.name for feature in sensor.featuresOfInterest],
-        'properties': sensor.properties,
+        'observed_properties': sensor.observedProperties,
         'info': sensor.info
     }
 

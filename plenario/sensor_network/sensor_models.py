@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, ForeignKey, Table
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import relationship
 
-from plenario.database import session, Base
+from plenario.database import session, Base, app_engine
 
 sensor_to_node = Table('sensor__sensor_to_node', Base.metadata,
                       Column('sensor', String, ForeignKey('sensor__sensors.name')),
@@ -47,20 +47,27 @@ class FeatureOfInterest(Base):
 
     @staticmethod
     def index(network_name=None):
-        features = session.query(FeatureOfInterest).all()
-        return [feature.name for feature in features if
-                network_name in [network.name for network in feature.sensorNetworks] or network_name is None]
+        features = []
+        for node in session.query(NodeMeta).all():
+            for sensor in node.sensors:
+                for prop in sensor.observedProperties:
+                    if node.sensorNetwork == network_name or network_name is None:
+                        features.append(prop.split('.')[0])
+        return list(set(features))
 
 
 class Sensor(Base):
     __tablename__ = 'sensor__sensors'
 
     name = Column(String, primary_key=True)
-    properties = Column(ARRAY(String))
+    observedProperties = Column(ARRAY(String))
     info = Column(JSONB)
 
     @staticmethod
     def index(network_name=None):
         sensors = session.query(Sensor).all()
         return [sensor.name for sensor in sensors if
-                network_name in [network.name for network in sensor.sensorNetworks] or network_name is None]
+                network_name in [node.sensorNetwork for node in session.query(NodeMeta).filter(sensor.in_(NodeMeta.sensors)).all()] or network_name is None]
+
+if __name__ == "__main__":
+    Base.metadata.create_all(app_engine)
