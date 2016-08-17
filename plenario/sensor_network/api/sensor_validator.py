@@ -60,7 +60,7 @@ class Validator(Schema):
     or rejected, the validator will substitute it with the value specified by
     <DEFAULT_VALUE>."""
 
-    network_name = fields.Str(allow_none=True, missing=None, default='ArrayOfThings', validate=OneOf(NetworkMeta.index()))
+    # network_name = fields.Str(allow_none=True, missing=None, default='ArrayOfThings', validate=OneOf(NetworkMeta.index()))
 
     # For observations:
     #
@@ -72,9 +72,9 @@ class Validator(Schema):
     sensors = fields.List(fields.Str(), default=None, validate=validate_sensors)
 
     # For metadata:
-    node_id = fields.Str(default=None, validate=OneOf(NodeMeta.index()))
-    feature = fields.Str(default=None, validate=OneOf(FeatureOfInterest.index()))
-    sensor = fields.Str(default=None, validate=OneOf(Sensor.index()))
+    # node_id = fields.Str(default=None, validate=OneOf(NodeMeta.index()))
+    # feature = fields.Str(default=None, validate=OneOf(FeatureOfInterest.index()))
+    # sensor = fields.Str(default=None, validate=OneOf(Sensor.index()))
 
     location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
     start_datetime = fields.DateTime(default=datetime.utcnow() - timedelta(days=90))

@@ -14,8 +14,8 @@ if PLENARIO_SENTRY_URL:
 db = SQLAlchemy()
 # NOTE: Models must be imported after initializing the db
 # object since the models themselves need to import db.
-from plenario.models import ShapeMetadata, MetaTable, Role, User
-
+from sensor_network.sensor_models import FeatureOfInterest, Sensor
+from sensor_network.sensor_models import NetworkMeta, NodeMeta
 
 def create_app():
     # API depends on the tables in the database to exist.
@@ -54,10 +54,10 @@ def create_app():
         db.create_all()
 
     admin.init_app(app)
-    admin.add_view(ModelView(Role, db.session))
-    admin.add_view(ModelView(User, db.session))
-    admin.add_view(ModelView(MetaTable, db.session))
-    admin.add_view(ModelView(ShapeMetadata, db.session))
+    admin.add_view(ModelView(FeatureOfInterest, db.session))
+    admin.add_view(ModelView(Sensor, db.session))
+    admin.add_view(ModelView(NetworkMeta, db.session))
+    admin.add_view(ModelView(NodeMeta, db.session))
 
     @app.before_request
     def check_maintenance_mode():

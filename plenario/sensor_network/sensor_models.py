@@ -3,15 +3,16 @@ from sqlalchemy import Column, String, ForeignKey, Table
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import relationship
 
+from plenario import db
 from plenario.database import session, Base
 
-sensor_to_node = Table('sensor__sensor_to_node', Base.metadata,
+sensor_to_node = Table('sensor__sensor_to_node', db.Model.metadata,
                       Column('sensor', String, ForeignKey('sensor__sensors.name')),
                       Column('node', String, ForeignKey('sensor__node_metadata.id'))
                       )
 
 
-class NetworkMeta(Base):
+class NetworkMeta(db.Model):
     __tablename__ = 'sensor__network_metadata'
 
     name = Column(String, primary_key=True)
@@ -24,7 +25,7 @@ class NetworkMeta(Base):
         return [network.name for network in networks]
 
 
-class NodeMeta(Base):
+class NodeMeta(db.Model):
     __tablename__ = 'sensor__node_metadata'
 
     id = Column(String, primary_key=True)
@@ -39,7 +40,7 @@ class NodeMeta(Base):
         return [node.id for node in nodes if node.sensorNetwork == network_name or network_name is None]
 
 
-class FeatureOfInterest(Base):
+class FeatureOfInterest(db.Model):
     __tablename__ = 'sensor__features_of_interest'
 
     name = Column(String, primary_key=True)
@@ -52,7 +53,7 @@ class FeatureOfInterest(Base):
                 network_name in [network.name for network in feature.sensorNetworks] or network_name is None]
 
 
-class Sensor(Base):
+class Sensor(db.Model):
     __tablename__ = 'sensor__sensors'
 
     name = Column(String, primary_key=True)
