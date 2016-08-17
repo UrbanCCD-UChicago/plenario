@@ -28,8 +28,7 @@ from plenario.utils.helpers import get_size_in_degrees, slugify
 
 bcrypt = Bcrypt()
 
-
-class MetaTable(db.Model):
+class MetaTable(Base):
     __tablename__ = 'meta_master'
     # limited to 50 chars elsewhere
     dataset_name = db.Column(db.String(100), nullable=False)

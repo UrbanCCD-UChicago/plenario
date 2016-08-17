@@ -3,7 +3,7 @@ from sqlalchemy import create_engine, and_, text, func
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 
-from plenario.settings import DATABASE_CONN
+from plenario.settings import DATABASE_CONN, REDSHIFT_CONN
 
 if os.environ.get('WORKER'):
     app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=8, max_overflow=8, pool_timeout=60)
@@ -15,6 +15,15 @@ session = scoped_session(sessionmaker(bind=app_engine,
                                       autoflush=False, expire_on_commit=False))
 Base = declarative_base(bind=app_engine)
 Base.query = session.query_property()
+
+
+redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=True)
+
+redshift_session = scoped_session(sessionmaker(bind=redshift_engine,
+                                      autocommit=False,
+                                      autoflush=False, expire_on_commit=False))
+redshift_Base = declarative_base(bind=redshift_engine)
+redshift_Base.query = redshift_session.query_property()
 
 
 # Efficient query of large datasets (for use in DataDump)
@@ -79,3 +88,5 @@ def fast_count(q):
     count_q = q.statement.with_only_columns([func.count()]).order_by(None)
     count = q.session.execute(count_q).scalar()
     return count
+# Redshift connection setup
+

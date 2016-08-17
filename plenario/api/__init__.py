@@ -8,6 +8,9 @@ from time import sleep
 from sensor import weather_stations, weather
 from flask_login import login_required
 
+from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, \
+    get_observations, get_features, get_sensors
+
 API_VERSION = '/v1'
 
 api = Blueprint('api', __name__)
@@ -31,6 +34,32 @@ api.add_url_rule(prefix + '/jobs/<ticket>', view_func=get_job_view, methods=['GE
 
 api.add_url_rule(prefix + '/datadump', 'datadump', datadump)
 api.add_url_rule(prefix + '/datadump/<ticket>', 'get_datadump', get_datadump)
+# sensor networks
+api.add_url_rule(prefix + '/sensor-networks', 'sensor_networks', get_network_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>', 'sensor_network', get_network_metadata)
+api.add_url_rule(prefix + '/sensor-networks/nodes/<node_id>', 'single_node', get_node_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes', 'network_nodes', get_node_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>', 'single_node', get_node_metadata)
+
+api.add_url_rule(prefix + '/sensor-networks/features-of-interest', 'features', get_features)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/features-of-interest', 'features', get_features)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/features-of-interest/<feature>', 'features', get_features)
+api.add_url_rule(prefix + '/sensor-networks/features-of-interest/<feature>', 'features', get_features)
+
+api.add_url_rule(prefix + '/sensor-networks/sensors', 'sensors', get_sensors)
+api.add_url_rule(prefix + '/sensor-networks/sensors/<sensor>', 'sensors', get_sensors)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/sensors', 'sensors', get_sensors)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/sensors/<sensor>', 'sensors', get_sensors)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/features-of-interest/<feature>/sensors', 'sensors', get_sensors)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/features-of-interest/<feature>/sensors/<sensor>', 'sensors', get_sensors)
+api.add_url_rule(prefix + '/sensor-networks/features-of-interest/<feature>/sensors', 'sensors', get_sensors)
+api.add_url_rule(prefix + '/sensor-networks/features-of-interest/<feature>/sensors/<sensor>', 'sensors', get_sensors)
+
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/query', 'observations', get_observations)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/query', 'observations', get_observations)
+# do we want this?
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>/query', 'observations', get_observations)
+
 
 @api.route(prefix + '/flush-cache')
 @login_required

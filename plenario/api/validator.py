@@ -106,7 +106,6 @@ class ExportFormatsValidator(Validator):
     valid_formats = {'shapefile', 'kml', 'json'}
     data_type = fields.Str(default='json', validate=OneOf(valid_formats))
 
-
 # ValidatorResult
 # ===============
 # Many methods in response.py rely on information that used to be provided
