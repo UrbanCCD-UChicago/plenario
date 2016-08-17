@@ -5,20 +5,10 @@ from sqlalchemy.orm import relationship
 
 from plenario.database import session, Base
 
-sensor_to_foi = Table('sensor__sensor_to_foi', Base.metadata,
+sensor_to_node = Table('sensor__sensor_to_node', Base.metadata,
                       Column('sensor', String, ForeignKey('sensor__sensors.name')),
-                      Column('foi', String, ForeignKey('sensor__features_of_interest.name'))
+                      Column('node', String, ForeignKey('sensor__node_metadata.id'))
                       )
-
-foi_to_network = Table('sensor__foi_to_network', Base.metadata,
-                       Column('foi', String, ForeignKey('sensor__features_of_interest.name')),
-                       Column('network', String, ForeignKey('sensor__network_metadata.name'))
-                       )
-
-network_to_sensor = Table('sensor__network_to_sensor', Base.metadata,
-                          Column('network', String, ForeignKey('sensor__network_metadata.name')),
-                          Column('sensor', String, ForeignKey('sensor__sensors.name'))
-                          )
 
 
 class NetworkMeta(Base):
@@ -26,10 +16,6 @@ class NetworkMeta(Base):
 
     name = Column(String, primary_key=True)
     nodes = relationship('NodeMeta')
-    featuresOfInterest = relationship('FeatureOfInterest', secondary='sensor__foi_to_network',
-                                      back_populates='sensorNetworks')
-    sensors = relationship('Sensor', secondary='sensor__network_to_sensor',
-                           back_populates='sensorNetworks')
     info = Column(JSONB)
 
     @staticmethod
@@ -44,6 +30,7 @@ class NodeMeta(Base):
     id = Column(String, primary_key=True)
     sensorNetwork = Column(String, ForeignKey('sensor__network_metadata.name'))
     location = Column(Geometry(geometry_type='POINT', srid=4326))
+    sensors = relationship('Sensor', secondary='sensor__sensor_to_node')
     info = Column(JSONB)
 
     @staticmethod
@@ -57,10 +44,6 @@ class FeatureOfInterest(Base):
 
     name = Column(String, primary_key=True)
     observedProperties = Column(JSONB)
-    sensors = relationship('Sensor', secondary='sensor__sensor_to_foi',
-                           back_populates='featuresOfInterest')
-    sensorNetworks = relationship('NetworkMeta', secondary='sensor__foi_to_network',
-                                  back_populates='featuresOfInterest')
 
     @staticmethod
     def index(network_name=None):
@@ -73,11 +56,7 @@ class Sensor(Base):
     __tablename__ = 'sensor__sensors'
 
     name = Column(String, primary_key=True)
-    featuresOfInterest = relationship('FeatureOfInterest', secondary='sensor__sensor_to_foi',
-                                      back_populates='sensors')
     properties = Column(ARRAY(String))
-    sensorNetworks = relationship('NetworkMeta', secondary='sensor__network_to_sensor',
-                                  back_populates='sensors')
     info = Column(JSONB)
 
     @staticmethod
