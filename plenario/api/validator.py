@@ -1,5 +1,6 @@
 import json
 import re
+import sqlalchemy
 
 from collections import namedtuple
 from datetime import datetime, timedelta
@@ -23,6 +24,13 @@ def validate_dataset(dataset_name):
 def validate_many_datasets(list_of_datasets):
     for dataset in list_of_datasets:
         validate_dataset(dataset)
+
+
+def validate_geom(geojson_str):
+    try:
+        return extract_first_geometry_fragment(geojson_str)
+    except (ValueError, AttributeError):
+        raise ValidationError("Invalid geom: {}".format(geojson_str))
 
 
 class Validator(Schema):
@@ -50,12 +58,14 @@ class Validator(Schema):
     date__time_of_day_ge = fields.Integer(default=0, validate=Range(0, 23))
     date__time_of_day_le = fields.Integer(default=23, validate=Range(0, 23))
     data_type = fields.Str(default='json', validate=OneOf(valid_formats))
-    location_geom__within = fields.Str(default=None, dump_to='geom')
+    location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
     obs_date__ge = fields.Date(default=datetime.now() - timedelta(days=90))
     obs_date__le = fields.Date(default=datetime.now())
-    limit = fields.Integer(default=1000)
+    limit = fields.Integer(default=1000, validate=Range(0, 10000))
     offset = fields.Integer(default=0, validate=Range(0))
     resolution = fields.Integer(default=500, validate=Range(0))
+    job = fields.Bool(default=False)
+    all = fields.Bool(default=False)
 
 
 class DatasetRequiredValidator(Validator):
@@ -143,6 +153,7 @@ def convert(request_args):
         try:
             request_args[key] = converters[key](value)
         except (KeyError, TypeError, AttributeError, NoSuchTableError):
+            # print "UNABLE TO CONVERT {} {}".format(key, value)
             pass
         except (DatabaseError, ProgrammingError):
             # Failed transactions, which we do expect, can cause
@@ -256,13 +267,19 @@ def validate(validator, request_args):
             field = param.split('__')[0]
             if table is not None:
                 try:
-                    valid_column_condition(table, field, args[param])
+                    param = param.encode()
+                    value = args[param].encode()
+
+                    valid_column_condition(table, field, value)
                     result.data[param] = args[param]
+                except UnicodeEncodeError:
+                    result.errors['EncodeError'] = ['Either your column or your value cannot be encoded into unicode.']
+                    result.errors['EncodeError'] += (param, args[param])
                 except KeyError:
-                    warnings.append('Unused parameter value "{}={}"'.format(param, args[param]))
+                    warnings.append('Unused parameter value "{}={}"'.format(param, value))
                     warnings.append('{} is not a valid column for {}'.format(param, table))
                 except ValueError:
-                    warnings.append('Unused parameter value "{}={}"'.format(param, args[param]))
+                    warnings.append('Unused parameter value "{}={}"'.format(param, value))
                     warnings.append('{} is not a valid value for {}'.format(args[param], param))
 
     # ValidatorResult(dict, dict, list)
@@ -292,7 +309,7 @@ def valid_tree(table, tree):
         col = tree.get('col')
         val = tree.get('val')
 
-        if not col or not val:
+        if col is None or val is None:
             err_msg = 'Missing or invalid keyword in {}'.format(tree)
             err_msg += ' -- use format "{\'op\': OP, \'col\': COL, \'val\', VAL}"'
             raise ValueError(err_msg)
@@ -312,6 +329,8 @@ def valid_column_condition(table, column_name, value):
     :param value: target value"""
 
     try:
+        if type(table) != sqlalchemy.sql.schema.Table:
+            table = converters['dataset'](table)
         column = table.columns[column_name]
     except KeyError:
         raise KeyError("Invalid column name {}".format(column_name))

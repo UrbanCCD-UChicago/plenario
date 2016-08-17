@@ -1,3 +1,5 @@
+import boto.ec2
+import boto.utils
 from os import environ
 get = environ.get
 
@@ -27,13 +29,13 @@ CACHE_CONFIG = {
 
 # Load a default admin
 DEFAULT_USER = {
-    'name': get('DEFAULT_USER_NAME'),
-    'email': get('DEFAULT_USER_EMAIL'),
-    'password': get('DEFAULT_USER_PASSWORD')
+    'name': get('DEFAULT_USER_NAME', 'Plenario Admin'),
+    'email': get('DEFAULT_USER_EMAIL', 'plenario@email.com'),
+    'password': get('DEFAULT_USER_PASSWORD', 'changemeplz')
 }
 
-AWS_ACCESS_KEY = get('AWS_ACCESS_KEY', '')
-AWS_SECRET_KEY = get('AWS_SECRET_KEY', '')
+AWS_ACCESS_KEY = get('AWS_ACCESS_KEY_ID', '')
+AWS_SECRET_KEY = get('AWS_SECRET_ACCESS_KEY', '')
 S3_BUCKET = get('S3_BUCKET', '')
 AWS_REGION_NAME = get('AWS_REGION_NAME', 'us-east-1')
 
@@ -55,3 +57,33 @@ MAIL_PASSWORD = get('MAIL_PASSWORD', '')
 
 # Toggle maintenence mode
 MAINTENANCE = False
+
+# SQS Jobs Queue
+JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-queue-test')
+
+# Get Instance ID and Autoscaling Group Name
+
+try:
+    instance_metadata = boto.utils.get_instance_metadata(timeout=2, num_retries=2)
+    INSTANCE_ID = instance_metadata["instance-id"]
+except KeyError:
+    print "Could not get INSTANCE_ID"
+    INSTANCE_ID = ""
+
+try:
+    AUTOSCALING_GROUP = ""
+    ec2 = boto.ec2.connect_to_region(
+        AWS_REGION_NAME,
+        aws_access_key_id=AWS_ACCESS_KEY,
+        aws_secret_access_key=AWS_SECRET_KEY
+    )
+    reservations = ec2.get_all_instances()
+    for res in reservations:
+        for inst in res.instances:
+            if inst.id == INSTANCE_ID:
+                AUTOSCALING_GROUP = inst.tags["aws:autoscaling:groupName"]
+                break
+        if AUTOSCALING_GROUP:
+            break
+except boto.exception.EC2ResponseError:
+    print "Could not get AUTOSCALING_GROUP"

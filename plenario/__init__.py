@@ -24,6 +24,15 @@ def create_app():
     from plenario.api import api, cache
     from plenario.admin import admin
 
+    # These other imports might eventually use API as well.
+    # plenario.views does now. So we'll put them here like
+    # API and not import them until they're really needed.
+    from plenario.database import session as db_session
+    from plenario.models import bcrypt
+    from plenario.auth import auth, login_manager
+    from plenario.views import views
+    from plenario.utils.helpers import slugify as slug
+
     app = Flask(__name__)
     app.config.from_object('plenario.settings')
     app.url_map.strict_slashes = False
