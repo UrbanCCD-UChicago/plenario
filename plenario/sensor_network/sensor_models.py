@@ -40,7 +40,9 @@ class NodeMeta(Base):
     def index(network_name=None):
         nodes = session.query(NodeMeta).all()
         return [node.id for node in nodes if node.sensor_network == network_name or network_name is None]
-
+    
+    def __repr__(self):
+        return '<Node "{}">' .format(self.id)
 
 class FeatureOfInterest(Base):
     __tablename__ = 'sensor__features_of_interest'
@@ -74,6 +76,9 @@ class Sensor(Base):
                 for sensor in node.sensors:
                     sensors.append(sensor.name)
         return list(set(sensors))
+
+    def __repr__(self):
+        return '<Sensor "{}">'.format(self.name)
 
 
 if __name__ == "__main__":
