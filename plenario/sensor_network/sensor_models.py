@@ -1,18 +1,26 @@
 from geoalchemy2 import Geometry
-from sqlalchemy import Column, String, ForeignKey, Table
+from sqlalchemy import create_engine
+from sqlalchemy import Column, String, ForeignKey, Table, MetaData
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
-from sqlalchemy.orm import relationship
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, sessionmaker
 
 from plenario import db
-from plenario.database import session, Base, app_engine
+from plenario.settings import DATABASE_CONN
 
-sensor_to_node = Table('sensor__sensor_to_node', db.Model.metadata,
-                      Column('sensor', String, ForeignKey('sensor__sensors.name')),
-                      Column('node', String, ForeignKey('sensor__node_metadata.id'))
-                      )
+print DATABASE_CONN
+engine = create_engine(DATABASE_CONN)
+Base = declarative_base(bind=engine)
+session = sessionmaker(bind=engine)
 
 
-class NetworkMeta(db.Model):
+sensor_to_node = Table('sensor__sensor_to_node', Base.metadata,
+                       Column('sensor', String, ForeignKey('sensor__sensors.name')),
+                       Column('node', String, ForeignKey('sensor__node_metadata.id'))
+                       )
+
+
+class NetworkMeta(Base):
     __tablename__ = 'sensor__network_metadata'
 
     name = Column(String, primary_key=True)
@@ -25,7 +33,7 @@ class NetworkMeta(db.Model):
         return [network.name for network in networks]
 
 
-class NodeMeta(db.Model):
+class NodeMeta(Base):
     __tablename__ = 'sensor__node_metadata'
 
     id = Column(String, primary_key=True)
@@ -40,7 +48,7 @@ class NodeMeta(db.Model):
         return [node.id for node in nodes if node.sensor_network == network_name or network_name is None]
 
 
-class FeatureOfInterest(db.Model):
+class FeatureOfInterest(Base):
     __tablename__ = 'sensor__features_of_interest'
 
     name = Column(String, primary_key=True)
@@ -57,7 +65,7 @@ class FeatureOfInterest(db.Model):
         return list(set(features))
 
 
-class Sensor(db.Model):
+class Sensor(Base):
     __tablename__ = 'sensor__sensors'
 
     name = Column(String, primary_key=True)
@@ -68,7 +76,11 @@ class Sensor(db.Model):
     def index(network_name=None):
         sensors = session.query(Sensor).all()
         return [sensor.name for sensor in sensors if
-                network_name in [node.sensor_network for node in session.query(NodeMeta).filter(sensor.in_(NodeMeta.sensors)).all()] or network_name is None]
+                network_name in [node.sensor_network for node in session.query(NodeMeta).filter(
+                    sensor.in_(NodeMeta.sensors)).all()] or network_name is None]
+
 
 if __name__ == "__main__":
-    Base.metadata.create_all(app_engine, extend_existing=True)
+    # print Base.metadata
+    # Base.metadata.create_all(app_engine, extend_existing=True)
+    Base.metadata.create_all()
