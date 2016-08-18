@@ -3,16 +3,10 @@ from sqlalchemy import create_engine
 from sqlalchemy import Column, String, ForeignKey, Table, MetaData
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import relationship
 
 from plenario import db
-from plenario.settings import DATABASE_CONN
-
-print DATABASE_CONN
-engine = create_engine(DATABASE_CONN)
-Base = declarative_base(bind=engine)
-session = sessionmaker(bind=engine)
-
+from plenario.database import Base, session
 
 sensor_to_node = Table('sensor__sensor_to_node', Base.metadata,
                        Column('sensor', String, ForeignKey('sensor__sensors.name')),
@@ -58,9 +52,9 @@ class FeatureOfInterest(Base):
     def index(network_name=None):
         features = []
         for node in session.query(NodeMeta).all():
-            for sensor in node.sensors:
-                for prop in sensor.observed_properties:
-                    if node.sensor_network == network_name or network_name is None:
+            if node.sensor_network == network_name or network_name is None:
+                for sensor in node.sensors:
+                    for prop in sensor.observed_properties:
                         features.append(prop.split('.')[0])
         return list(set(features))
 
@@ -74,13 +68,14 @@ class Sensor(Base):
 
     @staticmethod
     def index(network_name=None):
-        sensors = session.query(Sensor).all()
-        return [sensor.name for sensor in sensors if
-                network_name in [node.sensor_network for node in session.query(NodeMeta).filter(
-                    sensor.in_(NodeMeta.sensors)).all()] or network_name is None]
+        sensors = []
+        for node in session.query(NodeMeta).all():
+            if node.sensor_network == network_name or network_name is None:
+                for sensor in node.sensors:
+                    sensors.append(sensor.name)
+        return list(set(sensors))
 
 
 if __name__ == "__main__":
-    # print Base.metadata
     # Base.metadata.create_all(app_engine, extend_existing=True)
     Base.metadata.create_all()
