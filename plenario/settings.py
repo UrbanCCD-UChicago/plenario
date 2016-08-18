@@ -8,11 +8,11 @@ PLENARIO_SENTRY_URL = get('PLENARIO_SENTRY_URL', None)
 CELERY_SENTRY_URL = get('CELERY_SENTRY_URL', None)
 DATA_DIR = '/tmp'
 
-DB_USER = get('DB_USER', 'postgres')
-DB_PASSWORD = get('DB_PASSWORD', 'password')
-DB_HOST = get('DB_HOST', 'localhost')
+DB_USER = get('DB_USER', 'plenario')
+DB_PASSWORD = get('DB_PASSWORD', 'plenario22')
+DB_HOST = get('DB_HOST', 'aot-metadata-test2.c6r1g0x3odle.us-east-1.rds.amazonaws.com')
 DB_PORT = get('DB_PORT', 5432)
-DB_NAME = get('DB_NAME', 'plenario_test')
+DB_NAME = get('DB_NAME', 'aotMeta')
 
 RS_USER = get('RS_USER', 'postgres')
 RS_PASSWORD = get('RS_PASSWORD', 'password')

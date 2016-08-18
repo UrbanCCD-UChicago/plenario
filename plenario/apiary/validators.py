@@ -1,16 +1,10 @@
-import pdb
-
 from collections import defaultdict
 from plenario.database import session
-from plenario.sensor_network.sensor_models import Sensor
+from plenario.sensor_network.sensor_models import Sensor, NodeMeta, NetworkMeta
 from wtforms import ValidationError
 
 
-# [X][ ][ ]
 def validate_foi(foi_name, observed_properties):
-
-    pdb.set_trace()
-
     if not observed_properties:
         raise ValidationError("No observed properties were provided!")
 
@@ -25,3 +19,8 @@ def validate_foi(foi_name, observed_properties):
 
     if not all(prop["name"] in sensors[foi_name] for prop in observed_properties):
         raise ValidationError("Bad property specified!")
+
+
+def validate_node(network):
+    if network not in [net.name for net in session.query(NetworkMeta).all()]:
+        raise ValidationError("Invalid network name!")

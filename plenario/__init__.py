@@ -55,7 +55,7 @@ def create_app():
 
     admin.init_app(app)
     admin.add_view(admin_views["FOI"](FeatureOfInterest, db.session))
-    admin.add_view(admin_views["Base"](Sensor, db.session))
+    admin.add_view(admin_views["Sensor"](Sensor, db.session))
     admin.add_view(admin_views["Network"](NetworkMeta, db.session))
     admin.add_view(admin_views["Node"](NodeMeta, db.session))
 
