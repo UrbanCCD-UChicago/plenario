@@ -2,8 +2,8 @@ from flask_admin.contrib.sqla import ModelView
 from wtforms import StringField
 
 from plenario.apiary.validators import validate_foi, validate_node
-from plenario.apiary.validators import validate_sensor
-
+from plenario.database import session
+from plenario.sensor_network.sensor_models import NetworkMeta
 
 class BaseMetaView(ModelView):
     can_delete = False
@@ -25,7 +25,15 @@ class NodeMetaView(BaseMetaView):
     }
 
     def on_model_change(self, form, model, is_created):
-        validate_node(form.sensor_network.data)
+        try:
+            network = form.sensor_network.data
+            validate_node(network)
+            network_obj = session.query(NetworkMeta).filter(NetworkMeta.name == network)
+            network_obj = network_obj.first()
+            network_obj.nodes.append(model)
+            session.commit()
+        except:
+            session.rollback()
 
 
 class FOIMetaView(BaseMetaView):
@@ -40,7 +48,7 @@ class FOIMetaView(BaseMetaView):
 
 
 admin_views = {
-    "Sensor": SensorMetaView,
+    "Sensor": BaseMetaView,
     "FOI": FOIMetaView,
     "Network": NetworkMetaView,
     "Node": NodeMetaView,
