@@ -1,0 +1,4 @@
+[sqlalchemy.dialects]
+redshift = sqlalchemy_redshift.dialect:RedshiftDialect
+redshift.psycopg2 = sqlalchemy_redshift.dialect:RedshiftDialect
+

@@ -4,6 +4,9 @@ from wtforms import StringField
 from plenario.apiary.validators import validate_foi, validate_node
 from plenario.database import session
 from plenario.sensor_network.sensor_models import NetworkMeta
+from plenario.sensor_network.redshift_ops import create_foi_table, add_column
+from plenario.sensor_network.redshift_ops import table_exists
+
 
 class BaseMetaView(ModelView):
     can_delete = False
@@ -44,8 +47,20 @@ class FOIMetaView(BaseMetaView):
     }
 
     def on_model_change(self, form, model, is_created):
-        validate_foi(form.name.data, form.observed_properties.data)
 
+        import pdb
+        pdb.set_trace()
+
+        name = form.name.data
+        properties = form.observed_properties.data
+
+        validate_foi(name, properties)
+
+        if table_exists(name):
+            pass
+        else:
+            foi_properties = [{"name": e["name"], "type": e["type"]} for e in properties]
+            create_foi_table(name, foi_properties)
 
 admin_views = {
     "Sensor": BaseMetaView,

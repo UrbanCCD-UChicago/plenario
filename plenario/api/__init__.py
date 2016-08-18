@@ -61,7 +61,7 @@ api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>/query
 
 
 @api.route(prefix + '/flush-cache')
-@login_required
+# @login_required
 def flush_cache():
     cache.clear()
     resp = make_response(json.dumps({'status': 'ok', 'message': 'cache flushed!'}))
