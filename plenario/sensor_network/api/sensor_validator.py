@@ -3,7 +3,7 @@ import json
 from collections import namedtuple
 from datetime import datetime, timedelta
 from marshmallow import fields, Schema
-from marshmallow.validate import Range, OneOf, ValidationError
+from marshmallow.validate import Range, ValidationError
 from psycopg2 import Error
 from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 from sqlalchemy import MetaData, Table
@@ -12,6 +12,11 @@ from plenario.api.common import extract_first_geometry_fragment, make_fragment_s
 from plenario.sensor_network.api.sensor_condition_builder import field_ops
 from plenario.database import session, redshift_engine
 from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest, Sensor
+
+
+def validate_network(network):
+    if network not in NetworkMeta.index():
+        raise ValidationError("Invalid network name: {}.".format(network))
 
 
 def validate_nodes(nodes):
@@ -65,7 +70,7 @@ class Validator(Schema):
     or rejected, the validator will substitute it with the value specified by
     <DEFAULT_VALUE>."""
 
-    # network_name = fields.Str(allow_none=True, missing=None, default='ArrayOfThings', validate=OneOf(NetworkMeta.index()))
+    network_name = fields.Str(allow_none=True, missing=None, default='ArrayOfThings', validate=validate_network)
 
     # For observations:
     #
