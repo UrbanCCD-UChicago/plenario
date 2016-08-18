@@ -17,3 +17,4 @@ notebooks/
 .idea/
 # Elastic Beanstalk Test Packages
 *.testy.zip
+*.todo

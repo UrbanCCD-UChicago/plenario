@@ -49,14 +49,9 @@ class FOIMetaView(BaseMetaView):
     }
 
     def on_model_change(self, form, model, is_created):
-        import pdb
-        pdb.set_trace()
-
         name = form.name.data
         properties = form.observed_properties.data
-
         validate_foi(name, properties)
-
         if table_exists(name):
             pass
         else:
