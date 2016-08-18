@@ -20,6 +20,7 @@ class NetworkMetaView(BaseMetaView):
 
 
 class NodeMetaView(BaseMetaView):
+    can_edit = True
     column_list = ("id", "sensor_network", "location", "sensors", "info")
     form_extra_fields = {
         "location": StringField("Location"),
@@ -40,6 +41,7 @@ class NodeMetaView(BaseMetaView):
 
 
 class FOIMetaView(BaseMetaView):
+    can_delete = True
     column_list = ("name", "observed_properties", "info")
     form_extra_fields = {
         "name": StringField("Name"),
