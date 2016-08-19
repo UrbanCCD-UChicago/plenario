@@ -354,7 +354,7 @@ def _get_observations(args):
         all_features = []
         for sensor in sensors:
             for foi in list(set([prop.split('.')[0] for prop in sensor.observed_properties])):
-                all_features.append(foi.name)
+                all_features.append(foi)
         features = set(features).intersection(all_features)
     except KeyError:
         pass
