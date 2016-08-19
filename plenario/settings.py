@@ -8,11 +8,15 @@ PLENARIO_SENTRY_URL = get('PLENARIO_SENTRY_URL', None)
 CELERY_SENTRY_URL = get('CELERY_SENTRY_URL', None)
 DATA_DIR = '/tmp'
 
-DB_USER = get('DB_USER', '')
-DB_PASSWORD = get('DB_PASSWORD', '')
-DB_HOST = get('DB_HOST', '')
-DB_PORT = get('DB_PORT', 0)
-DB_NAME = get('DB_NAME', '')
+# Travis CI relies on the default values to build correctly,
+# just keep in mind that if you push changes to the default
+# values, you need to make sure to adjust for these changes 
+# in the travis.yml
+DB_USER = get('DB_USER', 'postgres')
+DB_PASSWORD = get('DB_PASSWORD', 'password')
+DB_HOST = get('DB_HOST', 'localhost')
+DB_PORT = get('DB_PORT', 5432)
+DB_NAME = get('DB_NAME', 'plenario_test')
 
 RS_USER = get('RS_USER', '')
 RS_PASSWORD = get('RS_PASSWORD', '')
