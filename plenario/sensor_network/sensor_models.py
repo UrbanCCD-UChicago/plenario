@@ -79,8 +79,3 @@ class Sensor(Base):
 
     def __repr__(self):
         return '<Sensor "{}">'.format(self.name)
-
-
-if __name__ == "__main__":
-    # Base.metadata.create_all(app_engine, extend_existing=True)
-    Base.metadata.create_all()

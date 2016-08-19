@@ -25,6 +25,8 @@ def init_db(args):
             init_weather()
         if args.functions:
             add_functions()
+        if args.sensors:
+            init_sensor_meta()
 
 
 def init_tables():
@@ -79,6 +81,23 @@ def init_weather():
         raise e
 
 
+def init_sensor_meta():
+    sensor_meta_table_names = {
+        "sensor__network_metadata",
+        "sensor__node_metadata",
+        "sensor__features_of_interest",
+        "sensor__sensors"
+    }
+
+    non_sensor_tables = [t for t in Base.metadata.sorted_tables
+                         if t.name not in sensor_meta_table_names]
+
+    for t in non_sensor_tables:
+        Base.metadata.remove(t)
+    
+    Base.metadata.create_all()
+
+
 def add_functions():
     def add_function(script_path):
         args = 'PGPASSWORD=' + DB_PASSWORD + ' psql -h ' + DB_HOST + ' -U ' + DB_USER + ' -d ' + DB_NAME + ' -f ' + script_path
@@ -109,6 +128,8 @@ def build_arg_parser():
                               observations.')
     parser.add_argument('-f', '--functions', action='store_true',
                         help='Add plenario-specific functions to database.')
+    parser.add_argument("-s", "--sensors", action="store_true",
+                        help="Initialize tables for working with AOT data.")
     return parser
 
 
