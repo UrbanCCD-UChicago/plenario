@@ -347,13 +347,13 @@ def _get_observations(args):
     # if the user specified a sensor list,
     # only query feature tables that those sensors report on
     try:
-        # Will throw KeyError if no 'sensor' argument was given
+        # Will throw KeyError if no 'sensors' argument was given
         s = request.args['sensors']
 
         sensors = [sensor for sensor in session.query(Sensor).filter(Sensor.name.in_(args.data['sensors']))]
         all_features = []
         for sensor in sensors:
-            for foi in sensor.featuresOfInterest:
+            for foi in list(set([prop.split('.')[0] for prop in sensor.observed_properties])):
                 all_features.append(foi.name)
         features = set(features).intersection(all_features)
     except KeyError:
@@ -368,6 +368,7 @@ def _get_observations(args):
         except (AttributeError, NoSuchTableError):
             return bad_request("Table {} not found".format(table_name))
 
+    # TODO: make limit on threaded query reliably return the correct number of results
     data = []
     threads = []
     for table in tables:
