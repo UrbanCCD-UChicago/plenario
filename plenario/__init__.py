@@ -22,11 +22,11 @@ def create_app():
     # Don't import until we really need it to create the app
     # Since otherwise it may be called before init_db.py runs.
     from plenario.api import api, cache
-    from plenario.admin import admin, admin_views
 
     # These other imports might eventually use API as well.
     # plenario.views does now. So we'll put them here like
     # API and not import them until they're really needed.
+    from plenario.apiary import apiary
     from plenario.database import session as db_session
     from plenario.models import bcrypt
     from plenario.auth import auth, login_manager
@@ -46,18 +46,7 @@ def create_app():
     app.register_blueprint(views)
     app.register_blueprint(auth)
     cache.init_app(app)
-
-    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_CONN
-
-    db.init_app(app)
-    with app.app_context():
-        db.create_all()
-
-    admin.init_app(app)
-    admin.add_view(admin_views["FOI"](FeatureOfInterest, db.session))
-    admin.add_view(admin_views["Sensor"](Sensor, db.session))
-    admin.add_view(admin_views["Network"](NetworkMeta, db.session))
-    admin.add_view(admin_views["Node"](NodeMeta, db.session))
+    apiary.init_app(app)
 
     @app.before_request
     def check_maintenance_mode():

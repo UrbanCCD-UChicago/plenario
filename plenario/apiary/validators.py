@@ -1,24 +1,26 @@
 from collections import defaultdict
-from plenario.database import session
-from plenario.sensor_network.sensor_models import Sensor, NodeMeta, NetworkMeta
 from wtforms import ValidationError
 
+from plenario.database import session
+from plenario.sensor_network.sensor_models import FeatureOfInterest
+from plenario.sensor_network.sensor_models import NetworkMeta
 
-def validate_foi(foi_name, observed_properties):
+
+def validate_sensor_properties(observed_properties):
     if not observed_properties:
         raise ValidationError("No observed properties were provided!")
 
-    sensors = defaultdict(list)
-    for sensor in session.query(Sensor).all():
-        for prop in sensor.observed_properties:
-            key, value = prop.split(".")
-            sensors[key].append(value)
+    features = defaultdict(list)
+    for feature in session.query(FeatureOfInterest).all():
+        for property_dict in feature.observed_properties:
+            features[feature.name].append(property_dict["name"])
 
-    if foi_name not in sensors:
-        raise ValidationError("Bad FOI name, doesn't correspond to any sensor properties")
-
-    if not all(prop["name"] in sensors[foi_name] for prop in observed_properties):
-        raise ValidationError("Bad property specified!")
+    for feature_property in observed_properties:
+        feat, prop = feature_property.split(".")
+        if feat not in features:
+            raise ValidationError('Bad FOI name: "{}"'.format(feat))
+        if prop not in features[feat]:
+            raise ValidationError('Bad property name: "{}"'.format(prop))
 
 
 def validate_node(network):
