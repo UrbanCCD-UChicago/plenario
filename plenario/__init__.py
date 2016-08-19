@@ -26,7 +26,7 @@ def create_app():
     # These other imports might eventually use API as well.
     # plenario.views does now. So we'll put them here like
     # API and not import them until they're really needed.
-    from plenario.apiary import apiary
+    from plenario.apiary import apiary, apiary_bp
     from plenario.database import session as db_session
     from plenario.models import bcrypt
     from plenario.auth import auth, login_manager
@@ -46,7 +46,9 @@ def create_app():
     app.register_blueprint(views)
     app.register_blueprint(auth)
     cache.init_app(app)
+
     apiary.init_app(app)
+    app.register_blueprint(apiary_bp)
 
     @app.before_request
     def check_maintenance_mode():

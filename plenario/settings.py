@@ -25,7 +25,10 @@ DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.\
 REDSHIFT_CONN = 'postgresql://{}:{}@{}:{}/{}'.\
     format(RS_USER, RS_PASSWORD, RS_HOST, RS_PORT, RS_NAME)
 
-REDIS_HOST = get('REDIS_HOST', 'localhost')
+# Use this cache for data that can be refreshed
+REDIS_HOST = get('REDIS_HOST', "")
+# Use this cache for data that needs protection from the API flush
+REDIS_HOST_SAFE = get("REDIS_HOST_SAFE", "")
 
 # See: https://pythonhosted.org/Flask-Cache/#configuring-flask-cache
 # for config options
