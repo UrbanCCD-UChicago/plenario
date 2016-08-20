@@ -16,7 +16,7 @@ csvkit
 redis
 pytz
 datetime_truncate
-pyshp
+pyshp==1.2.3
 git+https://github.com/datamade/python-metar.git#egg=metar
 lxml
 alembic
