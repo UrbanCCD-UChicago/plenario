@@ -44,7 +44,6 @@ script:
 - nosetests tests/points/ -v
 - nosetests tests/shapes/ -v
 - nosetests tests/submission/ -v
-- nosetests tests/jobs -v
 deploy:
 - provider: elasticbeanstalk
   access_key_id:
