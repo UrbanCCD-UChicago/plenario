@@ -11,7 +11,7 @@ from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
 
-from init_db import init_meta
+from init_db import init_meta, init_worker_meta
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 
@@ -70,6 +70,7 @@ class BasePlenarioTest(unittest.TestCase):
 
         # Re-add meta tables
         init_meta()
+        init_worker_meta()
 
         # Fully ingest the fixtures
         BasePlenarioTest.ingest_fixture(fixtures['city'])
