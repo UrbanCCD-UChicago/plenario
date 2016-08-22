@@ -1,16 +1,16 @@
 import traceback
-
 from datetime import datetime, timedelta
 from functools import wraps
-from raven import Client
-from sqlalchemy.exc import NoSuchTableError, InternalError, DBAPIError
 
+from raven import Client
+from sqlalchemy.exc import NoSuchTableError, InternalError
+
+from plenario.api.jobs import submit_job
 from plenario.database import session as session, app_engine as engine
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
-from plenario.api.jobs import submit_job
 from plenario.models import MetaTable, ShapeMetadata
-from plenario.models_.ETLTask import update_task, ETLStatus, delete_task, add_task
+from plenario.models.ETLTask import update_task, ETLStatus, delete_task, add_task
 from plenario.settings import PLENARIO_SENTRY_URL
 from plenario.utils.weather import WeatherETL
 

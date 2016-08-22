@@ -2,20 +2,41 @@ import datetime
 import subprocess
 from argparse import ArgumentParser
 
-# Imports cause the meta tables to be created and added to Base.
-import plenario.models
-import plenario.models_
+from sqlalchemy.exc import ProgrammingError
 
+# Imports cause the meta tables to be created and added to Base.
 from plenario.database import session, app_engine, Base
+from plenario.models import User
 from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DEFAULT_USER
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
 
 
+def create_tables(tables):
+    """Helper to initialize the tables from the Base.metadata store
+
+    :param tables: (iterable) of string table names"""
+
+    for table in Base.metadata.sorted_tables:
+        if str(table) in tables:
+            print "CREATE TABLE: {}".format(table)
+            try:
+                table.create(bind=app_engine)
+            except ProgrammingError:
+                print "ALREADY EXISTS: {}".format(table)
+
+
 def init_db(args):
+    print ""
+    print "================"
+    print "Plenario INIT DB"
+    print "================"
     if not any(vars(args).values()):
         # No specific arguments specified. Run it all!
-        init_tables()
         add_functions()
+        init_meta()
+        init_sensor_meta()
+        init_user()
+        init_worker_meta()
     else:
         if args.meta:
             init_meta()
@@ -23,38 +44,28 @@ def init_db(args):
             init_user()
         if args.weather:
             init_weather()
+        if args.workers():
+            init_worker_meta()
         if args.functions:
             add_functions()
         if args.sensors:
             init_sensor_meta()
 
 
-def init_tables():
-    print 'creating master, meta, data, and user tables'
-    init_meta()
-    init_user()
-
-
 def init_meta():
-    # Reset concept of a metadata table
-    print [table.name for table in Base.metadata.sorted_tables]
-    non_meta_tables = [table for table in Base.metadata.sorted_tables
-                       if table.name not in
-                       {'meta_master', 'meta_shape', 'plenario_user', 'plenario_workers', 'plenario_datadump', 'etl_task'}]
-    for t in non_meta_tables:
-        Base.metadata.remove(t)
-
-    # Create databases (if they don't exist)
-    Base.metadata.create_all(bind=app_engine)
+    create_tables(("meta_master", "meta_shape"))
 
 
 def init_user():
+    create_tables(("plenario_user",))
+
     if DEFAULT_USER['name']:
-        print 'Creating default user %s' % DEFAULT_USER['name']
-        if session.query(plenario.models.User).count() > 0:
+        if session.query(User).count() > 0:
             print 'Users already exist. Skipping this step.'
             return
-        user = plenario.models.User(**DEFAULT_USER)
+
+        print 'Creating default user %s' % DEFAULT_USER['name']
+        user = User(**DEFAULT_USER)
         session.add(user)
         try:
             session.commit()
@@ -71,7 +82,7 @@ def init_weather():
     s.initialize()
 
     print 'initializing NOAA daily and hourly weather observations for %s/%s' % (
-    datetime.datetime.now().month, datetime.datetime.now().year)
+        datetime.datetime.now().month, datetime.datetime.now().year)
     print 'this will take a few minutes ...'
     e = WeatherETL()
     try:
@@ -82,20 +93,19 @@ def init_weather():
 
 
 def init_sensor_meta():
-    sensor_meta_table_names = {
+    sensor_meta_table_names = (
         "sensor__network_metadata",
         "sensor__node_metadata",
         "sensor__features_of_interest",
-        "sensor__sensors"
-    }
+        "sensor__sensors",
+        "sensor__sensor_to_node"
+    )
 
-    non_sensor_tables = [t for t in Base.metadata.sorted_tables
-                         if t.name not in sensor_meta_table_names]
+    create_tables(sensor_meta_table_names)
 
-    for t in non_sensor_tables:
-        Base.metadata.remove(t)
-    
-    Base.metadata.create_all()
+
+def init_worker_meta():
+    create_tables(('plenario_workers', 'plenario_datadump', 'etl_task'))
 
 
 def add_functions():
@@ -130,10 +140,12 @@ def build_arg_parser():
                         help='Add plenario-specific functions to database.')
     parser.add_argument("-s", "--sensors", action="store_true",
                         help="Initialize tables for working with AOT data.")
+    parser.add_argument("-k", "--workers", action="store_true",
+                        help="Initialze tables for plenario's worker system.")
     return parser
 
 
 if __name__ == "__main__":
-    parser = build_arg_parser()
-    arguments = parser.parse_args()
+    argparser = build_arg_parser()
+    arguments = argparser.parse_args()
     init_db(arguments)

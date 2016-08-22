@@ -2,11 +2,11 @@ from flask_admin.contrib.sqla import ModelView
 from wtforms import StringField
 
 from plenario.database import session
-from plenario.sensor_network.sensor_models import NetworkMeta
-from plenario.sensor_network.redshift_ops import create_foi_table, add_column
+from plenario.sensor_network.redshift_ops import create_foi_table
 from plenario.sensor_network.redshift_ops import table_exists
-
+from plenario.sensor_network.sensor_models import NetworkMeta
 from validators import validate_node, validate_sensor_properties
+
 
 class BaseMetaView(ModelView):
     can_delete = False
@@ -49,7 +49,6 @@ class FOIMetaView(BaseMetaView):
     }
 
     def on_model_change(self, form, model, is_created):
-
         name = form.name.data
         properties = form.observed_properties.data
         if not table_exists(name):
@@ -58,10 +57,9 @@ class FOIMetaView(BaseMetaView):
 
 
 class SensorMetaView(BaseMetaView):
-
     def on_model_change(self, form, model, is_created):
         validate_sensor_properties(form.observed_properties.data)
-        
+
 
 admin_views = {
     "Sensor": SensorMetaView,

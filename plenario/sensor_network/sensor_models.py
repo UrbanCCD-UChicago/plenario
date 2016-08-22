@@ -1,16 +1,14 @@
 from geoalchemy2 import Geometry
-from sqlalchemy import create_engine
-from sqlalchemy import Column, String, ForeignKey, Table, MetaData
+from sqlalchemy import Table, String, Column, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
-from plenario import db
 from plenario.database import Base, session
 
-sensor_to_node = Table('sensor__sensor_to_node', Base.metadata,
-                       Column('sensor', String, ForeignKey('sensor__sensors.name')),
-                       Column('node', String, ForeignKey('sensor__node_metadata.id'))
+sensor_to_node = Table('sensor__sensor_to_node',
+                       Base.metadata,
+                       Column('sensor', String(), ForeignKey('sensor__sensors.name')),
+                       Column('node', String(), ForeignKey('sensor__node_metadata.id'))
                        )
 
 
@@ -40,9 +38,10 @@ class NodeMeta(Base):
     def index(network_name=None):
         nodes = session.query(NodeMeta).all()
         return [node.id for node in nodes if node.sensor_network == network_name or network_name is None]
-    
+
     def __repr__(self):
-        return '<Node "{}">' .format(self.id)
+        return '<Node "{}">'.format(self.id)
+
 
 class FeatureOfInterest(Base):
     __tablename__ = 'sensor__features_of_interest'

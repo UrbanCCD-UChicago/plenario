@@ -8,12 +8,11 @@ from sqlalchemy.types import NullType
 
 from plenario.database import session, Base
 from plenario.utils.helpers import slugify
-from plenario import db
 
 bcrypt = Bcrypt()
 
 
-class ShapeMetadata(db.Model):
+class ShapeMetadata(Base):
     __tablename__ = 'meta_shape'
     dataset_name = Column(String, primary_key=True)
     human_name = Column(String, nullable=False)

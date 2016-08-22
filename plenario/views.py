@@ -1,29 +1,29 @@
 import itertools
 import json
 import re
-import dateutil.relativedelta
 from cStringIO import StringIO
 from collections import namedtuple
 from datetime import datetime
 from hashlib import md5
 from urlparse import urlparse
 
+import dateutil.relativedelta
 import requests
 import sqlalchemy
 from flask import make_response, request, redirect, url_for, render_template, \
     Blueprint, flash, session as flask_session
 from flask_login import login_required
 from flask_wtf import Form
-from sqlalchemy import Table, text
+from sqlalchemy import Table
 from sqlalchemy.exc import NoSuchTableError
 from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
 from plenario.api.jobs import submit_job, get_status, get_job, job_queue
-from plenario.database import session, Base, app_engine as engine, fast_count
+from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata, Workers
-from plenario.models_.ETLTask import ETLType, add_task
-from plenario.models_.ETLTask import fetch_pending_tables, fetch_table_etl_status
+from plenario.models.ETLTask import ETLType, add_task
+from plenario.models.ETLTask import fetch_pending_tables, fetch_table_etl_status
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 
 views = Blueprint('views', __name__)

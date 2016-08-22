@@ -1,9 +1,3 @@
-from hashlib import md5
-from itertools import groupby
-from operator import itemgetter
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from plenario import db
-
 import json
 import traceback
 from collections import namedtuple
@@ -11,53 +5,52 @@ from datetime import datetime
 from hashlib import md5
 from itertools import groupby
 from operator import itemgetter
-from uuid import uuid4
 
 import sqlalchemy as sa
 from flask_bcrypt import Bcrypt
 from geoalchemy2 import Geometry
-from sqlalchemy import Column, String, Boolean, Date, DateTime, Text, func
+from sqlalchemy import Column, Text, func
+from sqlalchemy import Boolean, Date, DateTime, String
 from sqlalchemy import Table, select, Integer
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.exc import ProgrammingError
-from sqlalchemy.orm import synonym
-from sqlalchemy.types import NullType
 
+from plenario.database import Base, session
 from plenario.utils.helpers import get_size_in_degrees, slugify
 
 bcrypt = Bcrypt()
 
-class MetaTable(db.Model):
+
+class MetaTable(Base):
     __tablename__ = 'meta_master'
     # limited to 50 chars elsewhere
-    dataset_name = db.Column(db.String(100), nullable=False)
-    human_name = db.Column(db.String(255), nullable=False)
-    description = db.Column(db.Text)
-    source_url = db.Column(db.String(255))
-    source_url_hash = db.Column(db.String(32), primary_key=True)
-    view_url = db.Column(db.String(255))
-    attribution = db.Column(db.String(255))
+    dataset_name = Column(String(100), nullable=False)
+    human_name = Column(String(255), nullable=False)
+    description = Column(Text)
+    source_url = Column(String(255))
+    source_url_hash = Column(String(32), primary_key=True)
+    view_url = Column(String(255))
+    attribution = Column(String(255))
     # Spatial and temporal boundaries of observations in this dataset
-    obs_from = db.Column(db.Date)
-    obs_to = db.Column(db.Date)
-    bbox = db.Column(Geometry('POLYGON', srid=4326))
+    obs_from = Column(Date)
+    obs_to = Column(Date)
+    bbox = Column(Geometry('POLYGON', srid=4326))
     # TODO: Add restriction list ['daily' etc.]
-    update_freq = db.Column(db.String(100), nullable=False)
-    last_update = db.Column(db.DateTime)
-    date_added = db.Column(db.DateTime)
+    update_freq = Column(String(100), nullable=False)
+    last_update = Column(DateTime)
+    date_added = Column(DateTime)
     # The names of our "special" fields
-    observed_date = db.Column(db.String, nullable=False)
-    latitude = db.Column(db.String)
-    longitude = db.Column(db.String)
-    location = db.Column(db.String)
+    observed_date = Column(String, nullable=False)
+    latitude = Column(String)
+    longitude = Column(String)
+    location = Column(String)
     # if False, then do not display without first getting administrator approval
-    approved_status = db.Column(db.Boolean)
-    contributor_name = db.Column(db.String)
-    contributor_organization = db.Column(db.String)
-    contributor_email = db.Column(db.String)
-    result_ids = db.Column(ARRAY(db.String))
-    column_names = db.Column(JSONB)  # storage format {'<COLUMN_NAME>': '<COLUMN_TYPE>'}
+    approved_status = Column(Boolean)
+    contributor_name = Column(String)
+    contributor_organization = Column(String)
+    contributor_email = Column(String)
+    result_ids = Column(ARRAY(String))
+    column_names = Column(JSONB)  # storage format {'<COLUMN_NAME>': '<COLUMN_TYPE>'}
 
     def __init__(self, url, human_name, observed_date,
                  approved_status=False, update_freq='yearly',
@@ -79,6 +72,7 @@ class MetaTable(db.Model):
         :param attribution: Text describing who maintains the dataset
         :param description: Text describing the dataset.
         """
+
         def curried_slug(name):
             if name is None:
                 return None
@@ -86,7 +80,7 @@ class MetaTable(db.Model):
                 return slugify(unicode(name), delim=u'_')
 
         # Some combination of columns from which we can derive a point in space.
-        assert(location or (latitude and longitude))
+        assert (location or (latitude and longitude))
         # Frontend validation should have slugified column names already,
         # but enforcing it here is nice for testing.
         self.latitude = curried_slug(latitude)
@@ -185,7 +179,7 @@ class MetaTable(db.Model):
         attrs = as_is_attrs + [bbox]
 
         # Make the DB call
-        result = db.session.query(*attrs). \
+        result = session.query(*attrs). \
             filter(cls.dataset_name.in_(dataset_names))
         meta_list = [dict(zip(attr_names, row)) for row in result]
 
@@ -214,7 +208,6 @@ class MetaTable(db.Model):
         # For each table in table_names, generate a query to be unioned
         selects = []
         for name in table_names:
-
             # If we have condition trees specified, apply them.
             # .get will return None for those datasets who don't have filters
             ctree = ctrees.get(name) if ctrees else None
@@ -226,7 +219,7 @@ class MetaTable(db.Model):
         panel_query = sa.union(*selects) \
             .order_by('dataset_name') \
             .order_by('time_bucket')
-        panel_vals = db.session.execute(panel_query)
+        panel_vals = session.execute(panel_query)
 
         panel = []
         for dataset_name, ts in groupby(panel_vals, lambda row: row.dataset_name):
@@ -274,7 +267,7 @@ class MetaTable(db.Model):
                        interesects with the given bounds.
         """
         # Filter out datsets that don't intersect the time boundary
-        q = db.session.query(cls.dataset_name) \
+        q = session.query(cls.dataset_name) \
             .filter(cls.dataset_name.in_(dataset_names), cls.date_added != None,
                     cls.obs_from < end,
                     cls.obs_to > start)
@@ -288,12 +281,12 @@ class MetaTable(db.Model):
 
     @classmethod
     def get_by_dataset_name(cls, name):
-        foo = db.session.query(cls).filter(cls.dataset_name == name).first()
+        foo = session.query(cls).filter(cls.dataset_name == name).first()
         return foo
 
     def get_bbox_center(self):
         sel = select([func.ST_AsGeoJSON(func.ST_centroid(self.bbox))])
-        result = db.session.execute(sel)
+        result = session.execute(sel)
         # returns [lon, lat]
         return json.loads(result.first()[0])['coordinates']
 
@@ -328,7 +321,7 @@ class MetaTable(db.Model):
 
         # Generate a count for each resolution by resolution square
         t = self.point_table
-        q = db.session.query(func.count(t.c.hash),
+        q = session.query(func.count(t.c.hash),
                           func.ST_SnapToGrid(t.c.geom, size_x, size_y)
                           .label('squares')) \
             .filter(*conditions) \
@@ -341,7 +334,7 @@ class MetaTable(db.Model):
         if geom:
             q = q.filter(t.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geom)))
 
-        return db.session.execute(q), size_x, size_y
+        return session.execute(q), size_x, size_y
 
     # Return select statement to execute or union
     def timeseries(self, agg_unit, start, end, geom=None, column_filters=None):
@@ -400,7 +393,7 @@ class MetaTable(db.Model):
 
     def timeseries_one(self, agg_unit, start, end, geom=None, column_filters=None):
         ts_select = self.timeseries(agg_unit, start, end, geom, column_filters)
-        rows = db.session.execute(ts_select.order_by('time_bucket'))
+        rows = session.execute(ts_select.order_by('time_bucket'))
 
         header = [['count', 'datetime']]
         # Discard the name attribute.
@@ -408,7 +401,7 @@ class MetaTable(db.Model):
         return header + rows
 
 
-class DataDump(db.Model):
+class DataDump(Base):
     __tablename__ = "plenario_datadump"
     id = Column(String(32), primary_key=True)
     request = Column(String(32), nullable=False)
@@ -430,7 +423,7 @@ class DataDump(db.Model):
         return self.id
 
 
-class Workers(db.Model):
+class Workers(Base):
     __tablename__ = "plenario_workers"
     name = Column(String(32), primary_key=True)
     timestamp = Column(String(32), nullable=False)

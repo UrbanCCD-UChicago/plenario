@@ -1,14 +1,14 @@
 import subprocess
-import unittest
 import time
+import unittest
 
 from sqlalchemy.exc import IntegrityError
 
 from plenario import create_app
 from plenario.database import session
-from plenario.models_.ETLTask import add_task, fetch_task, delete_task
-from plenario.models_.ETLTask import update_task, fetch_table_etl_status
-from plenario.models_.ETLTask import ETLStatus, ETLType
+from plenario.models.ETLTask import ETLStatus, ETLType
+from plenario.models.ETLTask import add_task, fetch_task, delete_task
+from plenario.models.ETLTask import update_task, fetch_table_etl_status
 from plenario.update import create_worker
 from plenario.views import approve_dataset
 from tests.test_fixtures.post_data import roadworks_post_data
