@@ -33,6 +33,7 @@ class CustomizableField(Field):
 
 class BaseMetaView(ModelView):
     can_delete = False
+    can_edit = True
     column_display_pk = True
     form_extra_fields = {"name": StringField("Name")}
 
@@ -57,7 +58,6 @@ class NetworkMetaView(BaseMetaView):
 
 
 class NodeMetaView(BaseMetaView):
-    can_edit = True
     column_list = ("id", "sensor_network", "location", "sensors", "info")
     
     def geom_to_latlng(self, *args):
@@ -93,8 +93,6 @@ class NodeMetaView(BaseMetaView):
 
 
 class FOIMetaView(BaseMetaView):
-    can_edit = True
-    can_delete = True
     column_list = ("name", "observed_properties", "info")
     form_extra_fields = {
         "name": StringField("Name"),
