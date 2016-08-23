@@ -17,7 +17,10 @@ redis = Redis(REDIS_HOST_SAFE)
 def send_message():
     try:
         data = loads(request.data)
-        redis.set(name="AOTMapper_" + data["name"], value=dumps(data["value"]))
+        if data["value"].upper() == "DELETE":
+            redis.delete(data["name"])
+        else:
+            redis.set(name="AOTMapper_" + data["name"], value=dumps(data["value"]))
         return make_response("Message received successfully!", 200)
     except (KeyError, ValueError):
         return make_response(format_exc(), 500)
