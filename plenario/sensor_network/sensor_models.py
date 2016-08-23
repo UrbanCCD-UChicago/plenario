@@ -34,6 +34,8 @@ class NodeMeta(Base):
     sensors = relationship('Sensor', secondary='sensor__sensor_to_node')
     info = Column(JSONB)
 
+    column_editable_list = ("sensors", "info")
+
     @staticmethod
     def index(network_name=None):
         nodes = session.query(NodeMeta).all()

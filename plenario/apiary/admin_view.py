@@ -1,7 +1,10 @@
+import traceback
+
 from flask import redirect, url_for, request
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.form.rules import Field
 from flask_login import current_user
+from sqlalchemy import func
 from wtforms import StringField
 
 from plenario.database import session
@@ -9,6 +12,7 @@ from plenario.sensor_network.redshift_ops import create_foi_table
 from plenario.sensor_network.redshift_ops import table_exists
 from plenario.sensor_network.sensor_models import NetworkMeta
 from validators import validate_node, validate_sensor_properties
+from validators import validate_foi_json
 
 
 # Based off a solution provided here:
@@ -42,9 +46,12 @@ class BaseMetaView(ModelView):
 class NetworkMetaView(BaseMetaView):
     column_list = ("name", "nodes", "info")
 
+    form_widget_args = {
+        "nodes": {"readonly": True}
+    }
+
     form_edit_rules = [
         CustomizableField('name', field_args={'readonly': True}),
-        CustomizableField('nodes', field_args={'readonly': True}),
         CustomizableField('info', field_args=None)
     ]
 
@@ -52,10 +59,20 @@ class NetworkMetaView(BaseMetaView):
 class NodeMetaView(BaseMetaView):
     can_edit = True
     column_list = ("id", "sensor_network", "location", "sensors", "info")
+    
+    def geom_to_latlng(self, *args):
+        geom = args[1].location
+        query = self.session.query(func.ST_X(geom), func.ST_Y(geom))
+        return query.first()
+
+    column_formatters = {
+        "location": geom_to_latlng
+    }
+
     form_extra_fields = {
+        "id": StringField("ID"),
         "location": StringField("Location"),
         "sensor_network": StringField("Network"),
-        "id": StringField("ID"),
     }
 
     form_edit_rules = [
@@ -93,9 +110,16 @@ class FOIMetaView(BaseMetaView):
     def on_model_change(self, form, model, is_created):
         name = form.name.data
         properties = form.observed_properties.data
-        if not table_exists(name):
-            foi_properties = [{"name": e["name"], "type": e["type"]} for e in properties]
-            create_foi_table(name, foi_properties)
+        validate_foi_json(properties)
+        try:
+            if not table_exists(name):
+                foi_properties = [{"name": e["name"], "type": e["type"]} for e in properties]
+                create_foi_table(name, foi_properties)
+        except TypeError as err:
+            # This will occur if you are running without an address for a
+            # Redshift DB - when we attempt to create a new table 
+            print("admin_view.FOIMetaView.on_model_change.err: {}"
+                  .format(traceback.format_exc()))
 
 
 class SensorMetaView(BaseMetaView):
