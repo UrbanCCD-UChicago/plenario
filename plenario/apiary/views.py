@@ -12,8 +12,8 @@ blueprint = Blueprint("apiary", __name__)
 redis = Redis(REDIS_HOST_SAFE)
 
 
-# @login_required
 @blueprint.route("/apiary/send_message", methods=["POST"])
+# @login_required
 def send_message():
     try:
         data = loads(request.data)
@@ -26,8 +26,8 @@ def send_message():
         return make_response(format_exc(), 500)
 
 
-@login_required
 @blueprint.route("/apiary/mapper_errors", methods=["GET"])
+@login_required
 def mapper_errors():
     errors = defaultdict(list)
     for key in redis.scan_iter(match="AOTMapper_*"):
