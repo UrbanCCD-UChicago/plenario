@@ -1,5 +1,6 @@
-from flask import redirect
-from flask_admin import Admin, AdminIndexView
+from collections import defaultdict
+from flask import redirect, render_template
+from flask_admin import Admin, AdminIndexView, expose
 from flask_admin.menu import MenuLink, url_for
 from flask_login import current_user
 
@@ -8,7 +9,7 @@ from plenario.sensor_network.sensor_models import FeatureOfInterest
 from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, Sensor
 
 from admin_view import admin_views
-from views import blueprint
+from views import blueprint, redis
 
 
 class ApiaryIndexView(AdminIndexView):
@@ -18,6 +19,13 @@ class ApiaryIndexView(AdminIndexView):
 
     def inaccessible_callback(self, name, **kwargs):
         return redirect(url_for("auth.login"))
+    
+    @expose("/")
+    def index(self):
+        errors = defaultdict(list)
+        for key in redis.scan_iter(match="AOTMapper_*"):
+            errors[key].append(redis.get(key))
+        return self.render("apiary/index.html", errors=errors)
 
 
 admin = Admin(

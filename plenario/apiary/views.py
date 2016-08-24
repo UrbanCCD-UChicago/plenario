@@ -18,7 +18,7 @@ def send_message():
     try:
         data = loads(request.data)
         if data["value"].upper() == "DELETE":
-            redis.delete(data["name"])
+            redis.delete("AOTMapper_" + data["name"])
         else:
             redis.set(name="AOTMapper_" + data["name"], value=dumps(data["value"]))
         return make_response("Message received successfully!", 200)
