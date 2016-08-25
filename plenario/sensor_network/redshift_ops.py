@@ -11,17 +11,16 @@ def create_foi_table(foi_name, properties):
        :param properties: list of {'name': name, 'type': type} dictionaries """
 
     op = ('CREATE TABLE {} ('
-          '"nodeId" VARCHAR NOT NULL, '
+          '"node_id" VARCHAR NOT NULL, '
           'datetime TIMESTAMP WITHOUT TIME ZONE NOT NULL, '
+          '"node_config" VARCHAR NOT NULL, '
           '"sensor" VARCHAR NOT NULL, ').format(foi_name)
     for prop in properties:
         op = (op + '"{}" {}, '.format(prop['name'], prop['type']))
-    op = (op + ('"procedures" INTEGER, '
-                'PRIMARY KEY ("nodeId", datetime)) '
+    op = (op + ('PRIMARY KEY ("node_id", datetime)) '
           'DISTKEY(datetime) SORTKEY(datetime);'))
     print op
-    op = text(op)
-    redshift_engine.execute(op)
+    redshift_engine.execute(text(op))
 
 
 def add_column(network_name, column_name, column_type):
