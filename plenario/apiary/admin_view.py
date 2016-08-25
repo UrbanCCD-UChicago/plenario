@@ -128,7 +128,6 @@ class SensorMetaView(BaseMetaView):
     ]
 
     def on_model_change(self, form, model, is_created):
-        assert_json_enclosed_in_brackets(form.observed_properties.data)
         validate_sensor_properties(form.observed_properties.data)
 
 
