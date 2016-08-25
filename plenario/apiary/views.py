@@ -1,8 +1,12 @@
+import os, sys
+sys.path.insert(0, os.path.abspath("../.."))
+
 from collections import defaultdict
 from flask import Blueprint, make_response, request
 from json import dumps, loads
 from redis import Redis
 from sqlalchemy import Table
+from sqlalchemy.inspection import inspect
 from traceback import format_exc
 
 from plenario.database import redshift_session as rshift_session
@@ -59,6 +63,11 @@ def map_unknown_to_foi(unknown, sensor_properties):
 
         rshift_engine.execute(insert.format(foi, columns, values))
 
+        delete = "delete from unknownfeature where node_id = '{}' and datetime = '{}' and node_config = '{}' and sensor = '{}'"
+        delete = delete.format(unknown.node_id, unknown.datetime, unknown.node_config, unknown.sensor)
+
+        rshift_engine.execute(delete)
+
 
 def unknown_features_resolve(target_sensor):
     """When the issues for a sensor with an unknown error have been resolved,
@@ -89,6 +98,7 @@ def unknown_features_resolve(target_sensor):
         map_unknown_to_foi(unknown, sensor_properties)
 
 
+
 @blueprint.route("/apiary/send_message", methods=["POST"])
 # @login_required
 def send_message():
@@ -102,3 +112,7 @@ def send_message():
         return make_response("Message received successfully!", 200)
     except (KeyError, ValueError):
         return make_response(format_exc(), 500)
+
+
+if __name__ == "__main__":
+    unknown_features_resolve("TMP112")
