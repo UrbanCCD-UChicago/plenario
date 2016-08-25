@@ -66,7 +66,7 @@ class Sensor(Base):
     __tablename__ = 'sensor__sensors'
 
     name = Column(String, primary_key=True)
-    observed_properties = Column(ARRAY(String))
+    observed_properties = Column(JSONB)
     info = Column(JSONB)
 
     @staticmethod

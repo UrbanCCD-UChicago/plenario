@@ -24,12 +24,4 @@ def send_message():
         return make_response("Message received successfully!", 200)
     except (KeyError, ValueError):
         return make_response(format_exc(), 500)
-
-
-@blueprint.route("/apiary/mapper_errors", methods=["GET"])
-@login_required
-def mapper_errors():
-    errors = defaultdict(list)
-    for key in redis.scan_iter(match="AOTMapper_*"):
-        errors[key].append(redis.get(key))
-    return make_response(dumps(errors), 200)
+        

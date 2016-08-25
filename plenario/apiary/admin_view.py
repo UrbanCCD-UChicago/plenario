@@ -12,7 +12,7 @@ from plenario.sensor_network.redshift_ops import create_foi_table
 from plenario.sensor_network.redshift_ops import table_exists
 from plenario.sensor_network.sensor_models import NetworkMeta
 from validators import validate_node, validate_sensor_properties
-from validators import validate_foi_json
+from validators import assert_json_enclosed_in_brackets
 
 
 # Based off a solution provided here:
@@ -108,7 +108,7 @@ class FOIMetaView(BaseMetaView):
     def on_model_change(self, form, model, is_created):
         name = form.name.data
         properties = form.observed_properties.data
-        validate_foi_json(properties)
+        assert_json_enclosed_in_brackets(properties)
         try:
             if not table_exists(name):
                 foi_properties = [{"name": e["name"], "type": e["type"]} for e in properties]
@@ -128,6 +128,7 @@ class SensorMetaView(BaseMetaView):
     ]
 
     def on_model_change(self, form, model, is_created):
+        assert_json_enclosed_in_brackets(form.observed_properties.data)
         validate_sensor_properties(form.observed_properties.data)
 
 

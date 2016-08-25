@@ -1,7 +1,8 @@
 import datetime
 import subprocess
-from argparse import ArgumentParser
 
+# TODO: Move this script under Flask-Script control
+from argparse import ArgumentParser
 from sqlalchemy.exc import ProgrammingError
 
 # Imports cause the meta tables to be created and added to Base.
@@ -9,6 +10,15 @@ from plenario.database import session, app_engine, Base
 from plenario.models import User
 from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DEFAULT_USER
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
+
+
+sensor_meta_table_names = (
+    "sensor__network_metadata",
+    "sensor__node_metadata",
+    "sensor__features_of_interest",
+    "sensor__sensors",
+    "sensor__sensor_to_node"
+)
 
 
 def create_tables(tables):
@@ -25,6 +35,20 @@ def create_tables(tables):
                 print "ALREADY EXISTS: {}".format(table)
 
 
+def delete_tables(tables):
+    """The opposite of create_tables.
+    
+    :param tables: (iterable) of string table names"""
+
+    for table in tables:
+        try:
+            app_engine.execute("DROP TABLE {} CASCADE".format(table))
+            print "DROP TABLE {}".format(table)
+        except ProgrammingError:
+            print "ALREADY DOESN'T EXIST: {}".format(table)
+        
+
+
 def init_db(args):
     print ""
     print "================"
@@ -34,7 +58,7 @@ def init_db(args):
         # No specific arguments specified. Run it all!
         add_functions()
         init_meta()
-        init_sensor_meta()
+        create_tables(sensor_meta_table_names)
         init_user()
         init_worker_meta()
     else:
@@ -44,12 +68,14 @@ def init_db(args):
             init_user()
         if args.weather:
             init_weather()
-        if args.workers():
+        if args.workers:
             init_worker_meta()
         if args.functions:
             add_functions()
         if args.sensors:
-            init_sensor_meta()
+            create_tables(sensor_meta_table_names)
+        if args.delete_sensors:
+            delete_tables(sensor_meta_table_names)
 
 
 def init_meta():
@@ -92,18 +118,6 @@ def init_weather():
         raise e
 
 
-def init_sensor_meta():
-    sensor_meta_table_names = (
-        "sensor__network_metadata",
-        "sensor__node_metadata",
-        "sensor__features_of_interest",
-        "sensor__sensors",
-        "sensor__sensor_to_node"
-    )
-
-    create_tables(sensor_meta_table_names)
-
-
 def init_worker_meta():
     create_tables(('plenario_workers', 'plenario_datadump', 'etl_task'))
 
@@ -142,6 +156,7 @@ def build_arg_parser():
                         help="Initialize tables for working with AOT data.")
     parser.add_argument("-k", "--workers", action="store_true",
                         help="Initialze tables for plenario's worker system.")
+    parser.add_argument("--delete-sensors", action="store_true")
     return parser
 
 
