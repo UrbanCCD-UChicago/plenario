@@ -218,6 +218,7 @@ def format_node_metadata(node):
     node_response = {
         'id': node.id,
         'network_name': node.sensor_network,
+        'sensors': [sensor.name for sensor in node.sensors],
         'location': {
             'lat': wkb.loads(bytes(node.location.data)).y,
             'lon': wkb.loads(bytes(node.location.data)).x
