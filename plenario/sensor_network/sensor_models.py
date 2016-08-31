@@ -5,6 +5,7 @@ from sqlalchemy.orm import relationship
 
 from plenario.database import Base, session
 
+# TODO: add network column so that we don't assume globally unique node IDs
 sensor_to_node = Table('sensor__sensor_to_node',
                        Base.metadata,
                        Column('sensor', String(), ForeignKey('sensor__sensors.name')),
@@ -57,7 +58,7 @@ class FeatureOfInterest(Base):
         for node in session.query(NodeMeta).all():
             if node.sensor_network == network_name or network_name is None:
                 for sensor in node.sensors:
-                    for prop in sensor.observed_properties:
+                    for prop in sensor.observed_properties.itervalues():
                         features.append(prop.split('.')[0])
         return list(set(features))
 

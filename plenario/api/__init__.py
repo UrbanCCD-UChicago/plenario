@@ -34,30 +34,23 @@ api.add_url_rule(prefix + '/jobs/<ticket>', view_func=get_job_view, methods=['GE
 
 api.add_url_rule(prefix + '/datadump', 'datadump', datadump)
 api.add_url_rule(prefix + '/datadump/<ticket>', 'get_datadump', get_datadump)
+
 # sensor networks
 api.add_url_rule(prefix + '/sensor-networks', 'sensor_networks', get_network_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>', 'sensor_network', get_network_metadata)
-api.add_url_rule(prefix + '/sensor-networks/nodes/<node_id>', 'single_node', get_node_metadata)
+
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes', 'network_nodes', get_node_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>', 'single_node', get_node_metadata)
 
-api.add_url_rule(prefix + '/sensor-networks/features-of-interest', 'features', get_features)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/features-of-interest', 'features', get_features)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/features-of-interest/<feature>', 'features', get_features)
-api.add_url_rule(prefix + '/sensor-networks/features-of-interest/<feature>', 'features', get_features)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest', 'features', get_features)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>', 'features', get_features)
 
-api.add_url_rule(prefix + '/sensor-networks/sensors', 'sensors', get_sensors)
-api.add_url_rule(prefix + '/sensor-networks/sensors/<sensor>', 'sensors', get_sensors)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/sensors', 'sensors', get_sensors)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/sensors/<sensor>', 'sensors', get_sensors)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/features-of-interest/<feature>/sensors', 'sensors', get_sensors)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/features-of-interest/<feature>/sensors/<sensor>', 'sensors', get_sensors)
-api.add_url_rule(prefix + '/sensor-networks/features-of-interest/<feature>/sensors', 'sensors', get_sensors)
-api.add_url_rule(prefix + '/sensor-networks/features-of-interest/<feature>/sensors/<sensor>', 'sensors', get_sensors)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>/sensors', 'sensors', get_sensors)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>/sensors/<sensor>', 'sensors', get_sensors)
 
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/query', 'observations', get_observations)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/query', 'observations', get_observations)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>/query', 'observations', get_observations)
 
 
 @api.route(prefix + '/flush-cache')

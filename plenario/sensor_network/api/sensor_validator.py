@@ -6,11 +6,9 @@ from marshmallow import fields, Schema
 from marshmallow.validate import Range, ValidationError
 from psycopg2 import Error
 from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
-from sqlalchemy import MetaData, Table
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
-from plenario.sensor_network.api.sensor_condition_builder import field_ops
-from plenario.database import session, redshift_engine
+from plenario.database import session
 from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest, Sensor
 
 
@@ -184,95 +182,9 @@ def validate(validator, request_args):
     # Determine unchecked parameters provided in the request.
     unchecked = set(args.keys()) - set(validator.fields.keys())
 
-    # If tree filters were provided, ignore ALL unchecked parameters that are
-    # not tree filters or response format information.
-    if 'filter NOT FUNCTIONAL' in request_args:
-
-        # Report a tree which causes the JSON parser to fail.
-        # Or a tree whose value is not valid.
-        try:
-            cond_tree = json.loads(request_args['filter'])
-            meta = MetaData()
-            if valid_tree(meta, cond_tree):
-                result.data['filter'] = cond_tree
-        except (ValueError, KeyError) as err:
-            result.errors['filter'] = "Bad tree: {} -- causes error {}.".format(request_args['filter'], err)
-            return result
-
     if unchecked:
         for param in unchecked:
             result.errors[param] = 'Not a valid filter'.format(param)
 
     # ValidatorResult(dict, dict, list)
     return ValidatorResult(result.data, result.errors, warnings)
-
-
-def valid_tree(meta, tree):
-    """Given a dictionary containing a condition tree, validate all conditions
-    nestled in the tree.
-
-    :param table: table to build conditions for, need it for the columns
-    :param tree: condition_tree
-
-    :returns: boolean value, true if the tree is valid"""
-
-    if not tree.keys():
-        raise ValueError("Empty or malformed tree.")
-
-    op = tree.get('op')
-    if not op:
-        raise ValueError("Invalid keyword in {}".format(tree))
-
-    if op == "and" or op == "or":
-        return all([valid_tree(meta, subtree) for subtree in tree['val']])
-
-    elif op in field_ops:
-        col = tree.get('col')
-        val = tree.get('val')
-
-        if col is None or val is None:
-            err_msg = 'Missing or invalid keyword in {}'.format(tree)
-            err_msg += ' -- use format "{\'op\': OP, \'col\': COL, \'val\', VAL}"'
-            raise ValueError(err_msg)
-
-        try:
-            (table_name, col_name) = col.split('.')
-            table_name = table_name.lower()
-            table = Table(table_name, meta, autoload=True, autoload_with=redshift_engine)
-        except (AttributeError, NoSuchTableError):
-            raise ValueError("Invalid feature of interest {} in filter".format(table_name))
-
-        return valid_column_condition(table, col_name, val)
-
-    else:
-        raise ValueError("Invalid operation {}".format(op))
-
-
-def valid_column_condition(table, column_name, value):
-    """Establish whether or not a set of components is able to make a valid
-    condition for the provided table.
-
-    :param table: SQLAlchemy table object
-    :param column_name: Name of the column
-    :param value: target value"""
-
-    # This is mostly to deal with what a pain datetime is.
-    # I can't just use its type to cast a string. :(
-
-    condition = {column_name: value}
-    convert(condition)
-    value = condition[column_name]
-
-    if column_name in table.columns.keys():
-        column = table.columns[column_name]
-    else:
-        raise KeyError("Invalid column name {}".format(column_name))
-
-    try:
-        if type(value) != column.type.python_type:
-            column.type.python_type(value)  # Blessed Python.
-    except (ValueError, TypeError):
-        raise ValueError("Invalid value type for {}. Was expecting {}"
-                         .format(value, column.type.python_type))
-
-    return True

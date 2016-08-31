@@ -1,23 +1,14 @@
 import json
-import shapely.geometry
 import sqlalchemy
 import ast
 import threading
-import dateutil.parser
 
-from collections import OrderedDict
-from datetime import datetime
-from flask import request, make_response, Response
-from itertools import groupby
-from operator import itemgetter
-from shapely.geometry import mapping
+from flask import request, make_response
 from shapely import wkb
-from geoalchemy2 import Geometry
 from sqlalchemy.exc import NoSuchTableError
 
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
 from plenario.api.common import make_cache_key
-from plenario.sensor_network.api.sensor_condition_builder import parse_tree
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.sensor_network.api.sensor_validator import SensorNetworkValidator, validate
 from plenario.database import session, redshift_session, redshift_engine
@@ -113,10 +104,10 @@ def get_sensors(network_name=None, feature=None, sensor=None):
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_observations(network_name=None, node_id=None):
-    fields = ('network_name', 'node_id', 'nodes',
+def get_observations(network_name=None):
+    fields = ('network_name', 'nodes',
               'start_datetime', 'end_datetime',
-              'location_geom__within', 'filter',
+              'location_geom__within',
               'features_of_interest', 'sensors',
               'limit', 'offset'
               )
@@ -127,9 +118,6 @@ def get_observations(network_name=None, node_id=None):
         return bad_request("Must specify network name")
     args['network_name'] = network_name
 
-    if node_id:
-        args['node_id'] = node_id
-
     if 'nodes' in args:
         args['nodes'] = args['nodes'].split(',')
 
@@ -138,12 +126,6 @@ def get_observations(network_name=None, node_id=None):
 
     if 'sensors' in args:
         args['sensors'] = args['sensors'].split(',')
-
-    # do we want to allow these?
-    if 'nodes' in args and 'node_id' in args:
-        return bad_request("Cannot specify single node ID and nodes filter")
-    if 'location_geom__within' in args and 'node_id' in args:
-        return bad_request("Cannot specify single node ID and geom filter")
 
     validator = SensorNetworkValidator(only=fields)
     validated_args = validate(validator, args)
@@ -180,25 +162,21 @@ def node_metadata_query(args):
     return q
 
 
-def observation_query(args):
-    params = ('nodes', 'filter',
+def observation_query(args, table):
+    params = ('nodes',
               'start_datetime', 'end_datetime',
-              'sensors',
-              'table')
+              'sensors')
 
     vals = (args.data.get(k) for k in params)
-    nodes, filter, start_datetime, end_datetime, sensors, table = vals
+    nodes, start_datetime, end_datetime, sensors = vals
 
     q = redshift_session.query(table)
 
     q = q.filter(table.c.datetime.between(start_datetime, end_datetime))
-    q = q.filter(table.c.nodeid.in_(nodes))
+    q = q.filter(table.c.node_id.in_(nodes))
 
     if sensors:
         q = q.filter(table.c.sensor.in_(sensors))
-
-    # if filter:
-    #    q = q.filter(parse_tree(table, filter))
 
     return q
 
@@ -219,9 +197,9 @@ def format_node_metadata(node):
         'id': node.id,
         'network_name': node.sensor_network,
         'sensors': [sensor.name for sensor in node.sensors],
-        'location': {
-            'lat': wkb.loads(bytes(node.location.data)).y,
-            'lon': wkb.loads(bytes(node.location.data)).x
+        'geometry': {
+            "type": "Point",
+            "coordinates": [wkb.loads(bytes(node.location.data)).y, wkb.loads(bytes(node.location.data)).x]
         },
         'info': node.info
     }
@@ -241,7 +219,7 @@ def format_feature(feature):
 def format_sensor(sensor):
     sensor_response = {
         'name': sensor.name,
-        'observed_properties': sensor.observed_properties,
+        'observed_properties': sensor.observed_properties.values(),
         'info': sensor.info
     }
 
@@ -250,13 +228,13 @@ def format_sensor(sensor):
 
 def format_observation(obs, table):
     obs_response = {
-        'node_id': obs.nodeid,
+        'node_id': obs.node_id,
         'datetime': obs.datetime.isoformat().split('+')[0],
         'sensor': obs.sensor,
         'feature_of_interest': table.name,
         'results': {}
     }
-    for prop in (set([c.name for c in table.c]) - {'nodeid', 'datetime', 'sensor', 'procedures'}):
+    for prop in (set([c.name for c in table.c]) - {'node_id', 'datetime', 'sensor', 'node_config'}):
         obs_response['results'][prop] = getattr(obs, prop)
 
     return obs_response
@@ -322,7 +300,7 @@ def _get_sensors(args):
     data = [format_sensor(sensor) for sensor in q.all()
             if (sensor.name in Sensor.index(args.data['network_name']) or
                 args.data['network_name'] is None) and
-            (args.data['feature'] in [prop.split('.')[0] for prop in sensor.observed_properties] or
+            (args.data['feature'] in [prop.split('.')[0] for prop in sensor.observed_properties.itervalues()] or
              args.data['feature'] is None) and
             (sensor.name == args.data['sensor'] or args.data['sensor'] is None)]
 
@@ -340,25 +318,23 @@ def _get_sensors(args):
 
 def _get_observations(args):
     nodes_to_query = [node.id for node in node_metadata_query(args).all()]
+    print nodes_to_query
 
     args.data['nodes'] = nodes_to_query
 
     features = args.data['features_of_interest']
+    print features
 
     # if the user specified a sensor list,
     # only query feature tables that those sensors report on
-    try:
-        # Will throw KeyError if no 'sensors' argument was given
-        s = request.args['sensors']
+    if 'sensors' in request.args:
 
         sensors = [sensor for sensor in session.query(Sensor).filter(Sensor.name.in_(args.data['sensors']))]
         all_features = []
         for sensor in sensors:
-            for foi in list(set([prop.split('.')[0] for prop in sensor.observed_properties])):
+            for foi in list(set([prop.split('.')[0] for prop in sensor.observed_properties.itervalues()])):
                 all_features.append(foi)
         features = set(features).intersection(all_features)
-    except KeyError:
-        pass
 
     tables = []
     meta = sqlalchemy.MetaData()
@@ -395,10 +371,6 @@ def _get_observations(args):
     if 'geom' in args.data:
         args.data.pop('geom')
 
-    # the reflected table object used for querying should not be returned in the output
-    if 'table' in args.data:
-        args.data.pop('table')
-
     # get rid of those pesky +00:00 timezones
     if 'start_datetime' in request.args:
         args.data['start_datetime'] = args.data['start_datetime'].split("+")[0]
@@ -423,8 +395,7 @@ def _get_observations(args):
 
 
 def _thread_query(table, num_tables, data, args):
-    args.data['table'] = table
-    q = observation_query(args)
+    q = observation_query(args, table)
     q = q.limit(args.data['limit'] / num_tables)
     q = q.offset(args.data['offset'] / num_tables) if args.data['offset'] else q
     for obs in q.all():

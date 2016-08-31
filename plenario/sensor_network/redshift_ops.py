@@ -1,3 +1,6 @@
+import os, sys
+sys.path.insert(0, os.path.abspath('../..'))
+
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
