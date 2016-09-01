@@ -16,7 +16,7 @@ def create_foi_table(foi_name, properties):
     op = ('CREATE TABLE {} ('
           '"node_id" VARCHAR NOT NULL, '
           'datetime TIMESTAMP WITHOUT TIME ZONE NOT NULL, '
-          '"meta_id" DOUBLE NOT NULL, '
+          '"meta_id" DOUBLE PRECISION NOT NULL, '
           '"sensor" VARCHAR NOT NULL, ').format(foi_name)
     for prop in properties:
         op = (op + '"{}" {}, '.format(prop['name'], prop['type']))
