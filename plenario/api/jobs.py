@@ -140,18 +140,21 @@ def submit_job(req):
     touch_ticket_expiry(ticket)
 
     # Send this *last* after everything is ready.
-    job_queue.send_message(
-        MessageBody="plenario_job",
-        MessageAttributes={
-            "ticket": {
-                "DataType": "String",
-                "StringValue": str(ticket)
-            }, str(ticket): {
-                "DataType": "String",
-                "StringValue": "ticket"
+    if job_queue is not None:
+        job_queue.send_message(
+            MessageBody="plenario_job",
+            MessageAttributes={
+                "ticket": {
+                    "DataType": "String",
+                    "StringValue": str(ticket)
+                }, str(ticket): {
+                    "DataType": "String",
+                    "StringValue": "ticket"
+                }
             }
-        }
-    )
+        )
+    else:
+        temporary_worker(ticket, req)
 
     file_ = open("/opt/python/log/sender.log", "a")
     file_.write("{}: Sent job with ticket {}...\n".format(datetime.datetime.now(), ticket))
@@ -167,3 +170,41 @@ def cancel_job(ticket):
         job_queue.delete_message(response[0])
         return ticket
     return None
+
+
+def temporary_worker(ticket, job_request):
+    """For situations in local development where queue system is not present,
+    spin up a temporary worker thread to accomplish a job right away.
+    
+    :param ticket: (str) ID of job status stored within Redis
+    :param job_request: (dict) contains API endpoint and query arguments"""
+
+    import traceback
+
+    from threading import Thread 
+
+    from plenario_worker.endpoints import endpoint_logic
+    from plenario_worker.metacommands import process_metacommands
+    from plenario_worker.ticket import set_ticket_error, set_ticket_queued
+    from plenario_worker.ticket import set_ticket_success
+
+    if endpoint not in endpoint_logic:
+        set_ticket_error({}, ticket, "Invalid endpoint specified.", "temp")
+        return
+
+    endpoint = job_request["endpoint"]
+    query_args = job_request["query"]
+    set_ticket_queued({}, ticket, "Queued", "temp")
+
+    def do_work():
+        try:
+            convert(query_args)
+            query_args = ValidatorProxy(query_args)
+            result = endpoint_logic[endpoint](query_args)
+            set_ticket_success(ticket, result)
+        except Exception as exc:
+            set_ticket_error({}, ticket, traceback.format_exc(exc), "temp")
+
+    temp_thread = Thread(target=do_work)
+    temp_thread.start()
+    
