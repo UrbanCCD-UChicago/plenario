@@ -8,6 +8,7 @@ import shapely.wkb
 import copy
 import sqlalchemy
 import traceback
+import warnings
 
 import response as api_response
 
@@ -499,9 +500,12 @@ def cleanup_datadump():
 
 
 def log(msg):
-    # The constant opening and closing is meh, I know. But I'm feeling lazy
-    # right now.
-    logfile = open('/opt/python/log/api.log', "a")
+    try:
+        logfile = open("/opt/python/log/api.log", "a")
+    except IOError:
+        warnings.warn("/opt/python/log/api.log not found - writing to current "
+                      "directory", RuntimeWarning)
+        logfile = open("./api.log", "a")
     logfile.write("{} - {}\n".format(datetime.now(), msg))
     logfile.close()
 

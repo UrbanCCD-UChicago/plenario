@@ -163,7 +163,7 @@ def submit_job(req):
     except IOError:
         warnings.warn("Failed to write to /opt/python/log/sender.log - "
                       "writing to current directory.", RuntimeWarning)
-        logfile = open("./sender.log", "a")        
+        logfile = open("./sender.log", "a")
     logfile.write("{}: Sent job with ticket {}...\n".format(datetime.datetime.now(), ticket))
     logfile.close()
 
@@ -184,20 +184,20 @@ def temporary_worker(ticket, job_request):
     spin up a temporary worker thread to accomplish a job right away. This is
     a very distilled version of worker.py - possibly a good reference for
     learning about the main worker system.
-    
+
     :param ticket: (str) ID of job status stored within Redis
     :param job_request: (dict) contains API endpoint and query arguments"""
 
     import traceback
 
     from collections import namedtuple
-    from threading import Thread 
+    from threading import Thread
 
+    from plenario.api.response import convert_result_geoms
     from plenario.api.validator import convert
     from plenario_worker.utilities import log
     from plenario_worker.endpoints import endpoint_logic, shape_logic
     from plenario_worker.endpoints import etl_logic
-    from plenario_worker.metacommands import process_metacommands
     from plenario_worker.ticket import set_ticket_error, set_ticket_queued
     from plenario_worker.ticket import set_ticket_success
 
@@ -205,7 +205,7 @@ def temporary_worker(ticket, job_request):
 
     endpoint = job_request["endpoint"]
     query_args = job_request["query"]
-    status = {"meta": {}}
+    status = {"meta": {"startTime": datetime.datetime.now()}}
     set_ticket_queued(status, ticket, "Queued", "temp")
 
     # Note that this section is idential to logic check in worker.py
@@ -213,6 +213,10 @@ def temporary_worker(ticket, job_request):
     def do_work(endpoint, query_args, ticket):
         try:
             if endpoint in endpoint_logic:
+                # These keys are used for the datadump endpoint
+                query_args["jobsframework_ticket"] = ticket
+                query_args["jobsframework_workerid"] = "temp"
+                query_args["jobsframework_workerbirthtime"] = datetime.datetime.now()
                 convert(query_args)
                 query_args = ValidatorProxy(query_args)
                 result = endpoint_logic[endpoint](query_args)
@@ -237,4 +241,4 @@ def temporary_worker(ticket, job_request):
     temp_thread.start()
     log("Beginning work on endpoint: {}, with args: {}"
         .format(endpoint, query_args), "temp")
-    
+
