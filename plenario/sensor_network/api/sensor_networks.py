@@ -1,6 +1,5 @@
 import json
 import sqlalchemy
-import ast
 import threading
 
 from flask import request, make_response
