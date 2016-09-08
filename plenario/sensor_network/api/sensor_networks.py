@@ -42,17 +42,6 @@ def get_node_metadata(node_id=None, network_name=None):
         args['network_name'] = network_name
     if node_id:
         args['node_id'] = node_id
-    if 'nodes' in args:
-        try:
-            args['nodes'] = ast.literal_eval(args['nodes'])
-        except (SyntaxError, ValueError) as e:
-            return bad_request("Cannot parse 'nodes' filter. Causes error {}".format(e))
-
-    # do we want to allow these?
-    if 'nodes' in args and 'node_id' in args:
-        return bad_request("Cannot specify single node ID and nodes filter")
-    if 'location_geom__within' in args and 'node_id' in args:
-        return bad_request("Cannot specify single node ID and geom filter")
 
     validator = SensorNetworkValidator(only=fields)
     validated_args = validate(validator, args)
@@ -83,8 +72,8 @@ def get_features(network_name=None, feature=None):
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_sensors(network_name=None, feature=None, sensor=None):
-    fields = ('network_name', 'feature', 'sensor')
+def get_sensors(network_name=None, feature=None, sensor=None, node_id=None):
+    fields = ('network_name', 'feature', 'sensor', 'node_id')
 
     args = {}
     if network_name:
@@ -93,6 +82,8 @@ def get_sensors(network_name=None, feature=None, sensor=None):
         args['feature'] = feature
     if sensor:
         args['sensor'] = sensor
+    if node_id:
+        args['node_id'] = node_id
 
     validator = SensorNetworkValidator(only=fields)
     validated_args = validate(validator, args)
@@ -115,7 +106,7 @@ def get_observations(network_name=None):
     args = request.args.to_dict()
 
     if network_name is None:
-        return bad_request("Must specify network name")
+        return bad_request("Must specify a network name")
     args['network_name'] = network_name
 
     if 'nodes' in args:
@@ -185,7 +176,8 @@ def format_network_metadata(network):
     network_response = {
         'name': network.name,
         'features_of_interest': FeatureOfInterest.index(network.name),
-        'nodes': [node.id for node in network.nodes],
+        'nodes': NodeMeta.index(network.name),
+        'sensors': Sensor.index(network.name),
         'info': network.info
     }
 
@@ -203,6 +195,12 @@ def format_node_metadata(node):
         },
         'info': node.info
     }
+
+    features = []
+    for sensor in node.sensors:
+        for prop in sensor.observed_properties.itervalues():
+            features.append(prop.split('.')[0])
+    node_response['features_of_interest'] = features
 
     return node_response
 
@@ -234,7 +232,7 @@ def format_observation(obs, table):
         'feature_of_interest': table.name,
         'results': {}
     }
-    for prop in (set([c.name for c in table.c]) - {'node_id', 'datetime', 'sensor', 'node_config'}):
+    for prop in (set([c.name for c in table.c]) - {'node_id', 'datetime', 'sensor', 'meta_id'}):
         obs_response['results'][prop] = getattr(obs, prop)
 
     return obs_response

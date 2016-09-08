@@ -1,5 +1,5 @@
 from geoalchemy2 import Geometry
-from sqlalchemy import Table, String, Column, ForeignKey
+from sqlalchemy import Table, String, Column, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import relationship
 
@@ -8,8 +8,11 @@ from plenario.database import Base, session
 # TODO: add network column so that we don't assume globally unique node IDs
 sensor_to_node = Table('sensor__sensor_to_node',
                        Base.metadata,
-                       Column('sensor', String(), ForeignKey('sensor__sensors.name')),
-                       Column('node', String(), ForeignKey('sensor__node_metadata.id'))
+                       Column('sensor', String, ForeignKey('sensor__sensors.name')),
+                       Column('network', String),
+                       Column('node', String),
+                       ForeignKeyConstraint(['network', 'node'],
+                                            ['sensor__node_metadata.sensor_network', 'sensor__node_metadata.id'])
                        )
 
 
@@ -30,7 +33,7 @@ class NodeMeta(Base):
     __tablename__ = 'sensor__node_metadata'
 
     id = Column(String, primary_key=True)
-    sensor_network = Column(String, ForeignKey('sensor__network_metadata.name'))
+    sensor_network = Column(String, ForeignKey('sensor__network_metadata.name'), primary_key=True)
     location = Column(Geometry(geometry_type='POINT', srid=4326))
     sensors = relationship('Sensor', secondary='sensor__sensor_to_node')
     info = Column(JSONB)

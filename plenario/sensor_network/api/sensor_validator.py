@@ -14,7 +14,7 @@ from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, Feature
 
 def validate_network(network):
     if network not in NetworkMeta.index():
-        raise ValidationError("Invalid network name: {}.".format(network))
+        raise ValidationError("Invalid network name: {}".format(network))
 
 
 def validate_nodes(nodes):
@@ -23,7 +23,7 @@ def validate_nodes(nodes):
     valid_nodes = NodeMeta.index()
     for node in nodes:
         if node not in valid_nodes:
-            raise ValidationError("Invalid node ID: {}.".format(node))
+            raise ValidationError("Invalid node ID: {}".format(node))
 
 
 def validate_features(features):
@@ -32,7 +32,7 @@ def validate_features(features):
     valid_features = FeatureOfInterest.index()
     for feature in features:
         if feature not in valid_features:
-            raise ValidationError("Invalid feature name: {}.".format(feature))
+            raise ValidationError("Invalid feature of interest name: {}".format(feature))
 
 
 def validate_sensors(sensors):
@@ -41,7 +41,7 @@ def validate_sensors(sensors):
     valid_sensors = Sensor.index()
     for sensor in sensors:
         if sensor not in valid_sensors:
-            raise ValidationError("Invalid sensor name: {}.".format(sensor))
+            raise ValidationError("Invalid sensor name: {}".format(sensor))
 
 
 # not working...

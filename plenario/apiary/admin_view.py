@@ -86,8 +86,7 @@ class NodeMetaView(BaseMetaView):
     def on_model_change(self, form, model, is_created):
         network = form.sensor_network.data
         validate_node(network)
-        network_obj = session.query(NetworkMeta).filter(NetworkMeta.name == network)
-        network_obj = network_obj.first()
+        network_obj = session.query(NetworkMeta).filter(NetworkMeta.name == network).first()
         network_obj.nodes.append(model)
         session.commit()
 

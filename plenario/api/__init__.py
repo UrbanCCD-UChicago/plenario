@@ -47,8 +47,10 @@ api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/
 
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/sensors', 'sensors', get_sensors)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/sensors/<sensor>', 'sensors', get_sensors)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>/sensors', 'sensors', get_sensors)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>/sensors/<sensor>', 'sensors', get_sensors)
+# api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>/sensors', 'sensors', get_sensors)
+# api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>/sensors/<sensor>', 'sensors', get_sensors)
+# api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>/sensors', 'sensors', get_sensors)
+# api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>/sensors/<sensor>', 'sensors', get_sensors)
 
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/query', 'observations', get_observations)
 
