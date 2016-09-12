@@ -1,6 +1,6 @@
 import traceback
 
-from flask import redirect, url_for, request
+from flask import redirect, url_for
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.form.rules import Field
 from flask_login import current_user
@@ -13,6 +13,7 @@ from plenario.sensor_network.redshift_ops import table_exists
 from plenario.sensor_network.sensor_models import NetworkMeta
 from validators import validate_node, validate_sensor_properties
 from validators import assert_json_enclosed_in_brackets
+from validators import map_to_redshift_type
 
 
 # Based off a solution provided here:
@@ -108,11 +109,14 @@ class FOIMetaView(BaseMetaView):
         name = form.name.data
         properties = form.observed_properties.data
         assert_json_enclosed_in_brackets(properties)
+        for property_dict in properties:
+            map_to_redshift_type(property_dict)
+
         try:
             if not table_exists(name):
-                foi_properties = [{"name": e["name"], "type": e["type"]} for e in properties]
+                foi_properties = [{"name": e["name"], "type": e["value"]} for e in properties]
                 create_foi_table(name, foi_properties)
-        except TypeError as err:
+        except TypeError:
             # This will occur if you are running without an address for a
             # Redshift DB - when we attempt to create a new table 
             print("admin_view.FOIMetaView.on_model_change.err: {}"

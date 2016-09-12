@@ -31,3 +31,31 @@ def assert_json_enclosed_in_brackets(json_list):
 def validate_node(network):
     if network not in [net.name for net in session.query(NetworkMeta).all()]:
         raise ValidationError("Invalid network name!")
+
+
+def map_to_redshift_type(property_dict):
+    """Given a dictionary of the form {"name": "foo", "value": "bar"}, pass
+    or coerce the "value" strings to one of four types: BOOLEAN, DOUBLE
+    PRECISION, BIGINT, VARCHAR.
+
+    :param property_dict: contains apiary provided column definition
+    :raises: ValidationError: if a provided value is unmappable"""
+
+    redshift_type_map = {
+        "BOOL": "BOOLEAN",
+        "INT": "BIGINT",
+        "INTEGER": "BIGINT",
+        "DOUBLE": "DOUBLE PRECISION",
+        "FLOAT": "DOUBLE PRECISION",
+        "STRING": "VARCHAR"
+    }
+
+    value = property_dict["value"].upper()
+    type_aliases = set(redshift_type_map.keys())
+    type_standards = set(redshift_type_map.values())
+
+    if value not in type_standards:
+        if value not in type_aliases:
+            raise ValidationError("Invalid type provided: {}".format(value))
+        else:
+            property_dict["value"] = redshift_type_map[value]
