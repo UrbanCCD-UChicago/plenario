@@ -195,15 +195,8 @@ def format_node_metadata(node):
             "network_name": node.sensor_network,
             "sensors": [sensor.name for sensor in node.sensors],
             "info": node.info,
-            "features_of_interest": None,
         },
     }
-
-    features = []
-    for sensor in node.sensors:
-        for prop in sensor.observed_properties.itervalues():
-            features.append(prop.split('.')[0])
-    node_response['properties']['features_of_interest'] = features
 
     return node_response
 
