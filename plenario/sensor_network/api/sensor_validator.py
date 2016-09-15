@@ -1,5 +1,3 @@
-import json
-
 from collections import namedtuple
 from datetime import datetime, timedelta
 from marshmallow import fields, Schema
@@ -85,8 +83,8 @@ class Validator(Schema):
     sensor = fields.Str(default=None, validate=validate_sensors)
 
     location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
-    start_datetime = fields.DateTime(default=datetime.utcnow() - timedelta(days=90))
-    end_datetime = fields.DateTime(default=datetime.utcnow())
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=90))
+    end_datetime = fields.DateTime(default=datetime.utcnow)
     filter = fields.Str(allow_none=True, missing=None, default=None)
     limit = fields.Integer(default=1000)
     offset = fields.Integer(default=0, validate=Range(0))
@@ -122,7 +120,6 @@ def convert(request_args):
     above.
 
     :param request_args: dictionary of request arguments
-    :param converters: dictionary of converter functions
 
     :returns: converted dictionary"""
 

@@ -62,9 +62,7 @@ def knn(pk, geom, pid, table, k):
     :param k: (int) number of results to return
     :returns: (list) of nearest k neighbors"""
 
-    q_knn = """
-        select {pk} from {table}
-        order by {geom} <-> (select {geom} from {table} where {pk} = '{pid}')
-        limit {k}
-    """.format(pk=pk, geom=geom, point_id=pid, table=table, k=k)
+    q_knn = "select {pk} from {table} " \
+            "order by {geom} <-> (select {geom} from {table} where {pk} = '{pid}') " \
+            "limit {k}".format(pk=pk, geom=geom, pid=pid, table=table, k=k)
     return engine.execute(q_knn).fetchall()
