@@ -226,6 +226,7 @@ def format_sensor(sensor):
 def format_observation(obs, table):
     obs_response = {
         'node_id': obs.node_id,
+        'meta_id': obs.meta_id,
         'datetime': obs.datetime.isoformat().split('+')[0],
         'sensor': obs.sensor,
         'feature_of_interest': table.name,
@@ -254,6 +255,8 @@ def _get_network_metadata(args):
     return resp
 
 
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
 def _get_node_metadata(args):
     q = node_metadata_query(args)
     data = [format_node_metadata(node) for node in q.all()]
@@ -349,7 +352,10 @@ def _get_observations(args):
         t = threading.Thread(target=_thread_query, args=(table, len(tables), data, args))
         threads.append(t)
         t.start()
-        t.join()
+
+    # Now wait for each thread to terminate
+    for thread in threads:
+        thread.join()
 
     # if the user didn't specify a 'nodes' filter, don't display nodes in the query output
     if 'nodes' not in request.args:
