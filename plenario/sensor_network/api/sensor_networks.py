@@ -185,21 +185,25 @@ def format_network_metadata(network):
 
 def format_node_metadata(node):
     node_response = {
-        'id': node.id,
-        'network_name': node.sensor_network,
-        'sensors': [sensor.name for sensor in node.sensors],
+        "type": "Feature",
         'geometry': {
             "type": "Point",
-            "coordinates": [wkb.loads(bytes(node.location.data)).x, wkb.loads(bytes(node.location.data)).y]
+            "coordinates": [wkb.loads(bytes(node.location.data)).y, wkb.loads(bytes(node.location.data)).x],
         },
-        'info': node.info
+        "properties": {
+            "id": node.id,
+            "network_name": node.sensor_network,
+            "sensors": [sensor.name for sensor in node.sensors],
+            "info": node.info,
+            "features_of_interest": None,
+        },
     }
 
     features = []
     for sensor in node.sensors:
         for prop in sensor.observed_properties.itervalues():
             features.append(prop.split('.')[0])
-    node_response['features_of_interest'] = features
+    node_response['properties']['features_of_interest'] = features
 
     return node_response
 
@@ -255,8 +259,6 @@ def _get_network_metadata(args):
     return resp
 
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin="*")
 def _get_node_metadata(args):
     q = node_metadata_query(args)
     data = [format_node_metadata(node) for node in q.all()]
