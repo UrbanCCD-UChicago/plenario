@@ -50,3 +50,21 @@ def table_exists(table_name):
         return True
     except ProgrammingError:
         return False
+
+
+def knn(pk, geom, pid, table, k):
+    """Execute a spatial query to select k nearest neighbors given some point.
+
+    :param pk: (str) primary key column name
+    :param geom: (str) geom column name
+    :param pid: (str) target point
+    :param table: (str) target table name
+    :param k: (int) number of results to return
+    :returns: (list) of nearest k neighbors"""
+
+    q_knn = """
+        select {pk} from {table}
+        order by {geom} <-> (select {geom} from {table} where {pk} = '{pid}')
+        limit {k}
+    """.format(pk=pk, geom=geom, point_id=pid, table=table, k=k)
+    return engine.execute(q_knn).fetchall()

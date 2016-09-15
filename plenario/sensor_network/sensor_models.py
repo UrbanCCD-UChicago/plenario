@@ -4,6 +4,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from plenario.database import Base, session
+from plenario.utils.model_helpers import knn
 
 sensor_to_node = Table('sensor__sensor_to_node',
                        Base.metadata,
@@ -43,6 +44,16 @@ class NodeMeta(Base):
     def index(network_name=None):
         nodes = session.query(NodeMeta).all()
         return [node.id for node in nodes if node.sensor_network == network_name or network_name is None]
+
+    @staticmethod
+    def nearest_neighbor_to(node_name):
+        return knn(
+            pk="id",
+            geom="location",
+            pid=node_name,
+            table="sensor__node_metadata",
+            k=1
+        )[0]
 
     def __repr__(self):
         return '<Node "{}">'.format(self.id)
