@@ -151,6 +151,57 @@ def get_observations(network_name=None):
     return _get_observations(validated_args)
 
 
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def get_node_aggregations(network_name, node_id):
+    """Aggregate individual node observations up to larger units of time.
+    Do so by applying aggregate functions on all observations found within
+    a specified window of time.
+
+    :endpoint: /sensor-networks/<network-name>/nodes/<node-id>/aggregate?<args>
+    :param network_name: (str) from sensor__network_metadata
+    :param node_id: (str) from sensor__node_metadata
+    :returns: (json) response"""
+
+    fields = ("network_name", "node_id")
+
+    args = request.args.to_dict()
+    args["network_name"] = network_name
+    args["node_id"] = node_id
+
+    validated_args = validate(Validator(only=fields), args)
+    if validated_args.errors:
+        return bad_request(validated_args.errors)
+
+    result = _get_node_aggregations(validated_args)
+    return node_aggregations_response(args, result)
+
+
+def _get_node_aggregations(args):
+
+    from sensor_aggregate_functions import apply_aggregate_fn
+
+    function = args.data.get("function")
+    function_args = args.data.get("function_args")
+    result = apply_aggregate_fn[function](function_args)
+
+    return format_node_aggregate(result)
+
+
+def format_node_aggregate(obs):
+
+    return True
+
+
+def node_aggregations_response(args, result):
+
+    resp = json_response_base(args, result, args.data)
+    resp = make_response(json.dumps(resp), 200)
+    resp.headers['Content-Type'] = 'application/json'
+
+    return resp
+
+
 def node_metadata_query(args):
     """Create a SQLAlchemy query for querying node metadata. Used in the
     _get_node_metadata route logic method.
@@ -348,11 +399,6 @@ def _get_observations(args):
         sensors = session.query(Sensor)
         sensors = sensors.filter(sqla_fn.lower(Sensor.name).in_(target_sensors))
         sensors = sensors.all()
-
-        print "\n\n\n\n\n\n"
-        print "SENSORS: {}".format(sensors)
-        print "\n\n\n\n\n\n"
-
         all_features = []
         for sensor in sensors:
             for foi in set([prop.split('.')[0].lower() for prop in sensor.observed_properties.itervalues()]):
