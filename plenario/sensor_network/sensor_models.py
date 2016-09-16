@@ -47,13 +47,15 @@ class NodeMeta(Base):
 
     @staticmethod
     def nearest_neighbor_to(node_name):
+        # Returns a list of tuples, usually the closest node
+        # is itself, which is why we grab the second element.
         return knn(
             pk="id",
             geom="location",
-            pid=node_name,
+            point_id=node_name,
             table="sensor__node_metadata",
-            k=1
-        )[0]
+            k=2
+        )[1][0]
 
     def __repr__(self):
         return '<Node "{}">'.format(self.id)

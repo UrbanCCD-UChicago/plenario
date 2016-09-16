@@ -52,33 +52,38 @@ def table_exists(table_name):
         return False
 
 
-def knn(pk, geom, pid, table, k):
+def knn(pk, geom, point_id, table, k):
     """Execute a spatial query to select k nearest neighbors given some point.
 
     :param pk: (str) primary key column name
     :param geom: (str) geom column name
-    :param pid: (str) target point
+    :param point_id: (str) target point
     :param table: (str) target table name
     :param k: (int) number of results to return
     :returns: (list) of nearest k neighbors"""
 
+    # How many to limit the initial bounding box query to
+    k_10 = k * 10
+
     # Based off snippet provided on pg 253 of PostGIS In Action (2nd Edition)
     query = """
-        with bounding_box_filtered as (
-            select
-                id,
-                location,
-                (select location from sensor__node_metadata where id = 'NODE_DEV_1') as ref_geom
-            from sensor__node_metadata
-            order by location <#> (select location from sensor__node_metadata as l where id = 'NODE_DEV_1')
-            limit 100
-        )
+    WITH bbox_results AS (
+      SELECT
+        {pk},
+        {geom},
+        (SELECT {geom} FROM {table} WHERE {pk} = '{point_id}') AS ref_geom
+      FROM {table}
+      ORDER BY {geom} <#>
+        (SELECT {geom} from {table} as l WHERE {pk} = '{point_id}')
+      LIMIT {k_10}
+    )
 
-        select
-        id, rank() over(order by ST_Distance(location, ref_geom)) as act_rank
-        from bounding_box_filtered
-        order by act_rank
-        limit {k}
-    """
+    SELECT
+      {pk},
+      RANK() OVER(ORDER BY ST_Distance({geom}, ref_geom)) AS act_r
+    FROM bbox_results
+    ORDER BY act_r
+    LIMIT {k};
+    """.format(pk=pk, geom=geom, point_id=point_id, table=table, k=k, k_10=k_10)
 
-    return engine.execute(q_knn).fetchall()
+    return engine.execute(query).fetchall()

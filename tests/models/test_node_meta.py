@@ -7,7 +7,11 @@ class TestNodeMeta(unittest.TestCase):
 
         from plenario.sensor_network.sensor_models import NodeMeta
 
-        expected = "SENSOR_DEV_4"
-        observed = NodeMeta.nearest_neighbor_to("SENSOR_DEV_1")
-
+        expected = "NODE_DEV_2"
+        observed = NodeMeta.nearest_neighbor_to("NODE_DEV_1")
         self.assertEqual(expected, observed)
+
+        expected = "NODE_DEV_1"
+        observed = NodeMeta.nearest_neighbor_to("NODE_DEV_2")
+        self.assertEqual(expected, observed)
+
