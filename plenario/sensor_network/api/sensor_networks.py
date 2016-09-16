@@ -2,6 +2,7 @@ import json
 import sqlalchemy
 import threading
 
+from dateutil.parser import parse
 from flask import request, make_response
 from shapely import wkb
 from sqlalchemy.exc import NoSuchTableError
@@ -384,6 +385,9 @@ def _get_observations(args):
     display_args = {}
     display_args.update(request.args)
     display_args.update(args.data)
+
+    # Sort the data by datetime
+    data.sort(key=lambda x: parse(x["datetime"]))
 
     resp = json_response_base(args, data, display_args)
     resp = make_response(json.dumps(resp), 200)
