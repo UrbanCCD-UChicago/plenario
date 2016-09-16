@@ -62,7 +62,23 @@ def knn(pk, geom, pid, table, k):
     :param k: (int) number of results to return
     :returns: (list) of nearest k neighbors"""
 
-    q_knn = "select {pk} from {table} " \
-            "order by {geom} <-> (select {geom} from {table} where {pk} = '{pid}') " \
-            "limit {k}".format(pk=pk, geom=geom, pid=pid, table=table, k=k)
+    # Based off snippet provided on pg 253 of PostGIS In Action (2nd Edition)
+    query = """
+        with bounding_box_filtered as (
+            select
+                id,
+                location,
+                (select location from sensor__node_metadata where id = 'NODE_DEV_1') as ref_geom
+            from sensor__node_metadata
+            order by location <#> (select location from sensor__node_metadata as l where id = 'NODE_DEV_1')
+            limit 100
+        )
+
+        select
+        id, rank() over(order by ST_Distance(location, ref_geom)) as act_rank
+        from bounding_box_filtered
+        order by act_rank
+        limit {k}
+    """
+
     return engine.execute(q_knn).fetchall()

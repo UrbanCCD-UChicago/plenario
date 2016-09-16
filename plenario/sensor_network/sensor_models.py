@@ -26,7 +26,7 @@ class NetworkMeta(Base):
     @staticmethod
     def index():
         networks = session.query(NetworkMeta)
-        return [network.name for network in networks]
+        return [network.name.lower() for network in networks]
 
 
 class NodeMeta(Base):
@@ -43,7 +43,7 @@ class NodeMeta(Base):
     @staticmethod
     def index(network_name=None):
         nodes = session.query(NodeMeta).all()
-        return [node.id for node in nodes if node.sensor_network == network_name or network_name is None]
+        return [node.id.lower() for node in nodes if node.sensor_network == network_name or network_name is None]
 
     @staticmethod
     def nearest_neighbor_to(node_name):
@@ -69,10 +69,10 @@ class FeatureOfInterest(Base):
     def index(network_name=None):
         features = []
         for node in session.query(NodeMeta).all():
-            if node.sensor_network == network_name or network_name is None:
+            if network_name is None or node.sensor_network.lower() == network_name.lower():
                 for sensor in node.sensors:
                     for prop in sensor.observed_properties.itervalues():
-                        features.append(prop.split('.')[0])
+                        features.append(prop.split('.')[0].lower())
         return list(set(features))
 
 
@@ -87,9 +87,9 @@ class Sensor(Base):
     def index(network_name=None):
         sensors = []
         for node in session.query(NodeMeta).all():
-            if node.sensor_network == network_name or network_name is None:
+            if network_name is None or node.sensor_network.lower() == network_name.lower():
                 for sensor in node.sensors:
-                    sensors.append(sensor.name)
+                    sensors.append(sensor.name.lower())
         return list(set(sensors))
 
     def __repr__(self):

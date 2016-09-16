@@ -1,16 +1,16 @@
 import json
-import sqlalchemy
 import threading
 
 from dateutil.parser import parse
 from flask import request, make_response
 from shapely import wkb
+from sqlalchemy import MetaData, Table, func as sqla_fn
 from sqlalchemy.exc import NoSuchTableError
 
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
 from plenario.api.common import make_cache_key
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
-from plenario.sensor_network.api.sensor_validator import SensorNetworkValidator, validate
+from plenario.sensor_network.api.sensor_validator import Validator, validate
 from plenario.database import session, redshift_session, redshift_engine
 from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
 
@@ -18,12 +18,18 @@ from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, Feature
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def get_network_metadata(network_name=None):
+    """Return metadata for some network. If no network_name is specified, the
+    default is to return metadata for all sensor networks.
+
+    :endpoint: /sensor-networks/<network-name>
+    :param network_name: (str) network name
+    :returns: (json) response"""
+
     fields = ('network_name',)
 
-    args = {}
-    if network_name:
-        args['network_name'] = network_name
-    validator = SensorNetworkValidator(only=fields)
+    args = {"network_name": network_name if network_name else None}
+
+    validator = Validator(only=fields)
     validated_args = validate(validator, args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
@@ -33,17 +39,23 @@ def get_network_metadata(network_name=None):
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_node_metadata(node_id=None, network_name=None):
-    fields = ('network_name', 'node_id', 'nodes',
-              'location_geom__within')
+def get_node_metadata(network_name, node_id=None):
+    """Return metadata about nodes for some network. If no node_id or
+    location_geom__within is specified, the default is to return metadata
+    for all nodes within the network.
+
+    :endpoint: /sensor-networks/<network-name>/nodes/<node-id>
+    :param network_name: (str) network that exists in sensor__network_metadata
+    :param node_id: (str) node that exists in sensor__node_metadata
+    :returns: (json) response"""
+
+    fields = ('network_name', 'node_id', 'nodes', 'location_geom__within')
 
     args = request.args.to_dict()
-    if network_name:
-        args['network_name'] = network_name
-    if node_id:
-        args['node_id'] = node_id
+    args["network_name"] = network_name
+    args["node_id"] = node_id if node_id else None
 
-    validator = SensorNetworkValidator(only=fields)
+    validator = Validator(only=fields)
     validated_args = validate(validator, args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
@@ -53,16 +65,22 @@ def get_node_metadata(node_id=None, network_name=None):
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_features(network_name=None, feature=None):
+def get_features(network_name, feature=None):
+    """Return metadata about features for some network. If no feature is
+    specified, return metadata about all features within the network.
+
+    :endpoint: /sensor-networks/<network_name>/features_of_interest/<feature>
+    :param network_name: (str) network name from sensor__network_metadata
+    :param feature: (str) name from sensor__features_of_interest
+    :returns: (json) response"""
+
     fields = ('network_name', 'feature')
 
-    args = {}
-    if network_name:
-        args['network_name'] = network_name
-    if feature:
-        args['feature'] = feature
+    args = dict()
+    args['network_name'] = network_name
+    args['feature'] = feature if feature else None
 
-    validator = SensorNetworkValidator(only=fields)
+    validator = Validator(only=fields)
     validated_args = validate(validator, args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
@@ -72,20 +90,27 @@ def get_features(network_name=None, feature=None):
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_sensors(network_name=None, feature=None, sensor=None, node_id=None):
+def get_sensors(network_name, feature=None, sensor=None, node_id=None):
+    """Return metadata for all sensors within a network. Sensors can also be
+    be filtered by various other properties. If no single sensor is specified,
+    the default is to return metadata for all sensors within the network.
+
+    :endpoint: /sensor-networks/<network_name>/sensors/<sensor>
+    :param network_name: (str) name from sensor__network_metadata
+    :param feature: (str) name from sensor__features_of_interest
+    :param sensor: (str) name from sensor__sensors
+    :param node_id: (str) name from sensor__node_metadata
+    :returns: (json) response"""
+
     fields = ('network_name', 'feature', 'sensor', 'node_id')
 
-    args = {}
-    if network_name:
-        args['network_name'] = network_name
-    if feature:
-        args['feature'] = feature
-    if sensor:
-        args['sensor'] = sensor
-    if node_id:
-        args['node_id'] = node_id
+    args = dict()
+    args["network_name"] = network_name
+    args["feature"] = feature if feature else None
+    args["sensor"] = sensor if sensor else None
+    args["node_id"] = node_id if node_id else None
 
-    validator = SensorNetworkValidator(only=fields)
+    validator = Validator(only=fields)
     validated_args = validate(validator, args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
@@ -96,12 +121,9 @@ def get_sensors(network_name=None, feature=None, sensor=None, node_id=None):
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def get_observations(network_name=None):
-    fields = ('network_name', 'nodes',
-              'start_datetime', 'end_datetime',
-              'location_geom__within',
-              'features_of_interest', 'sensors',
-              'limit', 'offset'
-              )
+    fields = ('network_name', 'nodes', 'start_datetime', 'end_datetime',
+              'location_geom__within', 'features_of_interest', 'sensors',
+              'limit', 'offset')
 
     args = request.args.to_dict()
 
@@ -111,14 +133,17 @@ def get_observations(network_name=None):
 
     if 'nodes' in args:
         args['nodes'] = args['nodes'].split(',')
+        args["nodes"] = (n.lower() for n in args["nodes"])
 
     if 'features_of_interest' in args:
         args['features_of_interest'] = args['features_of_interest'].split(',')
+        args["features_of_interest"] = (f.lower() for f in args["features_of_interest"])
 
     if 'sensors' in args:
         args['sensors'] = args['sensors'].split(',')
+        args["sensors"] = (s.lower() for s in args["sensors"])
 
-    validator = SensorNetworkValidator(only=fields)
+    validator = Validator(only=fields)
     validated_args = validate(validator, args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
@@ -127,47 +152,34 @@ def get_observations(network_name=None):
 
 
 def node_metadata_query(args):
-    params = ('network_name', 'node_id', 'nodes',
-              'geom')
-    vals = (args.data.get(k) for k in params)
-    network_name, node_id, nodes, geom = vals
+    """Create a SQLAlchemy query for querying node metadata. Used in the
+    _get_node_metadata route logic method.
 
-    q = session.query(NodeMeta)
+    :param args: (ValidatorResult) with args held in the data property
+    :returns: (sqlalchemy.orm.query.Query) object"""
 
-    # if path specified a sensor network or node ID, filter results accordingly
-    if node_id:
-        q = q.filter(NodeMeta.id == node_id)
-    if network_name:
-        q = q.filter(NodeMeta.sensor_network == network_name)
+    params = ('network_name', 'node_id', 'nodes', 'geom')
+    network_name, node_id, nodes, geom = (args.data.get(k) for k in params)
 
-    # if the user specified a node ID list, filter to those nodes
-    if nodes:
-        q = q.filter(NodeMeta.id.in_(nodes))
+    geom_filter = NodeMeta.location.ST_Within(sqla_fn.ST_GeomFromGeoJSON(geom))
 
-    # If the user specified a geom, filter results to those within its shape
-    if geom:
-        q = q.filter(NodeMeta.location.ST_Within(
-            sqlalchemy.func.ST_GeomFromGeoJSON(geom)
-        ))
+    query = session.query(NodeMeta)
+    query = query.filter(sqla_fn.lower(NodeMeta.sensor_network) == sqla_fn.lower(network_name))
+    query = query.filter(sqla_fn.lower(NodeMeta.id) == sqla_fn.lower(node_id)) if node_id else query
+    query = query.filter(sqla_fn.lower(NodeMeta.id).in_(nodes)) if nodes else query
+    query = query.filter(geom_filter) if geom else query
 
-    return q
+    return query
 
 
 def observation_query(args, table):
-    params = ('nodes',
-              'start_datetime', 'end_datetime',
-              'sensors')
-
-    vals = (args.data.get(k) for k in params)
-    nodes, start_datetime, end_datetime, sensors = vals
+    params = ('nodes', 'start_datetime', 'end_datetime', 'sensors')
+    nodes, start_datetime, end_datetime, sensors = (args.data.get(k) for k in params)
 
     q = redshift_session.query(table)
-
     q = q.filter(table.c.datetime.between(start_datetime, end_datetime))
-    q = q.filter(table.c.node_id.in_(nodes))
-
-    if sensors:
-        q = q.filter(table.c.sensor.in_(sensors))
+    q = q.filter(sqla_fn.lower(table.c.node_id).in_(nodes)) if nodes else q
+    q = q.filter(sqla_fn.lower(table.c.sensor).in_(sensors)) if sensors else q
 
     return q
 
@@ -237,14 +249,16 @@ def format_observation(obs, table):
 
 
 def _get_network_metadata(args):
-    q = session.query(NetworkMeta)
-    data = [format_network_metadata(network) for network in q.all()
-            if network.name == args.data['network_name'] or args.data['network_name'] is None]
+    network_name = args.data.get("network_name")
 
-    # don't display null query arguments
-    null_args = [field for field in args.data if args.data[field] is None]
-    for null_arg in null_args:
-        args.data.pop(null_arg)
+    query = session.query(NetworkMeta)
+    query = query.filter(sqla_fn.lower(NetworkMeta.name) == sqla_fn.lower(network_name)) if network_name else query
+    data = [format_network_metadata(network) for network in query.all()]
+
+    # Remove null query keys
+    null_keys = [k for k in args.data if args.data[k] is None]
+    for key in null_keys:
+        del args.data[key]
 
     resp = json_response_base(args, data, args.data)
     resp = make_response(json.dumps(resp), 200)
@@ -273,11 +287,14 @@ def _get_node_metadata(args):
 
 
 def _get_features(args):
-    q = session.query(FeatureOfInterest)
-    data = [format_feature(feature) for feature in q.all()
-            if (feature.name in FeatureOfInterest.index(args.data['network_name']) or
-                args.data['network_name'] is None) and
-            (feature.name == args.data['feature'] or args.data['feature'] is None)]
+
+    target_feature = args.data.get("feature")
+    features = session.query(FeatureOfInterest).all()
+    features_index = FeatureOfInterest.index(args.data.get("network_name"))
+
+    data = [format_feature(feature) for feature in features
+            if feature.name.lower() in features_index and
+            (target_feature is None or feature.name.lower() == target_feature.lower())]
 
     # don't display null query arguments
     null_args = [field for field in args.data if args.data[field] is None]
@@ -292,13 +309,19 @@ def _get_features(args):
 
 
 def _get_sensors(args):
-    q = session.query(Sensor)
-    data = [format_sensor(sensor) for sensor in q.all()
-            if (sensor.name in Sensor.index(args.data['network_name']) or
-                args.data['network_name'] is None) and
-            (args.data['feature'] in [prop.split('.')[0] for prop in sensor.observed_properties.itervalues()] or
-             args.data['feature'] is None) and
-            (sensor.name == args.data['sensor'] or args.data['sensor'] is None)]
+    feature, sensor_name, network = (args.data.get(k) for k in ("feature", "sensor", "network_name"))
+
+    valid_sensors = [s for s in Sensor.index(network) if sensor_name is None or s == sensor_name.lower()]
+    sensors = session.query(Sensor).all()
+
+    data = []
+    for sensor in sensors:
+        valid_properties = [p.split(".")[0] for p in sensor.observed_properties.values()]
+        if sensor.name.lower() not in valid_sensors:
+            continue
+        if feature is not None and feature not in valid_properties:
+            continue
+        data.append(format_sensor(sensor))
 
     # don't display null query arguments
     null_args = [field for field in args.data if args.data[field] is None]
@@ -313,31 +336,35 @@ def _get_sensors(args):
 
 
 def _get_observations(args):
-    nodes_to_query = [node.id for node in node_metadata_query(args).all()]
-    print nodes_to_query
-
+    nodes_to_query = [node.id.lower() for node in node_metadata_query(args).all()]
     args.data['nodes'] = nodes_to_query
 
     features = args.data['features_of_interest']
-    print features
+    target_sensors = args.data.get("sensors")
 
     # if the user specified a sensor list,
     # only query feature tables that those sensors report on
-    if 'sensors' in request.args:
+    if target_sensors:
+        sensors = session.query(Sensor)
+        sensors = sensors.filter(sqla_fn.lower(Sensor.name).in_(target_sensors))
+        sensors = sensors.all()
 
-        sensors = [sensor for sensor in session.query(Sensor).filter(Sensor.name.in_(args.data['sensors']))]
+        print "\n\n\n\n\n\n"
+        print "SENSORS: {}".format(sensors)
+        print "\n\n\n\n\n\n"
+
         all_features = []
         for sensor in sensors:
-            for foi in list(set([prop.split('.')[0] for prop in sensor.observed_properties.itervalues()])):
+            for foi in set([prop.split('.')[0].lower() for prop in sensor.observed_properties.itervalues()]):
                 all_features.append(foi)
         features = set(features).intersection(all_features)
 
     tables = []
-    meta = sqlalchemy.MetaData()
+    meta = MetaData()
     for feature in features:
         table_name = feature.lower()
         try:
-            tables.append(sqlalchemy.Table(table_name, meta, autoload=True, autoload_with=redshift_engine))
+            tables.append(Table(table_name, meta, autoload=True, autoload_with=redshift_engine))
         except (AttributeError, NoSuchTableError):
             return bad_request("Table {} not found".format(table_name))
 
