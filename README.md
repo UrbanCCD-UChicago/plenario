@@ -44,7 +44,7 @@ psql plenario_test
 plenario_test=# CREATE EXTENSION postgis;
 ```
 
-You'll need the ogr2ogr utility; it's part of the gdal package (we use it toimport and export shape datasets)
+You'll need the ogr2ogr utility - part of the gdal package. We use it to import and export shape datasets.
 
 OSX
 ```
@@ -57,8 +57,8 @@ Ubuntu/Debian
 sudo apt-get install gdal-bin
 ```
 
-Create your own `settings.py` files:
-=======
+## Create your own `settings.py`:
+
 
 ```
 cp plenario/settings.py.example plenario/settings.py
@@ -92,9 +92,11 @@ the homepage, click 'Login' to log in with the username and password
 from `settings.py`. Once logged in, go to 'Add a dataset' under the
 'Admin' menu to add your own datasets.
 
-# Open source tools:
+## Tools we are grateful for:
 
 ### Application Dependencies
+
+Thanks to the maintainers of these open source projects we depend on.
 
 * [PostgreSQL](http://www.postgresql.org/) - database version 9.3 or greater
 * [PostGIS](http://postgis.net/) - spatial database for PostgreSQL
@@ -108,7 +110,7 @@ from `settings.py`. Once logged in, go to 'Add a dataset' under the
 
 ### Production Support
 
-Many thanks for the following services that have given us free academic/open source accounts.
+Thanks for the following services that have given us free academic/open source accounts.
 
 * [Sentry](https://getsentry.com/welcome/) - exception and task monitoring
 * [Code Climate](https://codeclimate.com/) - static analysis
