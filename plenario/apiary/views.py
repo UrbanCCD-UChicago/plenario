@@ -77,7 +77,7 @@ def unknown_features_resolve(target_sensor):
     :param target_sensor: (str) resolved sensor"""
 
     sensors = reflect("sensor__sensors", psql_base.metadata, psql_engine)
-    unknowns = reflect("unknownfeature", rshift_base.metadata, rshift_engine)
+    unknowns = reflect("unknown_feature", rshift_base.metadata, rshift_engine)
 
     # Grab the set of keys that are used to assert if an unkown is correct
     c_obs_props = sensors.c.observed_properties
@@ -98,7 +98,6 @@ def unknown_features_resolve(target_sensor):
         map_unknown_to_foi(unknown, sensor_properties)
 
 
-
 @blueprint.route("/apiary/send_message", methods=["POST"])
 # @login_required
 def send_message():
@@ -106,6 +105,7 @@ def send_message():
         data = loads(request.data)
         if data["value"].upper() == "RESOLVE":
             unknown_features_resolve(data["name"])
+            print "AOTMapper_" + data["name"]
             redis.delete("AOTMapper_" + data["name"])
         else:
             redis.set(name="AOTMapper_" + data["name"], value=dumps(data["value"]))

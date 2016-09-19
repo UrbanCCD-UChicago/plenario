@@ -50,7 +50,7 @@ def map_to_redshift_type(property_dict):
         "STRING": "VARCHAR"
     }
 
-    value = property_dict["value"].upper()
+    value = property_dict["type"].upper()
     type_aliases = set(redshift_type_map.keys())
     type_standards = set(redshift_type_map.values())
 

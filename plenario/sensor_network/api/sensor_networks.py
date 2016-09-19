@@ -8,11 +8,13 @@ from sqlalchemy import MetaData, Table, func as sqla_fn
 from sqlalchemy.exc import NoSuchTableError
 
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
-from plenario.api.common import make_cache_key
+from plenario.api.common import make_cache_key, unknown_object_json_handler
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
-from plenario.sensor_network.api.sensor_validator import Validator, validate
+from plenario.sensor_network.api.sensor_validator import Validator, validate, NodeAggregateValidator
 from plenario.database import session, redshift_session, redshift_engine
 from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
+
+from sensor_aggregate_functions import aggregate_averages
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -153,7 +155,7 @@ def get_observations(network_name=None):
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_node_aggregations(network_name, node_id):
+def get_node_aggregations(network_name, node_id, feature):
     """Aggregate individual node observations up to larger units of time.
     Do so by applying aggregate functions on all observations found within
     a specified window of time.
@@ -161,42 +163,33 @@ def get_node_aggregations(network_name, node_id):
     :endpoint: /sensor-networks/<network-name>/nodes/<node-id>/aggregate?<args>
     :param network_name: (str) from sensor__network_metadata
     :param node_id: (str) from sensor__node_metadata
+    :param feature: (str) from sensor__features_of_interest
     :returns: (json) response"""
 
-    fields = ("network_name", "node_id")
+    fields = ("network_name", "node_id", "function", "feature", "start_datetime")
 
     args = request.args.to_dict()
     args["network_name"] = network_name
     args["node_id"] = node_id
+    args["feature"] = feature
 
-    validated_args = validate(Validator(only=fields), args)
+    validated_args = validate(NodeAggregateValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
     result = _get_node_aggregations(validated_args)
-    return node_aggregations_response(args, result)
+    return node_aggregations_response(validated_args, result)
 
 
 def _get_node_aggregations(args):
 
-    from sensor_aggregate_functions import apply_aggregate_fn
-
-    function = args.data.get("function")
-    function_args = args.data.get("function_args")
-    result = apply_aggregate_fn[function](function_args)
-
-    return format_node_aggregate(result)
-
-
-def format_node_aggregate(obs):
-
-    return True
+    return aggregate_averages(args)
 
 
 def node_aggregations_response(args, result):
 
     resp = json_response_base(args, result, args.data)
-    resp = make_response(json.dumps(resp), 200)
+    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
     resp.headers['Content-Type'] = 'application/json'
 
     return resp
