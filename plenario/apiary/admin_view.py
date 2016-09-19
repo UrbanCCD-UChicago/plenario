@@ -114,7 +114,7 @@ class FOIMetaView(BaseMetaView):
 
         try:
             if not table_exists(name):
-                foi_properties = [{"name": e["name"], "type": e["value"]} for e in properties]
+                foi_properties = [{"name": e["name"], "type": e["type"]} for e in properties]
                 create_foi_table(name, foi_properties)
         except TypeError:
             # This will occur if you are running without an address for a
