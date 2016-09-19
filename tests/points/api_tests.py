@@ -349,7 +349,7 @@ class PointAPITests(BasePlenarioTest):
 
     def test_timeseries_with_multiple_datasets(self):
         endpoint = 'timeseries'
-        query = '?obs_date__ge=2000&agg=year&dataset_name__in=flu_shot_clinics,landmarks'
+        query = '?obs_date__ge=2000-08-01&agg=year&dataset_name__in=flu_shot_clinics,landmarks'
 
         resp_data = self.get_api_response(endpoint + query)
 
