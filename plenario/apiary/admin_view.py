@@ -1,6 +1,6 @@
 import traceback
 
-from flask import redirect, url_for, request
+from flask import redirect, url_for
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.form.rules import Field
 from flask_login import current_user
