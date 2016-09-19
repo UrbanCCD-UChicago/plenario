@@ -27,7 +27,7 @@ def get_network_metadata(network_name=None):
 
     fields = ('network_name',)
 
-    args = {"network_name": network_name if network_name else None}
+    args = {"network_name": network_name.lower() if network_name else None}
 
     validator = Validator(only=fields)
     validated_args = validate(validator, args)
@@ -52,8 +52,8 @@ def get_node_metadata(network_name, node_id=None):
     fields = ('network_name', 'node_id', 'nodes', 'location_geom__within')
 
     args = request.args.to_dict()
-    args["network_name"] = network_name
-    args["node_id"] = node_id if node_id else None
+    args["network_name"] = network_name.lower()
+    args["node_id"] = node_id.lower() if node_id else None
 
     validator = Validator(only=fields)
     validated_args = validate(validator, args)
@@ -77,8 +77,8 @@ def get_features(network_name, feature=None):
     fields = ('network_name', 'feature')
 
     args = dict()
-    args['network_name'] = network_name
-    args['feature'] = feature if feature else None
+    args['network_name'] = network_name.lower()
+    args['feature'] = feature.lower() if feature else None
 
     validator = Validator(only=fields)
     validated_args = validate(validator, args)
@@ -105,10 +105,10 @@ def get_sensors(network_name, feature=None, sensor=None, node_id=None):
     fields = ('network_name', 'feature', 'sensor', 'node_id')
 
     args = dict()
-    args["network_name"] = network_name
-    args["feature"] = feature if feature else None
-    args["sensor"] = sensor if sensor else None
-    args["node_id"] = node_id if node_id else None
+    args["network_name"] = network_name.lower()
+    args["feature"] = feature.lower() if feature else None
+    args["sensor"] = sensor.lower() if sensor else None
+    args["node_id"] = node_id.lower() if node_id else None
 
     validator = Validator(only=fields)
     validated_args = validate(validator, args)
@@ -132,16 +132,13 @@ def get_observations(network_name=None):
     args['network_name'] = network_name
 
     if 'nodes' in args:
-        args['nodes'] = args['nodes'].split(',')
-        args["nodes"] = (n.lower() for n in args["nodes"])
+        args['nodes'] = args['nodes'].lower().split(',')
 
     if 'features_of_interest' in args:
-        args['features_of_interest'] = args['features_of_interest'].split(',')
-        args["features_of_interest"] = (f.lower() for f in args["features_of_interest"])
+        args['features_of_interest'] = args['features_of_interest'].lower().split(',')
 
     if 'sensors' in args:
-        args['sensors'] = args['sensors'].split(',')
-        args["sensors"] = (s.lower() for s in args["sensors"])
+        args['sensors'] = args['sensors'].lower().split(',')
 
     validator = Validator(only=fields)
     validated_args = validate(validator, args)
@@ -166,8 +163,8 @@ def get_node_aggregations(network_name, node_id):
     fields = ("network_name", "node_id")
 
     args = request.args.to_dict()
-    args["network_name"] = network_name
-    args["node_id"] = node_id
+    args["network_name"] = network_name.lower()
+    args["node_id"] = node_id.lower()
 
     validated_args = validate(Validator(only=fields), args)
     if validated_args.errors:
