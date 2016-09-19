@@ -50,3 +50,40 @@ def table_exists(table_name):
         return True
     except ProgrammingError:
         return False
+
+
+def knn(pk, geom, point_id, table, k):
+    """Execute a spatial query to select k nearest neighbors given some point.
+
+    :param pk: (str) primary key column name
+    :param geom: (str) geom column name
+    :param point_id: (str) target point
+    :param table: (str) target table name
+    :param k: (int) number of results to return
+    :returns: (list) of nearest k neighbors"""
+
+    # How many to limit the initial bounding box query to
+    k_10 = k * 10
+
+    # Based off snippet provided on pg 253 of PostGIS In Action (2nd Edition)
+    query = """
+    WITH bbox_results AS (
+      SELECT
+        {pk},
+        {geom},
+        (SELECT {geom} FROM {table} WHERE {pk} = '{point_id}') AS ref_geom
+      FROM {table}
+      ORDER BY {geom} <#>
+        (SELECT {geom} from {table} as l WHERE {pk} = '{point_id}')
+      LIMIT {k_10}
+    )
+
+    SELECT
+      {pk},
+      RANK() OVER(ORDER BY ST_Distance({geom}, ref_geom)) AS act_r
+    FROM bbox_results
+    ORDER BY act_r
+    LIMIT {k};
+    """.format(pk=pk, geom=geom, point_id=point_id, table=table, k=k, k_10=k_10)
+
+    return engine.execute(query).fetchall()

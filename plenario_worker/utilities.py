@@ -2,6 +2,7 @@
 of the worker threads."""
 
 import traceback
+import warnings
 from datetime import datetime
 from plenario.database import session
 from plenario.models import Workers
@@ -9,7 +10,12 @@ from plenario.settings import AUTOSCALING_GROUP, INSTANCE_ID
 
 
 def log(msg, worker_id):
-    logfile = open('/opt/python/log/worker.log', "a")
+    try:
+        logfile = open('/opt/python/log/worker.log', "a")
+    except IOError:
+        warnings.warn("Failed to write to /opt/python/log/worker.log - "
+                      "writing to current directory.", RuntimeWarning)
+        logfile = open("./worker.log", "a")        
     logfile.write("{} - Worker {}: {}\n".format(datetime.now(), worker_id.ljust(24), msg))
     logfile.close()
 

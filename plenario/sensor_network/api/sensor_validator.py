@@ -1,5 +1,3 @@
-import json
-
 from collections import namedtuple
 from datetime import datetime, timedelta
 from marshmallow import fields, Schema
@@ -13,7 +11,7 @@ from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, Feature
 
 
 def validate_network(network):
-    if network not in NetworkMeta.index():
+    if network.lower() not in NetworkMeta.index():
         raise ValidationError("Invalid network name: {}".format(network))
 
 
@@ -22,7 +20,7 @@ def validate_nodes(nodes):
         nodes = [nodes]
     valid_nodes = NodeMeta.index()
     for node in nodes:
-        if node not in valid_nodes:
+        if node.lower() not in valid_nodes:
             raise ValidationError("Invalid node ID: {}".format(node))
 
 
@@ -31,6 +29,7 @@ def validate_features(features):
         features = [features]
     valid_features = FeatureOfInterest.index()
     for feature in features:
+        feature = feature.lower()
         if feature not in valid_features:
             raise ValidationError("Invalid feature of interest name: {}".format(feature))
 
@@ -40,6 +39,7 @@ def validate_sensors(sensors):
         sensors = [sensors]
     valid_sensors = Sensor.index()
     for sensor in sensors:
+        sensor = sensor.lower()
         if sensor not in valid_sensors:
             raise ValidationError("Invalid sensor name: {}".format(sensor))
 
@@ -68,7 +68,7 @@ class Validator(Schema):
     or rejected, the validator will substitute it with the value specified by
     <DEFAULT_VALUE>."""
 
-    network_name = fields.Str(allow_none=True, missing=None, default='ArrayOfThings', validate=validate_network)
+    network_name = fields.Str(allow_none=True, missing=None, default='array_of_things', validate=validate_network)
 
     # For observations:
     #
@@ -80,20 +80,16 @@ class Validator(Schema):
     sensors = fields.List(fields.Str(), default=None, validate=validate_sensors)
 
     # For metadata:
-    node_id = fields.Str(default=None, validate=validate_nodes)
-    feature = fields.Str(default=None, validate=validate_features)
-    sensor = fields.Str(default=None, validate=validate_sensors)
+    node_id = fields.Str(default=None, missing=None, validate=validate_nodes)
+    feature = fields.Str(default=None, missing=None, validate=validate_features)
+    sensor = fields.Str(default=None, missing=None, validate=validate_sensors)
 
     location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
-    start_datetime = fields.DateTime(default=datetime.utcnow() - timedelta(days=90))
-    end_datetime = fields.DateTime(default=datetime.utcnow())
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=90))
+    end_datetime = fields.DateTime(default=datetime.utcnow)
     filter = fields.Str(allow_none=True, missing=None, default=None)
     limit = fields.Integer(default=1000)
     offset = fields.Integer(default=0, validate=Range(0))
-
-
-class SensorNetworkValidator(Validator):
-    """Validator for retrieving sensor network metadata"""
 
 
 # ValidatorResult
@@ -122,7 +118,6 @@ def convert(request_args):
     above.
 
     :param request_args: dictionary of request arguments
-    :param converters: dictionary of converter functions
 
     :returns: converted dictionary"""
 
