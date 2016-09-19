@@ -92,6 +92,11 @@ class Validator(Schema):
     offset = fields.Integer(default=0, validate=Range(0))
 
 
+class NodeAggregateValidator(Validator):
+
+    function = fields.Str(default=None, missing=None)
+
+
 # ValidatorResult
 # ===============
 # Many methods in response.py rely on information that used to be provided

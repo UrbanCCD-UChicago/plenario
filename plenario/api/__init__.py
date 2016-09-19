@@ -1,15 +1,15 @@
 import json
-from flask import make_response, Blueprint
-from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
-from common import cache, make_cache_key
-from shape import get_all_shape_datasets,\
-                    export_shape, aggregate_point_data
 from time import sleep
-from sensor import weather_stations, weather
-from flask_login import login_required
 
+from flask import make_response, Blueprint
+
+from common import cache, make_cache_key
 from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, \
-    get_observations, get_features, get_sensors
+    get_observations, get_features, get_sensors, get_node_aggregations
+from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
+from sensor import weather_stations, weather
+from shape import get_all_shape_datasets, \
+    export_shape, aggregate_point_data
 
 API_VERSION = '/v1'
 
@@ -41,6 +41,8 @@ api.add_url_rule(prefix + '/sensor-networks/<network_name>', 'sensor_network', g
 
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes', 'network_nodes', get_node_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>', 'single_node', get_node_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>/<feature>/aggregate', 'node_aggregations',
+                 get_node_aggregations)
 
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest', 'features', get_features)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>', 'features', get_features)
@@ -64,7 +66,7 @@ def flush_cache():
 
 
 @api.route(prefix + '/slow')
-@cache.cached(timeout=60*60*6, key_prefix=make_cache_key)
+@cache.cached(timeout=60 * 60 * 6, key_prefix=make_cache_key)
 def slow():
     sleep(5)
     return "I feel well rested"
