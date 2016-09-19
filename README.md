@@ -57,7 +57,7 @@ Ubuntu/Debian
 sudo apt-get install gdal-bin
 ```
 
-## Create your own `settings.py`:
+Next, create your own `settings.py`:
 
 
 ```
