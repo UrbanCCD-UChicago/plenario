@@ -38,11 +38,10 @@ api.add_url_rule(prefix + '/datadump/<ticket>', 'get_datadump', get_datadump)
 # sensor networks
 api.add_url_rule(prefix + '/sensor-networks', 'sensor_networks', get_network_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>', 'sensor_network', get_network_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/aggregate', 'node_aggregate', get_node_aggregations)
 
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes', 'network_nodes', get_node_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>', 'single_node', get_node_metadata)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>/<feature>/aggregate', 'node_aggregations',
-                 get_node_aggregations)
 
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest', 'features', get_features)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>', 'features', get_features)

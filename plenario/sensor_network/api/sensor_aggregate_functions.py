@@ -1,11 +1,13 @@
 from collections import defaultdict
 from datetime import timedelta
+
 from dateutil.parser import parse as date_parse
-from sqlalchemy import and_, func, Table, join
+from sqlalchemy import and_, func, Table
 from sqlalchemy.sql import select
 
-from plenario.database import Base as p_base, app_engine as p_engine
-from plenario.database import redshift_Base as r_base, redshift_engine as r_engine
+from plenario.database import redshift_Base as RBase
+from plenario.database import session, redshift_engine as r_engine
+from plenario.sensor_network.sensor_models import NodeMeta
 
 
 def _reflect(table_name, metadata, engine):
@@ -20,21 +22,15 @@ def aggregate(args, agg_label, agg_fn, buckets):
     start_datetime = date_parse(args.data.get("start_datetime"))
 
     # Reflect up the necessary tables
-    node_table = _reflect("sensor__node_metadata", p_base.metadata, p_engine)
-    sensor_table = _reflect("sensor__sensors", p_base.metadata, p_engine)
-    obs_table = _reflect(feature, r_base.metadata, r_engine)
+    obs_table = _reflect(feature, RBase.metadata, r_engine)
 
-    # Determine which column values to report on
-    target_nodes = p_engine.execute(
-        select([
-            node_table,
-            sensor_table.c.observed_properties
-        ]).where(node_table.c.id == node)
-    )
+    target_node = session.query(NodeMeta).filter(NodeMeta.id == node).first()
+    target_sensors = target_node.sensors
 
+    # Find out which subset of the possible observed properties are valid
     valid_columns = set()
-    for node in target_nodes.fetchall():
-        for val in node.observed_properties.values():
+    for sensor in target_sensors:
+        for val in sensor.observed_properties.values():
             valid_columns.add(val.split(".", 1)[1].lower())
 
     # Get delimiting datetimes to break the records up with

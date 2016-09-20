@@ -9,6 +9,8 @@ from plenario.api.common import extract_first_geometry_fragment, make_fragment_s
 from plenario.database import session
 from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest, Sensor
 
+from sensor_aggregate_functions import aggregate_fn_map
+
 
 def validate_network(network):
     if network.lower() not in NetworkMeta.index():
@@ -94,7 +96,10 @@ class Validator(Schema):
 
 class NodeAggregateValidator(Validator):
 
-    function = fields.Str(default=None, missing=None)
+    node_id = fields.Str(required=True, validate=validate_nodes)
+    feature = fields.Str(required=True, validate=validate_features)
+    function = fields.Str(required=True, validate=lambda x: x.lower() in aggregate_fn_map)
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
 
 
 # ValidatorResult

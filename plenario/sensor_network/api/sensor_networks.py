@@ -155,27 +155,27 @@ def get_observations(network_name=None):
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_node_aggregations(network_name, node_id, feature):
+def get_node_aggregations(network_name):
     """Aggregate individual node observations up to larger units of time.
     Do so by applying aggregate functions on all observations found within
     a specified window of time.
 
-    :endpoint: /sensor-networks/<network-name>/nodes/<node-id>/aggregate?<args>
+    :endpoint: /sensor-networks/<network-name>/aggregate
     :param network_name: (str) from sensor__network_metadata
-    :param node_id: (str) from sensor__node_metadata
-    :param feature: (str) from sensor__features_of_interest
     :returns: (json) response"""
 
     fields = ("network_name", "node_id", "function", "feature", "start_datetime")
 
     args = request.args.to_dict()
     args["network_name"] = network_name
-    args["node_id"] = node_id
-    args["feature"] = feature
 
     validated_args = validate(NodeAggregateValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
+
+    validated_args.data["node_id"] = validated_args.data["node_id"].lower()
+    validated_args.data["function"] = validated_args.data["function"].lower()
+    validated_args.data["feature"] = validated_args.data["feature"].lower()
 
     result = _get_node_aggregations(validated_args)
     return node_aggregations_response(validated_args, result)
