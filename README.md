@@ -44,7 +44,7 @@ psql plenario_test
 plenario_test=# CREATE EXTENSION postgis;
 ```
 
-You'll need the ogr2ogr utility; it's part of the gdal package (we use it toimport and export shape datasets)
+You'll need the ogr2ogr utility - part of the gdal package. We use it to import and export shape datasets.
 
 OSX
 ```
@@ -57,13 +57,11 @@ Ubuntu/Debian
 sudo apt-get install gdal-bin
 ```
 
-Create your own `settings.py` files:
-=======
+Next, create your own `settings.py`:
 
 
 ```
 cp plenario/settings.py.example plenario/settings.py
-cp plenario/celery_settings.py.example plenario/celery_settings.py
 ```
 
 You will want to change, at the minimum, the following `settings.py` fields:
@@ -73,27 +71,12 @@ You will want to change, at the minimum, the following `settings.py` fields:
 
 * `DEFAULT_USER`: change the username, email and password on the administrator account you will use on Plenario locally.
 
-
-Additionally, create your own `celery_settings.py` file:
-
-```
-cp plenario/celery_settings.py.example plenario/celery_settings.py
-```
-
-You probably do not need to change any values in `celery_settings.py`,
-unless you are running redis remotely (see `BROKER_URL`).
-
-Before running the server, [Redis](http://redis.io/) and
-[Celery](http://www.celeryproject.org/) also need to be running.
+Before running the server, [Redis](http://redis.io/) needs to be running.
 
 * To start Redis locally (in the background):
+
 ```
 redis-server &
-```
-
-* To start Celery locally (in the background):
-```
-celery -A plenario.celery_app worker --loglevel=info &
 ```
 
 Initialize the plenario database by running `python init_db.py`.
@@ -109,9 +92,11 @@ the homepage, click 'Login' to log in with the username and password
 from `settings.py`. Once logged in, go to 'Add a dataset' under the
 'Admin' menu to add your own datasets.
 
-# Open source tools:
+## Tools we are grateful for:
 
 ### Application Dependencies
+
+Thanks to the maintainers of these open source projects we depend on.
 
 * [PostgreSQL](http://www.postgresql.org/) - database version 9.3 or greater
 * [PostGIS](http://postgis.net/) - spatial database for PostgreSQL
@@ -120,16 +105,16 @@ from `settings.py`. Once logged in, go to 'Add a dataset' under the
 * [psycopg2](http://initd.org/psycopg/) - PostgreSQL adapter for the Python
 * [GeoAlchemy 2](http://geoalchemy-2.readthedocs.org/en/0.2.4/) - provides extensions to SQLAlchemy for working with spatial databases
 * [GDAL](http://www.gdal.org/) - geospatial data mungeing
-* [Celery](http://www.celeryproject.org/) - asynchronous task queue
 * [Redis](http://redis.io/) - key-value cache
 * [Gunicorn](http://gunicorn.org/) - WSGI server
 
 ### Production Support
 
-Many thanks for the following hosted services that have given us free academic/open source accounts.
+Thanks for the following services that have given us free academic/open source accounts.
 
 * [Sentry](https://getsentry.com/welcome/) - exception and task monitoring
 * [Code Climate](https://codeclimate.com/) - static analysis
+* [JetBrains](https://www.jetbrains.com/) - open source license for PyCharm and WebStorm IDEs
 
 
 ## Team
@@ -137,6 +122,7 @@ Many thanks for the following hosted services that have given us free academic/o
 * Charlie Catlett
 * Brett Goldstein
 * Will Engler
+* Jesus Bracho
 
 ## Join Our Community
 
