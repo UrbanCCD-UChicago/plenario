@@ -14,7 +14,7 @@ from plenario.sensor_network.api.sensor_validator import Validator, validate, No
 from plenario.database import session, redshift_session, redshift_engine
 from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
 
-from sensor_aggregate_functions import aggregate_averages
+from sensor_aggregate_functions import aggregate_fn_map
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -183,7 +183,7 @@ def get_node_aggregations(network_name, node_id, feature):
 
 def _get_node_aggregations(args):
 
-    return aggregate_averages(args)
+    return aggregate_fn_map[args.data.get("function")](args)
 
 
 def node_aggregations_response(args, result):
