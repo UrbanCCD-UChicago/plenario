@@ -41,7 +41,7 @@ def validate_features(features):
 
 def validate_sensors(sensors):
     valid_sensors = Sensor.index()
-    for sensor in sensors.split(","):
+    for sensor in sensors:
         sensor = sensor.lower()
         if sensor not in valid_sensors:
             raise ValidationError("Invalid sensor name: {}".format(sensor))
@@ -100,7 +100,6 @@ class NodeAggregateValidator(Validator):
     agg_unit = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_agg_units)
     node_id = fields.Str(required=True, validate=validate_nodes)
     feature = fields.Str(validate=validate_features, required=True)
-    sensors = fields.Str(validate=validate_sensors)
     function = fields.Str(required=True, validate=lambda x: x.lower() in aggregate_fn_map)
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
 
