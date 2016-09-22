@@ -169,6 +169,8 @@ def get_node_aggregations(network_name):
     :param network_name: (str) from sensor__network_metadata
     :returns: (json) response"""
 
+    # TODO: Faster queries!
+    # TODO: Fix gas concentration error.
     # TODO: Make query arguments for /query and /aggregate as close to
     # TODO: interchangeable as possible!
 

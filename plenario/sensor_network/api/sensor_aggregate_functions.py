@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from dateutil.parser import parse as date_parse
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import and_, func, Table
+from sqlalchemy import and_, func, Table, asc
 from sqlalchemy.sql import select
 
 from plenario.database import redshift_Base as RBase, redshift_session as r_session
@@ -11,32 +11,31 @@ from plenario.database import session, redshift_engine as r_engine
 from plenario.sensor_network.sensor_models import NodeMeta
 
 
-def _apply_aggregates(table, selects, datetimes):
-    """Apply the select statements for each datetime and return the results.
+def _fill_in_blanks(aggregates, agg_unit):
+    """Given a list of row proxies, interpolate empty results where the gap
+    between the datetime of two results exceeds the agg_unit.
 
-    :param table: (SQLAlchemy) reflect feature of interest table
-    :param selects: (list) of SQLAlchemy prepared statements
-    :param datetimes: (list) of datetime delimiters
-    :returns: (list) rowproxy (and rowproxy-like) objects"""
+    :param aggregates: (SQLAlchemy) row proxy objects
+    :param agg_unit: (str) unit of time
+    :returns: (list) of row proxies and row proxy-likes"""
 
-    aggregates = list()
+    filled_out_aggs = list()
 
-    for i in range(0, len(datetimes) - 1):
-        query = select(selects).where(and_(
-            table.c.datetime >= datetimes[i],
-            table.c.datetime < datetimes[i + 1]
-        )).group_by("time_bucket")
-        payload = r_session.execute(query).fetchall()
+    for i, agg in enumerate(aggregates):
+        if i == len(aggregates) - 1:
+            continue
 
-        empty_placeholder = [{
-            # Drop the microseconds for display
-            "time_bucket": datetimes[i].isoformat().split("+")[0],
-            "count": 0
-        }]
+        next_agg_time = aggregates[i + 1].time_bucket
+        candidate_time = agg.time_bucket + timedelta(**{agg_unit + "s": 1})
+        while next_agg_time != candidate_time:
+            filled_out_aggs.append({
+                "time_bucket": candidate_time,
+                "count": "0"
+            })
+            candidate_time += timedelta(**{agg_unit + "s": 1})
+        filled_out_aggs.append(agg)
 
-        aggregates += payload if payload else empty_placeholder
-
-    return aggregates
+    return sorted(filled_out_aggs, key=lambda x: x["time_bucket"])
 
 
 def _format_aggregates(aggregates, agg_label):
@@ -89,28 +88,6 @@ def _generate_aggregate_selects(table, target_columns, agg_fn, agg_unit):
         selects.append(func.count(col).label(col.name + "_count"))
 
     return selects
-
-
-def _generate_datetime_range(start_datetime, end_datetime, unit):
-    """Helper function for creating datetimes used to construct a series.
-
-    :param start_datetime: (datetime)
-    :param end_datetime: (datetime)
-    :param unit: (str) unit by which series is broken up (hours, days, ...)
-    :returns: (list) of datetimes"""
-
-    start_datetime = start_datetime.replace(tzinfo=None)
-    end_datetime = end_datetime.replace(tzinfo=None)
-
-    dt_range = list()
-    current_datetime = start_datetime
-    while current_datetime <= end_datetime:
-        try:
-            dt_range.append(current_datetime)
-            current_datetime += timedelta(**{unit + "s": 1})
-        except TypeError:
-            current_datetime += relativedelta(**{unit + "s": 1})
-    return dt_range
 
 
 def _reflect(table_name, metadata, engine):
@@ -198,9 +175,9 @@ def aggregate(args, agg_label, agg_fn):
     node, feature, start_dt, end_dt, sensors, agg_unit = (args.data.get(k) for k in expected)
 
     # Format the datetime parameters
-    start_dt = date_parse(start_dt)
-    start_dt = _zero_out_datetime(start_dt, agg_unit)
-    end_dt = date_parse(end_dt)
+    # start_dt = date_parse(start_dt)
+    # start_dt = _zero_out_datetime(start_dt, agg_unit)
+    # end_dt = date_parse(end_dt)
 
     # Break up comma-delimited query arguments
     target_features = feature.split(",")
@@ -228,10 +205,16 @@ def aggregate(args, agg_label, agg_fn):
 
     # Generate the necessary select statements and datetime delimiters
     selects = _generate_aggregate_selects(obs_table, valid_columns, agg_fn, agg_unit)
-    datetimes = _generate_datetime_range(start_dt, end_dt, agg_unit)
 
     # Execute the query and return the formatted results
-    results = _apply_aggregates(obs_table, selects, datetimes)
+    query = select(selects).where(and_(
+        obs_table.c.datetime >= start_dt,
+        obs_table.c.datetime < end_dt
+    )).group_by("time_bucket").order_by(asc("time_bucket"))
+
+    results = r_session.execute(query).fetchall()
+    results = _fill_in_blanks(results, agg_unit)
+
     return _format_aggregates(results, agg_label)
 
 
