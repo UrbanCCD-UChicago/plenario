@@ -1,5 +1,6 @@
 from collections import namedtuple
 from datetime import datetime, timedelta
+from dateutil.parser import parse as date_parse
 from marshmallow import fields, Schema
 from marshmallow.validate import Range, ValidationError
 from psycopg2 import Error
@@ -10,6 +11,8 @@ from plenario.database import session
 from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest, Sensor
 
 from sensor_aggregate_functions import aggregate_fn_map
+
+valid_agg_units = ("minute", "hour", "day", "week", "month", "year")
 
 
 def validate_network(network):
@@ -31,16 +34,14 @@ def validate_features(features):
         features = [features]
     valid_features = FeatureOfInterest.index()
     for feature in features:
-        feature = feature.lower()
+        feature = feature.split(".")[0].lower()
         if feature not in valid_features:
             raise ValidationError("Invalid feature of interest name: {}".format(feature))
 
 
 def validate_sensors(sensors):
-    if isinstance(sensors, basestring):
-        sensors = [sensors]
     valid_sensors = Sensor.index()
-    for sensor in sensors:
+    for sensor in sensors.split(","):
         sensor = sensor.lower()
         if sensor not in valid_sensors:
             raise ValidationError("Invalid sensor name: {}".format(sensor))
@@ -96,8 +97,11 @@ class Validator(Schema):
 
 class NodeAggregateValidator(Validator):
 
+    agg_unit = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_agg_units)
+    buckets = fields.Int(default=24, missing=24)
     node_id = fields.Str(required=True, validate=validate_nodes)
-    feature = fields.Str(required=True, validate=validate_features)
+    feature = fields.Str(validate=validate_features, required=True)
+    sensors = fields.Str(validate=validate_sensors)
     function = fields.Str(required=True, validate=lambda x: x.lower() in aggregate_fn_map)
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
 

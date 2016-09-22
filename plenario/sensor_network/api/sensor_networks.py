@@ -164,7 +164,11 @@ def get_node_aggregations(network_name):
     :param network_name: (str) from sensor__network_metadata
     :returns: (json) response"""
 
-    fields = ("network_name", "node_id", "function", "feature", "start_datetime")
+    # TODO: Add documentation!
+    # TODO: Add error handling (with a JSON response)!
+
+    fields = ("network_name", "node_id", "function", "feature",
+              "start_datetime", "buckets", "agg_unit", "sensors")
 
     args = request.args.to_dict()
     args["network_name"] = network_name
