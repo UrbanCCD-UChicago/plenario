@@ -7,7 +7,7 @@ from shapely import wkb
 from sqlalchemy import MetaData, Table, func as sqla_fn
 from sqlalchemy.exc import NoSuchTableError
 
-from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
+from plenario.api.common import cache, crossdomain
 from plenario.api.common import make_cache_key, unknown_object_json_handler
 from plenario.api.response import make_error
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
@@ -16,6 +16,10 @@ from plenario.database import session, redshift_session, redshift_engine
 from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
 
 from sensor_aggregate_functions import aggregate_fn_map
+
+
+# Cache timeout of 5 mintutes
+CACHE_TIMEOUT = 60 * 10
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -121,8 +125,8 @@ def get_sensors(network_name, feature=None, sensor=None, node_id=None):
     return _get_sensors(validated_args)
 
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin="*")
+# @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+# @crossdomain(origin="*")
 def get_observations(network_name=None):
     fields = ('network_name', 'nodes', 'start_datetime', 'end_datetime',
               'location_geom__within', 'features_of_interest', 'sensors',
@@ -165,7 +169,8 @@ def get_node_aggregations(network_name):
     :param network_name: (str) from sensor__network_metadata
     :returns: (json) response"""
 
-    # TODO: Add error handling (with a JSON response)!
+    # TODO: Make query arguments for /query and /aggregate as close to
+    # TODO: interchangeable as possible!
 
     fields = ("network_name", "node_id", "function", "feature",
               "start_datetime", "end_datetime", "agg_unit", "sensors")
