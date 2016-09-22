@@ -6,9 +6,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from plenario.settings import DATABASE_CONN, REDSHIFT_CONN
 
 if os.environ.get('WORKER'):
-    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=8, max_overflow=8, pool_timeout=60, echo=True)
+    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=8, max_overflow=8, pool_timeout=60, echo=False)
 else:
-    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=4, max_overflow=4, pool_timeout=60, echo=True)
+    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=4, max_overflow=4, pool_timeout=60, echo=False)
 
 session = scoped_session(sessionmaker(bind=app_engine,
                                       autocommit=False,
@@ -17,7 +17,7 @@ Base = declarative_base(bind=app_engine)
 Base.query = session.query_property()
 
 
-redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=True)
+redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=False)
 
 redshift_session = scoped_session(sessionmaker(bind=redshift_engine,
                                       autocommit=False,

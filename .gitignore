@@ -1,6 +1,28 @@
+# OS Generated Files
 .DS_Store
+
+# Python
 *.pyc
+
+# Vim Generated Files
 *.swp
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
+
+# Elastic Beanstalk Testing
+/.deployments/
+*.testy.zip
+
+# Development
+*~
+#.*#
+*.todo
+/.idea/
+
+# Miscellaneous
 Icon?
 .dropbox
 .coverage
@@ -8,13 +30,3 @@ celerybeat-schedule
 data/
 notebooks/
 .env
-*~
-#.*#
-# Elastic Beanstalk Files
-.elasticbeanstalk/*
-!.elasticbeanstalk/*.cfg.yml
-!.elasticbeanstalk/*.global.yml
-.idea/
-# Elastic Beanstalk Test Packages
-*.testy.zip
-*.todo

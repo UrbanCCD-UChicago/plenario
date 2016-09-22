@@ -98,7 +98,6 @@ class Validator(Schema):
 class NodeAggregateValidator(Validator):
 
     agg_unit = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_agg_units)
-    buckets = fields.Int(default=24, missing=24)
     node_id = fields.Str(required=True, validate=validate_nodes)
     feature = fields.Str(validate=validate_features, required=True)
     sensors = fields.Str(validate=validate_sensors)

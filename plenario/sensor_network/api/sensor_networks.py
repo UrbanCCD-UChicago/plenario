@@ -9,6 +9,7 @@ from sqlalchemy.exc import NoSuchTableError
 
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
 from plenario.api.common import make_cache_key, unknown_object_json_handler
+from plenario.api.response import make_error
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.sensor_network.api.sensor_validator import Validator, validate, NodeAggregateValidator
 from plenario.database import session, redshift_session, redshift_engine
@@ -164,11 +165,10 @@ def get_node_aggregations(network_name):
     :param network_name: (str) from sensor__network_metadata
     :returns: (json) response"""
 
-    # TODO: Add documentation!
     # TODO: Add error handling (with a JSON response)!
 
     fields = ("network_name", "node_id", "function", "feature",
-              "start_datetime", "buckets", "agg_unit", "sensors")
+              "start_datetime", "end_datetime", "agg_unit", "sensors")
 
     args = request.args.to_dict()
     args["network_name"] = network_name
@@ -181,7 +181,12 @@ def get_node_aggregations(network_name):
     validated_args.data["function"] = validated_args.data["function"].lower()
     validated_args.data["feature"] = validated_args.data["feature"].lower()
 
-    result = _get_node_aggregations(validated_args)
+    try:
+        result = _get_node_aggregations(validated_args)
+    except ValueError as err:
+        # In the case of proper syntax, but params which lead to an
+        # unprocesseable query.
+        return make_error(err.message, 422)
     return node_aggregations_response(validated_args, result)
 
 
