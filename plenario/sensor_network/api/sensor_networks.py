@@ -190,6 +190,7 @@ def get_node_aggregations(network_name):
     validated_args.data["node"] = validated_args.data["node"].lower()
     validated_args.data["function"] = validated_args.data["function"].lower()
     validated_args.data["feature"] = validated_args.data["features_of_interest"]
+    del validated_args.data["features_of_interest"]
 
     try:
         result = _get_node_aggregations(validated_args)
