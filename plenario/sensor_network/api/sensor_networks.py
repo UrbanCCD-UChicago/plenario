@@ -175,11 +175,13 @@ def get_node_aggregations(network_name):
     args = request.args.to_dict()
     args["network_name"] = network_name
 
-    # TODO: find a way to avoid having this here
-    try:
-        args["features_of_interest"] = args["features_of_interest"].split(",")
-    except KeyError:
-        pass
+    if 'features_of_interest' in args:
+        args['features_of_interest'] = args['features_of_interest'].split(',')
+        args["features_of_interest"] = (f.lower() for f in args["features_of_interest"])
+
+    if 'sensors' in args:
+        args["sensors"] = args["sensors"].split(',')
+        args["sensors"] = (s.lower() for s in args["sensors"])
 
     validated_args = validate(NodeAggregateValidator(only=fields), args)
     if validated_args.errors:
