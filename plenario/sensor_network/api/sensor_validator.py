@@ -40,6 +40,8 @@ def validate_features(features):
 
 
 def validate_sensors(sensors):
+    if isinstance(sensors, basestring):
+        sensors = [sensors]
     valid_sensors = Sensor.index()
     for sensor in sensors:
         sensor = sensor.lower()
@@ -97,10 +99,11 @@ class Validator(Schema):
 
 class NodeAggregateValidator(Validator):
 
-    agg_unit = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_agg_units)
-    node_id = fields.Str(required=True, validate=validate_nodes)
-    feature = fields.Str(validate=validate_features, required=True)
+    node = fields.Str(required=True, validate=validate_nodes)
+    features_of_interest = fields.List(fields.Str(), default=None, validate=validate_features, required=True)
     function = fields.Str(required=True, validate=lambda x: x.lower() in aggregate_fn_map)
+
+    agg = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_agg_units)
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
 
 

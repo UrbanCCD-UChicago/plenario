@@ -2,7 +2,6 @@ from collections import defaultdict
 from datetime import timedelta
 
 from dateutil.parser import parse as date_parse
-from dateutil.relativedelta import relativedelta
 from sqlalchemy import and_, func, Table, asc
 from sqlalchemy.sql import select
 
@@ -11,13 +10,21 @@ from plenario.database import session, redshift_engine as r_engine
 from plenario.sensor_network.sensor_models import NodeMeta
 
 
-def _fill_in_blanks(aggregates, agg_unit):
+def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
     """Given a list of row proxies, interpolate empty results where the gap
     between the datetime of two results exceeds the agg_unit.
 
     :param aggregates: (SQLAlchemy) row proxy objects
     :param agg_unit: (str) unit of time
     :returns: (list) of row proxies and row proxy-likes"""
+
+    start_dt = _zero_out_datetime(start_dt, agg_unit)
+    end_dt = _zero_out_datetime(end_dt, agg_unit)
+
+    if start_dt < aggregates[0].time_bucket:
+        aggregates.insert(0, start_dt)
+    if end_dt > aggregates[-1].time_bucket:
+        aggregates.append(end_dt)
 
     filled_out_aggs = list()
 
@@ -132,7 +139,7 @@ def _valid_columns(node, target_sensors, target_feature_properties):
             # We will only check against properties if properties were specified
             # ex. magnetic_field.x, magnetic_field.y ...
             if target_feature_properties[current_feature]:
-                if current_property not in target_feature_properties[current_feature]:
+                if current_property.lower() not in target_feature_properties[current_feature]:
                     continue
             columns.add(val.split(".")[1].lower())
 
@@ -171,17 +178,18 @@ def aggregate(args, agg_label, agg_fn):
     :param agg_fn: (function) aggregate function that is being applied
     :returns: (list) of dictionary objects that can be dumped to JSON"""
 
-    expected = ("node_id", "feature", "start_datetime", "end_datetime", "sensors", "agg_unit")
+    import pdb
+    pdb.set_trace()
+
+    expected = ("node", "feature", "start_datetime", "end_datetime", "sensors", "agg")
     node, feature, start_dt, end_dt, sensors, agg_unit = (args.data.get(k) for k in expected)
 
     # Format the datetime parameters
-    # start_dt = date_parse(start_dt)
-    # start_dt = _zero_out_datetime(start_dt, agg_unit)
-    # end_dt = date_parse(end_dt)
+    start_dt = date_parse(start_dt).replace(tzinfo=None)
+    end_dt = date_parse(end_dt).replace(tzinfo=None)
 
-    # Break up comma-delimited query arguments
-    target_features = feature.split(",")
-    target_sensors = sensors.split(",") if sensors else None
+    target_features = feature
+    target_sensors = sensors
 
     # Generate a map of the target features and properties
     target_feature_properties = dict()
@@ -213,7 +221,7 @@ def aggregate(args, agg_label, agg_fn):
     )).group_by("time_bucket").order_by(asc("time_bucket"))
 
     results = r_session.execute(query).fetchall()
-    results = _fill_in_blanks(results, agg_unit)
+    results = _fill_in_blanks(results, agg_unit, start_dt, end_dt)
 
     return _format_aggregates(results, agg_label)
 
@@ -222,4 +230,7 @@ aggregate_fn_map = {
     "avg": lambda args: aggregate(args, "avg", func.avg),
     "std": lambda args: aggregate(args, "std", func.stddev),
     "var": lambda args: aggregate(args, "var", func.variance),
+    "max": lambda args: aggregate(args, "std", func.max),
+    "min": lambda args: aggregate(args, "var", func.min),
+    "med": lambda args: aggregate(args, "var", func.median),
 }

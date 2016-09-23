@@ -126,7 +126,7 @@ def get_sensors(network_name, feature=None, sensor=None, node_id=None):
 
 
 # @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-# @crossdomain(origin="*")
+@crossdomain(origin="*")
 def get_observations(network_name=None):
     fields = ('network_name', 'nodes', 'start_datetime', 'end_datetime',
               'location_geom__within', 'features_of_interest', 'sensors',
@@ -169,24 +169,25 @@ def get_node_aggregations(network_name):
     :param network_name: (str) from sensor__network_metadata
     :returns: (json) response"""
 
-    # TODO: Faster queries!
-    # TODO: Fix gas concentration error.
-    # TODO: Make query arguments for /query and /aggregate as close to
-    # TODO: interchangeable as possible!
-
-    fields = ("network_name", "node_id", "function", "feature",
-              "start_datetime", "end_datetime", "agg_unit", "sensors")
+    fields = ("network_name", "node", "function", "features_of_interest",
+              "start_datetime", "end_datetime", "agg", "sensors")
 
     args = request.args.to_dict()
     args["network_name"] = network_name
+
+    # TODO: find a way to avoid having this here
+    try:
+        args["features_of_interest"] = args["features_of_interest"].split(",")
+    except KeyError:
+        pass
 
     validated_args = validate(NodeAggregateValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
-    validated_args.data["node_id"] = validated_args.data["node_id"].lower()
+    validated_args.data["node"] = validated_args.data["node"].lower()
     validated_args.data["function"] = validated_args.data["function"].lower()
-    validated_args.data["feature"] = validated_args.data["feature"].lower()
+    validated_args.data["feature"] = validated_args.data["features_of_interest"]
 
     try:
         result = _get_node_aggregations(validated_args)

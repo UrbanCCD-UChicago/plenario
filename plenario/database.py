@@ -17,7 +17,7 @@ Base = declarative_base(bind=app_engine)
 Base.query = session.query_property()
 
 
-redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=False)
+redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=False, pool_size=50, max_overflow=50)
 
 redshift_session = scoped_session(sessionmaker(bind=redshift_engine,
                                       autocommit=False,
