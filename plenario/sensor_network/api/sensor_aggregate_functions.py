@@ -22,9 +22,9 @@ def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
     end_dt = _zero_out_datetime(end_dt, agg_unit)
 
     if start_dt < aggregates[0].time_bucket:
-        aggregates.insert(0, start_dt)
+        aggregates.insert(0, {"time_bucket": start_dt, "count": 0})
     if end_dt > aggregates[-1].time_bucket:
-        aggregates.append(end_dt)
+        aggregates.append({"time_bucket": end_dt, "count": 0})
 
     filled_out_aggs = list()
 
@@ -32,8 +32,8 @@ def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
         if i == len(aggregates) - 1:
             continue
 
-        next_agg_time = aggregates[i + 1].time_bucket
-        candidate_time = agg.time_bucket + timedelta(**{agg_unit + "s": 1})
+        next_agg_time = aggregates[i + 1]["time_bucket"]
+        candidate_time = agg["time_bucket"] + timedelta(**{agg_unit + "s": 1})
         while next_agg_time != candidate_time:
             filled_out_aggs.append({
                 "time_bucket": candidate_time,
@@ -177,9 +177,6 @@ def aggregate(args, agg_label, agg_fn):
     :param agg_label: (str) name of the aggregate function being used
     :param agg_fn: (function) aggregate function that is being applied
     :returns: (list) of dictionary objects that can be dumped to JSON"""
-
-    import pdb
-    pdb.set_trace()
 
     expected = ("node", "feature", "start_datetime", "end_datetime", "sensors", "agg")
     node, feature, start_dt, end_dt, sensors, agg_unit = (args.data.get(k) for k in expected)
