@@ -5,7 +5,7 @@ from flask import make_response, Blueprint
 
 from common import cache, make_cache_key
 from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, \
-    get_observations, get_features, get_sensors, get_node_aggregations
+    get_observations, get_features, get_sensors, get_node_aggregations, set_sensor_datadump
 from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
 from sensor import weather_stations, weather
 from shape import get_all_shape_datasets, \
@@ -38,7 +38,9 @@ api.add_url_rule(prefix + '/datadump/<ticket>', 'get_datadump', get_datadump)
 # sensor networks
 api.add_url_rule(prefix + '/sensor-networks', 'sensor_networks', get_network_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>', 'sensor_network', get_network_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/query', 'observations', get_observations)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/aggregate', 'node_aggregate', get_node_aggregations)
+api.add_url_rule(prefix + '/sensor-networks/<network_name>/download', 'sensor_network_download', set_sensor_datadump)
 
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes', 'network_nodes', get_node_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>', 'single_node', get_node_metadata)
@@ -53,7 +55,6 @@ api.add_url_rule(prefix + '/sensor-networks/<network_name>/sensors/<sensor>', 's
 # api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>/sensors', 'sensors', get_sensors)
 # api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>/sensors/<sensor>', 'sensors', get_sensors)
 
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/query', 'observations', get_observations)
 
 
 @api.route(prefix + '/flush-cache')

@@ -44,6 +44,47 @@ def get_network_metadata(network_name=None):
     return _get_network_metadata(validated_args)
 
 
+@cache.cached(timeout=CACHE_TIMEOUT * 10, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def set_sensor_datadump(network_name):
+    """Queue a datadump job for raw sensor network observations and return
+    links to check on its status and eventual download. Has a longer cache
+    timeout than the other endpoints -- datadumps are alot of work.
+
+    :endpoint: /sensor-networks/<network-name>/download
+    :param network_name: (str) network name
+    :returns: (json) response"""
+
+    fields = ('network_name', 'nodes', 'start_datetime', 'end_datetime',
+              'limit', 'location_geom__within', 'features_of_interest',
+              'sensors', 'offset')
+
+    args = request.args.to_dict()
+    args["network_name"] = network_name.lower()
+
+    if 'nodes' in args:
+        args['nodes'] = args['nodes'].split(',')
+        args["nodes"] = [n.lower() for n in args["nodes"]]
+
+    if 'sensors' in args:
+        args['sensors'] = args['sensors'].split(',')
+        args["sensors"] = [s.lower() for s in args["sensors"]]
+
+    if 'features_of_interest' in args:
+        args['features_of_interest'] = args['features_of_interest'].split(',')
+        args["features_of_interest"] = [f.lower() for f in args["features_of_interest"]]
+
+    validator = Validator(only=fields)
+    validated_args = validate(validator, args)
+    if validated_args.errors:
+        return bad_request(validated_args.errors)
+
+    from plenario.api.jobs import make_job_response
+
+    job = make_job_response("datadump", validated_args)
+    return job
+
+
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def get_node_metadata(network_name, node_id=None):
@@ -125,7 +166,6 @@ def get_sensors(network_name, feature=None, sensor=None, node_id=None):
     return _get_sensors(validated_args)
 
 
-# @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def get_observations(network_name=None):
     fields = ('network_name', 'nodes', 'start_datetime', 'end_datetime',

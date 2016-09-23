@@ -43,6 +43,9 @@ def map_unknown_to_foi(unknown, sensor_properties):
     :param unknown: (object) a row returned from a SQLAlchemy query
     :param sensor_properties: (dict) holds mappings from node key to FOI"""
 
+    # TODO: Make sure to handle errors, in case the resolved issue doesn't
+    # TODO: actually fix what made this these observations misfits.
+
     foi_insert_vals = defaultdict(list)
 
     for key, value in loads(unknown.data).items():
