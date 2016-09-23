@@ -101,7 +101,7 @@ class NodeAggregateValidator(Validator):
 
     node = fields.Str(required=True, validate=validate_nodes)
     features_of_interest = fields.List(fields.Str(), default=None, validate=validate_features, required=True)
-    function = fields.Str(required=True, validate=lambda x: x.lower() in aggregate_fn_map)
+    function = fields.Str(missing="avg", default="avg", validate=lambda x: x.lower() in aggregate_fn_map)
 
     agg = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_agg_units)
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))

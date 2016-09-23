@@ -1,3 +1,4 @@
+from copy import deepcopy
 from collections import defaultdict
 from datetime import timedelta
 
@@ -21,10 +22,14 @@ def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
     start_dt = _zero_out_datetime(start_dt, agg_unit)
     end_dt = _zero_out_datetime(end_dt, agg_unit)
 
-    if start_dt < aggregates[0].time_bucket:
-        aggregates.insert(0, {"time_bucket": start_dt, "count": 0})
-    if end_dt > aggregates[-1].time_bucket:
-        aggregates.append({"time_bucket": end_dt, "count": 0})
+    placeholder = _generate_placeholder(aggregates[0])
+
+    if start_dt < aggregates[0]["time_bucket"]:
+        placeholder["time_bucket"] = start_dt
+        aggregates.insert(0, deepcopy(placeholder))
+    if end_dt > aggregates[-1]["time_bucket"]:
+        placeholder["time_bucket"] = end_dt
+        aggregates.append(deepcopy(placeholder))
 
     filled_out_aggs = list()
 
@@ -35,17 +40,15 @@ def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
         next_agg_time = aggregates[i + 1]["time_bucket"]
         candidate_time = agg["time_bucket"] + timedelta(**{agg_unit + "s": 1})
         while next_agg_time != candidate_time:
-            filled_out_aggs.append({
-                "time_bucket": candidate_time,
-                "count": "0"
-            })
+            placeholder["time_bucket"] = candidate_time
+            filled_out_aggs.append(deepcopy(placeholder))
             candidate_time += timedelta(**{agg_unit + "s": 1})
         filled_out_aggs.append(agg)
 
     return sorted(filled_out_aggs, key=lambda x: x["time_bucket"])
 
 
-def _format_aggregates(aggregates, agg_label):
+def _format_aggregates(aggregates, agg_label, agg_unit, start_dt, end_dt):
     """Given a list of row proxies, format them into serveable JSON.
 
     :param aggregates: (SQLAlchemy) row proxy objects (imitateable with dicts)
@@ -68,7 +71,7 @@ def _format_aggregates(aggregates, agg_label):
 
         results.append(aggregate_json)
 
-    return results
+    return _fill_in_blanks(results, agg_unit, start_dt, end_dt)
 
 
 def _generate_aggregate_selects(table, target_columns, agg_fn, agg_unit):
@@ -95,6 +98,25 @@ def _generate_aggregate_selects(table, target_columns, agg_fn, agg_unit):
         selects.append(func.count(col).label(col.name + "_count"))
 
     return selects
+
+
+def _generate_placeholder(aggreagte):
+    """Generate a placeholder dictionary for filling in empty timebuckets.
+
+    :param aggreagte: (dict) created from row proxy info
+    :returns: (dict) placeholder copy"""
+
+    placeholder = deepcopy(aggreagte)
+    for key, value in placeholder.items():
+        if key == "time_bucket":
+            continue
+        elif key == "count":
+            placeholder[key] = 0
+        elif type(value) == dict:
+            placeholder[key] = _generate_placeholder(value)
+        else:
+            placeholder[key] = None
+    return placeholder
 
 
 def _reflect(table_name, metadata, engine):
@@ -218,9 +240,7 @@ def aggregate(args, agg_label, agg_fn):
     )).group_by("time_bucket").order_by(asc("time_bucket"))
 
     results = r_session.execute(query).fetchall()
-    results = _fill_in_blanks(results, agg_unit, start_dt, end_dt)
-
-    return _format_aggregates(results, agg_label)
+    return _format_aggregates(results, agg_label, agg_unit, start_dt, end_dt)
 
 
 aggregate_fn_map = {
