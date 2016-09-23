@@ -160,10 +160,10 @@ def validate(validator, request_args):
     args = request_args.copy()
 
     # Prevent a time formatting issue that causes validator.load to act up
-    if args.data.get("start_datetime"):
-        args.data["start_datetime"] = args.data["start_datetime"].split("+")[0]
-    if args.data.get("end_datetime"):
-        args.data["end_datetime"] = args.data["end_datetime"].split("+")[0]
+    if args.get("start_datetime"):
+        args["start_datetime"] = args["start_datetime"].split("+")[0]
+    if args.get("end_datetime"):
+        args["end_datetime"] = args["end_datetime"].split("+")[0]
 
     # If there are errors, fail quickly and return.
     result = validator.load(args)
