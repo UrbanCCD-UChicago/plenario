@@ -2,6 +2,7 @@ import os
 from sqlalchemy import create_engine, and_, text, func
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.exc import InvalidRequestError
 
 from plenario.settings import DATABASE_CONN, REDSHIFT_CONN
 
@@ -78,8 +79,12 @@ def windowed_query(q, column, windowsize):
     """"Break a Query into windows on a given column."""
 
     for whereclause in column_windows(q.session, column, windowsize):
-        for row in q.filter(whereclause).order_by(column):
-            yield row
+        try:
+            for row in q.filter(whereclause).order_by(column):
+                yield row
+        except InvalidRequestError:
+            for row in q.from_self().filter(whereclause).order_by(column):
+                yield row
 
 
 # Fast Counting of large datasets (for use with DataDump).

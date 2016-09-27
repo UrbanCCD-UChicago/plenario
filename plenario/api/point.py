@@ -129,6 +129,7 @@ def datadump():
 @crossdomain(origin="*")
 def get_datadump(ticket):
     job = get_job(ticket)
+    print "{} point.get_datadump.job: {}".format(datetime.now(), job)
     try:
         if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
             datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get(
@@ -189,8 +190,16 @@ def get_datadump(ticket):
                 stream_data = stream_csv
 
             response = Response(stream_data(), mimetype="text/{}".format(datatype))
-            response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(
-                get_request(ticket)["query"]["dataset"], datatype)
+            job_request = get_request(ticket)
+
+            try:
+                response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(
+                    get_request(ticket)["query"]["dataset"], datatype)
+            except KeyError:
+                network_name = job_request["query"]["network_name"]
+                content_disposition = "attachement; filename={}.datadump.{}"
+                content_disposition = content_disposition.format(network_name, datatype)
+                response.headers["Content-Disposition"] = content_disposition
             return response
         else:
             return job
@@ -430,7 +439,6 @@ def _datadump(args):
     set_status(requestid, status)
 
     q = detail_query(args)
-    # TODO: Generalize the "dataset" argument, right now it expects Plenario DB
     columns = [c.name for c in args.data.get('dataset').columns if c.name not in ['point_date', 'hash', 'geom']]
 
     def add_chunk(chunk):

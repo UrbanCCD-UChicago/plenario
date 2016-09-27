@@ -1,6 +1,9 @@
+import math
 import json
+import os
 import threading
 
+from datetime import datetime
 from dateutil.parser import parse
 from flask import request, make_response
 from shapely import wkb
@@ -10,6 +13,9 @@ from sqlalchemy.exc import NoSuchTableError
 from plenario.api.common import cache, crossdomain
 from plenario.api.common import make_cache_key, unknown_object_json_handler
 from plenario.api.response import make_error
+from plenario.api.jobs import get_status, set_status, set_flag
+from plenario.database import fast_count, windowed_query
+from plenario.models import DataDump
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.sensor_network.api.sensor_validator import Validator, validate, NodeAggregateValidator
 from plenario.database import session, redshift_session, redshift_engine
@@ -81,7 +87,8 @@ def set_sensor_datadump(network_name):
     from plenario.api.jobs import make_job_response
 
     validated_args.data["query_fn"] = "aot_point"
-    job = make_job_response("datadump", validated_args)
+    validated_args.data["datadump_urlroot"] = request.url_root
+    job = make_job_response("observation_datadump", validated_args)
     return job
 
 
@@ -534,3 +541,81 @@ def run_observation_queries(args, queries):
     resp.headers['Content-Type'] = 'application/json'
 
     return resp
+
+
+def get_observation_datadump(args):
+
+    request_id = args.data.get("jobsframework_ticket")
+    observation_queries = get_observation_queries(args)
+
+    row_count = 0
+
+    for query, table in observation_queries:
+        row_count += fast_count(query)
+
+    if args.data.get("limit"):
+        row_count = args.data.get("limit")
+
+    chunk_size = 1000.0
+    chunk_count = math.ceil(row_count / chunk_size)
+    chunk_number = 1
+
+    chunk = list()
+    features = set()
+    for query, table in observation_queries:
+
+        features.add(table.name.lower())
+        for row in windowed_query(query, table.c.datetime, chunk_size):
+            chunk.append(format_observation(row, table))
+
+            if len(chunk) > chunk_size:
+                store_chunk(chunk, chunk_count, chunk_number, request_id)
+                chunk = list()
+                chunk_number += 1
+
+    if len(chunk) > 0:
+        store_chunk(chunk, chunk_count, chunk_number, request_id)
+
+    meta_chunk = '{{"startTime": "{}", "endTime": "{}", "workers": {}, "features": {}}}'.format(
+        get_status(request_id)["meta"]["startTime"],
+        str(datetime.now()),
+        json.dumps([args.data["jobsframework_workerid"]]),
+        json.dumps(list(features))
+    )
+
+    dump = DataDump(request_id, request_id, 0, chunk_count, meta_chunk)
+
+    session.add(dump)
+    try:
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise e
+
+    return {"url": args.data["datadump_urlroot"] + "v1/api/datadump/" + request_id}
+
+
+def store_chunk(chunk, chunk_count, chunk_number, request_id):
+
+    datadump_part = DataDump(
+        id=os.urandom(16).encode('hex'),
+        request=request_id,
+        part=chunk_number,
+        total=chunk_count,
+        data=json.dumps(chunk, default=str)
+    )
+
+    session.add(datadump_part)
+
+    try:
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise e
+
+    status = get_status(request_id)
+    status["progress"] = {"done": chunk_number, "total": chunk_count}
+    set_status(request_id, status)
+
+    # Supress datadump cleanup
+    set_flag(request_id + "_suppresscleanup", True, 10800)
