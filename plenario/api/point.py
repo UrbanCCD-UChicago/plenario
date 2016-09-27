@@ -394,16 +394,10 @@ def _datadump(args):
     users through a download. Defaults to returning observations from Plenario
     databases.
 
-    :param args: (ValidatorResult) be sure to define "query_fn" in args.data
+    :param args: (ValidatorResult) carries all meta information
     :returns: (ValidatorResult) with download link defined"""
 
     requestid = args.data.get("jobsframework_ticket")
-
-    # If no query function is specified, let's default to detail_query. This
-    # is to minimize the possibilty that including new queries will break
-    # existing plenario services.
-    query_fn = args.data.get("query_fn")
-    query_fn = query_fn_map[query_fn] if query_fn else detail_query
 
     chunksize = 1000
     original_validated = copy.deepcopy(args)
@@ -417,7 +411,7 @@ def _datadump(args):
     # Calculate query parameters
     log("===== STARTING WORK ON DATADUMP {} =====".format(args.data["jobsframework_ticket"]))
     log("-> Query: {}".format(json.dumps(query, default=unknown_object_json_handler)))
-    rows = fast_count(query_fn(args))
+    rows = fast_count(detail_query(args))
     log("-> Dump contains {} rows.".format(rows))
 
     if rows > row_threshold:
@@ -435,7 +429,7 @@ def _datadump(args):
     status["progress"] = {"done": 0, "total": chunks}
     set_status(requestid, status)
 
-    q = query_fn(args)
+    q = detail_query(args)
     # TODO: Generalize the "dataset" argument, right now it expects Plenario DB
     columns = [c.name for c in args.data.get('dataset').columns if c.name not in ['point_date', 'hash', 'geom']]
 
@@ -762,9 +756,3 @@ def request_args_to_condition_tree(request_args, ignore=list()):
             ctree['val'].append({"op": k[1], "col": k[0], "val": v})
 
     return ctree
-
-
-query_fn_map = {
-    "aot_point": None,
-    "core_point": detail_query,
-}
