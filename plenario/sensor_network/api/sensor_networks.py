@@ -17,7 +17,6 @@ from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, Feature
 
 from sensor_aggregate_functions import aggregate_fn_map
 
-
 # Cache timeout of 5 mintutes
 CACHE_TIMEOUT = 60 * 10
 
@@ -81,6 +80,7 @@ def set_sensor_datadump(network_name):
 
     from plenario.api.jobs import make_job_response
 
+    validated_args.data["query_fn"] = "aot_point"
     job = make_job_response("datadump", validated_args)
     return job
 
@@ -195,7 +195,8 @@ def get_observations(network_name=None):
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
-    return _get_observations(validated_args)
+    observation_queries = get_observation_queries(validated_args)
+    return run_observation_queries(validated_args, observation_queries)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -242,12 +243,10 @@ def get_node_aggregations(network_name):
 
 
 def _get_node_aggregations(args):
-
     return aggregate_fn_map[args.data.get("function")](args)
 
 
 def node_aggregations_response(args, result):
-
     resp = json_response_base(args, result, args.data)
     resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
     resp.headers['Content-Type'] = 'application/json'
@@ -276,14 +275,20 @@ def node_metadata_query(args):
     return query
 
 
-def observation_query(args, table):
-    params = ('nodes', 'start_datetime', 'end_datetime', 'sensors')
-    nodes, start_datetime, end_datetime, sensors = (args.data.get(k) for k in params)
+def observation_query(args, num_tables, table):
+    nodes = args.data.get("nodes")
+    start_dt = args.data.get("start_datetime")
+    end_dt = args.data.get("end_datetime")
+    sensors = args.data.get("sensors")
+    limit = args.data.get("limit")
+    offset = args.data.get("offset")
 
     q = redshift_session.query(table)
-    q = q.filter(table.c.datetime.between(start_datetime, end_datetime))
+    q = q.filter(table.c.datetime.between(start_dt, end_dt))
     q = q.filter(sqla_fn.lower(table.c.node_id).in_(nodes)) if nodes else q
     q = q.filter(sqla_fn.lower(table.c.sensor).in_(sensors)) if sensors else q
+    q = q.limit(limit / num_tables)
+    q = q.offset(offset / num_tables) if args.data['offset'] else q
 
     return q
 
@@ -346,6 +351,7 @@ def format_observation(obs, table):
         'feature_of_interest': table.name,
         'results': {}
     }
+
     for prop in (set([c.name for c in table.c]) - {'node_id', 'datetime', 'sensor', 'meta_id'}):
         obs_response['results'][prop] = getattr(obs, prop)
 
@@ -391,7 +397,6 @@ def _get_node_metadata(args):
 
 
 def _get_features(args):
-
     target_feature = args.data.get("feature")
     features = session.query(FeatureOfInterest).all()
     features_index = FeatureOfInterest.index(args.data.get("network_name"))
@@ -439,7 +444,7 @@ def _get_sensors(args):
     return resp
 
 
-def _get_observations(args):
+def get_observation_queries(args):
     nodes_to_query = [node.id.lower() for node in node_metadata_query(args).all()]
     args.data['nodes'] = nodes_to_query
 
@@ -468,14 +473,23 @@ def _get_observations(args):
             return bad_request("Table {} not found".format(table_name))
 
     # TODO: make limit on threaded query reliably return the correct number of results
-    data = []
-    threads = []
-    for table in tables:
-        t = threading.Thread(target=_thread_query, args=(table, len(tables), data, args))
+    return [(observation_query(args, len(tables), table), table) for table in tables]
+
+
+def run_observation_queries(args, queries):
+
+    def fetch_query_results(data, obs_query, obs_table):
+        for obs in obs_query.all():
+            data.append(format_observation(obs, obs_table))
+
+    results = list()
+    threads = list()
+
+    for query, table in queries:
+        t = threading.Thread(target=fetch_query_results, args=(results, query, table))
         threads.append(t)
         t.start()
 
-    # Now wait for each thread to terminate
     for thread in threads:
         thread.join()
 
@@ -513,18 +527,10 @@ def _get_observations(args):
     display_args.update(args.data)
 
     # Sort the data by datetime
-    data.sort(key=lambda x: parse(x["datetime"]))
+    results.sort(key=lambda x: parse(x["datetime"]))
 
-    resp = json_response_base(args, data, display_args)
+    resp = json_response_base(args, results, display_args)
     resp = make_response(json.dumps(resp), 200)
     resp.headers['Content-Type'] = 'application/json'
 
     return resp
-
-
-def _thread_query(table, num_tables, data, args):
-    q = observation_query(args, table)
-    q = q.limit(args.data['limit'] / num_tables)
-    q = q.offset(args.data['offset'] / num_tables) if args.data['offset'] else q
-    for obs in q.all():
-        data.append(format_observation(obs, table))
