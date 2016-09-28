@@ -291,7 +291,8 @@ def observation_query(args, num_tables, table):
     offset = args.data.get("offset")
 
     q = redshift_session.query(table)
-    q = q.filter(table.c.datetime.between(start_dt, end_dt))
+    q = q.filter(table.c.datetime >= start_dt)
+    q = q.filter(table.c.datetime < end_dt)
     q = q.filter(sqla_fn.lower(table.c.node_id).in_(nodes)) if nodes else q
     q = q.filter(sqla_fn.lower(table.c.sensor).in_(sensors)) if sensors else q
     q = q.limit(limit / num_tables)
