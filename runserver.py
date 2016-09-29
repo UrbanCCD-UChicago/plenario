@@ -19,4 +19,4 @@ else:
 
 if __name__ == "__main__":
     should_run_debug = os.environ.get('DEBUG') is not None
-    application.run(debug=should_run_debug)
+    application.run(debug=should_run_debug, host="0.0.0.0") # TODO: Review this - not sure if this the correct way to make flask server visible work on host os but http://flask.pocoo.org/docs/0.11/quickstart/#a-minimal-application
