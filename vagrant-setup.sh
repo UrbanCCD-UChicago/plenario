@@ -40,6 +40,7 @@ python init_db.py
 
 echo "-------------------- Running Flask app -------------------- "
 
+export VAGRANT="true"
 python runserver.py &
 
 echo "-------------------- Open http://localhost:5000/ on your host or curl localhost:5000 in vagrant vm -------------------- "
