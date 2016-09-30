@@ -1,12 +1,54 @@
 """utilities: helper functions that serve to monitor the health and activity
 of the worker threads."""
 
+import boto3
+import requests
 import traceback
 import warnings
 from datetime import datetime
 from plenario.database import session
 from plenario.models import Workers
-from plenario.settings import AUTOSCALING_GROUP, INSTANCE_ID
+
+
+def get_ec2_instance_id():
+    """Retrieve the instance id for the currently running EC2 instance. If
+    the host machine is not an EC2 instance or is for some reason unable
+    to make requests, return None.
+
+    :returns: (str) id of the current EC2 instance
+              (None) if the id could not be found"""
+
+    instance_id_url = "http://169.254.169.254/latest/meta-data/instance-id"
+    try:
+        return requests.get(instance_id_url).text
+    except requests.ConnectionError:
+        print "Could not find EC2 instance id..."
+        return None
+
+
+INSTANCE_ID = get_ec2_instance_id()
+
+
+# TODO: Test get_autoscaling_group
+def get_autoscaling_group():
+    """Retrieve the autoscaling group name of the current instance. If
+    the host machine is not an EC2 instance, not subject to autoscaling,
+    or unable to make requests, return None.
+
+    :returns: (str) id of the current autoscaling group
+              (None) if the id could not be found"""
+
+    autoscaling_client = boto3.client("autoscaling")
+    try:
+        return autoscaling_client.describe_autoscaling_instances(
+            InstanceIds=[INSTANCE_ID]
+        )["AutoscalingInstances"][0]["AutoscalingGroupName"]
+    except Exception as exc:
+        print "Could not find autoscaling group..."
+        raise exc
+
+
+AUTOSCALING_GROUP = get_autoscaling_group()
 
 
 def log(msg, worker_id):

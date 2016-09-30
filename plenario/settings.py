@@ -77,28 +77,28 @@ MAINTENANCE = False
 JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-queue-test')
 
 # Get Instance ID and Autoscaling Group Name
-
-try:
-    instance_metadata = boto.utils.get_instance_metadata(timeout=2, num_retries=2)
-    INSTANCE_ID = instance_metadata["instance-id"]
-except KeyError:
-    print "Could not get INSTANCE_ID"
-    INSTANCE_ID = ""
-
-try:
-    AUTOSCALING_GROUP = ""
-    ec2 = boto.ec2.connect_to_region(
-        AWS_REGION_NAME,
-        aws_access_key_id=AWS_ACCESS_KEY,
-        aws_secret_access_key=AWS_SECRET_KEY
-    )
-    reservations = ec2.get_all_instances()
-    for res in reservations:
-        for inst in res.instances:
-            if inst.id == INSTANCE_ID:
-                AUTOSCALING_GROUP = inst.tags["aws:autoscaling:groupName"]
-                break
-        if AUTOSCALING_GROUP:
-            break
-except boto.exception.EC2ResponseError:
-    print "Could not get AUTOSCALING_GROUP"
+#
+# try:
+#     instance_metadata = boto.utils.get_instance_metadata(timeout=2, num_retries=2)
+#     INSTANCE_ID = instance_metadata["instance-id"]
+# except KeyError:
+#     print "Could not get INSTANCE_ID"
+#     INSTANCE_ID = ""
+#
+# try:
+#     AUTOSCALING_GROUP = ""
+#     ec2 = boto.ec2.connect_to_region(
+#         AWS_REGION_NAME,
+#         aws_access_key_id=AWS_ACCESS_KEY,
+#         aws_secret_access_key=AWS_SECRET_KEY
+#     )
+#     reservations = ec2.get_all_instances()
+#     for res in reservations:
+#         for inst in res.instances:
+#             if inst.id == INSTANCE_ID:
+#                 AUTOSCALING_GROUP = inst.tags["aws:autoscaling:groupName"]
+#                 break
+#         if AUTOSCALING_GROUP:
+#             break
+# except boto.exception.EC2ResponseError:
+#     print "Could not get AUTOSCALING_GROUP"

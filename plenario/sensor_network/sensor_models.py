@@ -28,6 +28,9 @@ class NetworkMeta(Base):
         networks = session.query(NetworkMeta)
         return [network.name.lower() for network in networks]
 
+    def __repr__(self):
+        return '<Network "{}">'.format(self.name)
+
 
 class NodeMeta(Base):
     __tablename__ = 'sensor__node_metadata'
@@ -76,6 +79,9 @@ class FeatureOfInterest(Base):
                     for prop in sensor.observed_properties.itervalues():
                         features.append(prop.split('.')[0].lower())
         return list(set(features))
+
+    def __repr__(self):
+        return '<Feature "{}">'.format(self.name)
 
 
 class Sensor(Base):
