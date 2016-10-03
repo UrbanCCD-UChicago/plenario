@@ -54,8 +54,8 @@ def validate_geom(geom):
 
     try:
         return extract_first_geometry_fragment(geom)
-    except Error:
-        raise ValidationError("Could not parse geojson: {}.".format(geom))
+    except Exception as exc:
+        raise ValidationError("Could not parse geojson: {}. {}".format(geom, exc))
 
 
 class Validator(Schema):

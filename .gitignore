@@ -30,3 +30,4 @@ celerybeat-schedule
 data/
 notebooks/
 .env
+.coveragerc

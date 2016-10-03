@@ -269,15 +269,15 @@ def node_metadata_query(args):
     :returns: (sqlalchemy.orm.query.Query) object"""
 
     params = ('network_name', 'node_id', 'nodes', 'geom')
-    network_name, node_id, nodes, geom = (args.data.get(k) for k in params)
+    network_name, node_id, nodes, geojson = (args.data.get(k) for k in params)
 
-    geom_filter = NodeMeta.location.ST_Within(sqla_fn.ST_GeomFromGeoJSON(geom))
+    geom_filter = NodeMeta.location.ST_Within(sqla_fn.ST_GeomFromGeoJSON(geojson))
 
     query = session.query(NodeMeta)
     query = query.filter(sqla_fn.lower(NodeMeta.sensor_network) == sqla_fn.lower(network_name))
     query = query.filter(sqla_fn.lower(NodeMeta.id) == sqla_fn.lower(node_id)) if node_id else query
     query = query.filter(sqla_fn.lower(NodeMeta.id).in_(nodes)) if nodes else query
-    query = query.filter(geom_filter) if geom else query
+    query = query.filter(geom_filter) if geojson else query
 
     return query
 
