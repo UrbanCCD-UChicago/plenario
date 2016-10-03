@@ -49,7 +49,6 @@ def validate_sensors(sensors):
             raise ValidationError("Invalid sensor name: {}".format(sensor))
 
 
-# not working...
 def validate_geom(geom):
     """Custom validator for geom parameter."""
 

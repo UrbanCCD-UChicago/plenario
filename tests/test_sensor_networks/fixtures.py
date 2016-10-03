@@ -84,11 +84,11 @@ class Fixtures:
             nodes=[node],
         )
 
-        network_2 = NetworkMeta(
+        network_02 = NetworkMeta(
             name="test_network_other",
         )
 
-        for obj in [feature_01, feature_02, node, network, network_2]:
+        for obj in [feature_01, feature_02, node, network, network_02]:
             try:
                 print "INSERT {} with {}".format(obj, session.get_bind())
                 session.add(obj)
