@@ -103,8 +103,5 @@ class Fixtures:
     def generate_mock_features_of_interest(self):
         from plenario.sensor_network.redshift_ops import create_foi_table
 
-        session.configure(bind=self.rs_engine)
-
         create_foi_table("vector", [{"type": "float", "name": "x"}, {"type": "float", "name": "y"}])
-
-
+        self.rs_engine.execute("insert into vector ()")
