@@ -1,10 +1,10 @@
-alembic==0.8.7
+alembic==0.8.8
 bcrypt==3.1.0
 blinker==1.4
 boto==2.42.0
 boto3==1.4.0
-botocore==1.4.47
-cffi==1.7.0
+botocore==1.4.58
+cffi==1.8.3
 click==6.6
 contextlib2==0.5.4
 csvkit==0.9.1

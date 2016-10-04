@@ -24,6 +24,7 @@
 
 # Miscellaneous
 Icon?
+.vagrant
 .dropbox
 .coverage
 celerybeat-schedule

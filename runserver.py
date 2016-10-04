@@ -1,6 +1,7 @@
 import logging
 import os
 import subprocess
+import sys
 
 from scripts.process_running import is_process_running
 
@@ -19,4 +20,8 @@ else:
 
 if __name__ == "__main__":
     should_run_debug = os.environ.get('DEBUG') is not None
-    application.run(debug=should_run_debug)
+    in_vagrant = os.environ.get('VAGRANT') is not None
+    if in_vagrant:
+        application.run(debug=should_run_debug, host="0.0.0.0")
+    else:
+        application.run(debug=should_run_debug)

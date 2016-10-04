@@ -12,6 +12,32 @@ at the [Computation Institute](http://ci.uchicago.edu)
 of the [University of Chicago](http://uchicago.edu) and [Argonne National Laboratory](http://www.anl.gov).
 It is maintained by UrbanCCD and was prototyped by [DataMade](http://datamade.us).
 
+## Running locally with Vagrant
+
+* Install requirements
+  * [Vagrant](https://www.vagrantup.com/)
+  * [Virtualbox](https://www.virtualbox.org/)
+
+
+* Get the Plenario source:
+
+```bash
+git clone git@github.com:UrbanCCD-UChicago/plenario.git
+```
+
+* Start up Vagrantfile
+
+```bash
+cd plenario
+vagrant up
+```
+
+* Wait for Vagrant to finish its output and exit with this message
+
+```bash
+Open http://localhost:5000/ on your host browser
+```
+
 ## Running locally
 
 * Get the Plenario source:
