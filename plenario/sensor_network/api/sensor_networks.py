@@ -49,6 +49,87 @@ def get_network_metadata(network_name=None):
     return _get_network_metadata(validated_args)
 
 
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def get_node_metadata(network_name, node_id=None):
+    """Return metadata about nodes for some network. If no node_id or
+    location_geom__within is specified, the default is to return metadata
+    for all nodes within the network.
+
+    :endpoint: /sensor-networks/<network-name>/nodes/<node-id>
+    :param network_name: (str) network that exists in sensor__network_metadata
+    :param node_id: (str) node that exists in sensor__node_metadata
+    :returns: (json) response"""
+
+    fields = ('network_name', 'node_id', 'nodes', 'location_geom__within')
+
+    args = request.args.to_dict()
+    args["network_name"] = network_name.lower()
+    args["node_id"] = node_id.lower() if node_id else None
+
+    validator = Validator(only=fields)
+    validated_args = validate(validator, args)
+    if validated_args.errors:
+        return bad_request(validated_args.errors)
+
+    return _get_node_metadata(validated_args)
+
+
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def get_sensors(network_name, feature=None, sensor=None, node_id=None):
+    """Return metadata for all sensors within a network. Sensors can also be
+    be filtered by various other properties. If no single sensor is specified,
+    the default is to return metadata for all sensors within the network.
+
+    :endpoint: /sensor-networks/<network_name>/sensors/<sensor>
+    :param network_name: (str) name from sensor__network_metadata
+    :param feature: (str) name from sensor__features_of_interest
+    :param sensor: (str) name from sensor__sensors
+    :param node_id: (str) name from sensor__node_metadata
+    :returns: (json) response"""
+
+    fields = ('network_name', 'feature', 'sensor', 'node_id')
+
+    args = dict()
+    args["network_name"] = network_name.lower()
+    args["feature"] = feature.lower() if feature else None
+    args["sensor"] = sensor.lower() if sensor else None
+    args["node_id"] = node_id.lower() if node_id else None
+
+    validator = Validator(only=fields)
+    validated_args = validate(validator, args)
+    if validated_args.errors:
+        return bad_request(validated_args.errors)
+
+    return _get_sensors(validated_args)
+
+
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def get_features(network_name, feature=None):
+    """Return metadata about features for some network. If no feature is
+    specified, return metadata about all features within the network.
+
+    :endpoint: /sensor-networks/<network_name>/features_of_interest/<feature>
+    :param network_name: (str) network name from sensor__network_metadata
+    :param feature: (str) name from sensor__features_of_interest
+    :returns: (json) response"""
+
+    fields = ('network_name', 'feature')
+
+    args = dict()
+    args['network_name'] = network_name.lower()
+    args['feature'] = feature.lower() if feature else None
+
+    validator = Validator(only=fields)
+    validated_args = validate(validator, args)
+    if validated_args.errors:
+        return bad_request(validated_args.errors)
+
+    return _get_features(validated_args)
+
+
 @cache.cached(timeout=CACHE_TIMEOUT * 10, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def set_sensor_datadump(network_name):
@@ -90,87 +171,6 @@ def set_sensor_datadump(network_name):
     validated_args.data["datadump_urlroot"] = request.url_root
     job = make_job_response("observation_datadump", validated_args)
     return job
-
-
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin="*")
-def get_node_metadata(network_name, node_id=None):
-    """Return metadata about nodes for some network. If no node_id or
-    location_geom__within is specified, the default is to return metadata
-    for all nodes within the network.
-
-    :endpoint: /sensor-networks/<network-name>/nodes/<node-id>
-    :param network_name: (str) network that exists in sensor__network_metadata
-    :param node_id: (str) node that exists in sensor__node_metadata
-    :returns: (json) response"""
-
-    fields = ('network_name', 'node_id', 'nodes', 'location_geom__within')
-
-    args = request.args.to_dict()
-    args["network_name"] = network_name.lower()
-    args["node_id"] = node_id.lower() if node_id else None
-
-    validator = Validator(only=fields)
-    validated_args = validate(validator, args)
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
-
-    return _get_node_metadata(validated_args)
-
-
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin="*")
-def get_features(network_name, feature=None):
-    """Return metadata about features for some network. If no feature is
-    specified, return metadata about all features within the network.
-
-    :endpoint: /sensor-networks/<network_name>/features_of_interest/<feature>
-    :param network_name: (str) network name from sensor__network_metadata
-    :param feature: (str) name from sensor__features_of_interest
-    :returns: (json) response"""
-
-    fields = ('network_name', 'feature')
-
-    args = dict()
-    args['network_name'] = network_name.lower()
-    args['feature'] = feature.lower() if feature else None
-
-    validator = Validator(only=fields)
-    validated_args = validate(validator, args)
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
-
-    return _get_features(validated_args)
-
-
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin="*")
-def get_sensors(network_name, feature=None, sensor=None, node_id=None):
-    """Return metadata for all sensors within a network. Sensors can also be
-    be filtered by various other properties. If no single sensor is specified,
-    the default is to return metadata for all sensors within the network.
-
-    :endpoint: /sensor-networks/<network_name>/sensors/<sensor>
-    :param network_name: (str) name from sensor__network_metadata
-    :param feature: (str) name from sensor__features_of_interest
-    :param sensor: (str) name from sensor__sensors
-    :param node_id: (str) name from sensor__node_metadata
-    :returns: (json) response"""
-
-    fields = ('network_name', 'feature', 'sensor', 'node_id')
-
-    args = dict()
-    args["network_name"] = network_name.lower()
-    args["feature"] = feature.lower() if feature else None
-    args["sensor"] = sensor.lower() if sensor else None
-    args["node_id"] = node_id.lower() if node_id else None
-
-    validator = Validator(only=fields)
-    validated_args = validate(validator, args)
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
-
-    return _get_sensors(validated_args)
 
 
 @crossdomain(origin="*")
