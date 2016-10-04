@@ -453,23 +453,30 @@ def _get_sensors(args):
 
 
 def get_observation_queries(args):
+
+    # Formatting to guard against the "+" in some date strings
+    start_dt = args.data.get("start_dt")
+    end_dt = args.data.get("end_dt")
+    args.data["start_dt"] = start_dt.split("+")[0] if start_dt else None
+    args.data["end_dt"] = end_dt.split("+")[0] if end_dt else None
+
     nodes_to_query = [node.id.lower() for node in node_metadata_query(args).all()]
     args.data['nodes'] = nodes_to_query
 
     features = args.data['features_of_interest']
     target_sensors = args.data.get("sensors")
 
-    # if the user specified a sensor list,
-    # only query feature tables that those sensors report on
-    if target_sensors:
-        sensors = session.query(Sensor)
-        sensors = sensors.filter(sqla_fn.lower(Sensor.name).in_(target_sensors))
-        sensors = sensors.all()
-        all_features = []
-        for sensor in sensors:
-            for foi in set([prop.split('.')[0].lower() for prop in sensor.observed_properties.itervalues()]):
-                all_features.append(foi)
-        features = set(features).intersection(all_features)
+    # Target sensors are always provided by the validator
+    # Hmm....
+    sensors = session.query(Sensor)
+    sensors = sensors.filter(sqla_fn.lower(Sensor.name).in_(target_sensors))
+    sensors = sensors.all()
+
+    all_features = []
+    for sensor in sensors:
+        for foi in set([prop.split('.')[0].lower() for prop in sensor.observed_properties.itervalues()]):
+            all_features.append(foi)
+    features = set(features).intersection(all_features)
 
     tables = []
     meta = MetaData()
@@ -480,7 +487,6 @@ def get_observation_queries(args):
         except (AttributeError, NoSuchTableError):
             return bad_request("Table {} not found".format(table_name))
 
-    # TODO: make limit on threaded query reliably return the correct number of results
     return [(observation_query(args, len(tables), table), table) for table in tables]
 
 

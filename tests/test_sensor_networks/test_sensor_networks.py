@@ -12,9 +12,10 @@ class TestSensorNetworks(unittest.TestCase):
     def setUpClass(cls):
         cls.fixtures.drop_databases()
         cls.fixtures.setup_databases()
-        cls.app = create_app().test_client()
         cls.fixtures.generate_sensor_network_meta_tables()
+        cls.fixtures.generate_mock_observations()
         cls.fixtures.generate_mock_metadata()
+        cls.app = create_app().test_client()
 
     def test_network_metadata_returns_200_with_no_args(self):
         url = "/v1/api/sensor-networks/"
@@ -96,7 +97,7 @@ class TestSensorNetworks(unittest.TestCase):
 
     def test_download_queues_job_returns_ticket(self):
         url = "/v1/api/sensor-networks/test_network/download"
-        url += "?sensors=test_sensor_01&nodes=test_node&features_of_interest=vector"
+        url += "?sensors=sensor_01&nodes=test_node&features_of_interest=vector"
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertIn("ticket", result)
@@ -156,18 +157,42 @@ class TestSensorNetworks(unittest.TestCase):
     #     result = json.loads(response.data)
     #     self.assertEqual(result["meta"]["total"], 2)
 
-    def test_aggregate_endpoint_returns_correct_default_bucket_count(self):
-        url = "/v1/api/sensor-networks/test_network/aggregate?node=test_node&function=avg&features_of_interest=vector"
-        response = self.app.get(url)
-        result = json.loads(response.data)
-        print result
-        self.assertEqual(result["meta"]["total"], 24)
+    # def test_aggregate_endpoint_returns_correct_default_bucket_count(self):
+    #     url = "/v1/api/sensor-networks/test_network/aggregate?node=test_node"
+    #     url += "&function=avg&features_of_interest=vector"
+    #     response = self.app.get(url)
+    #     result = json.loads(response.data)
+    #     self.assertEqual(result["meta"]["total"], 24)
 
     def test_aggregate_endpoint_returns_correct_bucket_count(self):
         url = "/v1/api/sensor-networks/test_network/aggregate?node=test_node"
         url += "&function=avg&features_of_interest=vector"
-        url += "&start_datetime=2016-10-01-06:00:00&end_datetime=2016-10-01-10:00:00"
+        url += "&start_datetime=2016-10-01&end_datetime=2016-10-03"
         response = self.app.get(url)
         result = json.loads(response.data)
-        print result
-        self.assertEqual(result["meta"]["total"], 4)
+        self.assertEqual(result["meta"]["total"], 48)
+
+    def test_aggregate_endpoint_returns_correct_observation_count(self):
+        url = "/v1/api/sensor-networks/test_network/aggregate?node=test_node"
+        url += "&function=avg&features_of_interest=vector"
+        url += "&start_datetime=2016-10-01&end_datetime=2016-10-03"
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        total_count = 0
+        for bucket in result["data"]:
+            total_count += bucket.values()[0]["count"]
+        self.assertEqual(total_count, 200)
+
+    def test_query_endpoint_returns_correct_observation_count_total(self):
+        url = "/v1/api/sensor-networks/test_network/query?nodes=test_node"
+        url += "&features_of_interest=vector&start_datetime=2016-01-01"
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertEqual(result["meta"]["total"], 300)
+
+    def test_query_endpoint_returns_correct_observation_count_windowed(self):
+        url = "/v1/api/sensor-networks/test_network/query?nodes=test_node"
+        url += "&features_of_interest=vector&start_datetime=2016-10-01&end_datetime=2016-10-03"
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertEqual(result["meta"]["total"], 200)
