@@ -44,8 +44,10 @@ def get_autoscaling_group():
         return autoscaling_client.describe_auto_scaling_instances(
             InstanceIds=[INSTANCE_ID]
         )["AutoscalingInstances"][0]["AutoscalingGroupName"]
-    except botocore.exceptions.ParamValidationError as exc:
-        print "Could not find autoscaling group..."
+    except botocore.exceptions.ParamValidationError:
+        print "Bad params for autoscaling group ..."
+    except botocore.exceptions.NoRegionError:
+        print "Could not find autoscaling group region ..."
 
 
 AUTOSCALING_GROUP = get_autoscaling_group()
