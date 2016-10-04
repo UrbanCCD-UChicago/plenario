@@ -1,6 +1,7 @@
 """utilities: helper functions that serve to monitor the health and activity
 of the worker threads."""
 
+import botocore.exceptions
 import boto3
 import requests
 import traceback
@@ -40,12 +41,11 @@ def get_autoscaling_group():
 
     autoscaling_client = boto3.client("autoscaling")
     try:
-        return autoscaling_client.describe_autoscaling_instances(
+        return autoscaling_client.describe_auto_scaling_instances(
             InstanceIds=[INSTANCE_ID]
         )["AutoscalingInstances"][0]["AutoscalingGroupName"]
-    except Exception as exc:
+    except botocore.exceptions.ParamValidationError as exc:
         print "Could not find autoscaling group..."
-        raise exc
 
 
 AUTOSCALING_GROUP = get_autoscaling_group()

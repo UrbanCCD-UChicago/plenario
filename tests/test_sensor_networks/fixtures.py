@@ -1,4 +1,6 @@
 import os
+import signal
+import subprocess
 
 from plenario.sensor_network.sensor_models import *
 
@@ -60,6 +62,7 @@ class Fixtures:
         self.engine = create_engine(self.base_db_url)
         self.pg_engine = None
         self.rs_engine = None
+        self.worker_process = None
 
     def setup_databases(self):
         self._run_with_connection("create database sensor_meta_test")
@@ -151,8 +154,14 @@ class Fixtures:
 
             self.rs_engine.execute("""
                 insert into temperature (node_id, datetime, meta_id, sensor, temperature)
-                values ('test_node', '{}', '{}', 'sensor_02', {})
+                values ('test_node', '{}', '{}', 'sensor_01', {})
                 """.format(record_date, randint(0, 100), random(), random())
             )
 
         print "\n"
+
+    def run_worker(self):
+        self.worker_process = subprocess.Popen(["python", "worker.py"])
+
+    def kill_worker(self):
+        os.kill(self.worker_process.pid, signal.SIGTERM)

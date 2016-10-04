@@ -1,4 +1,5 @@
 import json
+import time
 import unittest
 from fixtures import Fixtures
 from plenario import create_app
@@ -15,6 +16,7 @@ class TestSensorNetworks(unittest.TestCase):
         cls.fixtures.generate_sensor_network_meta_tables()
         cls.fixtures.generate_mock_observations()
         cls.fixtures.generate_mock_metadata()
+        cls.fixtures.run_worker()
         cls.app = create_app().test_client()
 
     def test_network_metadata_returns_200_with_no_args(self):
@@ -102,6 +104,41 @@ class TestSensorNetworks(unittest.TestCase):
         result = json.loads(response.data)
         self.assertIn("ticket", result)
 
+    # def test_download_queues_job_returns_error_for_bad_args(self):
+    #     queueing_url = "/v1/api/sensor-networks/test_network/download"
+    #     queueing_url += "?sensors=sensor_01&nodes=test_node&features_of_interest=vector"
+    #     queueing_response = self.app.get(queueing_url)
+    #
+    #     ticket = json.loads(queueing_response.data)["ticket"]
+    #     ticket_url = "v1/api/jobs/{}".format(ticket)
+    #     ticket_response = self.app.get(ticket_url)
+    #     ticket_result = json.loads(ticket_response.data)
+    #     # TODO: .... this is a little gross but a bandaid for this scenario
+    #     print ticket_result
+    #     self.assertIn("error", ticket_result["result"])
+
+    def test_download_queues_job_returns_correct_result_for_good_args(self):
+        queueing_url = "/v1/api/sensor-networks/test_network/download"
+        queueing_url += "?sensors=sensor_01&nodes=test_node&features_of_interest=temperature"
+        queueing_response = self.app.get(queueing_url)
+
+        ticket = json.loads(queueing_response.data)["ticket"]
+        ticket_url = "v1/api/jobs/{}".format(ticket)
+        ticket_response = self.app.get(ticket_url)
+        ticket_result = json.loads(ticket_response.data)
+
+        while ticket_result["status"]["status"] not in {"error", "success"}:
+            ticket_response = self.app.get(ticket_url)
+            ticket_result = json.loads(ticket_response.data)
+            print ticket_result["status"]["status"] + " ... ",
+            time.sleep(1)
+
+        print ticket_result
+        download_url = ticket_result["result"]["url"]
+        download_response = self.app.get(download_url)
+        download_result = json.loads(download_response.data)
+        self.assertEqual(len(download_result["data"]), 300)
+
     def test_geom_filter_for_node_metadata_empty_filter(self):
         # Geom box in the middle of the lake, should return no results
         geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-86.7315673828125,42.24275208539065],[-86.7315673828125,42.370720143531955],[-86.50360107421875,42.370720143531955],[-86.50360107421875,42.24275208539065],[-86.7315673828125,42.24275208539065]]]}}'
@@ -111,7 +148,7 @@ class TestSensorNetworks(unittest.TestCase):
         self.assertEqual(result["meta"]["total"], 0)
 
     def test_geom_filter_for_node_metadata_bad_filter(self):
-        # Geom box in the middle of the lake, should return no results
+        # Geom box in the middle of the lake, returns no results (I hope)
         geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[Why hello!],[-86.7315673828125,42.370720143531955],[-86.50360107421875,42.370720143531955],[-86.50360107421875,42.24275208539065],[-86.7315673828125,42.24275208539065]]]}}'
         url = "/v1/api/sensor-networks/test_network/nodes?location_geom__within={}".format(geom)
         response = self.app.get(url)
@@ -196,3 +233,7 @@ class TestSensorNetworks(unittest.TestCase):
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertEqual(result["meta"]["total"], 200)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.fixtures.kill_worker()
