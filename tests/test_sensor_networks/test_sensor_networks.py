@@ -19,27 +19,12 @@ class TestSensorNetworks(unittest.TestCase):
         cls.fixtures.run_worker()
         cls.app = create_app().test_client()
 
-    def test_network_metadata_returns_200_with_no_args(self):
-        url = "/v1/api/sensor-networks/"
+    def test_network_metadata_with_no_args(self):
+        url = "/v1/api/sensor-networks"
         response = self.app.get(url)
+        result = json.loads(response.data)
         self.assertEqual(response.status_code, 200)
-        response = self.app.get(url + "test_network")
-        self.assertEqual(response.status_code, 200)
-
-    def test_sensor_metadata_returns_200_with_no_args(self):
-        url = "/v1/api/sensor-networks/test_network/sensors"
-        response = self.app.get(url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_node_metadata_returns_200_with_no_args(self):
-        url = "/v1/api/sensor-networks/test_network/nodes"
-        response = self.app.get(url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_feature_metadata_returns_200_with_no_args(self):
-        url = "/v1/api/sensor-networks/test_network/features_of_interest"
-        response = self.app.get(url)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result["meta"]["total"], 2)
 
     def test_network_metadata_returns_bad_request(self):
         url = "/v1/api/sensor-networks/bad_network"
@@ -48,15 +33,53 @@ class TestSensorNetworks(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", result)
 
-    def test_sensor_metadata_returns_bad_request(self):
-        url = "/v1/api/sensor-networks/test_network/sensors/bad_sensor"
+    def test_network_metadata_case_insensitive(self):
+        url = "/v1/api/sensor-networks/TEST_network"
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result["meta"]["total"], 1)
+
+    def test_node_metadata_with_no_args(self):
+        url = "/v1/api/sensor-networks/test_network/nodes"
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result["meta"]["total"], 2)
+
+    def test_node_metadata_returns_bad_request(self):
+        url = "/v1/api/sensor-networks/test_network/nodes/bad_node"
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", result)
 
-    def test_node_metadata_returns_bad_request(self):
-        url = "/v1/api/sensor-networks/test_network/nodes/bad_node"
+    def test_node_metadata_with_arg(self):
+        url = "/v1/api/sensor-networks/test_network/nodes/test_node"
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result["meta"]["total"], 1)
+
+    def test_node_metadata_case_insensitive(self):
+        url = "/v1/api/sensor-networks/test_network/nodes/TEST_node"
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(result["meta"]["total"], 1)
+
+    def test_sensor_metadata_returns_with_no_args(self):
+        url = "/v1/api/sensor-networks/test_network/sensors"
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_feature_metadata_returns_200_with_no_args(self):
+        url = "/v1/api/sensor-networks/test_network/features_of_interest"
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_sensor_metadata_returns_bad_request(self):
+        url = "/v1/api/sensor-networks/test_network/sensors/bad_sensor"
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertEqual(response.status_code, 400)
@@ -68,20 +91,6 @@ class TestSensorNetworks(unittest.TestCase):
         result = json.loads(response.data)
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", result)
-
-    def test_network_metadata_returns_correct_number_of_results(self):
-        url = "/v1/api/sensor-networks"
-        response = self.app.get(url)
-        response = json.loads(response.data)
-        result = response["meta"]["total"]
-        self.assertEqual(result, 2)
-
-    def test_node_metadata_returns_correct_number_of_results(self):
-        url = "/v1/api/sensor-networks/test_network/nodes"
-        response = self.app.get(url)
-        response = json.loads(response.data)
-        result = response["meta"]["total"]
-        self.assertEqual(result, 1)
 
     def test_sensor_metadata_returns_correct_number_of_results(self):
         url = "/v1/api/sensor-networks/test_network/sensors"
@@ -162,7 +171,7 @@ class TestSensorNetworks(unittest.TestCase):
         url = "/v1/api/sensor-networks/test_network/nodes?location_geom__within={}".format(geom)
         response = self.app.get(url)
         result = json.loads(response.data)
-        self.assertEqual(result["meta"]["total"], 1)
+        self.assertEqual(result["meta"]["total"], 2)
 
     # def test_geom_filter_for_sensor_metadata(self):
     #     # Geom box in the middle of the lake, should return no results
@@ -222,14 +231,14 @@ class TestSensorNetworks(unittest.TestCase):
 
     def test_query_endpoint_returns_correct_observation_count_total(self):
         url = "/v1/api/sensor-networks/test_network/query?nodes=test_node"
-        url += "&features_of_interest=vector&start_datetime=2016-01-01"
+        url += "&feature=vector&start_datetime=2016-01-01"
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertEqual(result["meta"]["total"], 300)
 
     def test_query_endpoint_returns_correct_observation_count_windowed(self):
         url = "/v1/api/sensor-networks/test_network/query?nodes=test_node"
-        url += "&features_of_interest=vector&start_datetime=2016-10-01&end_datetime=2016-10-03"
+        url += "&feature=vector&start_datetime=2016-10-01&end_datetime=2016-10-03"
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertEqual(result["meta"]["total"], 200)

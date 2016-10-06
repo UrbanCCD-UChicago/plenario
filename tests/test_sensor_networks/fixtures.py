@@ -109,6 +109,13 @@ class Fixtures:
             location="0101000020E6100000A4A7C821E2E755C07C48F8DEDFF04440",
         )
 
+        node_2 = NodeMeta(
+            id="node_2",
+            sensor_network="test_network",
+            sensors=[sensor_01, sensor_02],
+            location="0101000020E6100000A4A7C821E2E755C07C48F8DEDFF04440",
+        )
+
         network = NetworkMeta(
             name="test_network",
             nodes=[node],
@@ -118,7 +125,7 @@ class Fixtures:
             name="test_network_other",
         )
 
-        for obj in [feature_01, feature_02, network, network_02, node]:
+        for obj in [feature_01, feature_02, network, network_02, node, node_2]:
             try:
                 print "INSERT {} with {}".format(obj, session.get_bind())
                 session.add(obj)

@@ -22,6 +22,9 @@ def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
     start_dt = _zero_out_datetime(start_dt, agg_unit)
     end_dt = _zero_out_datetime(end_dt, agg_unit)
 
+    if not aggregates:
+        return aggregates
+
     placeholder = _generate_placeholder(aggregates[0])
 
     if start_dt < aggregates[0]["time_bucket"]:

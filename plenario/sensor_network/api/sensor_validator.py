@@ -106,6 +106,11 @@ class NodeAggregateValidator(Validator):
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
 
 
+class RequiredFeatureValidator(Validator):
+
+    feature = fields.Str(validate=validate_features, required=True)
+
+
 # ValidatorResult
 # ===============
 # Many methods in response.py rely on information that used to be provided

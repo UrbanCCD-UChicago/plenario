@@ -13,7 +13,9 @@ def make_error(msg, status_code):
     }
 
     resp['meta']['query'] = request.args
-    return make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
+    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
 
 
 def bad_request(msg):
