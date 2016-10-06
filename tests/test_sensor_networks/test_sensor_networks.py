@@ -244,6 +244,13 @@ class TestSensorNetworks(unittest.TestCase):
         result = json.loads(response.data)
         self.assertEqual(result["meta"]["total"], 1)
 
+    # todo
+    # -----------------------------------------------
+    # def alter second node location for better tests
+    # def test_query_endpoint_with_geom_filter
+    # def test_aggregate_endpoint_with_geom_filter
+    # def test_download_endpoint_with_geom_filter
+
     @classmethod
     def tearDownClass(cls):
         cls.fixtures.kill_worker()

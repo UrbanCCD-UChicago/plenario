@@ -303,8 +303,8 @@ def format_node_metadata(node):
         'geometry': {
             "type": "Point",
             "coordinates": [
-                wkb.loads(bytes(node.location.data)).y,
-                wkb.loads(bytes(node.location.data)).x
+                wkb.loads(bytes(node.location.data)).x,
+                wkb.loads(bytes(node.location.data)).y
             ],
         },
         "properties": {
