@@ -122,8 +122,6 @@ class TestSensorNetworks(unittest.TestCase):
     #     ticket_url = "v1/api/jobs/{}".format(ticket)
     #     ticket_response = self.app.get(ticket_url)
     #     ticket_result = json.loads(ticket_response.data)
-    #     # TODO: .... this is a little gross but a bandaid for this scenario
-    #     print ticket_result
     #     self.assertIn("error", ticket_result["result"])
 
     def test_download_queues_job_returns_correct_result_for_good_args(self):
@@ -139,10 +137,8 @@ class TestSensorNetworks(unittest.TestCase):
         while ticket_result["status"]["status"] not in {"error", "success"}:
             ticket_response = self.app.get(ticket_url)
             ticket_result = json.loads(ticket_response.data)
-            print ticket_result["status"]["status"] + " ... ",
             time.sleep(1)
 
-        print ticket_result
         download_url = ticket_result["result"]["url"]
         download_response = self.app.get(download_url)
         download_result = json.loads(download_response.data)
@@ -154,7 +150,7 @@ class TestSensorNetworks(unittest.TestCase):
         url = "/v1/api/sensor-networks/test_network/nodes?location_geom__within={}".format(geom)
         response = self.app.get(url)
         result = json.loads(response.data)
-        self.assertEqual(result["meta"]["total"], 0)
+        self.assertIn("error", result)
 
     def test_geom_filter_for_node_metadata_bad_filter(self):
         # Geom box in the middle of the lake, returns no results (I hope)
@@ -173,42 +169,35 @@ class TestSensorNetworks(unittest.TestCase):
         result = json.loads(response.data)
         self.assertEqual(result["meta"]["total"], 2)
 
-    # def test_geom_filter_for_sensor_metadata(self):
-    #     # Geom box in the middle of the lake, should return no results
-    #     geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.39486694335938,41.823525308461456],[-87.39486694335938,41.879786443521795],[-87.30972290039062,41.879786443521795],[-87.30972290039062,41.823525308461456],[-87.39486694335938,41.823525308461456]]]}}'
-    #     url = "/v1/api/sensor-networks/test_network/sensors?location_geom__within={}".format(geom)
-    #     response = self.app.get(url)
-    #     result = json.loads(response.data)
-    #     self.assertEqual(result["meta"]["total"], 0)
-    #
-    #     # Geom box surrounding chicago, should return results
-    #     geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.76290893554688,41.7559466348148],[-87.76290893554688,41.95029860413911],[-87.51983642578125,41.95029860413911],[-87.51983642578125,41.7559466348148],[-87.76290893554688,41.7559466348148]]]}}'
-    #     url = "/v1/api/sensor-networks/test_network/sensors?location_geom__within={}".format(geom)
-    #     response = self.app.get(url)
-    #     result = json.loads(response.data)
-    #     self.assertEqual(result["meta"]["total"], 2)
-    #
-    # def test_geom_filter_for_feature_metadata(self):
-    #     # Geom box in the middle of the lake, should return no results
-    #     geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.39486694335938,41.823525308461456],[-87.39486694335938,41.879786443521795],[-87.30972290039062,41.879786443521795],[-87.30972290039062,41.823525308461456],[-87.39486694335938,41.823525308461456]]]}}'
-    #     url = "/v1/api/sensor-networks/test_network/features_of_interest?location_geom__within={}".format(geom)
-    #     response = self.app.get(url)
-    #     result = json.loads(response.data)
-    #     self.assertEqual(result["meta"]["total"], 0)
-    #
-    #     # Geom box surrounding chicago, should return results
-    #     geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.76290893554688,41.7559466348148],[-87.76290893554688,41.95029860413911],[-87.51983642578125,41.95029860413911],[-87.51983642578125,41.7559466348148],[-87.76290893554688,41.7559466348148]]]}}'
-    #     url = "/v1/api/sensor-networks/test_network/features_of_interest?location_geom__within={}".format(geom)
-    #     response = self.app.get(url)
-    #     result = json.loads(response.data)
-    #     self.assertEqual(result["meta"]["total"], 2)
+    def test_geom_filter_for_sensor_metadata(self):
+        # Geom box in the middle of the lake, should return no results
+        geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.39486694335938,41.823525308461456],[-87.39486694335938,41.879786443521795],[-87.30972290039062,41.879786443521795],[-87.30972290039062,41.823525308461456],[-87.39486694335938,41.823525308461456]]]}}'
+        url = "/v1/api/sensor-networks/test_network/sensors?location_geom__within={}".format(geom)
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertIn("error", result)
 
-    # def test_aggregate_endpoint_returns_correct_default_bucket_count(self):
-    #     url = "/v1/api/sensor-networks/test_network/aggregate?node=test_node"
-    #     url += "&function=avg&features_of_interest=vector"
-    #     response = self.app.get(url)
-    #     result = json.loads(response.data)
-    #     self.assertEqual(result["meta"]["total"], 24)
+        # Geom box surrounding chicago, should return results
+        geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.76290893554688,41.7559466348148],[-87.76290893554688,41.95029860413911],[-87.51983642578125,41.95029860413911],[-87.51983642578125,41.7559466348148],[-87.76290893554688,41.7559466348148]]]}}'
+        url = "/v1/api/sensor-networks/test_network/sensors?location_geom__within={}".format(geom)
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertEqual(result["meta"]["total"], 2)
+
+    def test_geom_filter_for_feature_metadata(self):
+        # Geom box in the middle of the lake, should return no results
+        geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.37770080566405,41.95131994679697],[-87.37770080566405,41.96357478222518],[-87.36328125,41.96357478222518],[-87.36328125,41.95131994679697],[-87.37770080566405,41.95131994679697]]]}}'
+        url = "/v1/api/sensor-networks/test_network/features_of_interest?location_geom__within={}".format(geom)
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertIn("error", result)
+
+        # Geom box surrounding chicago, should return results
+        geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.76290893554688,41.7559466348148],[-87.76290893554688,41.95029860413911],[-87.51983642578125,41.95029860413911],[-87.51983642578125,41.7559466348148],[-87.76290893554688,41.7559466348148]]]}}'
+        url = "/v1/api/sensor-networks/test_network/features_of_interest?location_geom__within={}".format(geom)
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertEqual(result["meta"]["total"], 2)
 
     def test_aggregate_endpoint_returns_correct_bucket_count(self):
         url = "/v1/api/sensor-networks/test_network/aggregate?node=test_node"
@@ -242,6 +231,18 @@ class TestSensorNetworks(unittest.TestCase):
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertEqual(result["meta"]["total"], 200)
+
+    def test_sensor_metadata_case_insensitive(self):
+        url = "/v1/api/sensor-networks/test_network/sensors/SENSor_01"
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertEqual(result["meta"]["total"], 1)
+
+    def test_feature_metadata_case_insensitive(self):
+        url = "/v1/api/sensor-networks/test_network/features_of_interest/VECtor"
+        response = self.app.get(url)
+        result = json.loads(response.data)
+        self.assertEqual(result["meta"]["total"], 1)
 
     @classmethod
     def tearDownClass(cls):

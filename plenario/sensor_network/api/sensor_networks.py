@@ -117,7 +117,7 @@ def get_feature_metadata(network_name, feature=None):
 
     fields = ('network_name', 'feature', 'location_geom__within')
 
-    args = dict()
+    args = request.args.to_dict()
     args['network_name'] = network_name.lower()
     args['feature'] = feature.lower() if feature else None
 
@@ -127,7 +127,7 @@ def get_feature_metadata(network_name, feature=None):
         return bad_request(validated_args.errors)
     validated_args.data["features"] = validated_args.data.get("feature")
     if validated_args.data.get("feature"):
-        del validated_args["feature"]
+        del validated_args.data["feature"]
     return get_metadata("features", validated_args)
 
 
@@ -280,6 +280,8 @@ def get_raw_metadata(target, args):
 def get_metadata(target, args):
     args = remove_null_keys(args)
     raw_metadata = get_raw_metadata(target, args)
+    if type(raw_metadata) != list:
+        return raw_metadata
     return jsonify(args, [format_metadata[target](record) for record in raw_metadata])
 
 
@@ -531,9 +533,6 @@ def filter_meta(meta_level, upper_filter_values, filter_values, geojson):
         for sensor in upper_filter_values:
             valid_values += [p.split(".")[0] for p in sensor.observed_properties.values()]
 
-    # import pdb
-    # pdb.set_trace()
-
     if type(filter_values) != list and filter_values is not None:
         filter_values = [filter_values]
 
@@ -563,27 +562,27 @@ def remove_null_keys(args):
 
 
 def sanitize_args(args):
-    for k, v in args.items():
+    for k in args:
         try:
-            args[k] = v.lower()
+            args[k] = args[k].lower()
         except AttributeError:
             continue
         if k in {"nodes", "sensors", "features"}:
-            args[k] = v.split(",")
-        if "+" in v:
-            args[k] = v.split("+")[0]
+            args[k] = args[k].split(",")
+        if "+" in args[k]:
+            args[k] = args[k].split("+")[0]
     return args
 
 
 def sanitize_validated_args(args):
     args = remove_null_keys(args)
-    for k, v in args.data.items():
+    for k in args.data:
         try:
-            args.data[k] = v.lower()
+            args.data[k] = args.data[k].lower()
         except AttributeError:
             continue
         if k in {"nodes", "sensors", "features"}:
-            args.data[k] = v.split(",")
-        if "+" in v:
-            args.data[k] = v.split("+")[0]
+            args.data[k] = args.data[k].split(",")
+        if "+" in args.data[k]:
+            args.data[k] = args.data[k].split("+")[0]
     return args
