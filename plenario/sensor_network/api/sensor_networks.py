@@ -11,7 +11,7 @@ from sqlalchemy import MetaData, Table, func as sqla_fn
 
 from plenario.api.common import cache, crossdomain
 from plenario.api.common import make_cache_key, unknown_object_json_handler
-from plenario.api.jobs import get_status, set_status, set_flag
+from plenario.api.jobs import get_status, set_status, set_flag, make_job_response
 from plenario.api.response import make_error
 from plenario.database import fast_count, windowed_query
 from plenario.database import session, redshift_session, redshift_engine
@@ -57,7 +57,10 @@ def get_node_metadata(network, node=None):
     :param node: (str) node that exists in sensor__node_metadata
     :returns: (json) response"""
 
-    args = dict(request.args.to_dict(), **{"network": network, "nodes": [node] if node else None})
+    args = dict(request.args.to_dict(), **{
+        "network": network,
+        "nodes": [node] if node else None
+    })
 
     fields = ('network', 'nodes', 'geom')
     validated_args = validate(Validator(only=fields), args)
@@ -80,7 +83,10 @@ def get_sensor_metadata(network, sensor=None):
     :param sensor: (str) name from sensor__sensors
     :returns: (json) response"""
 
-    args = dict(request.args.to_dict(), **{"network": network, "sensors": [sensor] if sensor else None})
+    args = dict(request.args.to_dict(), **{
+        "network": network,
+        "sensors": [sensor] if sensor else None
+    })
 
     fields = ('network', 'sensors', 'geom')
     validated_args = validate(Validator(only=fields), args)
@@ -102,7 +108,10 @@ def get_feature_metadata(network, feature=None):
     :param feature: (str) name from sensor__features_of_interest
     :returns: (json) response"""
 
-    args = dict(request.args.to_dict(), **{"network": network, "features": [feature] if feature else None})
+    args = dict(request.args.to_dict(), **{
+        "network": network,
+        "features": [feature] if feature else None
+    })
 
     fields = ('network', 'features', 'geom')
     validated_args = validate(Validator(only=fields), args)
@@ -121,57 +130,51 @@ def get_observations(network):
     :param network: (str) network name
     :returns: (json) response"""
 
-    args = dict(request.args.to_dict(), **{"network": network})
+    args = dict(request.args.to_dict(), **{
+        "network": network,
+        "nodes": request.args["nodes"].split(",") if request.args.get("nodes") else None,
+        "sensors": request.args["sensors"].split(",") if request.args.get("sensors") else None,
+        "features": [request.args["feature"]],
+    })
+    del args["feature"]
 
     fields = ('network', 'nodes', 'start_datetime', 'end_datetime', 'geom',
-              'feature', 'sensors', 'limit', 'offset')
+              'features', 'sensors', 'limit', 'offset')
     validated_args = validate(RequiredFeatureValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
-    validated_args = sanitize_args(validated_args)
+    validated_args = sanitize_validated_args(validated_args)
 
     observation_queries = get_observation_queries(validated_args)
     if type(observation_queries) != list:
         return observation_queries
+
     return run_observation_queries(validated_args, observation_queries)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT * 10, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_observations_download(network_name):
+def get_observations_download(network):
     """Queue a datadump job for raw sensor network observations and return
     links to check on its status and eventual download. Has a longer cache
     timeout than the other endpoints -- datadumps are alot of work.
 
     :endpoint: /sensor-networks/<network-name>/download
-    :param network_name: (str) network name
+    :param network: (str) network name
     :returns: (json) response"""
 
-    fields = ('network_name', 'nodes', 'start_datetime', 'end_datetime',
-              'limit', 'location_geom__within', 'features_of_interest',
-              'sensors', 'offset')
+    args = dict(request.args.to_dict(), **{
+        "network": network,
+        "nodes": request.args["nodes"].split(",") if request.args.get("nodes") else None,
+        "sensors": request.args["sensors"].split(",") if request.args.get("sensors") else None,
+        "features": request.args["features"].split(",") if request.args.get("features") else None
+    })
 
-    args = request.args.to_dict()
-    args.update({"network_name": network_name})
-
-    if 'nodes' in args:
-        args['nodes'] = args['nodes'].split(',')
-        args["nodes"] = [n.lower() for n in args["nodes"]]
-
-    if 'sensors' in args:
-        args['sensors'] = args['sensors'].split(',')
-        args["sensors"] = [s.lower() for s in args["sensors"]]
-
-    if 'features_of_interest' in args:
-        args['features_of_interest'] = args['features_of_interest'].split(',')
-        args["features_of_interest"] = [f.lower() for f in args["features_of_interest"]]
-
-    validator = Validator(only=fields)
-    validated_args = validate(validator, args)
+    fields = ('network', 'nodes', 'start_datetime', 'end_datetime',
+              'limit', 'geom', 'features', 'sensors', 'offset')
+    validated_args = validate(Validator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
-
-    from plenario.api.jobs import make_job_response
 
     validated_args.data["query_fn"] = "aot_point"
     validated_args.data["datadump_urlroot"] = request.url_root
@@ -457,11 +460,11 @@ def metadata(target, network=None, nodes=None, sensors=None, features=None, geom
             meta_levels[key] = filter_meta(key, current_state[i - 1], value, geom)
 
         if not meta_levels[key]:
-            msg = "Given your selection, {}: {} are available and from these no " \
-                  "valid {} could be found".format(
+            msg = "Given your parameters, we could not find your target {} " \
+                  "within {}, {}".format(
+                      target,
                       current_state[i - 1][0],
-                      current_state[i - 1][1],
-                      target
+                      current_state[i - 1][1]
                   )
             try:
                 return bad_request(msg)
@@ -484,6 +487,9 @@ def filter_meta(meta_level, upper_filter_values, filter_values, geojson):
     query, table = meta_queries[meta_level]
     upper_filter_values = upper_filter_values[1] if upper_filter_values else None
 
+    # import pdb
+    # pdb.set_trace()
+
     valid_values = []
     if meta_level == "nodes":
         for network in upper_filter_values:
@@ -503,8 +509,13 @@ def filter_meta(meta_level, upper_filter_values, filter_values, geojson):
 
     if meta_level == "network" and not filter_values:
         return query.all()
-    elif not filter_values and valid_values:
+    if meta_level == "network" and filter_values:
+        return query.filter(table.name.in_(filter_values)).all()
+
+    if not filter_values and valid_values:
         filter_values = valid_values
+    else:
+        filter_values = set(filter_values).intersection(valid_values)
 
     try:
         return query.filter(table.name.in_(filter_values)).all()

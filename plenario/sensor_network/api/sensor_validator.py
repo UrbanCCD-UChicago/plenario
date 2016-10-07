@@ -75,6 +75,7 @@ class Validator(Schema):
     network = fields.Str(allow_none=True, missing=None, default='array_of_things', validate=validate_network)
     nodes = fields.List(fields.Str(), default=None, missing=None, validate=validate_nodes)
     sensors = fields.List(fields.Str(), default=None, missing=None, validate=validate_sensors)
+    feature = fields.Str(validate=validate_features)
     features = fields.List(fields.Str(), default=None, missing=None, validate=validate_features)
 
     geom = fields.Str(default=None, validate=validate_geom)
