@@ -27,19 +27,18 @@ CACHE_TIMEOUT = 60 * 10
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_network_metadata(network_name=None):
+def get_network_metadata(network=None):
     """Return metadata for some network. If no network_name is specified, the
     default is to return metadata for all sensor networks.
 
     :endpoint: /sensor-networks/<network-name>
-    :param network_name: (str) network name
+    :param network: (str) network name
     :returns: (json) response"""
 
-    fields = ('network_name',)
-    args = {"network_name": network_name.lower() if network_name else None}
+    args = {"network": network.lower() if network else None}
 
-    validator = Validator(only=fields)
-    validated_args = validate(validator, args)
+    fields = ('network',)
+    validated_args = validate(Validator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
@@ -48,120 +47,92 @@ def get_network_metadata(network_name=None):
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_node_metadata(network_name, node_id=None):
+def get_node_metadata(network, node=None):
     """Return metadata about nodes for some network. If no node_id or
     location_geom__within is specified, the default is to return metadata
     for all nodes within the network.
 
-    :endpoint: /sensor-networks/<network-name>/nodes/<node-id>
-    :param network_name: (str) network that exists in sensor__network_metadata
-    :param node_id: (str) node that exists in sensor__node_metadata
+    :endpoint: /sensor-networks/<network-name>/nodes/<node>
+    :param network: (str) network that exists in sensor__network_metadata
+    :param node: (str) node that exists in sensor__node_metadata
     :returns: (json) response"""
 
-    fields = ('network_name', 'node_id', 'location_geom__within')
+    args = dict(request.args.to_dict(), **{"network": network, "nodes": [node] if node else None})
 
-    args = request.args.to_dict()
-    args.update({"network_name": network_name, "node_id": node_id})
-
-    validator = Validator(only=fields)
-    validated_args = validate(validator, args)
+    fields = ('network', 'nodes', 'geom')
+    validated_args = validate(Validator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
-
-    validated_args.data["nodes"] = validated_args.data.get("node_id")
-    if validated_args.data.get("node_id"):
-        del validated_args.data["node_id"]
     validated_args = sanitize_validated_args(validated_args)
+
     return get_metadata("nodes", validated_args)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_sensor_metadata(network_name, sensor=None):
+def get_sensor_metadata(network, sensor=None):
     """Return metadata for all sensors within a network. Sensors can also be
     be filtered by various other properties. If no single sensor is specified,
     the default is to return metadata for all sensors within the network.
 
     :endpoint: /sensor-networks/<network_name>/sensors/<sensor>
-    :param network_name: (str) name from sensor__network_metadata
+    :param network: (str) name from sensor__network_metadata
     :param sensor: (str) name from sensor__sensors
     :returns: (json) response"""
 
-    fields = ('network_name', 'sensor', 'location_geom__within')
+    args = dict(request.args.to_dict(), **{"network": network, "sensors": [sensor] if sensor else None})
 
-    args = request.args.to_dict()
-    args.update({"network_name": network_name, "sensor": sensor})
-
-    validator = Validator(only=fields)
-    validated_args = validate(validator, args)
+    fields = ('network', 'sensors', 'geom')
+    validated_args = validate(Validator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
-
-    validated_args.data["sensors"] = validated_args.data.get("sensor")
-    if validated_args.data.get("sensor"):
-        del validated_args.data["sensor"]
     validated_args = sanitize_validated_args(validated_args)
+
     return get_metadata("sensors", validated_args)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_feature_metadata(network_name, feature=None):
+def get_feature_metadata(network, feature=None):
     """Return metadata about features for some network. If no feature is
     specified, return metadata about all features within the network.
 
     :endpoint: /sensor-networks/<network_name>/features_of_interest/<feature>
-    :param network_name: (str) network name from sensor__network_metadata
+    :param network: (str) network name from sensor__network_metadata
     :param feature: (str) name from sensor__features_of_interest
     :returns: (json) response"""
 
-    fields = ('network_name', 'feature', 'location_geom__within')
+    args = dict(request.args.to_dict(), **{"network": network, "features": [feature] if feature else None})
 
-    args = request.args.to_dict()
-    args['network_name'] = network_name.lower()
-    args['feature'] = feature.lower() if feature else None
-
-    validator = Validator(only=fields)
-    validated_args = validate(validator, args)
+    fields = ('network', 'features', 'geom')
+    validated_args = validate(Validator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
-    validated_args.data["features"] = validated_args.data.get("feature")
-    if validated_args.data.get("feature"):
-        del validated_args.data["feature"]
+
     return get_metadata("features", validated_args)
 
 
 @crossdomain(origin="*")
-def get_observations(network_name):
+def get_observations(network):
     """Return raw sensor network observations for a single feature within
     the specified network.
 
     :endpoint: /sensor-networks/<network-name>/query?feature=<feature>
-    :param network_name: (str) network name
+    :param network: (str) network name
     :returns: (json) response"""
 
-    fields = ('network_name', 'nodes', 'start_datetime', 'end_datetime',
-              'location_geom__within', 'feature', 'sensors',
-              'limit', 'offset')
+    args = dict(request.args.to_dict(), **{"network": network})
 
-    args = request.args.to_dict()
-    args.update({"network_name": network_name})
-    args = sanitize_args(args)
-
-    validator = RequiredFeatureValidator(only=fields)
-    validated_args = validate(validator, args)
+    fields = ('network', 'nodes', 'start_datetime', 'end_datetime', 'geom',
+              'feature', 'sensors', 'limit', 'offset')
+    validated_args = validate(RequiredFeatureValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
-
-    validated_args = sanitize_validated_args(validated_args)
-    validated_args.data["features"] = validated_args.data.get("feature")
-    if validated_args.data.get("feature"):
-        del validated_args.data["feature"]
+    validated_args = sanitize_args(validated_args)
 
     observation_queries = get_observation_queries(validated_args)
     if type(observation_queries) != list:
         return observation_queries
-
     return run_observation_queries(validated_args, observation_queries)
 
 
@@ -211,29 +182,23 @@ def get_observations_download(network_name):
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_aggregations(network_name):
+def get_aggregations(network):
     """Aggregate individual node observations up to larger units of time.
     Do so by applying aggregate functions on all observations found within
     a specified window of time.
 
     :endpoint: /sensor-networks/<network-name>/aggregate
-    :param network_name: (str) from sensor__network_metadata
+    :param network: (str) from sensor__network_metadata
     :returns: (json) response"""
 
-    fields = ("network_name", "node", "function", "features_of_interest",
-              "start_datetime", "end_datetime", "agg", "sensors")
+    fields = ("network", "node", "sensors", "features", "function",
+              "start_datetime", "end_datetime", "agg")
 
-    request_args = request.args.to_dict()
-    request_args.update({"network_name": network_name})
-    request_args.update({"features_of_interest": request_args["features_of_interest"].split(",")})
+    request_args = dict(request.args.to_dict(), **{"network": network})
     request_args = sanitize_args(request_args)
-
     validated_args = validate(NodeAggregateValidator(only=fields), request_args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
-
-    validated_args.data["feature"] = validated_args.data["features_of_interest"]
-    del validated_args.data["features_of_interest"]
     validated_args = sanitize_validated_args(validated_args)
 
     try:
@@ -268,7 +233,7 @@ def observation_query(args, table):
 def get_raw_metadata(target, args):
     metadata_args = {
         "target": target,
-        "network": args.data.get("network_name"),
+        "network": args.data.get("network"),
         "nodes": args.data.get("nodes"),
         "sensors": args.data.get("sensors"),
         "features": args.data.get("features"),

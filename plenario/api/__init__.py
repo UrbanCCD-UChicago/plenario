@@ -37,19 +37,19 @@ api.add_url_rule(prefix + '/datadump/<ticket>', 'get_datadump', get_datadump)
 
 # sensor networks
 api.add_url_rule(prefix + '/sensor-networks', 'sensor_networks', get_network_metadata)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>', 'sensor_network', get_network_metadata)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/query', 'observations', get_observations)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/aggregate', 'node_aggregate', get_aggregations)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/download', 'sensor_network_download', get_observations_download)
+api.add_url_rule(prefix + '/sensor-networks/<network>', 'sensor_network', get_network_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/query', 'observations', get_observations)
+api.add_url_rule(prefix + '/sensor-networks/<network>/aggregate', 'node_aggregate', get_aggregations)
+api.add_url_rule(prefix + '/sensor-networks/<network>/download', 'sensor_network_download', get_observations_download)
 
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes', 'network_nodes', get_node_metadata)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/nodes/<node_id>', 'single_node', get_node_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/nodes', 'network_nodes', get_node_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/nodes/<node>', 'single_node', get_node_metadata)
 
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest', 'features', get_feature_metadata)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/features_of_interest/<feature>', 'features', get_feature_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/features', 'features', get_feature_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/features/<feature>', 'features', get_feature_metadata)
 
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/sensors', 'sensors', get_sensor_metadata)
-api.add_url_rule(prefix + '/sensor-networks/<network_name>/sensors/<sensor>', 'sensors', get_sensor_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/sensors', 'sensors', get_sensor_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/sensors/<sensor>', 'sensors', get_sensor_metadata)
 
 
 @api.route(prefix + '/flush-cache')

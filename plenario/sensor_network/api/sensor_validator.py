@@ -72,23 +72,12 @@ class Validator(Schema):
     or rejected, the validator will substitute it with the value specified by
     <DEFAULT_VALUE>."""
 
-    network_name = fields.Str(allow_none=True, missing=None, default='array_of_things', validate=validate_network)
+    network = fields.Str(allow_none=True, missing=None, default='array_of_things', validate=validate_network)
+    nodes = fields.List(fields.Str(), default=None, missing=None, validate=validate_nodes)
+    sensors = fields.List(fields.Str(), default=None, missing=None, validate=validate_sensors)
+    features = fields.List(fields.Str(), default=None, missing=None, validate=validate_features)
 
-    # For observations:
-    #
-    # only validates that nodes, features, and sensors exist, not that they are part of the correct network
-    # fills in None as default, handled by validate(),
-    # which fills in all nodes, features, and sensors in the correct network
-    nodes = fields.List(fields.Str(), default=None, validate=validate_nodes)
-    features_of_interest = fields.List(fields.Str(), default=None, validate=validate_features)
-    sensors = fields.List(fields.Str(), default=None, validate=validate_sensors)
-
-    # For metadata:
-    node_id = fields.Str(default=None, missing=None, validate=validate_nodes)
-    feature = fields.Str(default=None, missing=None, validate=validate_features)
-    sensor = fields.Str(default=None, missing=None, validate=validate_sensors)
-
-    location_geom__within = fields.Str(default=None, dump_to='geom', validate=validate_geom)
+    geom = fields.Str(default=None, validate=validate_geom)
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=90))
     end_datetime = fields.DateTime(default=datetime.utcnow)
     filter = fields.Str(allow_none=True, missing=None, default=None)
@@ -99,7 +88,7 @@ class Validator(Schema):
 class NodeAggregateValidator(Validator):
 
     node = fields.Str(required=True, validate=validate_nodes)
-    features_of_interest = fields.List(fields.Str(), default=None, validate=validate_features, required=True)
+    features = fields.List(fields.Str(), required=True, validate=validate_features)
     function = fields.Str(missing="avg", default="avg", validate=lambda x: x.lower() in aggregate_fn_map)
 
     agg = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_agg_units)
