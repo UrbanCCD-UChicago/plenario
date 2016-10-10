@@ -50,7 +50,7 @@ def get_node_metadata(network, node=None):
 
     args = dict(request.args.to_dict(), **{
         "network": network,
-        "nodes": [node] if node else None
+        "nodes": [node.lower()] if node else None
     })
 
     fields = ('network', 'nodes', 'geom')
@@ -76,7 +76,7 @@ def get_sensor_metadata(network, sensor=None):
 
     args = dict(request.args.to_dict(), **{
         "network": network,
-        "sensors": [sensor] if sensor else None
+        "sensors": [sensor.lower()] if sensor else None
     })
 
     fields = ('network', 'sensors', 'geom')
@@ -101,7 +101,7 @@ def get_feature_metadata(network, feature=None):
 
     args = dict(request.args.to_dict(), **{
         "network": network,
-        "features": [feature] if feature else None
+        "features": [feature.lower()] if feature else None
     })
 
     fields = ('network', 'features', 'geom')
@@ -124,16 +124,19 @@ def get_observations(network):
     args = dict(request.args.to_dict(), **{
         "network": network,
         "nodes": request.args["nodes"].split(",") if request.args.get("nodes") else None,
-        "sensors": request.args["sensors"].split(",") if request.args.get("sensors") else None,
-        "features": [request.args["feature"]],
+        "sensors": request.args["sensors"].split(",") if request.args.get("sensors") else None
     })
-    del args["feature"]
+    args = sanitize_args(args)
 
     fields = ('network', 'nodes', 'start_datetime', 'end_datetime', 'geom',
-              'features', 'sensors', 'limit', 'offset')
+              'feature', 'sensors', 'limit', 'offset')
     validated_args = validate(RequiredFeatureValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
+    validated_args.data.update({
+        "features": [validated_args.data["feature"]],
+        "feature": None
+    })
     validated_args = sanitize_validated_args(validated_args)
 
     observation_queries = get_observation_queries(validated_args)

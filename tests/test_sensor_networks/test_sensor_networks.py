@@ -147,7 +147,7 @@ class TestSensorNetworks(unittest.TestCase):
     def test_geom_filter_for_node_metadata_empty_filter(self):
         # Geom box in the middle of the lake, should return no results
         geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-86.7315673828125,42.24275208539065],[-86.7315673828125,42.370720143531955],[-86.50360107421875,42.370720143531955],[-86.50360107421875,42.24275208539065],[-86.7315673828125,42.24275208539065]]]}}'
-        url = "/v1/api/sensor-networks/test_network/nodes?location_geom__within={}".format(geom)
+        url = "/v1/api/sensor-networks/test_network/nodes?geom={}".format(geom)
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertIn("error", result)
@@ -155,7 +155,7 @@ class TestSensorNetworks(unittest.TestCase):
     def test_geom_filter_for_node_metadata_bad_filter(self):
         # Geom box in the middle of the lake, returns no results (I hope)
         geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[Why hello!],[-86.7315673828125,42.370720143531955],[-86.50360107421875,42.370720143531955],[-86.50360107421875,42.24275208539065],[-86.7315673828125,42.24275208539065]]]}}'
-        url = "/v1/api/sensor-networks/test_network/nodes?location_geom__within={}".format(geom)
+        url = "/v1/api/sensor-networks/test_network/nodes?geom={}".format(geom)
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertEqual(response.status_code, 400)
@@ -164,7 +164,7 @@ class TestSensorNetworks(unittest.TestCase):
     def test_geom_filter_for_node_metadata_good_filter(self):
         # Geom box surrounding chicago, should return results
         geom = '{"type"%3A"Feature"%2C"properties"%3A{}%2C"geometry"%3A{"type"%3A"Polygon"%2C"coordinates"%3A[[[-87.747802734375%2C41.75799552006108]%2C[-87.747802734375%2C41.93088998442502]%2C[-87.5555419921875%2C41.93088998442502]%2C[-87.5555419921875%2C41.75799552006108]%2C[-87.747802734375%2C41.75799552006108]]]}}'
-        url = "/v1/api/sensor-networks/test_network/nodes?location_geom__within={}".format(geom)
+        url = "/v1/api/sensor-networks/test_network/nodes?geom={}".format(geom)
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertEqual(result["meta"]["total"], 2)
@@ -172,14 +172,14 @@ class TestSensorNetworks(unittest.TestCase):
     def test_geom_filter_for_sensor_metadata(self):
         # Geom box in the middle of the lake, should return no results
         geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.39486694335938,41.823525308461456],[-87.39486694335938,41.879786443521795],[-87.30972290039062,41.879786443521795],[-87.30972290039062,41.823525308461456],[-87.39486694335938,41.823525308461456]]]}}'
-        url = "/v1/api/sensor-networks/test_network/sensors?location_geom__within={}".format(geom)
+        url = "/v1/api/sensor-networks/test_network/sensors?geom={}".format(geom)
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertIn("error", result)
 
         # Geom box surrounding chicago, should return results
         geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.76290893554688,41.7559466348148],[-87.76290893554688,41.95029860413911],[-87.51983642578125,41.95029860413911],[-87.51983642578125,41.7559466348148],[-87.76290893554688,41.7559466348148]]]}}'
-        url = "/v1/api/sensor-networks/test_network/sensors?location_geom__within={}".format(geom)
+        url = "/v1/api/sensor-networks/test_network/sensors?geom={}".format(geom)
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertEqual(result["meta"]["total"], 2)
@@ -187,21 +187,21 @@ class TestSensorNetworks(unittest.TestCase):
     def test_geom_filter_for_feature_metadata(self):
         # Geom box in the middle of the lake, should return no results
         geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.37770080566405,41.95131994679697],[-87.37770080566405,41.96357478222518],[-87.36328125,41.96357478222518],[-87.36328125,41.95131994679697],[-87.37770080566405,41.95131994679697]]]}}'
-        url = "/v1/api/sensor-networks/test_network/features?location_geom__within={}".format(geom)
+        url = "/v1/api/sensor-networks/test_network/features?geom={}".format(geom)
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertIn("error", result)
 
         # Geom box surrounding chicago, should return results
         geom = '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[-87.76290893554688,41.7559466348148],[-87.76290893554688,41.95029860413911],[-87.51983642578125,41.95029860413911],[-87.51983642578125,41.7559466348148],[-87.76290893554688,41.7559466348148]]]}}'
-        url = "/v1/api/sensor-networks/test_network/features?location_geom__within={}".format(geom)
+        url = "/v1/api/sensor-networks/test_network/features?geom={}".format(geom)
         response = self.app.get(url)
         result = json.loads(response.data)
         self.assertEqual(result["meta"]["total"], 2)
 
     def test_aggregate_endpoint_returns_correct_bucket_count(self):
         url = "/v1/api/sensor-networks/test_network/aggregate?node=test_node"
-        url += "&function=avg&features=vector"
+        url += "&function=avg&feature=vector"
         url += "&start_datetime=2016-10-01&end_datetime=2016-10-03"
         response = self.app.get(url)
         result = json.loads(response.data)
@@ -209,7 +209,7 @@ class TestSensorNetworks(unittest.TestCase):
 
     def test_aggregate_endpoint_returns_correct_observation_count(self):
         url = "/v1/api/sensor-networks/test_network/aggregate?node=test_node"
-        url += "&function=avg&features_of_interest=vector"
+        url += "&function=avg&feature=vector"
         url += "&start_datetime=2016-10-01&end_datetime=2016-10-03"
         response = self.app.get(url)
         result = json.loads(response.data)
