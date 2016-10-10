@@ -11,15 +11,6 @@ from sqlalchemy import MetaData, Table, func as sqla_fn
 
 from plenario.api.common import cache, crossdomain
 from plenario.api.common import make_cache_key, unknown_object_json_handler
-from plenario.api.jobs import get_status, set_status, set_flag, make_job_response
-from plenario.api.response import make_error
-from plenario.database import fast_count, windowed_query
-from plenario.database import session, redshift_session, redshift_engine
-from plenario.models import DataDump
-from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
-from plenario.sensor_network.api.sensor_validator import Validator, validate, NodeAggregateValidator, RequiredFeatureValidator
-from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
-from sensor_aggregate_functions import aggregate_fn_map
 
 # Cache timeout of 5 mintutes
 CACHE_TIMEOUT = 60 * 10
@@ -194,10 +185,14 @@ def get_aggregations(network):
     :param network: (str) from sensor__network_metadata
     :returns: (json) response"""
 
-    fields = ("network", "node", "sensors", "features", "function",
+    fields = ("network", "node", "sensors", "feature", "function",
               "start_datetime", "end_datetime", "agg")
 
-    request_args = dict(request.args.to_dict(), **{"network": network})
+    request_args = dict(request.args.to_dict(), **{
+        "network": network,
+        "feature": request.args.get("feature").split(",") if request.args.get("feature") else None,
+    })
+
     request_args = sanitize_args(request_args)
     validated_args = validate(NodeAggregateValidator(only=fields), request_args)
     if validated_args.errors:
@@ -207,10 +202,8 @@ def get_aggregations(network):
     try:
         result = aggregate_fn_map[validated_args.data.get("function")](validated_args)
     except ValueError as err:
-        # In the case of proper syntax, but params which lead to an
-        # unprocesseable query.
-        return make_error(err.message, 422)
-    return jsonify(validated_args, result)
+        return bad_request(err.message)
+    return jsonify(validated_args, result, 200)
 
 
 def observation_query(args, table):
@@ -250,7 +243,7 @@ def get_metadata(target, args):
     raw_metadata = get_raw_metadata(target, args)
     if type(raw_metadata) != list:
         return raw_metadata
-    return jsonify(args, [format_metadata[target](record) for record in raw_metadata])
+    return jsonify(args, [format_metadata[target](record) for record in raw_metadata], 200)
 
 
 def format_network_metadata(network):
@@ -361,7 +354,7 @@ def run_observation_queries(args, queries):
         args.data.pop('geom')
     data.sort(key=lambda x: parse(x["datetime"]))
 
-    return jsonify(args, data)
+    return jsonify(args, data, 200)
 
 
 def get_observation_datadump(args):
@@ -520,9 +513,9 @@ def filter_meta(meta_level, upper_filter_values, filter_values, geojson):
         return query.filter(table.id.in_(filter_values)).all()
 
 
-def jsonify(args, data):
+def jsonify(args, data, status_code):
     resp = json_response_base(args, data, args.data)
-    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
+    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
@@ -559,3 +552,13 @@ def sanitize_validated_args(args):
         if "+" in args.data[k]:
             args.data[k] = args.data[k].split("+")[0]
     return args
+
+
+from plenario.api.jobs import get_status, set_status, set_flag, make_job_response
+from plenario.database import fast_count, windowed_query
+from plenario.database import session, redshift_session, redshift_engine
+from plenario.models import DataDump
+from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
+from plenario.sensor_network.api.sensor_validator import Validator, validate, NodeAggregateValidator, RequiredFeatureValidator
+from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
+from sensor_aggregate_functions import aggregate_fn_map

@@ -1,15 +1,13 @@
 from collections import namedtuple
 from datetime import datetime, timedelta
-from dateutil.parser import parse as date_parse
+
 from marshmallow import fields, Schema
 from marshmallow.validate import Range, ValidationError
-from psycopg2 import Error
 from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
 from plenario.database import session
 from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest, Sensor
-
 from sensor_aggregate_functions import aggregate_fn_map
 
 valid_agg_units = ("minute", "hour", "day", "week", "month", "year")
@@ -89,7 +87,7 @@ class Validator(Schema):
 class NodeAggregateValidator(Validator):
 
     node = fields.Str(required=True, validate=validate_nodes)
-    features = fields.List(fields.Str(), required=True, validate=validate_features)
+    feature = fields.List(fields.Str(), validate=validate_features, required=True)
     function = fields.Str(missing="avg", default="avg", validate=lambda x: x.lower() in aggregate_fn_map)
 
     agg = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_agg_units)

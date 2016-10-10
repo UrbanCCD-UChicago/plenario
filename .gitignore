@@ -32,3 +32,6 @@ data/
 notebooks/
 .env
 .coveragerc
+
+# Deployment Packages
+*.zip
