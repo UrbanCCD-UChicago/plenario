@@ -487,9 +487,6 @@ def filter_meta(meta_level, upper_filter_values, filter_values, geojson):
     query, table = meta_queries[meta_level]
     upper_filter_values = upper_filter_values[1] if upper_filter_values else None
 
-    # import pdb
-    # pdb.set_trace()
-
     valid_values = []
     if meta_level == "nodes":
         for network in upper_filter_values:
