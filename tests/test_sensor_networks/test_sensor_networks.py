@@ -1,6 +1,7 @@
 import json
 import time
 import unittest
+from datetime import datetime, timedelta
 from fixtures import Fixtures
 from plenario import create_app
 
@@ -244,12 +245,16 @@ class TestSensorNetworks(unittest.TestCase):
         result = json.loads(response.data)
         self.assertEqual(result["meta"]["total"], 1)
 
+    def test_validator_rejects_datetimes_too_close_to_current(self):
+        too_close = datetime.utcnow() - timedelta(minutes=30)
+        url = "/v1/api/sensor-networks/test_network/query?nodes=test_node"
+        url += "&feature=vector&start_datetime=2016-10-01&end_datetime={}".format(too_close)
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 400)
+
     # todo
     # -----------------------------------------------
     # def alter second node location for better tests
-    # def test_query_endpoint_with_geom_filter
-    # def test_aggregate_endpoint_with_geom_filter
-    # def test_download_endpoint_with_geom_filter
 
     @classmethod
     def tearDownClass(cls):

@@ -56,6 +56,11 @@ def validate_geom(geom):
         raise ValidationError("Could not parse geojson: {}. {}".format(geom, exc))
 
 
+def validate_datetime(dt):
+    if dt > datetime.utcnow() - timedelta(days=1):
+        raise ValidationError("Datetimes cannot be within an hour of the current time.")
+
+
 class Validator(Schema):
     """Base validator object using Marshmallow. Don't be intimidated! As scary
     as the following block of code looks it's quite simple, and saves us from
@@ -78,7 +83,7 @@ class Validator(Schema):
 
     geom = fields.Str(default=None, validate=validate_geom)
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=90))
-    end_datetime = fields.DateTime(default=datetime.utcnow)
+    end_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1), validate=validate_datetime)
     filter = fields.Str(allow_none=True, missing=None, default=None)
     limit = fields.Integer(default=1000)
     offset = fields.Integer(default=0, validate=Range(0))
@@ -91,7 +96,8 @@ class NodeAggregateValidator(Validator):
     function = fields.Str(missing="avg", default="avg", validate=lambda x: x.lower() in aggregate_fn_map)
 
     agg = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_agg_units)
-    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=2))
+    end_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
 
 
 class RequiredFeatureValidator(Validator):
