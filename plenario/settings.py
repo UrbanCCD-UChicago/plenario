@@ -18,11 +18,11 @@ DB_HOST = get('DB_HOST', 'localhost')
 DB_PORT = get('DB_PORT', 5432)
 DB_NAME = get('DB_NAME', 'plenario_test')
 
-RS_USER = get('RS_USER', '')
-RS_PASSWORD = get('RS_PASSWORD', '')
-RS_HOST = get('RS_HOST', '')
-RS_PORT = get('RS_PORT', 0)
-RS_NAME = get('RS_NAME', '')
+RS_USER = get('RS_USER', 'postgres')
+RS_PASSWORD = get('RS_PASSWORD', 'password')
+RS_HOST = get('RS_HOST', 'localhost')
+RS_PORT = get('RS_PORT', 5432)
+RS_NAME = get('RS_NAME', 'sensor_obs_test')
 
 DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.\
     format(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
