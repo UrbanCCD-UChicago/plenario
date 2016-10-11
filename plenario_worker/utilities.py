@@ -39,8 +39,8 @@ def get_autoscaling_group():
     :returns: (str) id of the current autoscaling group
               (None) if the id could not be found"""
 
-    autoscaling_client = boto3.client("autoscaling")
     try:
+        autoscaling_client = boto3.client("autoscaling")
         return autoscaling_client.describe_auto_scaling_instances(
             InstanceIds=[INSTANCE_ID]
         )["AutoscalingInstances"][0]["AutoscalingGroupName"]
