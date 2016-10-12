@@ -30,7 +30,6 @@ def get_ec2_instance_id():
 INSTANCE_ID = get_ec2_instance_id()
 
 
-# TODO: Test get_autoscaling_group
 def get_autoscaling_group():
     """Retrieve the autoscaling group name of the current instance. If
     the host machine is not an EC2 instance, not subject to autoscaling,
@@ -43,7 +42,7 @@ def get_autoscaling_group():
         autoscaling_client = boto3.client("autoscaling")
         return autoscaling_client.describe_auto_scaling_instances(
             InstanceIds=[INSTANCE_ID]
-        )["AutoscalingInstances"][0]["AutoscalingGroupName"]
+        )["AutoScalingInstances"][0]["AutoScalingGroupName"]
     except botocore.exceptions.ParamValidationError:
         print "Bad params for autoscaling group ..."
     except botocore.exceptions.NoRegionError:
