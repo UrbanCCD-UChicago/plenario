@@ -1,5 +1,5 @@
 import boto3
-import botocore
+import botocore.exceptions
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME
 from plenario.settings import JOBS_QUEUE
 
