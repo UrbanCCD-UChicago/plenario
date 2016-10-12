@@ -278,7 +278,7 @@ def format_network_metadata(network):
 
     network_response = {
         'name': network.name,
-        'features_of_interest': FeatureOfInterest.index(network.name),
+        'features': FeatureOfInterest.index(network.name),
         'nodes': NodeMeta.index(network.name),
         'sensors': Sensor.index(network.name),
         'info': network.info
@@ -321,7 +321,7 @@ def format_sensor_metadata(sensor):
 
     sensor_response = {
         'name': sensor.name,
-        'observed_properties': sensor.observed_properties.values(),
+        'properties': sensor.observed_properties.values(),
         'info': sensor.info
     }
 
@@ -336,7 +336,7 @@ def format_feature_metadata(feature):
 
     feature_response = {
         'name': feature.name,
-        'observed_properties': feature.observed_properties,
+        'properties': feature.observed_properties,
     }
 
     return feature_response
@@ -361,11 +361,11 @@ def format_observation(obs, table):
     :returns: (dict) formatted result"""
 
     obs_response = {
-        'node_id': obs.node_id,
+        'node': obs.node_id,
         'meta_id': obs.meta_id,
         'datetime': obs.datetime.isoformat().split('+')[0],
         'sensor': obs.sensor,
-        'feature_of_interest': table.name,
+        'feature': table.name,
         'results': {}
     }
 
