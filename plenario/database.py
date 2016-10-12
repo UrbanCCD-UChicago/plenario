@@ -20,9 +20,15 @@ Base.query = session.query_property()
 
 redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=False, pool_size=50, max_overflow=50)
 
-redshift_session = scoped_session(sessionmaker(bind=redshift_engine,
-                                      autocommit=False,
-                                      autoflush=False, expire_on_commit=False))
+redshift_session = scoped_session(
+    sessionmaker(
+        bind=redshift_engine,
+        autocommit=True,
+        autoflush=True,
+        expire_on_commit=True
+    )
+)
+
 redshift_Base = declarative_base(bind=redshift_engine)
 redshift_Base.query = redshift_session.query_property()
 
