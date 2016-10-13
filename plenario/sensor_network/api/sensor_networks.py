@@ -304,7 +304,7 @@ def format_node_metadata(node):
         },
         "properties": {
             "id": node.id,
-            "network_name": node.sensor_network,
+            "network": node.sensor_network,
             "sensors": [sensor.name for sensor in node.sensors],
             "info": node.info,
         },
