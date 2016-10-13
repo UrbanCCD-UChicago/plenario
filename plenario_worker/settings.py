@@ -25,7 +25,7 @@ def get_autoscaling_group():
     or unable to make requests, return None.
 
     :returns: (str) id of the current autoscaling group
-              (None) if the id could not be found"""
+              (None) if the autoscaling group could not be found"""
 
     try:
         autoscaling_client = boto3.client("autoscaling", region_name="us-east-1")
@@ -36,6 +36,8 @@ def get_autoscaling_group():
         print "Bad params for autoscaling group ..."
     except botocore.exceptions.NoRegionError:
         print "Could not find autoscaling group region ..."
+    except botocore.exceptions.ClientError:
+        print "Could not create autoscaling client ..."
 
 
 AUTOSCALING_GROUP = get_autoscaling_group()
