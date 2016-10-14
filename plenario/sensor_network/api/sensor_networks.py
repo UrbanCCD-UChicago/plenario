@@ -453,7 +453,7 @@ def get_observation_datadump(args):
     features = set()
     for query, table in observation_queries:
         features.add(table.name.lower())
-        for row in query.yield_per(1000).enable_eagerloads(False):
+        for row in query.yield_per(1).enable_eagerloads(False):
             chunk.append(format_observation(row, table))
 
             if len(chunk) >= chunk_size:

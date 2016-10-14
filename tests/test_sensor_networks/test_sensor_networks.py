@@ -128,6 +128,7 @@ class TestSensorNetworks(unittest.TestCase):
     def test_download_queues_job_returns_correct_result_for_good_args(self):
         queueing_url = "/v1/api/sensor-networks/test_network/download"
         queueing_url += "?sensors=sensor_01&nodes=test_node&features=temperature"
+        queueing_url += "&start_datetime=2000-01-01"
         queueing_response = self.app.get(queueing_url)
 
         ticket = json.loads(queueing_response.data)["ticket"]
