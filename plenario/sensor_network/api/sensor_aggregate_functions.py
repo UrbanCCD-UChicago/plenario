@@ -250,7 +250,7 @@ aggregate_fn_map = {
     "avg": lambda args: aggregate(args, "avg", func.avg),
     "std": lambda args: aggregate(args, "std", func.stddev),
     "var": lambda args: aggregate(args, "var", func.variance),
-    "max": lambda args: aggregate(args, "std", func.max),
-    "min": lambda args: aggregate(args, "var", func.min),
-    "med": lambda args: aggregate(args, "var", func.median),
+    "max": lambda args: aggregate(args, "max", func.max),
+    "min": lambda args: aggregate(args, "min", func.min),
+    "med": lambda args: aggregate(args, "med", func.median),
 }

@@ -78,7 +78,7 @@ class Validator(Schema):
 
     geom = fields.Str(default=None, validate=validate_geom)
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=90))
-    end_datetime = fields.DateTime(default=datetime.utcnow)
+    end_datetime = fields.DateTime(default=lambda: datetime.utcnow())
     filter = fields.Str(allow_none=True, missing=None, default=None)
     limit = fields.Integer(default=1000)
     offset = fields.Integer(default=0, validate=Range(0))
@@ -87,17 +87,24 @@ class Validator(Schema):
 class NodeAggregateValidator(Validator):
 
     node = fields.Str(required=True, validate=validate_nodes)
-    features = fields.List(fields.Str(), required=True, validate=validate_features)
+    feature = fields.List(fields.Str(), validate=validate_features, required=True)
     function = fields.Str(missing="avg", default="avg", validate=lambda x: x.lower() in aggregate_fn_map)
 
     agg = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_sensor_aggs)
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
+    end_datetime = fields.DateTime(default=lambda: datetime.utcnow())
 
 
 class RequiredFeatureValidator(Validator):
 
     feature = fields.Str(validate=validate_features, required=True)
 
+
+class DatadumpValidator(Validator):
+
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=7))
+    end_datetime = fields.DateTime(default=lambda: datetime.utcnow())
+    limit = fields.Integer(default=None)
 
 # ValidatorResult
 # ===============

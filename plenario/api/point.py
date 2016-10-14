@@ -196,7 +196,7 @@ def get_datadump(ticket):
                 response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(
                     get_request(ticket)["query"]["dataset"], datatype)
             except KeyError:
-                network_name = job_request["query"]["network_name"]
+                network_name = job_request["query"]["network"]
                 content_disposition = "attachement; filename={}.datadump.{}"
                 content_disposition = content_disposition.format(network_name, datatype)
                 response.headers["Content-Disposition"] = content_disposition
