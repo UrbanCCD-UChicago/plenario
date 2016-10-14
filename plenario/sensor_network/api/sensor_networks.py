@@ -223,6 +223,9 @@ def observation_query(args, table):
     limit = args.data.get("limit")
     offset = args.data.get("offset")
 
+    import pdb
+    pdb.set_trace()
+
     q = redshift_session.query(table)
     q = q.filter(table.c.datetime >= start_dt)
     q = q.filter(table.c.datetime < end_dt)
@@ -426,6 +429,7 @@ def get_observation_datadump(args):
     :param args: (ValidatorResult) validated query arguments
     :returns (dict) containing URL to download chunked data"""
 
+    limit = args.data.get("limit")
     request_id = args.data.get("jobsframework_ticket")
     observation_queries = get_observation_queries(args)
 
@@ -436,24 +440,32 @@ def get_observation_datadump(args):
     for query, table in observation_queries:
         row_count += fast_count(query)
 
+    if limit and limit < row_count:
+        row_count = limit
+
     chunk_size = 1000.0
     chunk_count = math.ceil(row_count / chunk_size)
-    chunk_number = 1
+
+    # Note that the streaming of datadump results relies, for better or worse,
+    # very strictly on the number each chunk has. Make sure to increment the
+    # chunk number BEFORE adding it, as the place of 0 is reserved for the
+    # meta chunk.
+    chunk_number = 0
 
     chunk = list()
     features = set()
     for query, table in observation_queries:
-
         features.add(table.name.lower())
-        for row in windowed_query(query, table.c.datetime, chunk_size):
+        for row in query.yield_per(1000).enable_eagerloads(False):
             chunk.append(format_observation(row, table))
 
-            if len(chunk) > chunk_size:
+            if len(chunk) >= chunk_size:
+                chunk_number += 1
                 store_chunk(chunk, chunk_count, chunk_number, request_id)
                 chunk = list()
-                chunk_number += 1
 
-    if len(chunk) > 0:
+    if len(chunk) > 0 and chunk_number < chunk_count:
+        chunk_number += 1
         store_chunk(chunk, chunk_count, chunk_number, request_id)
 
     meta_chunk = '{{"startTime": "{}", "endTime": "{}", "workers": {}, "features": {}}}'.format(
@@ -494,12 +506,7 @@ def store_chunk(chunk, chunk_count, chunk_number, request_id):
     )
 
     session.add(datadump_part)
-
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        raise e
+    session.commit()
 
     status = get_status(request_id)
     status["progress"] = {"done": chunk_number, "total": chunk_count}
