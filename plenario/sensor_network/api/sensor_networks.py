@@ -223,9 +223,6 @@ def observation_query(args, table):
     limit = args.data.get("limit")
     offset = args.data.get("offset")
 
-    import pdb
-    pdb.set_trace()
-
     q = redshift_session.query(table)
     q = q.filter(table.c.datetime >= start_dt)
     q = q.filter(table.c.datetime < end_dt)
