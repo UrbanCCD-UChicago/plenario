@@ -17,7 +17,7 @@ from plenario.database import session, redshift_engine
 from plenario.models import ShapeMetadata, MetaTable
 from plenario.utils.model_helpers import table_exists
 from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest, Sensor
-from sensor_aggregate_functions import aggregate_fn_map
+from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
 
 
 def validate_dataset(dataset_name):
@@ -173,6 +173,13 @@ class NodeAggregateValidator(SensorNetworkValidator):
 
 class RequiredFeatureValidator(SensorNetworkValidator):
     feature = fields.Str(validate=validate_features, required=True)
+
+
+class DatadumpValidator(SensorNetworkValidator):
+
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=7))
+    end_datetime = fields.DateTime(default=lambda: datetime.utcnow())
+    limit = fields.Integer(default=None)
 
 
 # ValidatorResult
@@ -403,15 +410,17 @@ def sensor_network_validate(validator, request_args):
     unchecked = set(args.keys()) - set(validator.fields.keys())
 
     if 'filter' in args.keys():
-        raw_tree = result.data.filter
-        t_name = raw_tree.col.split(".")[0]
+        raw_tree = result.data['filter']
         try:
             cond_tree = json.loads(raw_tree)
+            t_name = cond_tree['prop'].split(".")[0]
+            cond_tree['col'] = cond_tree['prop'].split(".")[1]
+            del cond_tree['prop']
             table = reflect(t_name, MetaData(), redshift_engine)
             if valid_tree(table, cond_tree):
-                result.data.filter = cond_tree
+                result.data['filter'] = cond_tree
         except (ValueError, KeyError) as err:
-            result.errors[t_name] = "Bad tree: {} -- causes error {}.".format(raw_tree, err)
+            result.errors['filter'] = "Bad tree: {} -- causes error {}.".format(raw_tree, err)
             return result
 
     if unchecked:

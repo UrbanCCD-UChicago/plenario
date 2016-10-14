@@ -106,7 +106,7 @@ def get_feature_metadata(network, feature=None):
 
     fields = ('network', 'features', 'geom')
     validated_args = sensor_network_validate(SensorNetworkValidator(only=fields), args)
-    if sensor_network_validated_args.errors:
+    if validated_args.errors:
         return bad_request(validated_args.errors)
 
     return get_metadata("features", validated_args)
@@ -129,7 +129,7 @@ def get_observations(network):
     args = sanitize_args(args)
 
     fields = ('network', 'nodes', 'start_datetime', 'end_datetime', 'geom',
-              'features', 'sensors', 'limit', 'offset')
+              'feature', 'sensors', 'limit', 'offset', 'filter')
     validated_args = sensor_network_validate(RequiredFeatureValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
@@ -209,12 +209,16 @@ def get_aggregations(network):
     return jsonify(validated_args, result, 200)
 
 
-def observation_query(args, table, condition=None):
+def observation_query(args, table):
     """Constructs a query used to fetch raw data from a Redshift table. Used
     by the /query and /download endpoints.
 
     :param args: (ValidatorResult) contains arguments in the data property
-    :param table: (SQLAlchemy.Table) represents a database table"""
+    :param table: (SQLAlchemy.Table) represents a database table
+    :param condition: asdkfjhgasdfkjhgasdkfjhgasdfkjhgasdf"""
+
+    # import pdb
+    # pdb.set_trace()
 
     nodes = args.data.get("nodes")
     start_dt = args.data.get("start_datetime")
@@ -222,6 +226,7 @@ def observation_query(args, table, condition=None):
     sensors = args.data.get("sensors")
     limit = args.data.get("limit")
     offset = args.data.get("offset")
+    condition = parse_tree(table, args.data.get("filter")) if args.data.get("filter") else None
 
     q = redshift_session.query(table)
     q = q.filter(table.c.datetime >= start_dt)
@@ -229,7 +234,7 @@ def observation_query(args, table, condition=None):
 
     q = q.filter(sqla_fn.lower(table.c.node_id).in_(nodes)) if nodes else q
     q = q.filter(sqla_fn.lower(table.c.sensor).in_(sensors)) if sensors else q
-    q = q.filter(condition) if condition else q
+    q = q.filter(condition) if condition is not None else q
     q = q.limit(limit) if limit else q
     q = q.offset(offset) if offset else q
 
@@ -677,11 +682,12 @@ def sanitize_validated_args(args):
 
 
 from plenario.api.jobs import get_status, set_status, set_flag, make_job_response
-from plenario.database import fast_count, windowed_query
+from plenario.database import fast_count
 from plenario.database import session, redshift_session, redshift_engine
 from plenario.models import DataDump
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
-from plenario.sensor_network.api.sensor_validator import Validator, validate, DatadumpValidator
+from plenario.api.validator import SensorNetworkValidator, DatadumpValidator, sensor_network_validate
 from plenario.sensor_network.api.sensor_validator import NodeAggregateValidator, RequiredFeatureValidator
 from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
 from sensor_aggregate_functions import aggregate_fn_map
+from plenario.api.condition_builder import parse_tree

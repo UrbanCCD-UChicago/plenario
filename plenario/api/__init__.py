@@ -6,7 +6,7 @@ from flask import make_response, Blueprint
 from common import cache, make_cache_key
 from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, \
     get_observations, get_feature_metadata, get_sensor_metadata, get_aggregations, get_observations_download
-from plenario.sensor_network.api.ifttt import property_comparison
+# from plenario.sensor_network.api.ifttt import property_comparison
 from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
 from sensor import weather_stations, weather
 from shape import get_all_shape_datasets, \
@@ -52,8 +52,8 @@ api.add_url_rule(prefix + '/sensor-networks/<network>/features/<feature>', 'feat
 api.add_url_rule(prefix + '/sensor-networks/<network>/sensors', 'sensors', get_sensor_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network>/sensors/<sensor>', 'sensors', get_sensor_metadata)
 
-# IFTTT
-api.add_url_rule(prefix + '/ifttt/v1/triggers/property_comparison', 'property_comparison', property_comparison, methods=['POST'])
+# # IFTTT
+# api.add_url_rule(prefix + '/ifttt/v1/triggers/property_comparison', 'property_comparison', property_comparison, methods=['POST'])
 
 
 
