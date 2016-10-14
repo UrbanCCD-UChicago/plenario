@@ -100,6 +100,12 @@ class RequiredFeatureValidator(Validator):
     feature = fields.Str(validate=validate_features, required=True)
 
 
+class DatadumpValidator(Validator):
+
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=7))
+    end_datetime = fields.DateTime(default=lambda: datetime.utcnow())
+    limit = fields.Integer(default=None)
+
 # ValidatorResult
 # ===============
 # Many methods in response.py rely on information that used to be provided

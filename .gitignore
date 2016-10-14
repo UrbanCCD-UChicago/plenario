@@ -35,3 +35,6 @@ notebooks/
 
 # Deployment Packages
 *.zip
+
+# Scripts
+_scripts/

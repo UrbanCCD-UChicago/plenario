@@ -166,7 +166,7 @@ def get_observations_download(network):
 
     fields = ('network', 'nodes', 'start_datetime', 'end_datetime',
               'limit', 'geom', 'features', 'sensors', 'offset')
-    validated_args = validate(Validator(only=fields), args)
+    validated_args = validate(DatadumpValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
@@ -229,8 +229,8 @@ def observation_query(args, table):
 
     q = q.filter(sqla_fn.lower(table.c.node_id).in_(nodes)) if nodes else q
     q = q.filter(sqla_fn.lower(table.c.sensor).in_(sensors)) if sensors else q
-    q = q.limit(limit) if args.data["limit"] else q
-    q = q.offset(offset) if args.data["offset"] else q
+    q = q.limit(limit) if limit else q
+    q = q.offset(offset) if offset else q
 
     return q
 
@@ -676,6 +676,7 @@ from plenario.database import fast_count, windowed_query
 from plenario.database import session, redshift_session, redshift_engine
 from plenario.models import DataDump
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
-from plenario.sensor_network.api.sensor_validator import Validator, validate, NodeAggregateValidator, RequiredFeatureValidator
+from plenario.sensor_network.api.sensor_validator import Validator, validate, DatadumpValidator
+from plenario.sensor_network.api.sensor_validator import NodeAggregateValidator, RequiredFeatureValidator
 from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
 from sensor_aggregate_functions import aggregate_fn_map
