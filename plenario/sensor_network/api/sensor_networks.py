@@ -17,11 +17,11 @@ from plenario.database import fast_count, windowed_query
 from plenario.database import session, redshift_session, redshift_engine
 from plenario.models import DataDump
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
-from plenario.sensor_network.api.sensor_validator import Validator, validate, NodeAggregateValidator, RequiredFeatureValidator
+from plenario.api.validator import SensorNetworkValidator, sensor_network_validate, NodeAggregateValidator, RequiredFeatureValidator
 from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
 from sensor_aggregate_functions import aggregate_fn_map
 
-# Cache timeout of 5 mintutes
+# Cache timeout of 5 minutes
 CACHE_TIMEOUT = 60 * 10
 
 
@@ -38,7 +38,7 @@ def get_network_metadata(network=None):
     args = {"network": network.lower() if network else None}
 
     fields = ('network',)
-    validated_args = validate(Validator(only=fields), args)
+    validated_args = sensor_network_validate(SensorNetworkValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
@@ -63,7 +63,7 @@ def get_node_metadata(network, node=None):
     })
 
     fields = ('network', 'nodes', 'geom')
-    validated_args = validate(Validator(only=fields), args)
+    validated_args = sensor_network_validate(SensorNetworkValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
     validated_args = sanitize_validated_args(validated_args)
@@ -89,7 +89,7 @@ def get_sensor_metadata(network, sensor=None):
     })
 
     fields = ('network', 'sensors', 'geom')
-    validated_args = validate(Validator(only=fields), args)
+    validated_args = sensor_network_validate(SensorNetworkValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
     validated_args = sanitize_validated_args(validated_args)
@@ -114,8 +114,8 @@ def get_feature_metadata(network, feature=None):
     })
 
     fields = ('network', 'features', 'geom')
-    validated_args = validate(Validator(only=fields), args)
-    if validated_args.errors:
+    validated_args = sensor_network_validate(SensorNetworkValidator(only=fields), args)
+    if sensor_network_validated_args.errors:
         return bad_request(validated_args.errors)
 
     return get_metadata("features", validated_args)
@@ -140,7 +140,7 @@ def get_observations(network):
 
     fields = ('network', 'nodes', 'start_datetime', 'end_datetime', 'geom',
               'features', 'sensors', 'limit', 'offset')
-    validated_args = validate(RequiredFeatureValidator(only=fields), args)
+    validated_args = sensor_network_validate(RequiredFeatureValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
     validated_args = sanitize_validated_args(validated_args)
@@ -157,7 +157,7 @@ def get_observations(network):
 def get_observations_download(network):
     """Queue a datadump job for raw sensor network observations and return
     links to check on its status and eventual download. Has a longer cache
-    timeout than the other endpoints -- datadumps are alot of work.
+    timeout than the other endpoints -- datadumps are a lot of work.
 
     :endpoint: /sensor-networks/<network-name>/download
     :param network: (str) network name
@@ -172,7 +172,7 @@ def get_observations_download(network):
 
     fields = ('network', 'nodes', 'start_datetime', 'end_datetime',
               'limit', 'geom', 'features', 'sensors', 'offset')
-    validated_args = validate(Validator(only=fields), args)
+    validated_args = sensor_network_validate(SensorNetworkValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
@@ -199,7 +199,7 @@ def get_aggregations(network):
 
     request_args = dict(request.args.to_dict(), **{"network": network})
     request_args = sanitize_args(request_args)
-    validated_args = validate(NodeAggregateValidator(only=fields), request_args)
+    validated_args = sensor_network_validate(NodeAggregateValidator(only=fields), request_args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
     validated_args = sanitize_validated_args(validated_args)
@@ -213,7 +213,7 @@ def get_aggregations(network):
     return jsonify(validated_args, result)
 
 
-def observation_query(args, table):
+def observation_query(args, table, condition=None):
     nodes = args.data.get("nodes")
     start_dt = args.data.get("start_datetime")
     end_dt = args.data.get("end_datetime")
@@ -227,6 +227,7 @@ def observation_query(args, table):
 
     q = q.filter(sqla_fn.lower(table.c.node_id).in_(nodes)) if nodes else q
     q = q.filter(sqla_fn.lower(table.c.sensor).in_(sensors)) if sensors else q
+    q = q.filter(condition) if condition else q
     q = q.limit(limit) if args.data["limit"] else q
     q = q.offset(offset) if args.data["offset"] else q
 

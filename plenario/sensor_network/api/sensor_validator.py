@@ -1,18 +1,16 @@
 from collections import namedtuple
 from datetime import datetime, timedelta
-from dateutil.parser import parse as date_parse
+
 from marshmallow import fields, Schema
 from marshmallow.validate import Range, ValidationError
-from psycopg2 import Error
 from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
 from plenario.database import session
 from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest, Sensor
-
 from sensor_aggregate_functions import aggregate_fn_map
 
-valid_agg_units = ("minute", "hour", "day", "week", "month", "year")
+valid_sensor_aggs = ("minute", "hour", "day", "week", "month", "year")
 
 
 def validate_network(network):
@@ -92,7 +90,7 @@ class NodeAggregateValidator(Validator):
     features = fields.List(fields.Str(), required=True, validate=validate_features)
     function = fields.Str(missing="avg", default="avg", validate=lambda x: x.lower() in aggregate_fn_map)
 
-    agg = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_agg_units)
+    agg = fields.Str(default="hour", missing="hour", validate=lambda x: x in valid_sensor_aggs)
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
 
 
@@ -142,60 +140,3 @@ def convert(request_args):
             session.rollback()
 
 
-def validate(validator, request_args):
-    """Validate a dictionary of arguments. Substitute all missing fields with
-    defaults if not explicitly told to do otherwise.
-
-    :param validator: type of validator to use
-    :param request_args: dictionary of arguments from a request object
-
-    :returns: ValidatorResult namedtuple"""
-
-    args = request_args.copy()
-
-    # Prevent a time formatting issue that causes validator.load to act up
-    # The "+" sign in dates gets turned into a space character
-    if args.get("start_datetime"):
-        args["start_datetime"] = args["start_datetime"].split(" ")[0]
-    if args.get("end_datetime"):
-        args["end_datetime"] = args["end_datetime"].split(" ")[0]
-
-    # If there are errors, fail quickly and return.
-    result = validator.load(args)
-    if result.errors:
-        return result
-
-    # If all arguments are valid, fill in validator defaults.
-    result = validator.dump(result.data)
-
-    # fill in all nodes, sensors, and features within the network as a default
-    # if this is not an observation query, KeyErrors will result
-    try:
-        network_name = result.data['network_name']
-        if result.data['nodes'] is None:
-            result.data['nodes'] = NodeMeta.index(network_name)
-        if result.data['features_of_interest'] is None:
-            result.data['features_of_interest'] = FeatureOfInterest.index(network_name)
-        if result.data['sensors'] is None:
-            result.data['sensors'] = Sensor.index(network_name)
-    except KeyError:
-        pass
-
-    # Certain values will be dumped as strings. This conversion
-    # makes them into their corresponding type. (ex. Table)
-    convert(result.data)
-
-    # Holds messages concerning unnecessary parameters. These can be either
-    # junk parameters, or redundant column parameters if a tree filter was
-    # used.
-    warnings = []
-
-    # Determine unchecked parameters provided in the request.
-    unchecked = set(args.keys()) - set(validator.fields.keys())
-
-    if unchecked:
-        for param in unchecked:
-            result.errors[param] = 'Not a valid filter'.format(param)
-
-    # ValidatorResult(dict, dict, list)
-    return ValidatorResult(result.data, result.errors, warnings)
