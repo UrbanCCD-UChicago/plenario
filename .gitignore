@@ -38,3 +38,6 @@ notebooks/
 
 # Scripts
 _scripts/
+
+# Virtualenv
+_venv/
