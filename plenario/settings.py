@@ -1,6 +1,8 @@
-import boto.ec2
-import boto.utils
+import botocore.exceptions
+import boto3
+import requests
 from os import environ
+
 get = environ.get
 
 SECRET_KEY = get('SECRET_KEY', 'abcdefghijklmnop')
@@ -35,7 +37,7 @@ DEFAULT_USER = {
 }
 
 AWS_ACCESS_KEY = get('AWS_ACCESS_KEY_ID', '')
-AWS_SECRET_KEY = get('AWS_SECRET_ACCESS_KEY', '')
+AWS_SECRET_KEY = get('AWS_SECRET_KEY', '')
 S3_BUCKET = get('S3_BUCKET', '')
 AWS_REGION_NAME = get('AWS_REGION_NAME', 'us-east-1')
 
@@ -61,29 +63,44 @@ MAINTENANCE = False
 # SQS Jobs Queue
 JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-queue-test')
 
-# Get Instance ID and Autoscaling Group Name
 
-try:
-    instance_metadata = boto.utils.get_instance_metadata(timeout=2, num_retries=2)
-    INSTANCE_ID = instance_metadata["instance-id"]
-except KeyError:
-    print "Could not get INSTANCE_ID"
-    INSTANCE_ID = ""
+def get_ec2_instance_id():
+    """Retrieve the instance id for the currently running EC2 instance. If
+    the host machine is not an EC2 instance or is for some reason unable
+    to make requests, return None.
 
-try:
-    AUTOSCALING_GROUP = ""
-    ec2 = boto.ec2.connect_to_region(
-        AWS_REGION_NAME,
-        aws_access_key_id=AWS_ACCESS_KEY,
-        aws_secret_access_key=AWS_SECRET_KEY
-    )
-    reservations = ec2.get_all_instances()
-    for res in reservations:
-        for inst in res.instances:
-            if inst.id == INSTANCE_ID:
-                AUTOSCALING_GROUP = inst.tags["aws:autoscaling:groupName"]
-                break
-        if AUTOSCALING_GROUP:
-            break
-except boto.exception.EC2ResponseError:
-    print "Could not get AUTOSCALING_GROUP"
+    :returns: (str) id of the current EC2 instance
+              (None) if the id could not be found"""
+
+    instance_id_url = "http://169.254.169.254/latest/meta-data/instance-id"
+    try:
+        return requests.get(instance_id_url).text
+    except requests.ConnectionError:
+        print "Could not find EC2 instance id..."
+
+INSTANCE_ID = get_ec2_instance_id()
+
+
+def get_autoscaling_group():
+    """Retrieve the autoscaling group name of the current instance. If
+    the host machine is not an EC2 instance, not subject to autoscaling,
+    or unable to make requests, return None.
+
+    :returns: (str) id of the current autoscaling group
+              (None) if the autoscaling group could not be found"""
+
+    try:
+        autoscaling_client = boto3.client("autoscaling", region_name=AWS_REGION_NAME)
+        return autoscaling_client.describe_auto_scaling_instances(
+            InstanceIds=[INSTANCE_ID]
+        )["AutoScalingInstances"][0]["AutoScalingGroupName"]
+    except botocore.exceptions.ParamValidationError as err:
+        print err
+    except botocore.exceptions.NoRegionError as err:
+        print err
+    except botocore.exceptions.ClientError as err:
+        print err
+    except botocore.exceptions.PartialCredentialsError as err:
+        print err
+
+AUTOSCALING_GROUP = get_autoscaling_group()
