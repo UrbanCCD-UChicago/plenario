@@ -96,5 +96,7 @@ def get_autoscaling_group():
         )["AutoScalingInstances"][0]["AutoScalingGroupName"]
     except botocore.exceptions.BotoCoreError as err:
         print err.message
+    except botocore.exceptions.ClientError as err:
+        print err.message
 
 AUTOSCALING_GROUP = get_autoscaling_group()
