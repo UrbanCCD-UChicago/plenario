@@ -75,8 +75,8 @@ def get_ec2_instance_id():
     instance_id_url = "http://169.254.169.254/latest/meta-data/instance-id"
     try:
         return requests.get(instance_id_url).text
-    except requests.ConnectionError:
-        print "Could not find EC2 instance id..."
+    except requests.ConnectionError as err:
+        print err.message
 
 INSTANCE_ID = get_ec2_instance_id()
 
@@ -94,13 +94,7 @@ def get_autoscaling_group():
         return autoscaling_client.describe_auto_scaling_instances(
             InstanceIds=[INSTANCE_ID]
         )["AutoScalingInstances"][0]["AutoScalingGroupName"]
-    except botocore.exceptions.ParamValidationError as err:
-        print err
-    except botocore.exceptions.NoRegionError as err:
-        print err
-    except botocore.exceptions.ClientError as err:
-        print err
-    except botocore.exceptions.PartialCredentialsError as err:
-        print err
+    except botocore.exceptions.BotoCoreError as err:
+        print err.message
 
 AUTOSCALING_GROUP = get_autoscaling_group()
