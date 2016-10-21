@@ -176,10 +176,13 @@ class RequiredFeatureValidator(SensorNetworkValidator):
 
 
 class DatadumpValidator(SensorNetworkValidator):
-
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=7))
     end_datetime = fields.DateTime(default=lambda: datetime.utcnow())
     limit = fields.Integer(default=None)
+
+
+class IFTTTValidator(SensorNetworkValidator):
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(minutes=20))
 
 
 # ValidatorResult

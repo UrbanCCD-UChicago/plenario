@@ -7,7 +7,7 @@ from flask import request, make_response
 
 from plenario.api.common import crossdomain
 from plenario.api.common import unknown_object_json_handler
-from plenario.api.validator import sensor_network_validate, RequiredFeatureValidator
+from plenario.api.validator import sensor_network_validate, IFTTTValidator
 from plenario.sensor_network.api.sensor_networks import sanitize_validated_args, get_observation_queries
 from plenario.api.response import bad_request
 
@@ -22,19 +22,20 @@ curated_map = {"Temperature": "temperature.temperature",
 def get_ifttt():
     input_args = request.json
     args = dict()
-    args['network'] = 'array_of_things'
+    args['network'] = 'plenario_development'
     args['nodes'] = [input_args['triggerFields']['node']]
     args['feature'] = curated_map[input_args['triggerFields']['prop']].split('.')[0]
-    args['limit'] = input_args['limit'] if input_args['limit'] else 50
-    args['filter'] = {'prop': curated_map[input_args['triggerFields']['prop']].split('.')[1],
-                      'op': input_args['triggerFields']['op'],
-                      'val': input_args['triggerFields']['val']}
-    # include the curated input property so we can return it to the user for display purposes
-    args['property'] = input_args['triggerFields']['prop']
+    args['limit'] = input_args['limit'] if 'limit' in input_args.keys() else 50
+    args['filter'] = json.dumps({'prop': curated_map[input_args['triggerFields']['prop']].split('.')[1],
+                                 'op': input_args['triggerFields']['op'],
+                                 'val': input_args['triggerFields']['val']})
+    # pass through the curated input property so we can return it to the user for display purposes
+    curated_property = input_args['triggerFields']['prop']
 
-    fields = ('network', 'nodes', 'feature', 'sensors', 'limit', 'filter')
+    fields = ('network', 'nodes', 'feature', 'sensors',
+              'start_datetime', 'end_datetime', 'limit', 'filter')
 
-    validated_args = sensor_network_validate(RequiredFeatureValidator(only=fields), args)
+    validated_args = sensor_network_validate(IFTTTValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
     validated_args.data.update({
@@ -47,15 +48,15 @@ def get_ifttt():
     if type(observation_queries) != list:
         return observation_queries
 
-    return run_ifttt_queries(validated_args, observation_queries)
+    return run_ifttt_queries(validated_args, observation_queries, curated_property)
 
 
-def format_ifttt(obs, prop):
+def format_ifttt(obs, curated_property):
     obs_response = {
         "node": obs.node_id,
         "datetime": obs.datetime.isoformat().split('+')[0],
-        "property": prop,
-        "value": getattr(obs, prop),
+        "property": curated_property,
+        "value": getattr(obs, curated_map[curated_property].split('.')[1]),
         "meta": {
             "id": uuid.uuid1().hex,
             "timestamp": int(time.time())
@@ -65,10 +66,10 @@ def format_ifttt(obs, prop):
     return obs_response
 
 
-def run_ifttt_queries(args, queries):
+def run_ifttt_queries(args, queries, curated_property):
     data = list()
     for query, table in queries:
-        data += [format_ifttt(obs, args['property']) for obs in query.all()]
+        data += [format_ifttt(obs, curated_property) for obs in query.all()]
 
     data.sort(key=lambda x: parse(x["datetime"]), reverse=True)
 
