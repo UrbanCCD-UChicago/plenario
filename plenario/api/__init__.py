@@ -6,7 +6,7 @@ from flask import make_response, Blueprint
 from common import cache, make_cache_key
 from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, \
     get_observations, get_feature_metadata, get_sensor_metadata, get_aggregations, get_observations_download
-from plenario.sensor_network.api.ifttt import get_ifttt
+from plenario.sensor_network.api.ifttt import get_ifttt_observations, get_ifttt_meta
 from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
 from sensor import weather_stations, weather
 from shape import get_all_shape_datasets, \
@@ -53,7 +53,8 @@ api.add_url_rule(prefix + '/sensor-networks/<network>/sensors', 'sensors', get_s
 api.add_url_rule(prefix + '/sensor-networks/<network>/sensors/<sensor>', 'sensors', get_sensor_metadata)
 
 # IFTTT
-api.add_url_rule(prefix + '/ifttt/v1/triggers/property_comparison', 'ifttt', get_ifttt, methods=['POST'])
+api.add_url_rule(prefix + '/ifttt/v1/triggers/property_comparison', 'ifttt_obs', get_ifttt_observations, methods=['POST'])
+api.add_url_rule(prefix + '/ifttt/v1/triggers/property_comparison/fields/<field>/options', 'ifttt_meta', get_ifttt_meta, methods=['POST'])
 
 
 @api.route(prefix + '/flush-cache')
