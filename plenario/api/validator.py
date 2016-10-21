@@ -413,8 +413,8 @@ def sensor_network_validate(validator, request_args):
         raw_tree = result.data['filter']
         try:
             cond_tree = json.loads(raw_tree)
-            t_name = cond_tree['prop'].split(".")[0]
-            cond_tree['col'] = cond_tree['prop'].split(".")[1]
+            t_name = result.data['feature']
+            cond_tree['col'] = cond_tree['prop']
             del cond_tree['prop']
             table = reflect(t_name, MetaData(), redshift_engine)
             if valid_tree(table, cond_tree):
