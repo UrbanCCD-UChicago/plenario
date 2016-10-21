@@ -4,6 +4,7 @@ import time
 
 from dateutil.parser import parse
 from flask import request, make_response
+from os import environ
 
 from plenario.api.common import crossdomain
 from plenario.api.common import unknown_object_json_handler
@@ -17,21 +18,30 @@ curated_map = {"Temperature": "temperature.temperature",
                "Humidity": "relative_humidity.humidity"}
 
 
-# TODO: format errors how ifttt wants
-# TODO: decide on time or datetime
+# TODO: error list?
 @crossdomain(origin="*")
 def get_ifttt_observations():
+    if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
+        return make_ifttt_error("incorrect channel key", 401)
+
     input_args = request.json
     args = dict()
-    args['network'] = 'plenario_development'
-    args['nodes'] = [input_args['triggerFields']['node']]
-    args['feature'] = curated_map[input_args['triggerFields']['prop']].split('.')[0]
-    args['limit'] = input_args['limit'] if 'limit' in input_args.keys() else 50
-    args['filter'] = json.dumps({'prop': curated_map[input_args['triggerFields']['prop']].split('.')[1],
-                                 'op': input_args['triggerFields']['op'],
-                                 'val': input_args['triggerFields']['val']})
-    # pass through the curated input property so we can return it to the user for display purposes
-    curated_property = input_args['triggerFields']['prop']
+    try:
+        args['network'] = 'plenario_development'
+        args['nodes'] = [input_args['triggerFields']['node']]
+        args['feature'] = curated_map[input_args['triggerFields']['curated_property']].split('.')[0]
+        args['limit'] = input_args['limit'] if 'limit' in input_args.keys() else 50
+        args['filter'] = json.dumps({'prop': curated_map[input_args['triggerFields']['curated_property']].split('.')[1],
+                                     'op': input_args['triggerFields']['op'],
+                                     'val': float(input_args['triggerFields']['val'])})
+        # pass through the curated input property so we can return it to the user for display purposes
+        curated_property = input_args['triggerFields']['curated_property']
+    except (KeyError, ValueError) as err:
+        return make_ifttt_error(str(err), 400)
+
+    # override the normal limit 0 behaviour, which is to apply no limit
+    if args['limit'] == 0:
+        return make_ifttt_response([])
 
     fields = ('network', 'nodes', 'feature', 'sensors',
               'start_datetime', 'end_datetime', 'limit', 'filter')
@@ -54,6 +64,9 @@ def get_ifttt_observations():
 
 @crossdomain(origin="*")
 def get_ifttt_meta(field):
+    if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
+        return make_ifttt_error("incorrect channel key", 401)
+
     data = []
     if field == 'node':
         args = {"network": "plenario_development"}
@@ -61,7 +74,7 @@ def get_ifttt_meta(field):
         validated_args = sensor_network_validate(IFTTTValidator(only=fields), args)
         data = [{"label": node.id,
                  "value": node.id} for node in get_raw_metadata('nodes', validated_args)]
-    elif field == 'property':
+    elif field == 'curated_property':
         data = [{"label": curated_property,
                  "value": curated_property} for curated_property in curated_map.keys()]
 
@@ -71,8 +84,8 @@ def get_ifttt_meta(field):
 def format_ifttt_observations(obs, curated_property):
     obs_response = {
         "node": obs.node_id,
-        "datetime": obs.datetime.isoformat().split('+')[0],
-        "property": curated_property,
+        "datetime": obs.datetime.isoformat()+'+05:00',
+        "curated_property": curated_property,
         "value": getattr(obs, curated_map[curated_property].split('.')[1]),
         "meta": {
             "id": uuid.uuid1().hex,
@@ -98,5 +111,66 @@ def make_ifttt_response(data):
         "data": data
     }
     resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
+    resp.headers['Content-Type'] = 'application/json; charset=utf-8'
+    return resp
+
+
+def make_ifttt_error(err, status_code):
+    resp = {
+        "errors": [{"message": err}]
+    }
+    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
+    resp.headers['Content-Type'] = 'application/json; charset=utf-8'
+    return resp
+
+
+# ========================
+# IFTTT testing endpoints
+# ========================
+
+
+@crossdomain(origin="*")
+def ifttt_status():
+    if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
+        return make_ifttt_error("incorrect channel key", 401)
+
+    resp = make_response('{}', 200)
     resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
+@crossdomain(origin="*")
+def ifttt_test_setup():
+    if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
+        return make_ifttt_error("incorrect channel key", 401)
+
+    resp = {
+        "data": {
+            "samples": {
+                "triggers": {
+                    "property_comparison": {
+                        "node": "node_dev_1",
+                        "curated_property": "Temperature",
+                        "op": "gt",
+                        "val": 0
+                    }
+                },
+                "triggerFieldValidations": {
+                    "property_comparison": {
+                        "node": {
+                            "valid": "node_dev_1",
+                            "invalid": "invalid_node"
+                        },
+                        "curated_property": {
+                            "valid": "Temperature",
+                            "invalid": "invalid_property"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
+    resp.headers['Content-Type'] = 'application/json; charset=utf-8'
     return resp

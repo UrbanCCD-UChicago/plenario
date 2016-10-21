@@ -217,9 +217,6 @@ def observation_query(args, table):
     :param table: (SQLAlchemy.Table) represents a database table
     :param condition: asdkfjhgasdfkjhgasdkfjhgasdfkjhgasdf"""
 
-    # import pdb
-    # pdb.set_trace()
-
     nodes = args.data.get("nodes")
     start_dt = args.data.get("start_datetime")
     end_dt = args.data.get("end_datetime")
