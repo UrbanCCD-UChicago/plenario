@@ -18,3 +18,13 @@ notebooks/
 .idea/
 # Elastic Beanstalk Test Packages
 *.testy.zip
+
+# coverage.py
+.coveragerc
+
+# development tools
+_scripts/
+_venv/
+
+# deployments
+*.zip
