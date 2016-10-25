@@ -14,8 +14,7 @@ from plenario.sensor_network.api.sensor_networks import sanitize_validated_args,
 from plenario.api.response import bad_request
 
 # dictionary mapping the curated drop-down list name to the correct feature and property
-curated_map = {"Temperature": "temperature.temperature",
-               "Humidity": "relative_humidity.humidity"}
+curated_map = {"temperature": "temperature.temperature"}
 
 
 # TODO: error list?
@@ -150,7 +149,7 @@ def ifttt_test_setup():
                 "triggers": {
                     "property_comparison": {
                         "node": "node_dev_1",
-                        "curated_property": "Temperature",
+                        "curated_property": "temperature",
                         "op": "gt",
                         "val": 0
                     }
@@ -162,7 +161,7 @@ def ifttt_test_setup():
                             "invalid": "invalid_node"
                         },
                         "curated_property": {
-                            "valid": "Temperature",
+                            "valid": "temperature",
                             "invalid": "invalid_property"
                         }
                     }
