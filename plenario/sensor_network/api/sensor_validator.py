@@ -106,6 +106,14 @@ class DatadumpValidator(Validator):
     end_datetime = fields.DateTime(default=lambda: datetime.utcnow())
     limit = fields.Integer(default=None)
 
+
+class NearMeValidator(Validator):
+
+    lat = fields.Float(required=True)
+    lng = fields.Float(required=True)
+    feature = fields.Str(required=True, validate=validate_features)
+
+
 # ValidatorResult
 # ===============
 # Many methods in response.py rely on information that used to be provided

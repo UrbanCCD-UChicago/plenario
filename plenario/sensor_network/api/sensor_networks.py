@@ -2,15 +2,17 @@ import json
 import math
 import os
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dateutil.parser import parse
 from flask import request, make_response
 from shapely import wkb
-from sqlalchemy import MetaData, Table, func as sqla_fn
+from sqlalchemy import MetaData, Table, func as sqla_fn, and_
 
 from plenario.api.common import cache, crossdomain
 from plenario.api.common import make_cache_key, unknown_object_json_handler
+from plenario.models.SensorNetwork import NodeMeta
+from plenario.utils.helpers import reflect
 
 # Cache timeout of 5 minutes
 CACHE_TIMEOUT = 60 * 10
@@ -144,6 +146,29 @@ def get_observations(network):
         return observation_queries
 
     return run_observation_queries(validated_args, observation_queries)
+
+
+@crossdomain(origin="*")
+def get_observation_nearest(network):
+    """Return a single observation from the node nearest to the specified
+    long, lat coordinate.
+
+    :endpoint: /sensor-networks/<network-name>/near-me?lng=<lng>&lat=<lat>&feature=<feature>
+    :param network: (str) network name
+    :returns: (json) response"""
+
+    args = dict(request.args.to_dict(), **{"network": network})
+    args = sanitize_args(args)
+
+    fields = ('start_datetime', 'end_datetime', 'network', 'feature', 'lat', 'lng')
+    validated_args = sensor_network_validate(NearMeValidator(only=fields), args)
+    if validated_args.errors:
+        return bad_request(validated_args.errors)
+
+    result = get_observation_nearest_query(validated_args)
+    if result is None:
+        return jsonify(validated_args, "This node has not reported for the last 5 days. :(", 200)
+    return jsonify(validated_args, result, 200)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT * 10, key_prefix=make_cache_key)
@@ -422,6 +447,32 @@ def run_observation_queries(args, queries):
     return jsonify(args, data, 200)
 
 
+def get_observation_nearest_query(args):
+    """Get an observation of the specified feature from the node nearest
+    to the provided long, lat coordinates.
+
+    :param args: (ValidatorResult) validated query arguments
+    """
+
+    lng = args.data["lng"]
+    lat = args.data["lat"]
+    nearest_node = NodeMeta.nearest_neighbor_to(lng, lat)
+    feature = reflect(args.data["feature"], MetaData(), redshift_engine)
+
+    result = None
+    for hours in range(1, 168):  # Query at most a week into the past
+        result = redshift_session.query(feature).filter(and_(
+            feature.c.node_id == nearest_node,
+            feature.c.datetime <= datetime.now(),
+            feature.c.datetime >= datetime.now() - timedelta(hours=hours)
+        )).order_by(feature.c.datetime.desc()).first()
+
+        if result is not None:
+            break
+
+    return format_observation(result, feature)
+
+
 def get_observation_datadump(args):
     """Query and store large amounts of raw sensor network observations for
     download.
@@ -685,6 +736,7 @@ from plenario.models import DataDump
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.api.validator import SensorNetworkValidator, DatadumpValidator, sensor_network_validate
 from plenario.sensor_network.api.sensor_validator import NodeAggregateValidator, RequiredFeatureValidator
+from plenario.sensor_network.api.sensor_validator import NearMeValidator
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, FeatureMeta, SensorMeta
 from sensor_aggregate_functions import aggregate_fn_map
 from plenario.api.condition_builder import parse_tree
