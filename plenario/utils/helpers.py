@@ -8,6 +8,7 @@ from plenario.settings import MAIL_USERNAME, ADMIN_EMAILS, \
     AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME
 import math
 from collections import namedtuple
+from sqlalchemy import Table
 
 
 def get_size_in_degrees(meters, latitude):
@@ -128,3 +129,18 @@ def send_mail(subject, recipient, body):
         )
     except Exception as e:
         print e.message, "Failed to send email through AWS SES."
+
+def reflect(table_name, metadata, engine):
+    """Helper function for an oft repeated block of code.
+
+    :param table_name: (str) table name
+    :param metadata: (MetaData) SQLAlchemy object found in a declarative base
+    :param engine: (Engine) SQLAlchemy object to send queries to the database
+    :returns: (Table) SQLAlchemy object"""
+
+    return Table(
+        table_name,
+        metadata,
+        autoload=True,
+        autoload_with=engine
+    )

@@ -25,9 +25,6 @@ def _make_call_sign_wban_map():
         raise IOError(str(err) + " -- running from {}".format(os.path.abspath(".")))
 
 
-call_sign_wban_map = _make_call_sign_wban_map()
-
-
 # An example code:
 # - In this example, we have "few clouds at 1500 feet, broken clouds at 4,000 feet w/ cumulonimbus,
 #   broken at 6,500 feet, overcast at 20,000 feet"

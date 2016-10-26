@@ -1,12 +1,16 @@
 import json
-from flask import make_response, Blueprint
-from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
-from common import cache, make_cache_key
-from shape import get_all_shape_datasets,\
-                    export_shape, aggregate_point_data
 from time import sleep
+
+from flask import make_response, Blueprint
+
+from common import cache, make_cache_key
+from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, \
+    get_observations, get_feature_metadata, get_sensor_metadata, get_aggregations, get_observations_download
+from plenario.sensor_network.api.ifttt import get_ifttt_observations, get_ifttt_meta, ifttt_status, ifttt_test_setup
+from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
 from sensor import weather_stations, weather
-from flask_login import login_required
+from shape import get_all_shape_datasets, \
+    export_shape, aggregate_point_data
 
 API_VERSION = '/v1'
 
@@ -32,8 +36,30 @@ api.add_url_rule(prefix + '/jobs/<ticket>', view_func=get_job_view, methods=['GE
 api.add_url_rule(prefix + '/datadump', 'datadump', datadump)
 api.add_url_rule(prefix + '/datadump/<ticket>', 'get_datadump', get_datadump)
 
+# sensor networks
+api.add_url_rule(prefix + '/sensor-networks', 'sensor_networks', get_network_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>', 'sensor_network', get_network_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/query', 'observations', get_observations)
+api.add_url_rule(prefix + '/sensor-networks/<network>/aggregate', 'node_aggregate', get_aggregations)
+api.add_url_rule(prefix + '/sensor-networks/<network>/download', 'sensor_network_download', get_observations_download)
+
+api.add_url_rule(prefix + '/sensor-networks/<network>/nodes', 'network_nodes', get_node_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/nodes/<node>', 'single_node', get_node_metadata)
+
+api.add_url_rule(prefix + '/sensor-networks/<network>/features', 'features', get_feature_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/features/<feature>', 'features', get_feature_metadata)
+
+api.add_url_rule(prefix + '/sensor-networks/<network>/sensors', 'sensors', get_sensor_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/sensors/<sensor>', 'sensors', get_sensor_metadata)
+
+# IFTTT
+api.add_url_rule('/ifttt/v1/status', 'ifttt_status', ifttt_status)
+api.add_url_rule('/ifttt/v1/test/setup', 'ifttt_test_setup', ifttt_test_setup, methods=['POST'])
+api.add_url_rule('/ifttt/v1/triggers/property_comparison', 'ifttt_obs', get_ifttt_observations, methods=['POST'])
+api.add_url_rule('/ifttt/v1/triggers/property_comparison/fields/<field>/options', 'ifttt_meta', get_ifttt_meta, methods=['POST'])
+
+
 @api.route(prefix + '/flush-cache')
-@login_required
 def flush_cache():
     cache.clear()
     resp = make_response(json.dumps({'status': 'ok', 'message': 'cache flushed!'}))
@@ -42,7 +68,7 @@ def flush_cache():
 
 
 @api.route(prefix + '/slow')
-@cache.cached(timeout=60*60*6, key_prefix=make_cache_key)
+@cache.cached(timeout=60 * 60 * 6, key_prefix=make_cache_key)
 def slow():
     sleep(5)
     return "I feel well rested"

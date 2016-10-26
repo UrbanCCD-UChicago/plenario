@@ -1,0 +1,10 @@
+{% extends 'admin/index.html' %}
+
+{% block body %}
+<h3>Mapper Errors</h3>
+<ul>
+{% for error in errors %}
+    <li><strong>{{error}}</strong> -- {{errors[error]}}</li>
+{% endfor %}
+</ul>
+{% endblock %}

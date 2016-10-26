@@ -10,16 +10,31 @@ PLENARIO_SENTRY_URL = get('PLENARIO_SENTRY_URL', None)
 CELERY_SENTRY_URL = get('CELERY_SENTRY_URL', None)
 DATA_DIR = '/tmp'
 
+# Travis CI relies on the default values to build correctly,
+# just keep in mind that if you push changes to the default
+# values, you need to make sure to adjust for these changes 
+# in the travis.yml
 DB_USER = get('DB_USER', 'postgres')
 DB_PASSWORD = get('DB_PASSWORD', 'password')
 DB_HOST = get('DB_HOST', 'localhost')
-DB_PORT = get('DB_PORT', '5432')
+DB_PORT = get('DB_PORT', 5432)
 DB_NAME = get('DB_NAME', 'plenario_test')
+
+RS_USER = get('RS_USER', 'postgres')
+RS_PASSWORD = get('RS_PASSWORD', 'password')
+RS_HOST = get('RS_HOST', 'localhost')
+RS_PORT = get('RS_PORT', 5432)
+RS_NAME = get('RS_NAME', 'sensor_obs_test')
 
 DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.\
     format(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
+REDSHIFT_CONN = 'postgresql://{}:{}@{}:{}/{}'.\
+    format(RS_USER, RS_PASSWORD, RS_HOST, RS_PORT, RS_NAME)
 
-REDIS_HOST = get('REDIS_HOST', 'localhost')
+# Use this cache for data that can be refreshed
+REDIS_HOST = get('REDIS_HOST', "localhost")
+# Use this cache for data that needs protection from the API flush
+REDIS_HOST_SAFE = get("REDIS_HOST_SAFE", "")
 
 # See: https://pythonhosted.org/Flask-Cache/#configuring-flask-cache
 # for config options

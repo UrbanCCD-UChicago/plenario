@@ -1,16 +1,23 @@
 from flask import Flask, render_template, redirect, url_for, request
+from flask_admin.contrib.sqla import ModelView
+from flask_sqlalchemy import SQLAlchemy
 from raven.contrib.flask import Sentry
-from plenario.settings import PLENARIO_SENTRY_URL
-
 
 # Unless PLENARIO_SENTRY_URL specified in settings, don't try to start raven.
+from plenario.settings import PLENARIO_SENTRY_URL
+from plenario.settings import DATABASE_CONN
+
 sentry = None
 if PLENARIO_SENTRY_URL:
     sentry = Sentry(dsn=PLENARIO_SENTRY_URL)
 
+db = SQLAlchemy()
+# NOTE: Models must be imported after initializing the db
+# object since the models themselves need to import db.
+from sensor_network.sensor_models import FeatureOfInterest, Sensor
+from sensor_network.sensor_models import NetworkMeta, NodeMeta
 
 def create_app():
-
     # API depends on the tables in the database to exist.
     # Don't import until we really need it to create the app
     # Since otherwise it may be called before init_db.py runs.
@@ -19,6 +26,7 @@ def create_app():
     # These other imports might eventually use API as well.
     # plenario.views does now. So we'll put them here like
     # API and not import them until they're really needed.
+    from plenario.apiary import apiary, apiary_bp
     from plenario.database import session as db_session
     from plenario.models import bcrypt
     from plenario.auth import auth, login_manager
@@ -38,6 +46,9 @@ def create_app():
     app.register_blueprint(views)
     app.register_blueprint(auth)
     cache.init_app(app)
+
+    apiary.init_app(app)
+    app.register_blueprint(apiary_bp)
 
     @app.before_request
     def check_maintenance_mode():
@@ -94,3 +105,9 @@ def create_app():
 
     return app
 
+
+from plenario.database import session as db_session
+# from plenario.auth import auth, login_manager
+from plenario.models import bcrypt
+from plenario.views import views
+from plenario.utils.helpers import slugify as slug

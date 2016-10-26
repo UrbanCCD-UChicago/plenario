@@ -2,19 +2,35 @@ import os
 from sqlalchemy import create_engine, and_, text, func
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.exc import InvalidRequestError
 
-from plenario.settings import DATABASE_CONN
+from plenario.settings import DATABASE_CONN, REDSHIFT_CONN
 
 if os.environ.get('WORKER'):
-    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=8, max_overflow=8, pool_timeout=60)
+    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=8, max_overflow=8, pool_timeout=60, echo=False)
 else:
-    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=4, max_overflow=4, pool_timeout=60)
+    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=4, max_overflow=4, pool_timeout=60, echo=False)
 
 session = scoped_session(sessionmaker(bind=app_engine,
                                       autocommit=False,
                                       autoflush=False, expire_on_commit=False))
 Base = declarative_base(bind=app_engine)
 Base.query = session.query_property()
+
+
+redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=False, pool_size=50, max_overflow=50)
+
+redshift_session = scoped_session(
+    sessionmaker(
+        bind=redshift_engine,
+        autocommit=True,
+        autoflush=True,
+        expire_on_commit=True
+    )
+)
+
+redshift_Base = declarative_base(bind=redshift_engine)
+redshift_Base.query = redshift_session.query_property()
 
 
 # Efficient query of large datasets (for use in DataDump)
@@ -69,8 +85,12 @@ def windowed_query(q, column, windowsize):
     """"Break a Query into windows on a given column."""
 
     for whereclause in column_windows(q.session, column, windowsize):
-        for row in q.filter(whereclause).order_by(column):
-            yield row
+        try:
+            for row in q.filter(whereclause).order_by(column):
+                yield row
+        except InvalidRequestError:
+            for row in q.from_self().filter(whereclause).order_by(column):
+                yield row
 
 
 # Fast Counting of large datasets (for use with DataDump).
@@ -79,3 +99,5 @@ def fast_count(q):
     count_q = q.statement.with_only_columns([func.count()]).order_by(None)
     count = q.session.execute(count_q).scalar()
     return count
+# Redshift connection setup
+

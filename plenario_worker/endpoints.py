@@ -8,6 +8,7 @@ from plenario.api.shape import _aggregate_point_data, _export_shape
 from plenario.tasks import add_dataset, delete_dataset, update_dataset
 from plenario.tasks import add_shape, update_shape, delete_shape
 from plenario.tasks import update_weather, frequency_update
+from plenario.sensor_network.api.sensor_networks import get_observation_datadump
 
 endpoint_logic = {
     # /timeseries?<args>
@@ -28,7 +29,9 @@ endpoint_logic = {
     'datadump': lambda args: _datadump(args),
     # Health endpoint.
     # 'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)}
-    'ping': lambda args: {'hello': 'from a worker!'}
+    'ping': lambda args: {'hello': 'from a worker!'},
+
+    'observation_datadump': lambda args: get_observation_datadump(args)
 }
 
 shape_logic = {

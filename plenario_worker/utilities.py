@@ -5,7 +5,7 @@ import logging
 import traceback
 from plenario.database import session
 from plenario.models import Workers
-from plenario.settings import AUTOSCALING_GROUP, INSTANCE_ID
+from plenario_worker.settings import AUTOSCALING_GROUP, INSTANCE_ID
 
 
 logging.basicConfig(level=logging.INFO)

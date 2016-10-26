@@ -8,12 +8,16 @@ from dateutil import parser
 from marshmallow import fields, Schema
 from marshmallow.validate import Range, OneOf, ValidationError
 from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
+from sqlalchemy import MetaData
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
+from plenario.utils.helpers import reflect
 from plenario.api.condition_builder import field_ops
-from plenario.database import session
-from plenario.models import MetaTable, ShapeMetadata
+from plenario.database import session, redshift_engine
+from plenario.models import ShapeMetadata, MetaTable
 from plenario.utils.model_helpers import table_exists
+from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest, Sensor
+from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
 
 
 def validate_dataset(dataset_name):
@@ -31,6 +35,40 @@ def validate_geom(geojson_str):
         return extract_first_geometry_fragment(geojson_str)
     except (ValueError, AttributeError):
         raise ValidationError("Invalid geom: {}".format(geojson_str))
+
+
+def validate_network(network):
+    if network.lower() not in NetworkMeta.index():
+        raise ValidationError("Invalid network name: {}".format(network))
+
+
+def validate_nodes(nodes):
+    if isinstance(nodes, basestring):
+        nodes = [nodes]
+    valid_nodes = NodeMeta.index()
+    for node in nodes:
+        if node.lower() not in valid_nodes:
+            raise ValidationError("Invalid node ID: {}".format(node))
+
+
+def validate_features(features):
+    if isinstance(features, basestring):
+        features = [features]
+    valid_features = FeatureOfInterest.index()
+    for feature in features:
+        feature = feature.split(".")[0].lower()
+        if feature not in valid_features:
+            raise ValidationError("Invalid feature of interest name: {}".format(feature))
+
+
+def validate_sensors(sensors):
+    if isinstance(sensors, basestring):
+        sensors = [sensors]
+    valid_sensors = Sensor.index()
+    for sensor in sensors:
+        sensor = sensor.lower()
+        if sensor not in valid_sensors:
+            raise ValidationError("Invalid sensor name: {}".format(sensor))
 
 
 class Validator(Schema):
@@ -107,6 +145,46 @@ class ExportFormatsValidator(Validator):
     data_type = fields.Str(default='json', validate=OneOf(valid_formats))
 
 
+class SensorNetworkValidator(Validator):
+    network = fields.Str(allow_none=True, missing=None, default='array_of_things', validate=validate_network)
+    nodes = fields.List(fields.Str(), default=None, missing=None, validate=validate_nodes)
+    sensors = fields.List(fields.Str(), default=None, missing=None, validate=validate_sensors)
+    feature = fields.Str(validate=validate_features)
+    features = fields.List(fields.Str(), default=None, missing=None, validate=validate_features)
+
+    geom = fields.Str(default=None, validate=validate_geom)
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=90))
+    end_datetime = fields.DateTime(default=datetime.utcnow)
+    filter = fields.Str(allow_none=True, missing=None, default=None)
+    limit = fields.Integer(default=1000)
+    offset = fields.Integer(default=0, validate=Range(0))
+
+
+class NodeAggregateValidator(SensorNetworkValidator):
+    valid_sensor_aggs = ("minute", "hour", "day", "week", "month", "year")
+
+    node = fields.Str(required=True, validate=validate_nodes)
+    features = fields.List(fields.Str(), required=True, validate=validate_features)
+    function = fields.Str(missing="avg", default="avg", validate=lambda x: x.lower() in aggregate_fn_map)
+
+    agg = fields.Str(default="hour", missing="hour", validate=lambda x: x in NodeAggregateValidator.valid_sensor_aggs)
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
+
+
+class RequiredFeatureValidator(SensorNetworkValidator):
+    feature = fields.Str(validate=validate_features, required=True)
+
+
+class DatadumpValidator(SensorNetworkValidator):
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=7))
+    end_datetime = fields.DateTime(default=lambda: datetime.utcnow())
+    limit = fields.Integer(default=None)
+
+
+class IFTTTValidator(SensorNetworkValidator):
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(minutes=30))
+
+
 # ValidatorResult
 # ===============
 # Many methods in response.py rely on information that used to be provided
@@ -114,7 +192,6 @@ class ExportFormatsValidator(Validator):
 # info around, and allows me to not have to rewrite any response code.
 
 ValidatorResult = namedtuple('ValidatorResult', 'data errors warnings')
-
 
 # converters
 # ==========
@@ -137,6 +214,8 @@ converters = {
     'offset': int,
     'resolution': int,
     'geom': lambda x: make_fragment_str(extract_first_geometry_fragment(x)),
+    'start_datetime': lambda x: x.isoformat().split('+')[0],
+    'end_datetime': lambda x: x.isoformat().split('+')[0]
 }
 
 
@@ -162,17 +241,7 @@ def convert(request_args):
             session.rollback()
 
 
-def validate(validator, request_args):
-    """Validate a dictionary of arguments. Substitute all missing fields with
-    defaults if not explicitly told to do otherwise.
-
-    :param validator: what kind of validator to use
-    :param request_args: dictionary of arguments from a request object
-
-    :returns: ValidatorResult namedtuple"""
-
-    args = request_args.copy()
-
+def marshmallow_validate(validator, args):
     # For validator dataset_name__in... need to find a better way to
     # make it play nice with the validator.
     if args.get('dataset_name__in'):
@@ -194,6 +263,22 @@ def validate(validator, request_args):
     # Certain values will be dumped as strings. This conversion
     # makes them into their corresponding type. (ex. Table)
     convert(result.data)
+
+    return result
+
+
+def validate(validator, request_args):
+    """Validate a dictionary of arguments. Substitute all missing fields with
+    defaults if not explicitly told to do otherwise.
+
+    :param validator: what kind of validator to use
+    :param request_args: dictionary of arguments from a request object
+
+    :returns: ValidatorResult namedtuple"""
+
+    args = request_args.copy()
+
+    result = marshmallow_validate(validator, args)
 
     # Holds messages concerning unnecessary parameters. These can be either
     # junk parameters, or redundant column parameters if a tree filter was
@@ -286,6 +371,69 @@ def validate(validator, request_args):
     return ValidatorResult(result.data, result.errors, warnings)
 
 
+def sensor_network_validate(validator, request_args):
+    """Validate a dictionary of arguments. Substitute all missing fields with
+    defaults if not explicitly told to do otherwise.
+
+    :param validator: type of validator to use
+    :param request_args: dictionary of arguments from a request object
+
+    :returns: ValidatorResult namedtuple"""
+
+    args = request_args.copy()
+
+    # # Prevent a time formatting issue that causes validator.load to act up
+    # # The "+" sign in dates gets turned into a space character
+    # if args.get("start_datetime"):
+    #     args["start_datetime"] = args["start_datetime"].split(" ")[0]
+    # if args.get("end_datetime"):
+    #     args["end_datetime"] = args["end_datetime"].split(" ")[0]
+
+    result = marshmallow_validate(validator, args)
+
+    # fill in all nodes, sensors, and features within the network as a default
+    # if this is not an observation query, KeyErrors will result
+    try:
+        network_name = result.data['network_name']
+        if result.data['nodes'] is None:
+            result.data['nodes'] = NodeMeta.index(network_name)
+        if result.data['features'] is None:
+            result.data['features'] = FeatureOfInterest.index(network_name)
+        if result.data['sensors'] is None:
+            result.data['sensors'] = Sensor.index(network_name)
+    except KeyError:
+        pass
+
+    # Holds messages concerning unnecessary parameters. These can be either
+    # junk parameters, or redundant column parameters if a tree filter was
+    # used.
+    warnings = []
+
+    # Determine unchecked parameters provided in the request.
+    unchecked = set(args.keys()) - set(validator.fields.keys())
+
+    if 'filter' in args.keys():
+        raw_tree = result.data['filter']
+        try:
+            cond_tree = json.loads(raw_tree)
+            t_name = result.data['feature']
+            cond_tree['col'] = cond_tree['prop']
+            del cond_tree['prop']
+            table = reflect(t_name, MetaData(), redshift_engine)
+            if valid_tree(table, cond_tree):
+                result.data['filter'] = cond_tree
+        except (ValueError, KeyError) as err:
+            result.errors['filter'] = "Bad tree: {} -- causes error {}.".format(raw_tree, err)
+            return result
+
+    if unchecked:
+        for param in unchecked:
+            result.errors[param] = 'Not a valid filter'.format(param)
+
+    # ValidatorResult(dict, dict, list)
+    return ValidatorResult(result.data, result.errors, warnings)
+
+
 def valid_tree(table, tree):
     """Given a dictionary containing a condition tree, validate all conditions
     nestled in the tree.
@@ -367,3 +515,5 @@ def has_tree_filters(request_args):
     :returns: boolean, true if there's a filter argument"""
 
     return any('filter' in key for key in request_args.keys())
+
+
