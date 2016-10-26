@@ -53,7 +53,7 @@ deploy:
     secure: OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ=
   region: us-east-1
   app: plenario
-  env: plenario-app-prod
+  env: plenario-app-prod-docker
   bucket_name: elasticbeanstalk-us-east-1-031052761859
 - provider: elasticbeanstalk
   access_key_id:
@@ -62,7 +62,7 @@ deploy:
     secure: OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ=
   region: us-east-1
   app: plenario
-  env: plenario-worker-prod
+  env: plenario-worker-prod-docker
   bucket_name: elasticbeanstalk-us-east-1-031052761859
 notifications:
   slack:

@@ -1,27 +1,21 @@
 """utilities: helper functions that serve to monitor the health and activity
 of the worker threads."""
 
+import logging
 import traceback
-import warnings
-from datetime import datetime
 from plenario.database import session
 from plenario.models import Workers
 from plenario_worker.settings import AUTOSCALING_GROUP, INSTANCE_ID
 
 
+logging.basicConfig(level=logging.INFO)
+
+
 def log(msg, worker_id):
-    try:
-        logfile = open('/opt/python/log/worker.log', "a")
-    except IOError:
-        warnings.warn("Failed to write to /opt/python/log/worker.log - "
-                      "writing to current directory.", RuntimeWarning)
-        logfile = open("./worker.log", "a")        
-    logfile.write("{} - Worker {}: {}\n".format(datetime.now(), worker_id.ljust(24), msg))
-    logfile.close()
+    logging.log(logging.INFO, "Worker {}: {}".format(worker_id, msg))
 
 
 def check_in(birthtime, worker_id):
-    log("INFO: Checking in.", worker_id)
     try:
         session.query(Workers).filter(Workers.name == worker_id).one().check_in()
         session.commit()

@@ -24,4 +24,4 @@ if __name__ == "__main__":
     if in_vagrant:
         application.run(debug=should_run_debug, host="0.0.0.0")
     else:
-        application.run(debug=should_run_debug)
+        application.run(debug=should_run_debug, host="0.0.0.0")
