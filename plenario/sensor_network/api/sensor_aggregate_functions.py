@@ -1,5 +1,5 @@
-from copy import deepcopy
 from collections import defaultdict
+from copy import deepcopy
 from datetime import timedelta
 
 from dateutil.parser import parse as date_parse
@@ -8,7 +8,7 @@ from sqlalchemy.sql import select
 
 from plenario.database import redshift_Base as RBase, redshift_session as r_session
 from plenario.database import session, redshift_engine as r_engine
-from plenario.sensor_network.sensor_models import NodeMeta
+from plenario.models.SensorNetwork import NodeMeta
 
 
 def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):

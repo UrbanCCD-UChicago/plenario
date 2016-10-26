@@ -1,9 +1,10 @@
 from collections import defaultdict
+
 from wtforms import ValidationError
 
 from plenario.database import session
-from plenario.sensor_network.sensor_models import FeatureOfInterest
-from plenario.sensor_network.sensor_models import NetworkMeta
+from plenario.models.SensorNetwork import FeatureMeta
+from plenario.models.SensorNetwork import NetworkMeta
 
 
 def validate_sensor_properties(observed_properties):
@@ -11,7 +12,7 @@ def validate_sensor_properties(observed_properties):
         raise ValidationError("No observed properties were provided!")
 
     features = defaultdict(list)
-    for feature in session.query(FeatureOfInterest).all():
+    for feature in session.query(FeatureMeta).all():
         for property_dict in feature.observed_properties:
             features[feature.name].append(property_dict["name"])
 

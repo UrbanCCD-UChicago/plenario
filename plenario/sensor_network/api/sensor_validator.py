@@ -7,7 +7,7 @@ from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
 from plenario.database import session
-from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest, Sensor
+from plenario.models.SensorNetwork import NodeMeta, NetworkMeta, FeatureMeta, SensorMeta
 from sensor_aggregate_functions import aggregate_fn_map
 
 valid_sensor_aggs = ("minute", "hour", "day", "week", "month", "year")
@@ -30,7 +30,7 @@ def validate_nodes(nodes):
 def validate_features(features):
     if isinstance(features, basestring):
         features = [features]
-    valid_features = FeatureOfInterest.index()
+    valid_features = FeatureMeta.index()
     for feature in features:
         feature = feature.split(".")[0].lower()
         if feature not in valid_features:
@@ -40,7 +40,7 @@ def validate_features(features):
 def validate_sensors(sensors):
     if isinstance(sensors, basestring):
         sensors = [sensors]
-    valid_sensors = Sensor.index()
+    valid_sensors = SensorMeta.index()
     for sensor in sensors:
         sensor = sensor.lower()
         if sensor not in valid_sensors:

@@ -1,13 +1,13 @@
 import os
 import signal
 import subprocess
-
-from plenario.sensor_network.sensor_models import *
-
 from datetime import datetime
 from random import randint, random
+
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError, ProgrammingError
+
+from plenario.models.SensorNetwork import *
 
 
 class Fixtures:
@@ -82,22 +82,22 @@ class Fixtures:
     def generate_mock_metadata(self):
         session.configure(bind=self.pg_engine)
 
-        feature_01 = FeatureOfInterest(
+        feature_01 = FeatureMeta(
             name="temperature",
             observed_properties=[{"type": "float", "name": "temperature"}]
         )
 
-        feature_02 = FeatureOfInterest(
+        feature_02 = FeatureMeta(
             name="vector",
             observed_properties=[{"type": "float", "name": "x"}, {"type": "float", "name": "y"}]
         )
 
-        sensor_01 = Sensor(
+        sensor_01 = SensorMeta(
             name="sensor_01",
             observed_properties={"howhot": "temperature.temperature"}
         )
 
-        sensor_02 = Sensor(
+        sensor_02 = SensorMeta(
             name="sensor_02",
             observed_properties={"vec_x": "vector.x", "vex_y": "vector.y"}
         )
