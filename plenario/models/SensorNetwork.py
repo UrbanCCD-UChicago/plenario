@@ -49,16 +49,15 @@ class NodeMeta(Base):
         return [node.id.lower() for node in nodes if node.sensor_network == network_name or network_name is None]
 
     @staticmethod
-    def nearest_neighbor_to(node_name):
-        # Returns a list of tuples, usually the closest node
-        # is itself, which is why we grab the second element.
+    def nearest_neighbor_to(lng, lat):
         return knn(
             pk="id",
             geom="location",
-            point_id=node_name,
+            lng=lng,
+            lat=lat,
             table="sensor__node_metadata",
-            k=2
-        )[1][0]
+            k=1
+        )[0][0]
 
     def __repr__(self):
         return '<Node "{}">'.format(self.id)

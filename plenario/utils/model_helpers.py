@@ -1,6 +1,7 @@
 """model_helpers: Just a collection of functions which perform common
 interactions with the models."""
 
+import json
 from sqlalchemy.exc import ProgrammingError
 from plenario.database import app_engine as engine
 from plenario.models import MetaTable as Meta, ShapeMetadata as SMeta
@@ -52,15 +53,22 @@ def table_exists(table_name):
         return False
 
 
-def knn(pk, geom, point_id, table, k):
+def knn(pk, geom, lng, lat, table, k):
     """Execute a spatial query to select k nearest neighbors given some point.
 
     :param pk: (str) primary key column name
     :param geom: (str) geom column name
-    :param point_id: (str) target point
+    :param lng: (float) longitude
+    :param lat: (float) latitude
     :param table: (str) target table name
     :param k: (int) number of results to return
     :returns: (list) of nearest k neighbors"""
+
+    # Convert lng-lat to geojson point
+    point = "'" + json.dumps({
+        "type": "Point",
+        "coordinates": [lng, lat]
+    }) + "'"
 
     # How many to limit the initial bounding box query to
     k_10 = k * 10
@@ -71,10 +79,9 @@ def knn(pk, geom, point_id, table, k):
       SELECT
         {pk},
         {geom},
-        (SELECT {geom} FROM {table} WHERE {pk} = '{point_id}') AS ref_geom
+        (SELECT ST_SetSRID(ST_GeomFromGeoJSON({geojson}), 4326)) AS ref_geom
       FROM {table}
-      ORDER BY {geom} <#>
-        (SELECT {geom} from {table} as l WHERE {pk} = '{point_id}')
+      ORDER BY {geom} <#> (SELECT ST_SetSRID(ST_GeomFromGeoJSON({geojson}), 4326))
       LIMIT {k_10}
     )
 
@@ -84,6 +91,6 @@ def knn(pk, geom, point_id, table, k):
     FROM bbox_results
     ORDER BY act_r
     LIMIT {k};
-    """.format(pk=pk, geom=geom, point_id=point_id, table=table, k=k, k_10=k_10)
+    """.format(pk=pk, geom=geom, geojson=point, table=table, k=k, k_10=k_10)
 
     return engine.execute(query).fetchall()
