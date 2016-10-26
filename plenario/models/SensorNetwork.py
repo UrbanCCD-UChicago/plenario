@@ -59,6 +59,17 @@ class NodeMeta(Base):
             k=1
         )[0][0]
 
+    @staticmethod
+    def get_nodes_from_sensors(network, sensors):
+        return session.execute("""
+            select distinct id
+            from sensor__node_metadata
+            inner join sensor__sensor_to_node
+            on id = node
+            where sensor = any('{0}'::text[])
+            and network = '{1}'
+        """.format("{" + ",".join(sensors) + "}", network)).fetchall()
+
     def __repr__(self):
         return '<Node "{}">'.format(self.id)
 
