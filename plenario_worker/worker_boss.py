@@ -1,7 +1,10 @@
+import logging
 import threading
 import time
 from collections import defaultdict
 from plenario_worker.utilities import log
+
+logging.basicConfig(level=logging.INFO)
 
 
 class WorkerBoss(object):
@@ -46,22 +49,12 @@ class WorkerBoss(object):
             self.report()
 
     def report(self):
-
-        result = (
-            "Report\n"
-            "-----------------------\n"
-            "Active Worker Count: {}\n"
-            "Do Work: {}\n"
-            "Protected: {}\n"
-            "-----------------------\n"
-            .format(self.active_worker_count, self.do_work, self.protected)
-        )
+        msg = "DoWork: {}, Active: {}, Protected: {}".format(self.do_work, self.active_worker_count, self.protected)
+        logging.log(level=logging.INFO, msg=msg)
 
         for name, status in self.workers.items():
-            result += "{}: {}\n".format(name, status)
-        result += "-----------------------"
-
-        log(result, "WORKER BOSS")
+            logging.log(level=logging.INFO, msg="{}: {}".format(name, status))
+            msg += ", {}: {}".format(name, status)
 
     def stop_working(self, signum, frame):
         log("Received termination signal.", "WORKER BOSS")
