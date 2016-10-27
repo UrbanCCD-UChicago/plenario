@@ -1,23 +1,23 @@
 import json
 import re
-import sqlalchemy
-
 from collections import namedtuple
 from datetime import datetime, timedelta
+
+import sqlalchemy
 from dateutil import parser
 from marshmallow import fields, Schema
 from marshmallow.validate import Range, OneOf, ValidationError
-from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 from sqlalchemy import MetaData
+from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
-from plenario.utils.helpers import reflect
 from plenario.api.condition_builder import field_ops
 from plenario.database import session, redshift_engine
 from plenario.models import ShapeMetadata, MetaTable
-from plenario.utils.model_helpers import table_exists
-from plenario.sensor_network.sensor_models import NodeMeta, NetworkMeta, FeatureOfInterest, Sensor
+from plenario.models.SensorNetwork import NodeMeta, NetworkMeta, FeatureMeta, SensorMeta
 from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
+from plenario.utils.helpers import reflect
+from plenario.utils.model_helpers import table_exists
 
 
 def validate_dataset(dataset_name):
@@ -54,7 +54,7 @@ def validate_nodes(nodes):
 def validate_features(features):
     if isinstance(features, basestring):
         features = [features]
-    valid_features = FeatureOfInterest.index()
+    valid_features = FeatureMeta.index()
     for feature in features:
         feature = feature.split(".")[0].lower()
         if feature not in valid_features:
@@ -64,7 +64,7 @@ def validate_features(features):
 def validate_sensors(sensors):
     if isinstance(sensors, basestring):
         sensors = [sensors]
-    valid_sensors = Sensor.index()
+    valid_sensors = SensorMeta.index()
     for sensor in sensors:
         sensor = sensor.lower()
         if sensor not in valid_sensors:
@@ -398,9 +398,9 @@ def sensor_network_validate(validator, request_args):
         if result.data['nodes'] is None:
             result.data['nodes'] = NodeMeta.index(network_name)
         if result.data['features'] is None:
-            result.data['features'] = FeatureOfInterest.index(network_name)
+            result.data['features'] = FeatureMeta.index(network_name)
         if result.data['sensors'] is None:
-            result.data['sensors'] = Sensor.index(network_name)
+            result.data['sensors'] = SensorMeta.index(network_name)
     except KeyError:
         pass
 

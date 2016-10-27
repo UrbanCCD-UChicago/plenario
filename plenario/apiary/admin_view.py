@@ -1,6 +1,6 @@
 import traceback
-
 from copy import deepcopy
+
 from flask import redirect, url_for
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.form.rules import Field
@@ -9,12 +9,12 @@ from sqlalchemy import func
 from wtforms import StringField
 
 from plenario.database import session
+from plenario.models.SensorNetwork import NetworkMeta
 from plenario.sensor_network.redshift_ops import create_foi_table
 from plenario.sensor_network.redshift_ops import table_exists
-from plenario.sensor_network.sensor_models import NetworkMeta
-from validators import validate_node, validate_sensor_properties
 from validators import assert_json_enclosed_in_brackets
 from validators import map_to_redshift_type
+from validators import validate_node, validate_sensor_properties
 
 
 # Based off a solution provided here:

@@ -1,6 +1,7 @@
 """model_helpers: Just a collection of functions which perform common
 interactions with the models."""
 
+import json
 from sqlalchemy.exc import ProgrammingError
 from plenario.database import app_engine as engine
 from plenario.models import MetaTable as Meta, ShapeMetadata as SMeta
@@ -52,15 +53,19 @@ def table_exists(table_name):
         return False
 
 
-def knn(pk, geom, point_id, table, k):
+def knn(lng, lat, k, network, sensors):
     """Execute a spatial query to select k nearest neighbors given some point.
 
-    :param pk: (str) primary key column name
-    :param geom: (str) geom column name
-    :param point_id: (str) target point
-    :param table: (str) target table name
+    :param lng: (float) longitude
+    :param lat: (float) latitude
     :param k: (int) number of results to return
     :returns: (list) of nearest k neighbors"""
+
+    # Convert lng-lat to geojson point
+    point = "'" + json.dumps({
+        "type": "Point",
+        "coordinates": [lng, lat]
+    }) + "'"
 
     # How many to limit the initial bounding box query to
     k_10 = k * 10
@@ -69,21 +74,37 @@ def knn(pk, geom, point_id, table, k):
     query = """
     WITH bbox_results AS (
       SELECT
-        {pk},
-        {geom},
-        (SELECT {geom} FROM {table} WHERE {pk} = '{point_id}') AS ref_geom
-      FROM {table}
-      ORDER BY {geom} <#>
-        (SELECT {geom} from {table} as l WHERE {pk} = '{point_id}')
+        node,
+        location,
+        array_agg(sensor) AS sensors,
+        (SELECT ST_SetSRID(ST_GeomFromGeoJSON({geojson}), 4326)) AS ref_geom
+      FROM
+        sensor__node_metadata JOIN sensor__sensor_to_node
+        ON id=node
+      WHERE
+          sensor_network = '{network}'
+      GROUP BY
+        node,
+        location
+      ORDER BY
+        location <#> (SELECT ST_SetSRID(ST_GeomFromGeoJSON ({geojson}), 4326))
       LIMIT {k_10}
     )
 
     SELECT
-      {pk},
-      RANK() OVER(ORDER BY ST_Distance({geom}, ref_geom)) AS act_r
+      node,
+      RANK() OVER(ORDER BY ST_Distance(location, ref_geom)) AS act_r
     FROM bbox_results
+    WHERE
+      sensors && '{sensors}'::VARCHAR[]
     ORDER BY act_r
     LIMIT {k};
-    """.format(pk=pk, geom=geom, point_id=point_id, table=table, k=k, k_10=k_10)
+    """.format(
+        geojson=point,
+        network=network,
+        k=k,
+        k_10=k_10,
+        sensors="{" + ",".join(sensors) + "}"
+    )
 
     return engine.execute(query).fetchall()

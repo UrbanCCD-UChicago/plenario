@@ -2,15 +2,16 @@ import json
 import math
 import os
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from dateutil.parser import parse
+from dateutil.parser import parse as dt_parse
 from flask import request, make_response
 from shapely import wkb
-from sqlalchemy import MetaData, Table, func as sqla_fn
+from sqlalchemy import MetaData, Table, func as sqla_fn, and_, asc, desc
 
 from plenario.api.common import cache, crossdomain
 from plenario.api.common import make_cache_key, unknown_object_json_handler
+from plenario.utils.helpers import reflect
 
 # Cache timeout of 5 minutes
 CACHE_TIMEOUT = 60 * 10
@@ -144,6 +145,27 @@ def get_observations(network):
         return observation_queries
 
     return run_observation_queries(validated_args, observation_queries)
+
+
+@crossdomain(origin="*")
+def get_observation_nearest(network):
+    """Return a single observation from the node nearest to the specified
+    long, lat coordinate.
+
+    :endpoint: /sensor-networks/<network-name>/near-me?lng=<lng>&lat=<lat>&feature=<feature>
+    :param network: (str) network name
+    :returns: (json) response"""
+
+    args = dict(request.args.to_dict(), **{"network": network})
+    args = sanitize_args(args)
+
+    fields = ('datetime', 'network', 'feature', 'lat', 'lng')
+    validated_args = sensor_network_validate(NearMeValidator(only=fields), args)
+    if validated_args.errors:
+        return bad_request(validated_args.errors)
+
+    result = get_observation_nearest_query(validated_args)
+    return jsonify(validated_args, [result], 200)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT * 10, key_prefix=make_cache_key)
@@ -281,9 +303,9 @@ def format_network_metadata(network):
 
     network_response = {
         'name': network.name,
-        'features': FeatureOfInterest.index(network.name),
+        'features': FeatureMeta.index(network.name),
         'nodes': NodeMeta.index(network.name),
-        'sensors': Sensor.index(network.name),
+        'sensors': SensorMeta.index(network.name),
         'info': network.info
     }
 
@@ -408,7 +430,7 @@ def run_observation_queries(args, queries):
 
     :param args: (ValidatorResult) validated query arguments
     :param queries: (list) of SQLAlchemy query objects
-    :returns: (Response) containing rows fornatted into JSON"""
+    :returns: (Response) containing rows formatted into JSON"""
 
     data = list()
     for query, table in queries:
@@ -417,9 +439,56 @@ def run_observation_queries(args, queries):
     remove_null_keys(args)
     if 'geom' in args.data:
         args.data.pop('geom')
-    data.sort(key=lambda x: parse(x["datetime"]))
+    data.sort(key=lambda x: dt_parse(x["datetime"]))
 
     return jsonify(args, data, 200)
+
+
+def get_observation_nearest_query(args):
+    """Get an observation of the specified feature from the node nearest
+    to the provided long, lat coordinates.
+
+    :param args: (ValidatorResult) validated query arguments
+    """
+
+    lng = args.data["lng"]
+    lat = args.data["lat"]
+    feature = args.data["feature"].split(".")[0]
+    properties = args.data["feature"]
+    network = args.data["network"]
+    point_dt = dt_parse(args.data["datetime"])
+
+    nearest_nodes_rp = NodeMeta.nearest_neighbor_to(
+        lng, lat, network=network, features=[properties]
+    )
+
+    if not nearest_nodes_rp:
+        return "No nodes could be found nearby with your target feature."
+
+    feature = reflect(feature, MetaData(), redshift_engine)
+
+    result = None
+    for row in nearest_nodes_rp:
+        result = redshift_session.query(feature).filter(and_(
+            feature.c.node_id == row.node,
+            feature.c.datetime <= point_dt + timedelta(hours=12),
+            feature.c.datetime >= point_dt - timedelta(hours=12)
+        )).order_by(
+            asc(
+                # Ensures that the interval values is always positive,
+                # since the abs() function doesn't work for intervals
+                sqla_fn.greatest(point_dt, feature.c.datetime) -
+                sqla_fn.least(point_dt, feature.c.datetime)
+            )
+        ).first()
+
+        if result is not None:
+            break
+
+    if result is None:
+        return "Your feature has not been reported on by the nearest 10 " \
+               "nodes at the time provided."
+    return format_observation(result, feature)
 
 
 def get_observation_datadump(args):
@@ -575,8 +644,8 @@ def filter_meta(meta_level, upper_filter_values, filter_values, geojson):
     meta_queries = {
         "network": (session.query(NetworkMeta), NetworkMeta),
         "nodes": (session.query(NodeMeta), NodeMeta),
-        "sensors": (session.query(Sensor), Sensor),
-        "features": (session.query(FeatureOfInterest), FeatureOfInterest)
+        "sensors": (session.query(SensorMeta), SensorMeta),
+        "features": (session.query(FeatureMeta), FeatureMeta)
     }
 
     query, table = meta_queries[meta_level]
@@ -685,6 +754,7 @@ from plenario.models import DataDump
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.api.validator import SensorNetworkValidator, DatadumpValidator, sensor_network_validate
 from plenario.sensor_network.api.sensor_validator import NodeAggregateValidator, RequiredFeatureValidator
-from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
+from plenario.sensor_network.api.sensor_validator import NearMeValidator
+from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, FeatureMeta, SensorMeta
 from sensor_aggregate_functions import aggregate_fn_map
 from plenario.api.condition_builder import parse_tree
