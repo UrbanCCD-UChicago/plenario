@@ -112,6 +112,7 @@ class NearMeValidator(Validator):
     lat = fields.Float(required=True)
     lng = fields.Float(required=True)
     feature = fields.Str(required=True, validate=validate_features)
+    datetime = fields.DateTime(default=datetime.utcnow)
 
 
 # ValidatorResult

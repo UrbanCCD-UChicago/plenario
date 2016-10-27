@@ -4,10 +4,10 @@ import os
 from collections import OrderedDict
 from datetime import datetime, timedelta
 
-from dateutil.parser import parse
+from dateutil.parser import parse as dt_parse
 from flask import request, make_response
 from shapely import wkb
-from sqlalchemy import MetaData, Table, func as sqla_fn, and_
+from sqlalchemy import MetaData, Table, func as sqla_fn, and_, asc, desc
 
 from plenario.api.common import cache, crossdomain
 from plenario.api.common import make_cache_key, unknown_object_json_handler
@@ -159,7 +159,7 @@ def get_observation_nearest(network):
     args = dict(request.args.to_dict(), **{"network": network})
     args = sanitize_args(args)
 
-    fields = ('start_datetime', 'end_datetime', 'network', 'feature', 'lat', 'lng')
+    fields = ('datetime', 'network', 'feature', 'lat', 'lng')
     validated_args = sensor_network_validate(NearMeValidator(only=fields), args)
     if validated_args.errors:
         return bad_request(validated_args.errors)
@@ -439,7 +439,7 @@ def run_observation_queries(args, queries):
     remove_null_keys(args)
     if 'geom' in args.data:
         args.data.pop('geom')
-    data.sort(key=lambda x: parse(x["datetime"]))
+    data.sort(key=lambda x: dt_parse(x["datetime"]))
 
     return jsonify(args, data, 200)
 
@@ -456,31 +456,38 @@ def get_observation_nearest_query(args):
     feature = args.data["feature"].split(".")[0]
     properties = args.data["feature"]
     network = args.data["network"]
+    point_dt = dt_parse(args.data["datetime"])
 
-    nearest_node = NodeMeta.nearest_neighbor_to(
+    nearest_nodes_rp = NodeMeta.nearest_neighbor_to(
         lng, lat, network=network, features=[properties]
     )
 
-    if not nearest_node:
+    if not nearest_nodes_rp:
         return "No nodes could be found nearby with your target feature."
-    nearest_node = nearest_node[0].node
 
     feature = reflect(feature, MetaData(), redshift_engine)
 
     result = None
-    for hours in range(1, 168):  # Query at most a week into the past
+    for row in nearest_nodes_rp:
         result = redshift_session.query(feature).filter(and_(
-            feature.c.node_id == nearest_node,
-            feature.c.datetime <= datetime.now(),
-            feature.c.datetime >= datetime.now() - timedelta(hours=hours)
-        )).order_by(feature.c.datetime.desc()).first()
+            feature.c.node_id == row.node,
+            feature.c.datetime <= point_dt + timedelta(hours=12),
+            feature.c.datetime >= point_dt - timedelta(hours=12)
+        )).order_by(
+            asc(
+                # Ensures that the interval values is always positive,
+                # since the abs() function doesn't work for intervals
+                sqla_fn.greatest(point_dt, feature.c.datetime) -
+                sqla_fn.least(point_dt, feature.c.datetime)
+            )
+        ).first()
 
         if result is not None:
             break
 
     if result is None:
-        msg = "The node nearest to you: {}, hasn't reported in the last 5 days."
-        return msg.format(nearest_node)
+        return "Your feature has not been reported on by the nearest 10 " \
+               "nodes at the time provided."
     return format_observation(result, feature)
 
 

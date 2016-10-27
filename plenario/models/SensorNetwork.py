@@ -56,7 +56,7 @@ class NodeMeta(Base):
             lat=lat,
             network=network,
             sensors=sensors,
-            k=1
+            k=10
         )
 
     @staticmethod
