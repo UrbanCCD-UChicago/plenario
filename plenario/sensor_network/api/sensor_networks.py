@@ -456,7 +456,10 @@ def get_observation_nearest_query(args):
     feature = args.data["feature"].split(".")[0]
     properties = args.data["feature"]
     network = args.data["network"]
-    point_dt = dt_parse(args.data["datetime"])
+    point_dt = args.data["datetime"]
+
+    if type(point_dt) != datetime:
+        point_dt = dt_parse(point_dt)
 
     nearest_nodes_rp = NodeMeta.nearest_neighbor_to(
         lng, lat, network=network, features=[properties]
