@@ -49,26 +49,27 @@ class NodeMeta(Base):
         return [node.id.lower() for node in nodes if node.sensor_network == network_name or network_name is None]
 
     @staticmethod
-    def nearest_neighbor_to(lng, lat):
+    def nearest_neighbor_to(lng, lat, network, features):
+        sensors = SensorMeta.get_sensors_from_features(features)
         return knn(
-            pk="id",
-            geom="location",
             lng=lng,
             lat=lat,
-            table="sensor__node_metadata",
+            network=network,
+            sensors=sensors,
             k=1
-        )[0][0]
+        )[0].node
 
     @staticmethod
     def get_nodes_from_sensors(network, sensors):
-        return session.execute("""
+        rp = session.execute("""
             select distinct id
             from sensor__node_metadata
             inner join sensor__sensor_to_node
             on id = node
             where sensor = any('{0}'::text[])
             and network = '{1}'
-        """.format("{" + ",".join(sensors) + "}", network)).fetchall()
+        """.format("{" + ",".join(sensors) + "}", network))
+        return [row.id for row in rp]
 
     def __repr__(self):
         return '<Node "{}">'.format(self.id)
@@ -89,6 +90,16 @@ class SensorMeta(Base):
                 for sensor in node.sensors:
                     sensors.append(sensor.name.lower())
         return list(set(sensors))
+
+    @staticmethod
+    def get_sensors_from_features(features):
+        rp = session.execute("""
+            select distinct name
+            from sensor__sensors_view
+            where invert ?| '{}'
+        """.format("{" + ",".join(features) + "}"))
+
+        return [row.name for row in rp]
 
     def __repr__(self):
         return '<Sensor "{}">'.format(self.name)
