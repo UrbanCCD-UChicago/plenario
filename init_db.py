@@ -130,6 +130,7 @@ def add_functions():
 
     add_function("./plenario/dbscripts/audit_trigger.sql")
     add_function("./plenario/dbscripts/point_from_location.sql")
+    add_function("./plenario/dbscripts/sensors_trigger.sql")
 
 
 def build_arg_parser():
