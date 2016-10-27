@@ -11,7 +11,6 @@ from sqlalchemy import MetaData, Table, func as sqla_fn, and_
 
 from plenario.api.common import cache, crossdomain
 from plenario.api.common import make_cache_key, unknown_object_json_handler
-from plenario.models.SensorNetwork import NodeMeta
 from plenario.utils.helpers import reflect
 
 # Cache timeout of 5 minutes
@@ -166,11 +165,7 @@ def get_observation_nearest(network):
         return bad_request(validated_args.errors)
 
     result = get_observation_nearest_query(validated_args)
-    if result is None:
-        return jsonify(validated_args, "The nearest node to you has not "
-                                       "reported on your feature for the last "
-                                       "5 days. :(", 200)
-    return jsonify(validated_args, result, 200)
+    return jsonify(validated_args, [result], 200)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT * 10, key_prefix=make_cache_key)
@@ -463,7 +458,13 @@ def get_observation_nearest_query(args):
     network = args.data["network"]
 
     nearest_node = NodeMeta.nearest_neighbor_to(
-        lng, lat, network=network, features=[properties])
+        lng, lat, network=network, features=[properties]
+    )
+
+    if not nearest_node:
+        return "No nodes could be found nearby with your target feature."
+    nearest_node = nearest_node[0].node
+
     feature = reflect(feature, MetaData(), redshift_engine)
 
     result = None
@@ -477,6 +478,9 @@ def get_observation_nearest_query(args):
         if result is not None:
             break
 
+    if result is None:
+        msg = "The node nearest to you: {}, hasn't reported in the last 5 days."
+        return msg.format(nearest_node)
     return format_observation(result, feature)
 
 

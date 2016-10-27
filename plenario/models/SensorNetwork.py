@@ -57,7 +57,7 @@ class NodeMeta(Base):
             network=network,
             sensors=sensors,
             k=1
-        )[0].node
+        )
 
     @staticmethod
     def get_nodes_from_sensors(network, sensors):
