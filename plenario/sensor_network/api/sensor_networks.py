@@ -167,7 +167,9 @@ def get_observation_nearest(network):
 
     result = get_observation_nearest_query(validated_args)
     if result is None:
-        return jsonify(validated_args, "This node has not reported for the last 5 days. :(", 200)
+        return jsonify(validated_args, "The nearest node to you has not "
+                                       "reported on your feature for the last "
+                                       "5 days. :(", 200)
     return jsonify(validated_args, result, 200)
 
 
@@ -433,7 +435,7 @@ def run_observation_queries(args, queries):
 
     :param args: (ValidatorResult) validated query arguments
     :param queries: (list) of SQLAlchemy query objects
-    :returns: (Response) containing rows fornatted into JSON"""
+    :returns: (Response) containing rows formatted into JSON"""
 
     data = list()
     for query, table in queries:
@@ -456,8 +458,13 @@ def get_observation_nearest_query(args):
 
     lng = args.data["lng"]
     lat = args.data["lat"]
-    nearest_node = NodeMeta.nearest_neighbor_to(lng, lat)
-    feature = reflect(args.data["feature"], MetaData(), redshift_engine)
+    feature = args.data["feature"].split(".")[0]
+    properties = args.data["feature"]
+    network = args.data["network"]
+
+    nearest_node = NodeMeta.nearest_neighbor_to(
+        lng, lat, network=network, features=[properties])
+    feature = reflect(feature, MetaData(), redshift_engine)
 
     result = None
     for hours in range(1, 168):  # Query at most a week into the past

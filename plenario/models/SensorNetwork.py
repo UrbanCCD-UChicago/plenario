@@ -93,6 +93,12 @@ class SensorMeta(Base):
 
     @staticmethod
     def get_sensors_from_features(features):
+        full_features = []
+        for feature in features:
+            if len(feature.split(".")) == 1:
+                full_features += FeatureMeta.properties_of(feature)
+        features = set(features + full_features)
+
         rp = session.execute("""
             select distinct name
             from sensor__sensors_view
@@ -120,6 +126,12 @@ class FeatureMeta(Base):
                     for prop in sensor.observed_properties.itervalues():
                         features.append(prop.split('.')[0].lower())
         return list(set(features))
+
+    @staticmethod
+    def properties_of(feature):
+        query = session.query(FeatureMeta.observed_properties).filter(
+            FeatureMeta.name == feature)
+        return [feature + "." + prop["name"] for prop in query.first().observed_properties]
 
     def __repr__(self):
         return '<Feature "{}">'.format(self.name)
