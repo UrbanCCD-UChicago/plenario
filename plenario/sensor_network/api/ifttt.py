@@ -14,19 +14,38 @@ from plenario.sensor_network.api.sensor_networks import sanitize_validated_args,
 from plenario.api.response import bad_request
 
 # dictionary mapping the curated drop-down list name to the correct feature and property
-curated_map = {"temperature": "temperature.temperature"}
+curated_map = {"temperature": "temperature.temperature",
+               "relative humidity": "relative_humidity.humidity",
+               "light intensity": "light_intensity.640nm",
+               "sound level": "sound.instantaneous_sample",
+               "atmospheric pressure": "atmospheric_pressure.pressure",
+               "SO2 concerntration": "gas_concerntration.so2",
+               "H2S concerntration": "gas_concerntration.h2s",
+               "NO2 concerntration": "gas_concerntration.no2",
+               "O3 concerntration": "gas_concerntration.o3",
+               "CO concerntration": "gas_concerntration.co",
+               "2.5 micron particulate matter": "particulate_matter.2p5",
+               "10 micron particulate matter": "particulate_matter.10"}
 
 
 # TODO: error list?
 @crossdomain(origin="*")
 def get_ifttt_observations():
+    """Performs the query detailed by the IFTTT user's
+       input arguments and returns the formatted response.
+       Essentially acts as a shim to /query?filter
+       to satisfy IFTTT request and return format.
+
+       :endpoint: /ifttt/v1/triggers/property_comparison
+       :returns: (json) response"""
+
     if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
         return make_ifttt_error("incorrect channel key", 401)
 
     input_args = request.json
     args = dict()
     try:
-        args['network'] = 'plenario_development'
+        args['network'] = 'plenario_development'  # TODO: change to array_of_things when deployed
         args['nodes'] = [input_args['triggerFields']['node']]
         args['feature'] = curated_map[input_args['triggerFields']['curated_property']].split('.')[0]
         args['limit'] = input_args['limit'] if 'limit' in input_args.keys() else 50
@@ -47,7 +66,7 @@ def get_ifttt_observations():
 
     validated_args = sensor_network_validate(IFTTTValidator(only=fields), args)
     if validated_args.errors:
-        return bad_request(validated_args.errors)
+        return make_ifttt_error(validated_args.errors, 400)
     validated_args.data.update({
         "features": [validated_args.data["feature"]],
         "feature": None
@@ -63,6 +82,12 @@ def get_ifttt_observations():
 
 @crossdomain(origin="*")
 def get_ifttt_meta(field):
+    """Returns a list of valid drop-down options for node and property.
+
+       :endpoint: /ifttt/v1/triggers/property_comparison/fields/<field>/options
+       :param field: (string) type of metadata to return
+       :returns: (json) response"""
+
     if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
         return make_ifttt_error("incorrect channel key", 401)
 
@@ -81,9 +106,16 @@ def get_ifttt_meta(field):
 
 
 def format_ifttt_observations(obs, curated_property):
+    """Response format for network metadata.
+
+        :param obs: (Row) from feature table
+        :param curated_property: (string) the property drop-down list value,
+                                 returned for use in user alert messages
+        :returns: (dict) formatted result"""
+
     obs_response = {
         "node": obs.node_id,
-        "datetime": obs.datetime.isoformat()+'+05:00',
+        "datetime": obs.datetime.isoformat() + '+05:00',
         "curated_property": curated_property,
         "value": getattr(obs, curated_map[curated_property].split('.')[1]),
         "meta": {
@@ -96,6 +128,13 @@ def format_ifttt_observations(obs, curated_property):
 
 
 def run_ifttt_queries(queries, curated_property):
+    """Run a list of queries, collect results, and return formatted JSON.
+
+       :param queries: (list) of SQLAlchemy query objects
+       :param curated_property: (string) the property drop-down list value,
+                                returned for use in user alert messages
+       :returns: (Response) containing rows fornatted into JSON"""
+
     data = list()
     for query, table in queries:
         data += [format_ifttt_observations(obs, curated_property) for obs in query.all()]
@@ -106,6 +145,11 @@ def run_ifttt_queries(queries, curated_property):
 
 
 def make_ifttt_response(data):
+    """Format data into response format for IFTTT.
+
+       :param data: (list) list of formatted observation dicts
+       :returns: (Response) containing rows fornatted into JSON"""
+
     resp = {
         "data": data
     }
@@ -115,6 +159,12 @@ def make_ifttt_response(data):
 
 
 def make_ifttt_error(err, status_code):
+    """Format error response for IFTTT.
+
+       :param err: (string) error message
+       :param status_code: (int) status code required by IFTTT
+       :returns: (Response) containing errors"""
+
     resp = {
         "errors": [{"message": err}]
     }
@@ -130,6 +180,10 @@ def make_ifttt_error(err, status_code):
 
 @crossdomain(origin="*")
 def ifttt_status():
+    """Basic status reponse return for IFTTT endpoint testing.
+
+       :endpoint: ifttt/v1/status
+       :returns: (Response) containing errors or nothing"""
     if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
         return make_ifttt_error("incorrect channel key", 401)
 
@@ -140,6 +194,11 @@ def ifttt_status():
 
 @crossdomain(origin="*")
 def ifttt_test_setup():
+    """Returns testing data for IFTTT endpoint testing.
+
+       :endpoint: ifttt/v1/test/setup
+       :returns: (Response) containing errors or IFTTT-formatted test data dict"""
+
     if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
         return make_ifttt_error("incorrect channel key", 401)
 

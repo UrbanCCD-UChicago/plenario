@@ -153,7 +153,7 @@ class SensorNetworkValidator(Validator):
     features = fields.List(fields.Str(), default=None, missing=None, validate=validate_features)
 
     geom = fields.Str(default=None, validate=validate_geom)
-    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=90))
+    start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
     end_datetime = fields.DateTime(default=datetime.utcnow)
     filter = fields.Str(allow_none=True, missing=None, default=None)
     limit = fields.Integer(default=1000)

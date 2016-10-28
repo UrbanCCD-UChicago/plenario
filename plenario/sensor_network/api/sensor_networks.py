@@ -2,16 +2,15 @@ import json
 import math
 import os
 from collections import OrderedDict
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from dateutil.parser import parse as dt_parse
+from dateutil.parser import parse
 from flask import request, make_response
 from shapely import wkb
-from sqlalchemy import MetaData, Table, func as sqla_fn, and_, asc, desc
+from sqlalchemy import MetaData, Table, func as sqla_fn
 
 from plenario.api.common import cache, crossdomain
 from plenario.api.common import make_cache_key, unknown_object_json_handler
-from plenario.utils.helpers import reflect
 
 # Cache timeout of 5 minutes
 CACHE_TIMEOUT = 60 * 10
@@ -140,32 +139,12 @@ def get_observations(network):
     })
     validated_args = sanitize_validated_args(validated_args)
 
-    observation_queries = get_observation_queries(validated_args)
-    if type(observation_queries) != list:
-        return observation_queries
+    try:
+        observation_queries = get_observation_queries(validated_args)
+    except ValueError as err:
+        return bad_request(str(err))
 
     return run_observation_queries(validated_args, observation_queries)
-
-
-@crossdomain(origin="*")
-def get_observation_nearest(network):
-    """Return a single observation from the node nearest to the specified
-    long, lat coordinate.
-
-    :endpoint: /sensor-networks/<network-name>/near-me?lng=<lng>&lat=<lat>&feature=<feature>
-    :param network: (str) network name
-    :returns: (json) response"""
-
-    args = dict(request.args.to_dict(), **{"network": network})
-    args = sanitize_args(args)
-
-    fields = ('datetime', 'network', 'feature', 'lat', 'lng')
-    validated_args = sensor_network_validate(NearMeValidator(only=fields), args)
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
-
-    result = get_observation_nearest_query(validated_args)
-    return jsonify(validated_args, [result], 200)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT * 10, key_prefix=make_cache_key)
@@ -290,8 +269,6 @@ def get_metadata(target, args):
 
     args = remove_null_keys(args)
     raw_metadata = get_raw_metadata(target, args)
-    if type(raw_metadata) != list:
-        return raw_metadata
     return jsonify(args, [format_metadata[target](record) for record in raw_metadata], 200)
 
 
@@ -303,9 +280,9 @@ def format_network_metadata(network):
 
     network_response = {
         'name': network.name,
-        'features': FeatureMeta.index(network.name),
+        'features': FeatureOfInterest.index(network.name),
         'nodes': NodeMeta.index(network.name),
-        'sensors': SensorMeta.index(network.name),
+        'sensors': Sensor.index(network.name),
         'info': network.info
     }
 
@@ -412,8 +389,6 @@ def get_observation_queries(args):
     meta = MetaData()
 
     result = get_raw_metadata("features", args)
-    if type(result) != list:
-        return result
 
     for feature in result:
         tables.append(Table(
@@ -430,7 +405,7 @@ def run_observation_queries(args, queries):
 
     :param args: (ValidatorResult) validated query arguments
     :param queries: (list) of SQLAlchemy query objects
-    :returns: (Response) containing rows formatted into JSON"""
+    :returns: (Response) containing rows fornatted into JSON"""
 
     data = list()
     for query, table in queries:
@@ -439,59 +414,9 @@ def run_observation_queries(args, queries):
     remove_null_keys(args)
     if 'geom' in args.data:
         args.data.pop('geom')
-    data.sort(key=lambda x: dt_parse(x["datetime"]))
+    data.sort(key=lambda x: parse(x["datetime"]))
 
     return jsonify(args, data, 200)
-
-
-def get_observation_nearest_query(args):
-    """Get an observation of the specified feature from the node nearest
-    to the provided long, lat coordinates.
-
-    :param args: (ValidatorResult) validated query arguments
-    """
-
-    lng = args.data["lng"]
-    lat = args.data["lat"]
-    feature = args.data["feature"].split(".")[0]
-    properties = args.data["feature"]
-    network = args.data["network"]
-    point_dt = args.data["datetime"]
-
-    if type(point_dt) != datetime:
-        point_dt = dt_parse(point_dt)
-
-    nearest_nodes_rp = NodeMeta.nearest_neighbor_to(
-        lng, lat, network=network, features=[properties]
-    )
-
-    if not nearest_nodes_rp:
-        return "No nodes could be found nearby with your target feature."
-
-    feature = reflect(feature, MetaData(), redshift_engine)
-
-    result = None
-    for row in nearest_nodes_rp:
-        result = redshift_session.query(feature).filter(and_(
-            feature.c.node_id == row.node,
-            feature.c.datetime <= point_dt + timedelta(hours=12),
-            feature.c.datetime >= point_dt - timedelta(hours=12)
-        )).order_by(
-            asc(
-                # Ensures that the interval values is always positive,
-                # since the abs() function doesn't work for intervals
-                sqla_fn.greatest(point_dt, feature.c.datetime) -
-                sqla_fn.least(point_dt, feature.c.datetime)
-            )
-        ).first()
-
-        if result is not None:
-            break
-
-    if result is None:
-        return "Your feature has not been reported on by the nearest 10 " \
-               "nodes at the time provided."
-    return format_observation(result, feature)
 
 
 def get_observation_datadump(args):
@@ -504,9 +429,6 @@ def get_observation_datadump(args):
     limit = args.data.get("limit")
     request_id = args.data.get("jobsframework_ticket")
     observation_queries = get_observation_queries(args)
-
-    if type(observation_queries) != list:
-        return observation_queries
 
     row_count = 0
     for query, table in observation_queries:
@@ -599,7 +521,7 @@ def metadata(target, network=None, nodes=None, sensors=None, features=None, geom
     :param features: (list) conatining feature names
     :param geom: (str) containing GeoJSON location constraint
     :returns: (list) of row objects containing sensor network metadata
-              (Response) 400 returns a message for no valid values"""
+    :raises: ValueError if metadata could not be retrieved"""
 
     meta_levels = OrderedDict([
         ("network", network),
@@ -624,10 +546,7 @@ def metadata(target, network=None, nodes=None, sensors=None, features=None, geom
                       current_state[i - 1][0],
                       current_state[i - 1][1]
                   )
-            try:
-                return bad_request(msg)
-            except RuntimeError:
-                raise ValueError(msg)
+            raise ValueError(msg)
 
         if key == target:
             return meta_levels[key]
@@ -640,15 +559,15 @@ def filter_meta(meta_level, upper_filter_values, filter_values, geojson):
 
     :param meta_level: (str) where we are in the metadata heirarchy
     :param upper_filter_values: (list) of row objects for the level above
-    :param filter_values: (list) of strings the filter the current level by
+    :param filter_values: (list) of strings to filter the current level by
     :param geojson: (str) GeoJSON for filtering nodes
     :return: (list) of valid row objects for the current level"""
 
     meta_queries = {
         "network": (session.query(NetworkMeta), NetworkMeta),
         "nodes": (session.query(NodeMeta), NodeMeta),
-        "sensors": (session.query(SensorMeta), SensorMeta),
-        "features": (session.query(FeatureMeta), FeatureMeta)
+        "sensors": (session.query(Sensor), Sensor),
+        "features": (session.query(FeatureOfInterest), FeatureOfInterest)
     }
 
     query, table = meta_queries[meta_level]
@@ -757,7 +676,6 @@ from plenario.models import DataDump
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.api.validator import SensorNetworkValidator, DatadumpValidator, sensor_network_validate
 from plenario.sensor_network.api.sensor_validator import NodeAggregateValidator, RequiredFeatureValidator
-from plenario.sensor_network.api.sensor_validator import NearMeValidator
-from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, FeatureMeta, SensorMeta
+from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
 from sensor_aggregate_functions import aggregate_fn_map
 from plenario.api.condition_builder import parse_tree
