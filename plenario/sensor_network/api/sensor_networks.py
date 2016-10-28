@@ -675,7 +675,6 @@ from plenario.database import session, redshift_session, redshift_engine
 from plenario.models import DataDump
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.api.validator import SensorNetworkValidator, DatadumpValidator, sensor_network_validate
-from plenario.sensor_network.api.sensor_validator import NodeAggregateValidator, RequiredFeatureValidator
 from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
 from sensor_aggregate_functions import aggregate_fn_map
 from plenario.api.condition_builder import parse_tree
