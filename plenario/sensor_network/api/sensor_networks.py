@@ -280,9 +280,9 @@ def format_network_metadata(network):
 
     network_response = {
         'name': network.name,
-        'features': FeatureOfInterest.index(network.name),
+        'features': FeatureMeta.index(network.name),
         'nodes': NodeMeta.index(network.name),
-        'sensors': Sensor.index(network.name),
+        'sensors': SensorMeta.index(network.name),
         'info': network.info
     }
 
@@ -566,8 +566,8 @@ def filter_meta(meta_level, upper_filter_values, filter_values, geojson):
     meta_queries = {
         "network": (session.query(NetworkMeta), NetworkMeta),
         "nodes": (session.query(NodeMeta), NodeMeta),
-        "sensors": (session.query(Sensor), Sensor),
-        "features": (session.query(FeatureOfInterest), FeatureOfInterest)
+        "sensors": (session.query(SensorMeta), SensorMeta),
+        "features": (session.query(FeatureMeta), FeatureMeta)
     }
 
     query, table = meta_queries[meta_level]
@@ -674,7 +674,8 @@ from plenario.database import fast_count
 from plenario.database import session, redshift_session, redshift_engine
 from plenario.models import DataDump
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
-from plenario.api.validator import SensorNetworkValidator, DatadumpValidator, sensor_network_validate
-from plenario.sensor_network.sensor_models import NetworkMeta, NodeMeta, FeatureOfInterest, Sensor
+from plenario.api.validator import SensorNetworkValidator, DatadumpValidator, NodeAggregateValidator, \
+    RequiredFeatureValidator, sensor_network_validate
+from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, FeatureMeta, SensorMeta
 from sensor_aggregate_functions import aggregate_fn_map
 from plenario.api.condition_builder import parse_tree
