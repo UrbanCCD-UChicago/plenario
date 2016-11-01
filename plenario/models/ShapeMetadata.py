@@ -78,7 +78,7 @@ class ShapeMetadata(Base):
         attrs = as_is_attrs + [bbox]
 
         result = session.query(*attrs).filter(cls.is_ingested)
-        listing = [dict(zip(attr_names, row)) for row in result]
+        listing = [dict(list(zip(attr_names, row))) for row in result]
 
         for dataset in listing:
             dataset['date_added'] = str(dataset['date_added'])

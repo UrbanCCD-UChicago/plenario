@@ -71,7 +71,7 @@ class OgrExport(object):
             subprocess.check_call(args)
         except subprocess.CalledProcessError as e:
             shutil.rmtree(export_path)
-            print('Failed to export dataset to file with ogr2ogr.' + str(args))
+            print(('Failed to export dataset to file with ogr2ogr.' + str(args)))
             raise OgrError(e.message)
 
     def _make_flags(self):
@@ -129,7 +129,7 @@ def import_shapefile_to_table(component_path, table_name):
     try:
         subprocess.check_call(args)
     except subprocess.CalledProcessError as e:
-        print('Failed to import dataset to postgres with ogr2ogr.' + str(args))
+        print(('Failed to import dataset to postgres with ogr2ogr.' + str(args)))
         raise OgrError(e.message)
     except OSError as e:
         print('Could not locate ogr2ogr. Do you have it installed?')

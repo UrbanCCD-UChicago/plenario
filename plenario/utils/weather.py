@@ -142,7 +142,7 @@ class WeatherETL(object):
         fnames = self._extract_fnames()
         for fname in fnames:
             if (self.debug==True):
-                print("INITIALIZE: doing fname", fname)
+                print(("INITIALIZE: doing fname", fname))
             self._do_etl(fname)
 
     def initialize_month(self, year, month, no_daily=False, no_hourly=False, weather_stations_list = None, banned_weather_stations_list = None, start_line=0, end_line=None):
@@ -425,7 +425,7 @@ class WeatherETL(object):
         elif fname.endswith('tar.gz'):
             file_type = 'tarfile'
         else:
-            print("file type for ", fname, "not found: quitting")
+            print(("file type for ", fname, "not found: quitting"))
             return None
 
         # extract the year and month from the QCLCD filename
@@ -851,7 +851,7 @@ class WeatherETL(object):
             try:
                 weather_types_str = str(row_vals[self.out_header.index('weather_types')])
             except IndexError:
-                print('the offending row is', row_vals)
+                print(('the offending row is', row_vals))
                 continue
             #print "weather_types_str = '%s'" % weather_types_str
             # literally just change '[' to '{' and ']' to '}'
@@ -873,7 +873,7 @@ class WeatherETL(object):
                 if (row_dict['wban_code'] in banned_weather_stations_list):
                     continue
             if (self.debug==True):
-                print("_transform_metars(): WRITING row_vals: '%s'"  % str(row_vals))
+                print(("_transform_metars(): WRITING row_vals: '%s'"  % str(row_vals)))
 
             # Making sure there is a WBAN code
             if not row_vals[0]:
@@ -1449,7 +1449,7 @@ class WeatherETL(object):
         sql = "SELECT max (datetime) from dat_weather_observations_hourly;"
         # given this time, delete all from dat_weather_observations_metar
         #
-        print("executing: ", sql)
+        print(("executing: ", sql))
         conn = engine.contextual_connect()
         results = conn.execute(sql)
         res = results.fetchone()
@@ -1459,7 +1459,7 @@ class WeatherETL(object):
         res_dt_str = datetime.strftime(res_dt, "%Y-%m-%d %H:%M:%S")
         # given this most recent time, delete any metars from before that time
         sql2 = "DELETE FROM dat_weather_observations_metar WHERE datetime < '%s'" % (res_dt_str)
-        print("executing: " , sql2)
+        print(("executing: " , sql2))
         results = conn.execute(sql2)
 
 class WeatherStationsETL(object):

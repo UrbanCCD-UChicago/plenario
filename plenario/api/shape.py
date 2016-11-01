@@ -142,7 +142,7 @@ def _aggregate_point_data(args):
             res_cols.append(col[1])
     res_cols.append('count')
 
-    return [OrderedDict(zip(res_cols, res)) for res in q.all()]
+    return [OrderedDict(list(zip(res_cols, res))) for res in q.all()]
 
 
 def _export_shape(args):

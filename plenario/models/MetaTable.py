@@ -77,7 +77,7 @@ class MetaTable(Base):
             if name is None:
                 return None
             else:
-                return slugify(unicode(name), delim=u'_')
+                return slugify(str(name), delim='_')
 
         # Some combination of columns from which we can derive a point in space.
         assert (location or (latitude and longitude))
@@ -181,7 +181,7 @@ class MetaTable(Base):
         # Make the DB call
         result = session.query(*attrs). \
             filter(cls.dataset_name.in_(dataset_names))
-        meta_list = [dict(zip(attr_names, row)) for row in result]
+        meta_list = [dict(list(zip(attr_names, row))) for row in result]
 
         # We need to coerce datetimes to strings
         date_attrs = ['date_added', 'obs_from', 'obs_to']
@@ -456,4 +456,4 @@ class Workers(Base):
         except Exception as e:
             session.rollback()
             traceback.print_exc()
-            print("Problem purging plenario_workers: {}".format(e))
+            print(("Problem purging plenario_workers: {}".format(e)))

@@ -10,7 +10,8 @@ from plenario.database import session as session, app_engine as engine
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
-from plenario.models.ETLTask import update_task, ETLStatus, delete_task, add_task
+from plenario.models.ETLTask import update_task, ETLStatus
+from plenario.models.ETLTask import delete_task, add_task
 from plenario.settings import PLENARIO_SENTRY_URL
 from plenario.utils.weather import WeatherETL
 
@@ -168,7 +169,7 @@ def frequency_update(frequency):
         .filter(MetaTable.date_added != None) \
         .all()
     for m in md:
-        print "submitted job"
+        print("submitted job")
         submit_job({"endpoint": "update_dataset", "query": m.source_url_hash})
 
     md = session.query(ShapeMetadata) \
@@ -176,7 +177,7 @@ def frequency_update(frequency):
         .filter(ShapeMetadata.is_ingested == True) \
         .all()
     for m in md:
-        print "submitted job"
+        print("submitted job")
         submit_job({"endpoint": "update_shape", "query": m.dataset_name})
 
     return '%s updates queued.' % frequency
@@ -207,13 +208,13 @@ def update_weather():
     :returns (string) confirmation message"""
 
     # This should do the current month AND the previous month, just in case.
-    lastMonth_dt = datetime.now() - timedelta(days=1)
-    lastMonth = lastMonth_dt.month
-    lastYear = lastMonth_dt.year
+    last_month_dt = datetime.now() - timedelta(days=1)
+    last_month = last_month_dt.month
+    last_year = last_month_dt.year
 
     month, year = datetime.now().month, datetime.now().year
     w = WeatherETL()
-    if lastMonth != month:
-        w.initialize_month(lastYear, lastMonth)
+    if last_month != month:
+        w.initialize_month(last_year, last_month)
     w.initialize_month(year, month)
     return 'Added weather for %s %s' % (month, year)

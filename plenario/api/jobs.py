@@ -74,7 +74,7 @@ def worker_ready():
         submit_job(job)
         ticket = submit_job(job)
         time.sleep(1)  # Wait for worker to get started. Modify as necessary.
-        return "hello" in get_result(ticket).keys()
+        return "hello" in list(get_result(ticket).keys())
     except:
         return False
 

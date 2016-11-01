@@ -57,7 +57,7 @@ def wban2CallSign(wban_code):
         cs = x[0]
         # print "wban=", wban
     else:
-        print("could not find wban:", wban_code)
+        print(("could not find wban:", wban_code))
     return cs
 
 
@@ -95,7 +95,7 @@ def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban
         # XXXXXX: doing all stations
         pass
 
-    print("xml_METAR_url: '%s'" % xml_METAR_url)
+    print(("xml_METAR_url: '%s'" % xml_METAR_url))
     return raw_metars_from_url(xml_METAR_url)
 
 
@@ -118,7 +118,7 @@ def raw_metars_from_url(url):
         metar_raw = m['raw_text'].text
         metar_raws.append(metar_raw)
 
-    print("completed len(metar_raws)= %d" % len(metar_raws))
+    print(("completed len(metar_raws)= %d" % len(metar_raws)))
     return metar_raws
 
 
@@ -160,7 +160,7 @@ def getSkyCondition(obs):
             try:
                 sky_str = '%s%03d%s' % (sky_cond, height_100s_feet, detail)
             except TypeError as e:
-                print("parsing error on ", (sky_cond, height, detail), e)
+                print(("parsing error on ", (sky_cond, height, detail), e))
         elif height:
             sky_str = '%s%03d' % (sky_cond, height_100s_feet)
         else:
@@ -326,7 +326,7 @@ def getMetarVals(metar):
 
 
 def dumpRawMetar(raw_metar):
-    print("raw_metar=", raw_metar)
+    print(("raw_metar=", raw_metar))
     obs = Metar(raw_metar)
     dumpMetar(obs)
 

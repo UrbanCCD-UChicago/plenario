@@ -33,7 +33,7 @@ def weather_stations():
         base_query = session.query(stations_table)
 
         for clause in query_clauses:
-            print("weather_stations(): filtering on clause", clause)
+            print(("weather_stations(): filtering on clause", clause))
             base_query = base_query.filter(clause)
 
         values = [r for r in base_query.all()]
@@ -214,10 +214,7 @@ def make_query(table, raw_query_params):
         else:
 
             try:
-                attr = list(filter(
-                    lambda e: hasattr(column, e % operator),
-                    ['%s', '%s_', '__%s__']
-                ))[0] % operator
+                attr = list([e for e in ['%s', '%s_', '__%s__'] if hasattr(column, e % operator)])[0] % operator
             except IndexError:
                 msg = '"{}" is not a valid query operator'
                 resp['meta']['message'] = msg.format(operator)

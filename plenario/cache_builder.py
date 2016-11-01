@@ -11,7 +11,7 @@ longest_request = ''
 def fetch_for_dates(date_start, date_end):
     base_url = 'http://plenar.io'
 
-    print '--- fetching for dates %s - %s ---' % (date_start, date_end)
+    print('--- fetching for dates %s - %s ---' % (date_start, date_end))
 
     yield '%s/explore#aggregate/obs_date__le=%s&obs_date__ge=%s&agg=week' % (base_url,date_end, date_start)
     yield '%s/v1/api/timeseries/?obs_date__le=%s&obs_date__ge=%s&agg=week' % (base_url,date_end, date_start)
@@ -80,11 +80,11 @@ def fetch_url(url):
         except ValueError:
             # print 'Junk response'
             return None, url
-    except requests.exceptions.Timeout, e:
-        print 'Request timeout %s' % url
+    except requests.exceptions.Timeout as e:
+        print('Request timeout %s' % url)
         return None, url
-    except requests.exceptions.ConnectionError, e:
-        print 'Connection reset: %s' % url
+    except requests.exceptions.ConnectionError as e:
+        print('Connection reset: %s' % url)
         return None, url
 
 
@@ -117,5 +117,5 @@ if __name__ == "__main__":
         if worst_time > worst:
             worst = worst_time
             slowest_url = k
-    print 'Fastest: %s (%s)' % (fastest_url, best)
-    print 'Slowest: %s (%s)' % (slowest_url, worst)
+    print('Fastest: %s (%s)' % (fastest_url, best))
+    print('Slowest: %s (%s)' % (slowest_url, worst))

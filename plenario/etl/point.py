@@ -192,7 +192,7 @@ class Staging(object):
         """
         reader = UnicodeCSVReader(f)
         # Always create columns with slugified names
-        header = map(slugify, reader.next())
+        header = list(map(slugify, next(reader)))
 
         cols = []
         for col_idx, col_name in enumerate(header):
@@ -424,7 +424,7 @@ def update_meta(metatable, table):
 
         metatable.column_names = {
             c.name: str(c.type) for c in metatable.column_info()
-            if c.name not in {u'geom', u'point_date', u'hash'}
+            if c.name not in {'geom', 'point_date', 'hash'}
         }
 
         session.add(metatable)

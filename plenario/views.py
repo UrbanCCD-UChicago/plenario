@@ -369,7 +369,7 @@ def form_columns(form):
 
     labels = {}
     columns = []
-    for k, v in form.iteritems():
+    for k, v in form.items():
         if k.startswith('col_name_'):
             # key_type_observed_date
             key = k.replace("col_name_", "")
@@ -402,7 +402,7 @@ def contrib_thankyou():
 
 def point_meta_from_submit_form(form, is_approved):
     columns, labels = form_columns(form)
-    name = slugify(form['dataset_name'], delim=u'_')[:50]
+    name = slugify(form['dataset_name'], delim='_')[:50]
 
     metatable = MetaTable(
         url=form['file_url'],
@@ -842,7 +842,7 @@ def edit_dataset(source_url_hash):
 
             # Would prefer to just get the names from the metadata
             # without needing to reflect.
-            fieldnames = table.columns.keys()
+            fieldnames = list(table.columns.keys())
             pk_name = [p.name for p in table.primary_key][0]
             pk = table.c[pk_name]
             num_rows = session.query(pk).count()

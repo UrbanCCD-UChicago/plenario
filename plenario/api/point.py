@@ -129,7 +129,7 @@ def datadump():
 @crossdomain(origin="*")
 def get_datadump(ticket):
     job = get_job(ticket)
-    print("{} point.get_datadump.job: {}".format(datetime.now(), job))
+    print(("{} point.get_datadump.job: {}".format(datetime.now(), job)))
     try:
         if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
             datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get(
@@ -451,7 +451,7 @@ def _datadump(args):
             session.commit()
         except Exception as e:
             session.rollback()
-            print("DATADUMP ERROR: {}".format(e))
+            print(("DATADUMP ERROR: {}".format(e)))
             traceback.print_exc()
             raise e
 
@@ -488,7 +488,7 @@ def _datadump(args):
         session.commit()
     except Exception as e:
         session.rollback()
-        print("DATADUMP ERROR: {}".format(e))
+        print(("DATADUMP ERROR: {}".format(e)))
         traceback.print_exc()
         raise e
 
@@ -508,7 +508,7 @@ def cleanup_datadump():
             session.rollback()
             traceback.print_exc()
             log("---> Problem while clearing datadump request: {}".format(e))
-            print("ERROR IN DATADUMP: COULD NOT CLEAN UP:", e)
+            print(("ERROR IN DATADUMP: COULD NOT CLEAN UP:", e))
 
     for requestid, in session.query(DataDump.request).distinct():
         print(requestid)

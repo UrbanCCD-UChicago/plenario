@@ -91,7 +91,7 @@ def get_ec2_instance_id():
     try:
         return requests.get(instance_id_url).text
     except requests.ConnectionError as err:
-        print(err.response)
+        print((err.response))
 
 INSTANCE_ID = get_ec2_instance_id()
 
@@ -110,8 +110,8 @@ def get_autoscaling_group():
             InstanceIds=[INSTANCE_ID]
         )["AutoScalingInstances"][0]["AutoScalingGroupName"]
     except botocore.exceptions.BotoCoreError as err:
-        print(err.fmt)
+        print((err.fmt))
     except botocore.exceptions.ClientError as err:
-        print(err.response)
+        print((err.response))
 
 AUTOSCALING_GROUP = get_autoscaling_group()

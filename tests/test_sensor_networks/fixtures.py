@@ -46,19 +46,17 @@ class Fixtures:
         self.rs_engine.execute(create_table)
 
     def __init__(self):
-        self.user = os.environ["DB_USER"] = "postgres"
-        self.password = os.environ["DB_PASSWORD"] = "password"
-        self.host = os.environ["DB_HOST"] = "localhost"
-        self.port = os.environ["DB_PORT"] = "5432"
         os.environ["DB_NAME"] = "sensor_meta_test"
-
-        self.user = os.environ["RS_USER"] = "postgres"
-        self.password = os.environ["RS_PASSWORD"] = "password"
-        self.host = os.environ["RS_HOST"] = "localhost"
-        self.port = os.environ["RS_PORT"] = "5432"
         os.environ["RS_NAME"] = "sensor_obs_test"
 
-        self.base_db_url = "postgresql://{}:{}@{}:{}".format(self.user, self.password, self.host, self.port)
+        self.user = os.environ["DB_USER"]
+        self.host = os.environ["DB_HOST"]
+        self.port = os.environ["DB_PORT"]
+        self.password = os.environ["DB_PASSWORD"]
+
+        self.base_db_url = "postgresql://{}:{}@{}:{}".format(
+            self.user, self.password, self.host, self.port
+        )
         self.engine = create_engine(self.base_db_url)
         self.pg_engine = None
         self.rs_engine = None

@@ -108,7 +108,7 @@ def send_message():
         data = loads(request.data)
         if data["value"].upper() == "RESOLVE":
             unknown_features_resolve(data["name"])
-            print("AOTMapper_" + data["name"])
+            print(("AOTMapper_" + data["name"]))
             redis.delete("AOTMapper_" + data["name"])
         else:
             redis.set(name="AOTMapper_" + data["name"], value=dumps(data["value"]))

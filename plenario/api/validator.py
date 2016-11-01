@@ -43,7 +43,7 @@ def validate_network(network):
 
 
 def validate_nodes(nodes):
-    if isinstance(nodes, basestring):
+    if isinstance(nodes, str):
         nodes = [nodes]
     valid_nodes = NodeMeta.index()
     for node in nodes:
@@ -52,7 +52,7 @@ def validate_nodes(nodes):
 
 
 def validate_features(features):
-    if isinstance(features, basestring):
+    if isinstance(features, str):
         features = [features]
     valid_features = FeatureMeta.index()
     for feature in features:
@@ -62,7 +62,7 @@ def validate_features(features):
 
 
 def validate_sensors(sensors):
-    if isinstance(sensors, basestring):
+    if isinstance(sensors, str):
         sensors = [sensors]
     valid_sensors = SensorMeta.index()
     for sensor in sensors:
@@ -228,7 +228,7 @@ def convert(request_args):
 
     :returns: converted dictionary"""
 
-    for key, value in request_args.items():
+    for key, value in list(request_args.items()):
         try:
             request_args[key] = converters[key](value)
         except (KeyError, TypeError, AttributeError, NoSuchTableError):
@@ -412,7 +412,7 @@ def sensor_network_validate(validator, request_args):
     # Determine unchecked parameters provided in the request.
     unchecked = set(args.keys()) - set(validator.fields.keys())
 
-    if 'filter' in args.keys():
+    if 'filter' in list(args.keys()):
         raw_tree = result.data['filter']
         try:
             cond_tree = json.loads(raw_tree)
@@ -443,7 +443,7 @@ def valid_tree(table, tree):
 
     :returns: boolean value, true if the tree is valid"""
 
-    if not tree.keys():
+    if not list(tree.keys()):
         raise ValueError("Empty or malformed tree.")
 
     op = tree.get('op')
@@ -514,6 +514,4 @@ def has_tree_filters(request_args):
     :param request_args: dictionary of request arguments
     :returns: boolean, true if there's a filter argument"""
 
-    return any('filter' in key for key in request_args.keys())
-
-
+    return any('filter' in key for key in list(request_args.keys()))
