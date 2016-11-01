@@ -61,6 +61,7 @@ def init_db(args):
         create_tables(sensor_meta_table_names)
         init_user()
         init_worker_meta()
+        init_weather()
     else:
         if args.meta:
             init_meta()
