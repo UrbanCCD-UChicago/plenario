@@ -7,7 +7,7 @@ from plenario import create_app
 from plenario.database import app_engine
 from plenario.etl.point import PlenarioETL
 from plenario.models import MetaTable
-from api_tests import get_loop_rect
+from .api_tests import get_loop_rect
 from tests.test_fixtures.post_data import roadworks_post_data
 
 
@@ -31,7 +31,7 @@ class TestValidator(unittest.TestCase):
         resp_data = self.get_json_response_data(endpoint + query)
 
         self.assertTrue(len(resp_data['meta']['message']) == 1)
-        self.assertEquals(resp_data['meta']['message']['dataset_name'], ['Invalid table name: crimez.'])
+        self.assertEqual(resp_data['meta']['message']['dataset_name'], ['Invalid table name: crimez.'])
 
     def test_validator_bad_dataset_name_and_date(self):
         endpoint = 'detail'
@@ -40,8 +40,8 @@ class TestValidator(unittest.TestCase):
         resp_data = self.get_json_response_data(endpoint + query)
 
         self.assertTrue(len(resp_data['meta']['message']) == 2)
-        self.assertEquals(resp_data['meta']['message']['dataset_name'], ['Invalid table name: crimez.'])
-        self.assertEquals(resp_data['meta']['message']['obs_date__ge'], ['Not a valid date.'])
+        self.assertEqual(resp_data['meta']['message']['dataset_name'], ['Invalid table name: crimez.'])
+        self.assertEqual(resp_data['meta']['message']['obs_date__ge'], ['Not a valid date.'])
 
     def test_validator_bad_column_name(self):
         endpoint = 'detail'
@@ -60,7 +60,7 @@ class TestValidator(unittest.TestCase):
         resp_data = self.get_json_response_data(endpoint + query)
 
         self.assertTrue(len(resp_data['meta']['message']) == 1)
-        self.assertEquals(resp_data['meta']['message']['data_type'], ['Not a valid choice.'])
+        self.assertEqual(resp_data['meta']['message']['data_type'], ['Not a valid choice.'])
 
     def test_shape_validator_incorrect_datatype(self):
         endpoint = 'shapes/pedestrian_streets'
@@ -69,7 +69,7 @@ class TestValidator(unittest.TestCase):
         resp_data = self.get_json_response_data(endpoint + query)
 
         self.assertTrue(len(resp_data['meta']['message']) == 1)
-        self.assertEquals(resp_data['meta']['message']['data_type'], ['Not a valid choice.'])
+        self.assertEqual(resp_data['meta']['message']['data_type'], ['Not a valid choice.'])
 
     def test_validator_with_good_column_but_bad_value(self):
         endpoint = 'detail'

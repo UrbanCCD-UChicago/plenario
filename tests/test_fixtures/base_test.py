@@ -44,15 +44,15 @@ class Fixture(object):
 
 
 fixtures = {
-    'city': Fixture(human_name=u'Chicago City Limits',
+    'city': Fixture(human_name='Chicago City Limits',
                     file_name='chicago_city_limits.zip'),
-    'streets': Fixture(human_name=u'Pedestrian Streets',
+    'streets': Fixture(human_name='Pedestrian Streets',
                        file_name='chicago_pedestrian_streets.zip'),
-    'zips': Fixture(human_name=u'Zip Codes',
+    'zips': Fixture(human_name='Zip Codes',
                     file_name='chicago_zip_codes.zip'),
-    'neighborhoods': Fixture(human_name=u'Chicago Neighborhoods',
+    'neighborhoods': Fixture(human_name='Chicago Neighborhoods',
                              file_name='chicago_neighborhoods.zip'),
-    'changed_neighborhoods': Fixture(human_name=u'Chicago Neighborhoods',
+    'changed_neighborhoods': Fixture(human_name='Chicago Neighborhoods',
                                      file_name='chicago_neighborhoods_changed.zip', )
 }
 
@@ -64,7 +64,7 @@ class BasePlenarioTest(unittest.TestCase):
         # This doesn't happen in teardown because I find it helpful
         # to inspect them in the DB after running the tests.
         meta_table_names = ['meta_master', 'meta_shape', 'etl_task']
-        fixture_table_names = [fixture.table_name for key, fixture in fixtures.iteritems()]
+        fixture_table_names = [fixture.table_name for key, fixture in fixtures.items()]
 
         drop_tables(meta_table_names + fixture_table_names)
 
@@ -79,7 +79,7 @@ class BasePlenarioTest(unittest.TestCase):
         BasePlenarioTest.ingest_fixture(fixtures['neighborhoods'])
 
         # Add a dummy dataset to the metadata without ingesting a shapefile for it
-        cls.dummy_name = ShapeMetadata.add(human_name=u'Dummy Name',
+        cls.dummy_name = ShapeMetadata.add(human_name='Dummy Name',
                                            source_url=None,
                                            update_freq='yearly',
                                            approved_status=False).dataset_name

@@ -1,7 +1,7 @@
 import json
 import os
-import urllib
-from StringIO import StringIO
+import urllib.request, urllib.parse, urllib.error
+from io import StringIO
 import csv
 
 from tests.test_fixtures.base_test import BasePlenarioTest, fixtures_path
@@ -40,7 +40,7 @@ def get_escaped_geojson(fname):
     rect_path = os.path.join(pwd, '../test_fixtures', fname)
     with open(rect_path, 'r') as rect_json:
         query_rect = rect_json.read()
-    escaped_query_rect = urllib.quote(query_rect)
+    escaped_query_rect = urllib.parse.quote(query_rect)
     return escaped_query_rect
 
 
@@ -248,7 +248,7 @@ class PointAPITests(BasePlenarioTest):
         # Each feature should have an associated square geometry with 5 points
         # (4 points to a square, then repeat the first to close it)
         squares = [feat['geometry']['coordinates'][0] for feat in response_data['features']]
-        self.assert_(all([len(square) == 5 for square in squares]))
+        self.assertTrue(all([len(square) == 5 for square in squares]))
 
         # Each feature also needs a count of items found in that square.
         # We expect 3 squares with 1 and 1 square with 2

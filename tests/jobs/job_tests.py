@@ -3,7 +3,7 @@ import subprocess
 import random
 import zipfile
 
-from StringIO import StringIO
+from io import StringIO
 
 from plenario import create_app
 from plenario.api import prefix
@@ -55,41 +55,41 @@ class TestJobs(unittest.TestCase):
             pass
 
         # Seeding the database for ETL Tests.
-        restaurants = dict([('col_name_decisiontargetdate', u''), ('col_name_classificationlabel', u''),
-                            ('col_name_publicconsultationenddate', u''), ('col_name_locationtext', u''),
-                            ('view_url', u'https://opendata.bristol.gov.uk/api/views/5niz-5v5u/rows'), (
+        restaurants = dict([('col_name_decisiontargetdate', ''), ('col_name_classificationlabel', ''),
+                            ('col_name_publicconsultationenddate', ''), ('col_name_locationtext', ''),
+                            ('view_url', 'https://opendata.bristol.gov.uk/api/views/5niz-5v5u/rows'), (
                             'dataset_description',
-                            u'Planning applications details for applications from 2010 to 2014. Locations have been geocoded based on postcode where available.'),
-                            ('col_name_decisionnoticedate', u''), ('col_name_casetext', u''),
-                            ('update_frequency', u'yearly'), ('col_name_status', u''),
-                            ('col_name_location', u'location'), ('col_name_publicconsultationstartdate', u''),
-                            ('contributor_email', u'look@me.com'), ('col_name_decision', u''),
-                            ('col_name_decisiontype', u''), ('col_name_organisationuri', u''),
-                            ('col_name_appealref', u''), ('col_name_coordinatereferencesystem', u''),
-                            ('col_name_appealdecision', u''), ('col_name_geoarealabel', u''),
-                            ('col_name_organisationlabel', u''), ('contributor_organization', u''),
-                            ('col_name_casereference', u''), ('col_name_latitude', u''),
-                            ('col_name_servicetypelabel', u''), ('is_shapefile', u'false'),
-                            ('col_name_groundarea', u''), ('col_name_postcode', u''), ('col_name_agent', u''),
-                            ('col_name_classificationuri', u''), ('col_name_geoy', u''), ('col_name_geox', u''),
-                            ('col_name_uprn', u''), ('col_name_geopointlicencingurl', u''),
-                            ('col_name_appealdecisiondate', u''), ('col_name_decisiondate', u''),
-                            ('col_name_extractdate', u'observed_date'), ('col_name_servicetypeuri', u''),
-                            ('col_name_casedate', u''), ('dataset_attribution', u'Bristol City Council'),
-                            ('col_name_caseurl', u''), ('contributor_name', u'mrmeseeks'),
-                            ('col_name_publisheruri', u''), ('col_name_geoareauri', u''),
-                            ('col_name_postcode_sector', u''), ('file_url',
-                                                                u'https://opendata.bristol.gov.uk/api/views/5niz-5v5u/rows.csv?accessType=DOWNLOAD'),
-                            ('col_name_postcode_district', u''), ('col_name_publisherlabel', u''),
-                            ('col_name_responsesfor', u''), ('col_name_responsesagainst', u''),
-                            ('col_name_longitude', u''), ('dataset_name', u'restaurant_applications')])
+                            'Planning applications details for applications from 2010 to 2014. Locations have been geocoded based on postcode where available.'),
+                            ('col_name_decisionnoticedate', ''), ('col_name_casetext', ''),
+                            ('update_frequency', 'yearly'), ('col_name_status', ''),
+                            ('col_name_location', 'location'), ('col_name_publicconsultationstartdate', ''),
+                            ('contributor_email', 'look@me.com'), ('col_name_decision', ''),
+                            ('col_name_decisiontype', ''), ('col_name_organisationuri', ''),
+                            ('col_name_appealref', ''), ('col_name_coordinatereferencesystem', ''),
+                            ('col_name_appealdecision', ''), ('col_name_geoarealabel', ''),
+                            ('col_name_organisationlabel', ''), ('contributor_organization', ''),
+                            ('col_name_casereference', ''), ('col_name_latitude', ''),
+                            ('col_name_servicetypelabel', ''), ('is_shapefile', 'false'),
+                            ('col_name_groundarea', ''), ('col_name_postcode', ''), ('col_name_agent', ''),
+                            ('col_name_classificationuri', ''), ('col_name_geoy', ''), ('col_name_geox', ''),
+                            ('col_name_uprn', ''), ('col_name_geopointlicencingurl', ''),
+                            ('col_name_appealdecisiondate', ''), ('col_name_decisiondate', ''),
+                            ('col_name_extractdate', 'observed_date'), ('col_name_servicetypeuri', ''),
+                            ('col_name_casedate', ''), ('dataset_attribution', 'Bristol City Council'),
+                            ('col_name_caseurl', ''), ('contributor_name', 'mrmeseeks'),
+                            ('col_name_publisheruri', ''), ('col_name_geoareauri', ''),
+                            ('col_name_postcode_sector', ''), ('file_url',
+                                                                'https://opendata.bristol.gov.uk/api/views/5niz-5v5u/rows.csv?accessType=DOWNLOAD'),
+                            ('col_name_postcode_district', ''), ('col_name_publisherlabel', ''),
+                            ('col_name_responsesfor', ''), ('col_name_responsesagainst', ''),
+                            ('col_name_longitude', ''), ('dataset_name', 'restaurant_applications')])
         boundaries = dict(
-            [('dataset_attribution', u'City of Chicago'), ('contributor_name', u'mrmeseeks'), ('view_url', u''),
-             ('file_url', u'https://data.cityofchicago.org/api/geospatial/bbvz-uum9?method=export&format=Shapefile'),
-             ('contributor_organization', u''), ('dataset_description',
-                                                 u'Neighborhood boundaries in Chicago, as developed by the Office of Tourism. These boundaries are approximate and names are not official. The data can be viewed on the Chicago Data Portal with a web browser. However, to view or use the files outside of a web browser, you will need to use compression software and special GIS software, such as ESRI ArcGIS (shapefile) or Google Earth (KML or KMZ), is required.'),
-             ('update_frequency', u'yearly'), ('contributor_email', u'look@me.com'), ('is_shapefile', u'true'),
-             ('dataset_name', u'boundaries_neighborhoods')])
+            [('dataset_attribution', 'City of Chicago'), ('contributor_name', 'mrmeseeks'), ('view_url', ''),
+             ('file_url', 'https://data.cityofchicago.org/api/geospatial/bbvz-uum9?method=export&format=Shapefile'),
+             ('contributor_organization', ''), ('dataset_description',
+                                                 'Neighborhood boundaries in Chicago, as developed by the Office of Tourism. These boundaries are approximate and names are not official. The data can be viewed on the Chicago Data Portal with a web browser. However, to view or use the files outside of a web browser, you will need to use compression software and special GIS software, such as ESRI ArcGIS (shapefile) or Google Earth (KML or KMZ), is required.'),
+             ('update_frequency', 'yearly'), ('contributor_email', 'look@me.com'), ('is_shapefile', 'true'),
+             ('dataset_name', 'boundaries_neighborhoods')])
         cls.app.post('/add?is_shapefile=false', data=restaurants)
         cls.app.post('/add?is_shapefile=true', data=boundaries)
 
@@ -226,7 +226,7 @@ class TestJobs(unittest.TestCase):
         with self.other_app.test_request_context():
             ticket = approve_shape(shape_name)
 
-        print "shape_test.ticket: {}".format(ticket)
+        print(("shape_test.ticket: {}".format(ticket)))
 
         wait_on(ticket, 30)
         status = get_status(ticket)['status']
@@ -406,7 +406,7 @@ class TestJobs(unittest.TestCase):
         response = self.app.get(url)
         response = json.loads(response.get_data())
 
-        self.assertFalse("error" in response.keys())
+        self.assertFalse("error" in list(response.keys()))
         self.assertEqual(response["status"]["status"], "success")
         self.assertEqual(len(response["result"]), 1)
         self.assertEqual(response["result"][0]["source_url"],
@@ -442,7 +442,7 @@ class TestJobs(unittest.TestCase):
         url = response["url"]
         response = self.app.get(url)
         response = json.loads(response.get_data())
-        self.assertFalse("error" in response.keys())
+        self.assertFalse("error" in list(response.keys()))
         self.assertEqual(response["status"]["status"], "success")
         self.assertEqual(response["request"]["query"]["dataset"], "flu_shot_clinics")
         self.assertEqual(len(response["result"]), 3)
@@ -478,7 +478,7 @@ class TestJobs(unittest.TestCase):
         url = response["url"]
         response = self.app.get(url)
         response = json.loads(response.get_data())
-        self.assertFalse("error" in response.keys())
+        self.assertFalse("error" in list(response.keys()))
         self.assertEqual(response["status"]["status"], "success")
         self.assertEqual(len(response["result"]), 5)
 
@@ -508,7 +508,7 @@ class TestJobs(unittest.TestCase):
         url = response["url"]
         response = self.app.get(url)
         response = json.loads(response.get_data())
-        self.assertFalse("error" in response.keys())
+        self.assertFalse("error" in list(response.keys()))
         self.assertEqual(response["status"]["status"], "success")
         self.assertEqual(len(response["result"]), 1)
         self.assertEqual(response["result"][0]["source_url"],
@@ -541,7 +541,7 @@ class TestJobs(unittest.TestCase):
         url = response["url"]
         response = self.app.get(url)
         response = json.loads(response.get_data())
-        self.assertFalse("error" in response.keys())
+        self.assertFalse("error" in list(response.keys()))
         self.assertEqual(response["status"]["status"], "success")
         self.assertEqual(len(response["result"]), 1)
         self.assertEqual(len(response["result"][0]["columns"]), 17)
@@ -586,7 +586,7 @@ class TestJobs(unittest.TestCase):
         url = response["url"]
         response = self.app.get(url)
         response = json.loads(response.get_data())
-        self.assertFalse("error" in response.keys())
+        self.assertFalse("error" in list(response.keys()))
         self.assertEqual(response["status"]["status"], "success")
         self.assertEqual(len(response["result"]["features"]), 4)
         self.assertEqual(response["result"]["type"], "FeatureCollection")
@@ -738,7 +738,7 @@ class TestJobs(unittest.TestCase):
         url = response["result"]["url"]+"?data_type=csv"
         response = self.app.get(url)
 
-        print(response.get_data())
+        print((response.get_data()))
         response = response.get_data().split("\n")
 
         # 65 data lines, 1 column line, and 1 newline at the end.

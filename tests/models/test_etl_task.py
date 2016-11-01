@@ -96,7 +96,7 @@ class TestETLTask(unittest.TestCase):
 
         tasks = fetch_table_etl_status('master')
         for task in tasks:
-            print task
+            print(task)
 
         self.assertGreaterEqual(len(tasks), 2)
 

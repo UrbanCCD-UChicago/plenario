@@ -2,7 +2,7 @@ import json
 import time
 import unittest
 from datetime import datetime, timedelta
-from fixtures import Fixtures
+from .fixtures import Fixtures
 from plenario import create_app
 
 
@@ -217,7 +217,7 @@ class TestSensorNetworks(unittest.TestCase):
         result = json.loads(response.data)
         total_count = 0
         for bucket in result["data"]:
-            total_count += bucket.values()[0]["count"]
+            total_count += list(bucket.values())[0]["count"]
         self.assertEqual(total_count, 200)
 
     def test_query_endpoint_returns_correct_observation_count_total(self):

@@ -1,8 +1,8 @@
 import json
 import os
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import zipfile
-from StringIO import StringIO
+from io import StringIO
 
 from plenario.database import session, app_engine as engine
 from plenario.models import ShapeMetadata
@@ -59,7 +59,7 @@ class ShapeTests(BasePlenarioTest):
 
         # Add them back to return to original test state
         ShapeTests.ingest_fixture(fixtures['city'])
-        ShapeMetadata.add(human_name=u'Dummy Name',
+        ShapeMetadata.add(human_name='Dummy Name',
                           source_url=None,
                           update_freq='yearly',
                           approved_status=False)
@@ -74,7 +74,7 @@ class ShapeTests(BasePlenarioTest):
         all_names = [item['dataset_name'] for item in response_data['objects']]
 
         # Are all the names of the fully ingested fixtures in the response?
-        fixture_names_included = [(fixture.table_name in all_names) for fixture in fixtures.values()]
+        fixture_names_included = [(fixture.table_name in all_names) for fixture in list(fixtures.values())]
         self.assertTrue(all(fixture_names_included))
 
         # And make sure the name of an uningested shape didn't sneak in.
@@ -110,7 +110,7 @@ class ShapeTests(BasePlenarioTest):
         rect_path = os.path.join(FIXTURE_PATH, 'university_village_rectangle.json')
         with open(rect_path, 'r') as rect_json:
             query_rect = rect_json.read()
-        escaped_query_rect = urllib.quote(query_rect)
+        escaped_query_rect = urllib.parse.quote(query_rect)
 
         # Moving this functionality to the /shapes endpoint
         # What shape datasets intersect with the rectangle?
@@ -207,7 +207,7 @@ class ShapeTests(BasePlenarioTest):
         rect_path = os.path.join(FIXTURE_PATH, 'university_village_rectangle.json')
         with open(rect_path, 'r') as rect_json:
             query_rect = rect_json.read()
-        escaped_query_rect = urllib.quote(query_rect)
+        escaped_query_rect = urllib.parse.quote(query_rect)
 
         #url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
         url = '/v1/api/shapes/pedestrian_streets/?location_geom__within=' + escaped_query_rect
@@ -222,7 +222,7 @@ class ShapeTests(BasePlenarioTest):
         rect_path = os.path.join(FIXTURE_PATH, 'loop_rectangle.json')
         with open(rect_path, 'r') as rect_json:
             query_rect = rect_json.read()
-        escaped_query_rect = urllib.quote(query_rect)
+        escaped_query_rect = urllib.parse.quote(query_rect)
 
         #url = '/v1/api/shapes/filter/pedestrian_streets/' + query_rect
         url = '/v1/api/shapes/pedestrian_streets/?location_geom__within=' + escaped_query_rect
@@ -279,7 +279,7 @@ class ShapeTests(BasePlenarioTest):
         rect_path = os.path.join(FIXTURE_PATH, 'loop_rectangle.json')
         with open(rect_path, 'r') as rect_json:
             query_rect = rect_json.read()
-        escaped_query_rect = urllib.quote(query_rect)
+        escaped_query_rect = urllib.parse.quote(query_rect)
         unfiltered_url = '/v1/api/shapes/chicago_neighborhoods/'#?location_geom__within=' + escaped_query_rect
         filtered_url = '/v1/api/shapes/chicago_neighborhoods/?location_geom__within=' + escaped_query_rect
         
