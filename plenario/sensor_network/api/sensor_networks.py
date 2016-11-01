@@ -759,5 +759,5 @@ from plenario.api.validator import SensorNetworkValidator, DatadumpValidator, se
 from plenario.sensor_network.api.sensor_validator import NodeAggregateValidator, RequiredFeatureValidator
 from plenario.sensor_network.api.sensor_validator import NearMeValidator
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, FeatureMeta, SensorMeta
-from sensor_aggregate_functions import aggregate_fn_map
+from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
 from plenario.api.condition_builder import parse_tree

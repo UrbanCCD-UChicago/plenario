@@ -7,7 +7,6 @@ from sqlalchemy.exc import ProgrammingError
 
 # Imports cause the meta tables to be created and added to Base.
 from plenario.database import session, app_engine, Base
-from plenario.models import User
 from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DEFAULT_USER
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
 
@@ -87,6 +86,7 @@ def init_user():
     create_tables(("plenario_user",))
 
     if DEFAULT_USER['name']:
+        from plenario.models import User
         if session.query(User).count() > 0:
             print('Users already exist. Skipping this step.')
             return

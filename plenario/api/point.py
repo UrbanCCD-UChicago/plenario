@@ -10,7 +10,7 @@ import sqlalchemy
 import traceback
 import warnings
 
-import response as api_response
+from . import response as api_response
 
 from collections import OrderedDict
 from datetime import datetime
@@ -129,7 +129,7 @@ def datadump():
 @crossdomain(origin="*")
 def get_datadump(ticket):
     job = get_job(ticket)
-    print "{} point.get_datadump.job: {}".format(datetime.now(), job)
+    print("{} point.get_datadump.job: {}".format(datetime.now(), job))
     try:
         if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
             datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get(
@@ -180,7 +180,7 @@ def get_datadump(ticket):
                     for csvrow in json.loads(row.get_data()):
                         yield ",".join(
                             [json.dumps(csvrow[key].encode("utf-8")) if type(
-                                csvrow[key]) is unicode else json.dumps(str(csvrow[key]))
+                                csvrow[key]) is str else json.dumps(str(csvrow[key]))
                              for key in columns]) + "\n"
                     counter += 1
 
@@ -275,7 +275,7 @@ def _timeseries(args):
     if has_tree_filters(args.data):
         # Timeseries is a little tricky. If there aren't filters,
         # it would be ridiculous to build a condition tree for every one.
-        for field, value in args.data.items():
+        for field, value in list(args.data.items()):
             if 'filter' in field:
                 # This pattern matches the last occurrence of the '__' pattern.
                 # Prevents an error that is caused by dataset names with trailing
@@ -351,8 +351,8 @@ def _detail_aggregate(args):
             args.data, ignore=['obs_date__ge', 'obs_date__le']
         )
 
-    dataset_conditions = {k: v for k, v in args.data.items() if 'filter' in k}
-    for tablename, condition_tree in dataset_conditions.items():
+    dataset_conditions = {k: v for k, v in list(args.data.items()) if 'filter' in k}
+    for tablename, condition_tree in list(dataset_conditions.items()):
         # This pattern matches the last occurrence of the '__' pattern.
         # Prevents an error that is caused by dataset names with trailing
         # underscores.
@@ -391,7 +391,7 @@ def _detail(args):
         columns = [c.name for c in dataset.columns]
         if shapeset:
             columns += [c.name for c in shapeset.columns]
-        return [OrderedDict(zip(columns, row)) for row in q.all()]
+        return [OrderedDict(list(zip(columns, row))) for row in q.all()]
     except Exception as e:
         session.rollback()
         msg = "Failed to fetch records."
@@ -442,7 +442,7 @@ def _datadump(args):
     columns = [c.name for c in args.data.get('dataset').columns if c.name not in ['point_date', 'hash', 'geom']]
 
     def add_chunk(chunk):
-        chunk = [OrderedDict(zip(columns, row)) for row in chunk]
+        chunk = [OrderedDict(list(zip(columns, row))) for row in chunk]
         chunk = [{column: row[column] for column in columns} for row in chunk]
         dump = DataDump(os.urandom(16).encode('hex'), requestid, part, chunks,
                         json.dumps(chunk, default=unknown_object_json_handler))
@@ -451,7 +451,7 @@ def _datadump(args):
             session.commit()
         except Exception as e:
             session.rollback()
-            print "DATADUMP ERROR: {}".format(e)
+            print("DATADUMP ERROR: {}".format(e))
             traceback.print_exc()
             raise e
 
@@ -488,7 +488,7 @@ def _datadump(args):
         session.commit()
     except Exception as e:
         session.rollback()
-        print "DATADUMP ERROR: {}".format(e)
+        print("DATADUMP ERROR: {}".format(e))
         traceback.print_exc()
         raise e
 
@@ -508,7 +508,7 @@ def cleanup_datadump():
             session.rollback()
             traceback.print_exc()
             log("---> Problem while clearing datadump request: {}".format(e))
-            print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
+            print("ERROR IN DATADUMP: COULD NOT CLEAN UP:", e)
 
     for requestid, in session.query(DataDump.request).distinct():
         print(requestid)
@@ -546,7 +546,7 @@ def detail_query(args, aggregate=False):
         )
 
     # Sort out the filter conditions from the rest of the user arguments.
-    filters = {k: v for k, v in args.data.items() if 'filter' in k}
+    filters = {k: v for k, v in list(args.data.items()) if 'filter' in k}
 
     # Get upset if they specify more than a dataset and shapeset filter.
     if len(filters) > 2:
@@ -610,8 +610,8 @@ def _grid(args):
 
     # We only build conditions from values with a key containing 'filter'.
     # Therefore we only build dataset conditions from condition trees.
-    dataset_conditions = {k: v for k, v in args.data.items() if 'filter' in k}
-    for tablename, condition_tree in dataset_conditions.items():
+    dataset_conditions = {k: v for k, v in list(args.data.items()) if 'filter' in k}
+    for tablename, condition_tree in list(dataset_conditions.items()):
 
         tablename = tablename.split('__')[0]
 
@@ -696,7 +696,7 @@ def _meta(args):
                 )
             )
 
-    metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
+    metadata_records = [dict(list(zip(cols_to_return, row))) for row in q.all()]
     for record in metadata_records:
         try:
             if record.get('bbox') is not None:
@@ -704,7 +704,7 @@ def _meta(args):
                 record['bbox'] = json.loads(record['bbox'])
             # format columns in the expected way
             record['columns'] = [{'field_name': k, 'field_type': v}
-                                 for k, v in record['column_names'].items()]
+                                 for k, v in list(record['column_names'].items())]
         except Exception as e:
             args.warnings.append(e.message)
 
@@ -735,12 +735,12 @@ def request_args_to_condition_tree(request_args, ignore=list()):
         ignored.add(val)
 
     # If the key wasn't convertable, it meant that it was a column key.
-    columns = {k: v for k, v in request_args.items() if k not in ignored}
+    columns = {k: v for k, v in list(request_args.items()) if k not in ignored}
 
     ctree = {"op": "and", "val": []}
 
     # Add AND conditions based on query string parameters.
-    for k, v in columns.items():
+    for k, v in list(columns.items()):
         k = k.split('__')
         if k[0] == 'obs_date':
             k[0] = 'point_date'

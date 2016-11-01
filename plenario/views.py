@@ -1,21 +1,20 @@
 import itertools
 import json
 import re
-from cStringIO import StringIO
+import requests
+
 from collections import namedtuple
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from hashlib import md5
-from urlparse import urlparse
-
-import dateutil.relativedelta
-import requests
-import sqlalchemy
-from flask import make_response, request, redirect, url_for, render_template, \
-    Blueprint, flash, session as flask_session
+from flask import make_response, request, redirect, url_for, render_template
+from flask import Blueprint, flash, session as flask_session
 from flask_login import login_required
 from flask_wtf import Form
+from io import BytesIO
 from sqlalchemy import Table
 from sqlalchemy.exc import NoSuchTableError
+from urllib.parse import urlparse
 from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
@@ -101,13 +100,13 @@ def workers():
             continue
 
         if job["status"]["meta"].get("lastStartTime"):
-            diff = dateutil.relativedelta.relativedelta(
+            diff = relativedelta(
                 now,
                 datetime.strptime(job["status"]["meta"]["lastStartTime"],
                                   "%Y-%m-%d %H:%M:%S.%f"))
 
         else:
-            diff = dateutil.relativedelta.relativedelta(now,
+            diff = relativedelta(now,
                                                     datetime.strptime(job["status"]["meta"]["startTime"],
                                                                           "%Y-%m-%d %H:%M:%S.%f"))
         worker["jobinfo"] = {
@@ -133,11 +132,11 @@ def workers():
             worker["status"] = "nominal"
             nominal += 1
 
-        diff = dateutil.relativedelta.relativedelta(now, datetime.fromtimestamp(worker["uptime"]))
+        diff = relativedelta(now, datetime.fromtimestamp(worker["uptime"]))
         worker["humanized_uptime"] = " {}d {}h {}m {}s".format(
             diff.days, diff.hours, diff.minutes, diff.seconds).replace(
             " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
-        diff = dateutil.relativedelta.relativedelta(datetime.fromtimestamp(lastseen),
+        diff = relativedelta(datetime.fromtimestamp(lastseen),
                                                     datetime.fromtimestamp(0))
         worker["lastseen"] = " {}d {}h {}m {}s ago".format(
             diff.days, diff.hours, diff.minutes, diff.seconds).replace(
@@ -514,7 +513,7 @@ class GenericSuggestion(object):
 
     def _infer_columns(self):
         r = requests.get(self.file_url, stream=True)
-        inp = StringIO()
+        inp = BytesIO()
 
         head = itertools.islice(r.iter_lines(), 1000)
         for line in head:
@@ -848,7 +847,7 @@ def edit_dataset(source_url_hash):
             pk = table.c[pk_name]
             num_rows = session.query(pk).count()
 
-        except sqlalchemy.exc.NoSuchTableError:
+        except NoSuchTableError:
             # dataset has been approved, but perhaps still processing.
             pass
 

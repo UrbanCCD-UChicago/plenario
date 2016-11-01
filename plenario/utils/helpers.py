@@ -35,7 +35,7 @@ def infer_csv_columns(inp):
     :return: List of `ColumnInfo`s
     """
     reader = UnicodeCSVReader(inp)
-    header = reader.next()
+    header = next(reader)
     inp.seek(0)
     iter_output = [iter_column(col_idx, inp)
                    for col_idx in range(len(header))]
@@ -57,7 +57,7 @@ def iter_column(idx, f):
     reader = UnicodeCSVReader(f)
 
     # Discard the header
-    reader.next()
+    next(reader)
 
     col = []
     for row in reader:
@@ -71,7 +71,7 @@ def iter_column(idx, f):
     return col_type, null_values
 
 
-def slugify(text, delim=u'_'):
+def slugify(text, delim='_'):
     """
     Given text, return lowercase ASCII slug that gets as close as possible to the original.
     Will fail on Asian characters.
@@ -84,7 +84,7 @@ def slugify(text, delim=u'_'):
             word = normalize('NFKD', word).encode('ascii', 'ignore')
             if word:
                 result.append(word)
-        return unicode(delim.join(result))
+        return delim.join(result)
     else:
         return text
 
@@ -100,7 +100,7 @@ def send_mail(subject, recipient, body):
             region_name=AWS_REGION_NAME
         )
     except Exception as e:
-        print e.message, 'Failed to connect to AWS SES. Email aborted.'
+        print(e.message, 'Failed to connect to AWS SES. Email aborted.')
         return
 
     destination = {
@@ -128,7 +128,7 @@ def send_mail(subject, recipient, body):
             Message=message
         )
     except Exception as e:
-        print e.message, "Failed to send email through AWS SES."
+        print(e.message, "Failed to send email through AWS SES.")
 
 def reflect(table_name, metadata, engine):
     """Helper function for an oft repeated block of code.

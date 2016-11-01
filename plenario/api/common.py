@@ -1,15 +1,17 @@
-import json
-from flask_cache import Cache
-from plenario.settings import CACHE_CONFIG
-from datetime import timedelta, date, datetime, time
-from functools import update_wrapper
-from flask import make_response, request, current_app
 import csv
+import json
+
+from datetime import timedelta, date, datetime, time
+from flask import make_response, request, current_app
+from flask_cache import Cache
+from functools import update_wrapper
+from io import StringIO
 from shapely.geometry import asShape
-from cStringIO import StringIO
-from plenario.utils.helpers import get_size_in_degrees
-from plenario.models import MetaTable
 from sqlalchemy.sql.schema import Table
+
+from plenario.models import MetaTable
+from plenario.settings import CACHE_CONFIG
+from plenario.utils.helpers import get_size_in_degrees
 
 cache = Cache(config=CACHE_CONFIG)
 
@@ -59,9 +61,9 @@ def crossdomain(origin=None, methods=None, headers=None,
                 automatic_options=True): # pragma: no cover
     if methods is not None:
         methods = ', '.join(sorted(x.upper() for x in methods))
-    if headers is not None and not isinstance(headers, basestring):
+    if headers is not None and not isinstance(headers, str):
         headers = ', '.join(x.upper() for x in headers)
-    if not isinstance(origin, basestring):
+    if not isinstance(origin, str):
         origin = ', '.join(origin)
     if isinstance(max_age, timedelta):
         max_age = max_age.total_seconds()
@@ -98,13 +100,13 @@ def crossdomain(origin=None, methods=None, headers=None,
 
 def make_cache_key(*args, **kwargs):
     path = request.path
-    args = str(hash(frozenset(request.args.items())))
+    args = str(hash(frozenset(list(request.args.items()))))
     return (path + args).encode('utf-8')
 
 
 def make_csv(data):
-    print "data.type: {}".format(type(data))
-    print "data.firstrow: {}".format(data[0])
+    print("data.type: {}".format(type(data)))
+    print("data.firstrow: {}".format(data[0]))
     outp = StringIO()
     writer = csv.writer(outp)
     writer.writerows(data)
@@ -121,9 +123,9 @@ def extract_first_geometry_fragment(geojson):
     :return: dict representing geojson structure
     """
     geo = json.loads(geojson)
-    if 'features' in geo.keys():
+    if 'features' in list(geo.keys()):
         fragment = geo['features'][0]['geometry']
-    elif 'geometry' in geo.keys():
+    elif 'geometry' in list(geo.keys()):
         fragment = geo['geometry']
     else:
         fragment = geo

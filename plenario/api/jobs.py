@@ -3,15 +3,17 @@
 import datetime
 import json
 import redis
-import response as api_response
 import time
 import warnings
+
 
 from flask import request, make_response
 from os import urandom
 
 from plenario.settings import CACHE_CONFIG
 from plenario.api.common import unknown_object_json_handler
+from plenario.api.response import export_dataset_to_response
+from plenario.api.response import form_csv_detail_response
 from plenario.utils.model_helpers import fetch_table
 from plenario_worker.clients import job_queue
 
@@ -97,11 +99,11 @@ def get_job(ticket):
             # TODO: correct this.
             shapeset = fetch_table(req['query']['shapeset'])
             data_type = req['query']['data_type']
-            return api_response.export_dataset_to_response(shapeset, data_type, result)
+            return export_dataset_to_response(shapeset, data_type, result)
         elif hasattr(req['query'], 'get') and req['query'].get('data_type') == 'csv':
             # Exports CSV files for aggregate-point-data and detail-aggregate.
             # This method appends geom to remove on its own.
-            return api_response.form_csv_detail_response([], result)
+            return form_csv_detail_response([], result)
 
     response = {"ticket": ticket, "request": req, "result": result, "status": status}
     response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
