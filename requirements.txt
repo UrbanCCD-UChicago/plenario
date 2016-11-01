@@ -9,7 +9,6 @@ click==6.6
 contextlib2==0.5.4
 csvkit==0.9.1
 datetime-truncate==1.0.1
-dbf==0.94.3
 docutils==0.12
 Flask==0.11.1
 Flask-Admin==1.4.2
@@ -21,7 +20,6 @@ Flask-Principal==0.4.0
 Flask-Security==1.7.5
 Flask-SQLAlchemy==2.1
 Flask-WTF==0.12
-functools32==3.2.3.post2
 futures==3.0.5
 GeoAlchemy2==0.3.0
 gunicorn==19.6.0

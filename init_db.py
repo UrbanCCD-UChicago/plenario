@@ -28,11 +28,11 @@ def create_tables(tables):
 
     for table in Base.metadata.sorted_tables:
         if str(table) in tables:
-            print "CREATE TABLE: {}".format(table)
+            print("CREATE TABLE: {}".format(table))
             try:
                 table.create(bind=app_engine)
             except ProgrammingError:
-                print "ALREADY EXISTS: {}".format(table)
+                print("ALREADY EXISTS: {}".format(table))
 
 
 def delete_tables(tables):
@@ -43,17 +43,17 @@ def delete_tables(tables):
     for table in tables:
         try:
             app_engine.execute("DROP TABLE {} CASCADE".format(table))
-            print "DROP TABLE {}".format(table)
+            print("DROP TABLE {}".format(table))
         except ProgrammingError:
-            print "ALREADY DOESN'T EXIST: {}".format(table)
+            print("ALREADY DOESN'T EXIST: {}".format(table))
         
 
 
 def init_db(args):
-    print ""
-    print "================"
-    print "Plenario INIT DB"
-    print "================"
+    print("")
+    print("================")
+    print("Plenario INIT DB")
+    print("================")
     if not any(vars(args).values()):
         # No specific arguments specified. Run it all!
         add_functions()
@@ -88,29 +88,29 @@ def init_user():
 
     if DEFAULT_USER['name']:
         if session.query(User).count() > 0:
-            print 'Users already exist. Skipping this step.'
+            print('Users already exist. Skipping this step.')
             return
 
-        print 'Creating default user %s' % DEFAULT_USER['name']
+        print('Creating default user %s' % DEFAULT_USER['name'])
         user = User(**DEFAULT_USER)
         session.add(user)
         try:
             session.commit()
         except Exception as e:
             session.rollback()
-            print "Problem while creating default user: ", e
+            print("Problem while creating default user: ", e)
     else:
-        print 'No default user specified. Skipping this step.'
+        print('No default user specified. Skipping this step.')
 
 
 def init_weather():
-    print 'initializing NOAA weather stations'
+    print('initializing NOAA weather stations')
     s = WeatherStationsETL()
     s.initialize()
 
-    print 'initializing NOAA daily and hourly weather observations for %s/%s' % (
-        datetime.datetime.now().month, datetime.datetime.now().year)
-    print 'this will take a few minutes ...'
+    print('initializing NOAA daily and hourly weather observations for %s/%s' % (
+        datetime.datetime.now().month, datetime.datetime.now().year))
+    print('this will take a few minutes ...')
     e = WeatherETL()
     try:
         e.initialize_month(datetime.datetime.now().year, datetime.datetime.now().month)
