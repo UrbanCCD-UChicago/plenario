@@ -6,7 +6,7 @@ import zipfile
 import re
 from ftplib import FTP
 #from cStringIO import StringIO
-from StringIO import StringIO
+from io import StringIO
 from csvkit.unicsv import UnicodeCSVReader, UnicodeCSVWriter, \
     UnicodeCSVDictReader, FieldSizeLimitError
 from dateutil import parser
@@ -26,7 +26,7 @@ from geoalchemy2 import Geometry
 from uuid import uuid4
 from metar.metar import ParserError
 
-from weather_metar import getMetar, getMetarVals, getAllCurrentWeather, getCurrentWeather
+from .weather_metar import getMetar, getMetarVals, getAllCurrentWeather, getCurrentWeather
 
 # from http://stackoverflow.com/questions/7490660/converting-wind-direction-in-angles-to-text-words
 def degToCardinal(num):
@@ -142,7 +142,7 @@ class WeatherETL(object):
         fnames = self._extract_fnames()
         for fname in fnames:
             if (self.debug==True):
-                print "INITIALIZE: doing fname", fname
+                print("INITIALIZE: doing fname", fname)
             self._do_etl(fname)
 
     def initialize_month(self, year, month, no_daily=False, no_hourly=False, weather_stations_list = None, banned_weather_stations_list = None, start_line=0, end_line=None):
@@ -334,7 +334,7 @@ class WeatherETL(object):
         try:
             new_table.create(engine)
         except sql.exc.ProgrammingError:
-            print "got ProgrammingError on new metar table create"
+            print("got ProgrammingError on new metar table create")
             return None
 
         ## Essentially, insert into the new observations table for any src observations that are not in the current dat observations.
@@ -368,7 +368,7 @@ class WeatherETL(object):
         except TypeError:
             new = False
         except sql.exc.ProgrammingError:
-            print "got ProgrammingError on insert to new table"
+            print("got ProgrammingError on insert to new table")
         if new:
 
             # There were no new records.. soo, insert into the dat observations any records
@@ -425,7 +425,7 @@ class WeatherETL(object):
         elif fname.endswith('tar.gz'):
             file_type = 'tarfile'
         else:
-            print "file type for ", fname, "not found: quitting"
+            print("file type for ", fname, "not found: quitting")
             return None
 
         # extract the year and month from the QCLCD filename
@@ -526,7 +526,7 @@ class WeatherETL(object):
 
                 row_vals = getattr(self, '_parse_%s_row_daily' % file_type)(row, header, self.out_header)
              
-                row_dict = dict(zip(self.out_header, row_vals))
+                row_dict = dict(list(zip(self.out_header, row_vals)))
                 if (weather_stations_list is not None):
                     # Only include observations from the specified list of wban_code values
                     if (row_dict['wban_code'] not in weather_stations_list):
@@ -537,7 +537,7 @@ class WeatherETL(object):
                 if (self.debug == True):
                     self.debug_outfile.write("UnicodeDecodeError caught\n")
                     self.debug_outfile.write(str(row))
-                    self.debug_outfile.write(str(row_count) + "\n" + str(zip(self.out_header,row)) + "\n")
+                    self.debug_outfile.write(str(row_count) + "\n" + str(list(zip(self.out_header,row))) + "\n")
                     self.debug_outfile.flush()
                 # Skip this line, it has non-ASCII characters and probably shouldn't.
                 # We may not get this error anymore (ironically) after rolling our own CSV parser
@@ -640,7 +640,7 @@ class WeatherETL(object):
         raw_weather.seek(0)
         # XXX mcc: should probably convert this to DIY CSV parsing a la _transform_daily()
         reader = UnicodeCSVReader(raw_weather)
-        header = reader.next()
+        header = next(reader)
         # strip leading and trailing whitespace from header (e.g. from tarfiles)
         header = [x.strip() for x in header]
 
@@ -658,7 +658,7 @@ class WeatherETL(object):
         row_count = 0
         while True:
             try:
-                row = reader.next()
+                row = next(reader)
                 if (row_count % 1000 == 0):
                     if (self.debug==True):
                         self.debug_outfile.write( "\rparsing: row_count=%06d" % row_count)
@@ -681,7 +681,7 @@ class WeatherETL(object):
                 if (not row_vals):
                     continue
              
-                row_dict = dict(zip(self.out_header, row_vals))
+                row_dict = dict(list(zip(self.out_header, row_vals)))
                 if (weather_stations_list is not None):
                     # Only include observations from the specified list of wban_code values
                     if (row_dict['wban_code'] not in weather_stations_list):
@@ -851,7 +851,7 @@ class WeatherETL(object):
             try:
                 weather_types_str = str(row_vals[self.out_header.index('weather_types')])
             except IndexError:
-                print 'the offending row is', row_vals
+                print('the offending row is', row_vals)
                 continue
             #print "weather_types_str = '%s'" % weather_types_str
             # literally just change '[' to '{' and ']' to '}'
@@ -862,7 +862,7 @@ class WeatherETL(object):
 
             if (not row_vals):
                 continue
-            row_dict = dict(zip(self.out_header, row_vals))
+            row_dict = dict(list(zip(self.out_header, row_vals)))
 
             if (weather_stations_list is not None):
                 # Only include observations from the specified list of wban_code values
@@ -873,7 +873,7 @@ class WeatherETL(object):
                 if (row_dict['wban_code'] in banned_weather_stations_list):
                     continue
             if (self.debug==True):
-                print "_transform_metars(): WRITING row_vals: '%s'"  % str(row_vals)
+                print("_transform_metars(): WRITING row_vals: '%s'"  % str(row_vals))
 
             # Making sure there is a WBAN code
             if not row_vals[0]:
@@ -1074,11 +1074,11 @@ class WeatherETL(object):
                 # XXX: Examine this field more carefully to determine what its range is.
                 wind_direction_int = int(round(float(wind_direction)))
                 wind_direction = wind_direction_int
-            except ValueError, e:
+            except ValueError as e:
                 if (self.debug==True):
                     if (self.current_row): 
                         self.debug_outfile.write("\n")                        
-                        zipped_row = zip(self.out_header,self.current_row)
+                        zipped_row = list(zip(self.out_header,self.current_row))
                         for column in zipped_row:
                             self.debug_outfile.write(str(column) + "\n")
                     self.debug_outfile.write("\nValueError: [%s], could not convert wind_direction '%s' to int\n" % (e, wind_direction))
@@ -1115,11 +1115,11 @@ class WeatherETL(object):
         else:
             try:
                 fval = float(val_str)
-            except ValueError, e:
+            except ValueError as e:
                 if (self.debug==True):
                     if (self.current_row): 
                         self.debug_outfile.write("\n")
-                        zipped_row = zip(self.out_header,self.current_row)
+                        zipped_row = list(zip(self.out_header,self.current_row))
                         for column in zipped_row:
                             self.debug_outfile.write(str(column)+ "\n")
                     self.debug_outfile.write("\nValueError: [%s], could not convert '%s' to float\n" % (e, val_str))
@@ -1144,11 +1144,11 @@ class WeatherETL(object):
         else:
             try: 
                 ival = int(val)
-            except ValueError, e:
+            except ValueError as e:
                 if (self.debug==True):
                     if (self.current_row): 
                         self.debug_outfile.write("\n")
-                        zipped_row = zip(self.out_header,self.current_row)
+                        zipped_row = list(zip(self.out_header,self.current_row))
                         for column in zipped_row:
                             self.debug_outfile.write(str(column) + "\n")
                     self.debug_outfile.write("\nValueError [%s] could not convert '%s' to int\n" % (e, val))
@@ -1381,7 +1381,7 @@ class WeatherETL(object):
         try:
             self.src_metar_table.create(engine, checkfirst=True)
         except sqlalchemy.exc.ProgrammingError:
-            print "got ProgrammingError on src metar table create"
+            print("got ProgrammingError on src metar table create")
             return None
 
         
@@ -1432,13 +1432,13 @@ class WeatherETL(object):
         elif (daily_or_hourly == 'hourly'):
             column = table.c.datetime
         
-        dt = datetime(year, month,01)
+        dt = datetime(year, month,0o1)
         dt_nextmonth = dt + relativedelta.relativedelta(months=1)
         
         q = session.query(distinct(table.c.wban_code)).filter(and_(column >= dt,
                                                                    column < dt_nextmonth))
         
-        station_list = map(operator.itemgetter(0), q.all())
+        station_list = list(map(operator.itemgetter(0), q.all()))
         return station_list
 
     # Given that this was the most recent month, year, call this function,
@@ -1449,7 +1449,7 @@ class WeatherETL(object):
         sql = "SELECT max (datetime) from dat_weather_observations_hourly;"
         # given this time, delete all from dat_weather_observations_metar
         #
-        print "executing: ", sql
+        print("executing: ", sql)
         conn = engine.contextual_connect()
         results = conn.execute(sql)
         res = results.fetchone()
@@ -1459,7 +1459,7 @@ class WeatherETL(object):
         res_dt_str = datetime.strftime(res_dt, "%Y-%m-%d %H:%M:%S")
         # given this most recent time, delete any metars from before that time
         sql2 = "DELETE FROM dat_weather_observations_metar WHERE datetime < '%s'" % (res_dt_str)
-        print "executing: " , sql2
+        print("executing: " , sql2)
         results = conn.execute(sql2)
 
 class WeatherStationsETL(object):
@@ -1480,7 +1480,7 @@ class WeatherStationsETL(object):
         try:
             self._load()
         except:
-            print 'weather stations already exist, updating instead'
+            print('weather stations already exist, updating instead')
             self._update_stations()
 
     def update(self):
@@ -1509,7 +1509,7 @@ class WeatherStationsETL(object):
         header = ['wban_code', 'station_name', 'country', 
                   'state', 'call_sign', 'location', 'elevation', 
                   'begin', 'end']
-        reader.next()
+        next(reader)
         self.clean_station_info = StringIO()
         all_rows = []
         wbans = []

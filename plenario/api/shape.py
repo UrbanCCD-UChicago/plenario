@@ -1,6 +1,5 @@
 import json
 
-import response as api_response
 
 from collections import OrderedDict
 from flask import make_response, request
@@ -12,8 +11,10 @@ from plenario.api.common import make_fragment_str
 from plenario.api.condition_builder import parse_tree
 from plenario.api.point import detail_query
 from plenario.api.jobs import make_job_response
-from plenario.api.response import make_error
-from plenario.api.validator import validate, has_tree_filters, Validator, ExportFormatsValidator
+from plenario.api.response import export_dataset_to_response, make_error
+from plenario.api.response import aggregate_point_data_response, bad_request
+from plenario.api.validator import validate, has_tree_filters, Validator
+from plenario.api.validator import ExportFormatsValidator
 from plenario.models import ShapeMetadata
 
 
@@ -42,7 +43,7 @@ def get_all_shape_datasets():
         status_code = 200
 
     except Exception as e:
-        print e.message
+        print(e)
         response_skeleton = {
             'meta': {
                 'status': 'error',
@@ -68,13 +69,17 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     validated_args = validate(Validator(only=consider), request_args)
 
     if validated_args.errors:
-        return api_response.bad_request(validated_args.errors)
+        return bad_request(validated_args.errors)
     elif validated_args.data.get('job'):
         return make_job_response('aggregate-point-data', validated_args)
     else:
         result = _aggregate_point_data(validated_args)
         data_type = validated_args.data.get('data_type')
-        return api_response.aggregate_point_data_response(data_type, result, [polygon_dataset_name, point_dataset_name])
+        return aggregate_point_data_response(
+            data_type,
+            result,
+            [polygon_dataset_name, point_dataset_name]
+        )
 
 
 @crossdomain(origin="*")
@@ -99,17 +104,20 @@ def export_shape(dataset_name):
 
     # Using the 'shape' key triggers the correct validator.
     request_args['shape'] = dataset_name
-    validated_args = validate(ExportFormatsValidator(only=meta_params), request_args)
+    validated_args = validate(
+        ExportFormatsValidator(only=meta_params),
+        request_args
+    )
 
     if validated_args.errors:
-        return api_response.bad_request(validated_args.errors)
+        return bad_request(validated_args.errors)
     elif validated_args.data.get('job'):
         return make_job_response('export-shape', validated_args)
     else:
         query = _export_shape(validated_args)
         shapeset = validated_args.data.get('shapeset')
         data_type = validated_args.data.get('data_type')
-        return api_response.export_dataset_to_response(shapeset, data_type, query)
+        return export_dataset_to_response(shapeset, data_type, query)
 
 
 # =================
@@ -117,7 +125,8 @@ def export_shape(dataset_name):
 # =================
 
 def _aggregate_point_data(args):
-    meta_params = ('dataset', 'shapeset', 'data_type', 'geom', 'offset', 'limit')
+    meta_params = ('dataset', 'shapeset', 'data_type',
+                   'geom', 'offset', 'limit')
     meta_vals = (args.data.get(k) for k in meta_params)
     dataset, shapeset, data_type, geom, offset, limit = meta_vals
 
@@ -149,7 +158,8 @@ def _export_shape(args):
     shapeset, data_type, geom = meta_vals
 
     if shapeset is None:
-        error_message = 'Could not find shape dataset {}'.format(request.args['shape'])
+        error_message = 'Could not find shape dataset {}'
+        error_message = error_message.format(request.args['shape'])
         return make_response(error_message, 404)
 
     query = "SELECT * FROM {}".format(shapeset.name)
@@ -170,4 +180,3 @@ def _export_shape(args):
         query += " WHERE " + conditions
 
     return query
-

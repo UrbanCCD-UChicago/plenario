@@ -18,7 +18,7 @@ def _make_call_sign_wban_map():
         with open('plenario/utils/wban_to_call_sign.csv') as fp:
             reader = csv.reader(fp)
             # Discard header
-            reader.next()
+            next(reader)
             call_sign_to_wban_map = {row[1]: row[0] for row in reader}
         return call_sign_to_wban_map
     except IOError as err:
@@ -57,7 +57,7 @@ def wban2CallSign(wban_code):
         cs = x[0]
         # print "wban=", wban
     else:
-        print "could not find wban:", wban_code
+        print("could not find wban:", wban_code)
     return cs
 
 
@@ -72,7 +72,7 @@ def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban
         # XXXXXX TOOO
         pass
     elif (call_signs and wban_codes):
-        print "error: define only call_signs or wban_codes and not both"
+        print("error: define only call_signs or wban_codes and not both")
     elif (wban_codes):
         # Convert all wban_codes to call_signs
         if (wban2callsigns):
@@ -90,12 +90,12 @@ def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban
     if (call_signs):
         # OK, we have call signs now
         xml_METAR_url += '&stationString='
-        xml_METAR_url += ','.join(map(lambda x: x.upper(), call_signs))
+        xml_METAR_url += ','.join([x.upper() for x in call_signs])
     else:
         # XXXXXX: doing all stations
         pass
 
-    print "xml_METAR_url: '%s'" % xml_METAR_url
+    print("xml_METAR_url: '%s'" % xml_METAR_url)
     return raw_metars_from_url(xml_METAR_url)
 
 
@@ -118,7 +118,7 @@ def raw_metars_from_url(url):
         metar_raw = m['raw_text'].text
         metar_raws.append(metar_raw)
 
-    print "completed len(metar_raws)= %d" % len(metar_raws)
+    print("completed len(metar_raws)= %d" % len(metar_raws))
     return metar_raws
 
 
@@ -159,8 +159,8 @@ def getSkyCondition(obs):
         if detail:
             try:
                 sky_str = '%s%03d%s' % (sky_cond, height_100s_feet, detail)
-            except TypeError, e:
-                print "parsing error on ", (sky_cond, height, detail), e
+            except TypeError as e:
+                print("parsing error on ", (sky_cond, height, detail), e)
         elif height:
             sky_str = '%s%03d' % (sky_cond, height_100s_feet)
         else:
@@ -231,7 +231,7 @@ def getDewpointFahrenheit(obs):
 
 
 def getWind(obs):
-    from weather import degToCardinal
+    from .weather import degToCardinal
     wind_speed = None
     wind_speed_int = None
     wind_direction = None
@@ -326,7 +326,7 @@ def getMetarVals(metar):
 
 
 def dumpRawMetar(raw_metar):
-    print "raw_metar=", raw_metar
+    print("raw_metar=", raw_metar)
     obs = Metar(raw_metar)
     dumpMetar(obs)
 
@@ -334,11 +334,11 @@ def dumpRawMetar(raw_metar):
 ##allw = getAllCurrentWeather()
 
 # here's a list of Illinois-area wban_codes (from python scripts/get_weather_station_bboxes.py where whitelist_urls=['ce29323c565cbd4a97eb61c73426fb01']
-illinois_area_wbans = [u'14855', u'54808', u'14834', u'04838', u'04876', u'03887', u'04871', u'04873', u'04831',
-                       u'04879', u'04996', u'14880', u'04899', u'94892', u'94891', u'04890', u'54831', u'94870',
-                       u'04894', u'94854', u'14842', u'93822', u'04807', u'04808', u'54811', u'94822', u'94846',
-                       u'04868', u'04845', u'04896', u'04867', u'04866', u'04889', u'14816', u'04862', u'94866',
-                       u'04880', u'14819']
+illinois_area_wbans = ['14855', '54808', '14834', '04838', '04876', '03887', '04871', '04873', '04831',
+                       '04879', '04996', '14880', '04899', '94892', '94891', '04890', '54831', '94870',
+                       '04894', '94854', '14842', '93822', '04807', '04808', '54811', '94822', '94846',
+                       '04868', '04845', '04896', '04867', '04866', '04889', '14816', '04862', '94866',
+                       '04880', '14819']
 
 ##illinois_w = getCurrentWeather(wban_codes=illinois_wbans)
 # metars = []

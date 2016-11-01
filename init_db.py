@@ -7,7 +7,8 @@ from sqlalchemy.exc import ProgrammingError
 
 # Imports cause the meta tables to be created and added to Base.
 from plenario.database import session, app_engine, Base
-from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DEFAULT_USER
+from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST
+from plenario.settings import DEFAULT_USER
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
 
 
@@ -46,7 +47,6 @@ def delete_tables(tables):
         except ProgrammingError:
             print("ALREADY DOESN'T EXIST: {}".format(table))
         
-
 
 def init_db(args):
     print("")
@@ -108,12 +108,15 @@ def init_weather():
     s = WeatherStationsETL()
     s.initialize()
 
-    print('initializing NOAA daily and hourly weather observations for %s/%s' % (
-        datetime.datetime.now().month, datetime.datetime.now().year))
+    print('initializing NOAA daily and hourly weather observations for %s/%s' %
+          (datetime.datetime.now().month, datetime.datetime.now().year))
     print('this will take a few minutes ...')
     e = WeatherETL()
     try:
-        e.initialize_month(datetime.datetime.now().year, datetime.datetime.now().month)
+        e.initialize_month(
+            datetime.datetime.now().year,
+            datetime.datetime.now().month
+        )
     except Exception as e:
         session.rollback()
         raise e
@@ -124,10 +127,11 @@ def init_worker_meta():
 
 
 def add_functions():
+
     def add_function(script_path):
-        args = 'PGPASSWORD=' + DB_PASSWORD + ' psql -h ' + DB_HOST + ' -U ' + DB_USER + ' -d ' + DB_NAME + ' -f ' + script_path
+        args = 'PGPASSWORD=' + DB_PASSWORD + ' psql -h ' + DB_HOST + ' -U '
+        args += DB_USER + ' -d ' + DB_NAME + ' -f ' + script_path
         subprocess.check_output(args, shell=True)
-        # Using shell=True otherwise it seems that aws doesn't have the proper paths.
 
     add_function("./plenario/dbscripts/audit_trigger.sql")
     add_function("./plenario/dbscripts/point_from_location.sql")
