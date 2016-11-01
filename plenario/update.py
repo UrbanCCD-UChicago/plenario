@@ -64,6 +64,7 @@ def daily_update():
 
 def weekly_update():
     submit_job({"endpoint": "frequency_update", "query": "weekly"})
+    Process(target=tasks.clean_metar).start()
 
 
 def monthly_update():
