@@ -192,6 +192,15 @@ def update_metar():
     return 'Added current metars'
 
 
+def clean_metar():
+    """Given the latest datetime available in hourly observations table,
+    delete all metar records older than that datetime. Records which exist
+    in the hourly table are the quality-controlled versions of records that
+    existed in the metar table."""
+
+    WeatherETL().clear_metars()
+
+
 def update_weather():
     """Run a weather update.
 
@@ -207,9 +216,4 @@ def update_weather():
     if lastMonth != month:
         w.initialize_month(lastYear, lastMonth)
     w.initialize_month(year, month)
-
-    # Given that this was the most recent month, year, call this function,
-    # which will figure out the most recent hourly weather observation and
-    # delete all metars before that datetime.
-    w.clear_metars()
     return 'Added weather for %s %s' % (month, year)
