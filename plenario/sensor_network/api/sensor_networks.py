@@ -346,7 +346,7 @@ def format_sensor_metadata(sensor):
 
     sensor_response = {
         'name': sensor.name,
-        'properties': sensor.observed_properties.values(),
+        'properties': list(sensor.observed_properties.values()),
         'info': sensor.info
     }
 
@@ -609,7 +609,7 @@ def metadata(target, network=None, nodes=None, sensors=None, features=None, geom
     ])
 
     for i, key in enumerate(meta_levels):
-        current_state = meta_levels.items()
+        current_state = list(meta_levels.items())
         value = meta_levels[key]
 
         if key == "network":
@@ -666,7 +666,7 @@ def filter_meta(meta_level, upper_filter_values, filter_values, geojson):
             valid_values += [sensor.name for sensor in node.sensors]
     elif meta_level == "features":
         for sensor in upper_filter_values:
-            valid_values += [p.split(".")[0] for p in sensor.observed_properties.values()]
+            valid_values += [p.split(".")[0] for p in list(sensor.observed_properties.values())]
 
     if type(filter_values) != list and filter_values is not None:
         filter_values = [filter_values]

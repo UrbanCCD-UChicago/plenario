@@ -22,7 +22,7 @@ def create_foi_table(foi_name, properties):
         op = (op + '"{}" {}, '.format(prop['name'], prop['type']))
     op = (op + ('PRIMARY KEY ("node_id", datetime)) '
           'DISTKEY(datetime) SORTKEY(datetime);'))
-    print op
+    print(op)
     redshift_engine.execute(text(op))
 
 
@@ -46,7 +46,7 @@ def insert_observation(foi_name, nodeid, datetime, sensor,
     for val in values:
         op = (op + ', {}'.format(val))
     op = (op + ', {});'.format(str(procedures)))
-    print op
+    print(op)
     op = text(op)
     redshift_engine.execute(op)
 

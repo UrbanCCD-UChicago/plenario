@@ -6,7 +6,8 @@ from dateutil.parser import parse as date_parse
 from sqlalchemy import and_, func, Table, asc
 from sqlalchemy.sql import select
 
-from plenario.database import redshift_Base as RBase, redshift_session as r_session
+from plenario.database import redshift_Base as RBase
+from plenario.database import redshift_session as r_session
 from plenario.database import session, redshift_engine as r_engine
 from plenario.models.SensorNetwork import NodeMeta
 
@@ -62,7 +63,7 @@ def _format_aggregates(aggregates, agg_label, agg_unit, start_dt, end_dt):
     for agg in aggregates:
         aggregate_json = defaultdict(dict)
 
-        for key in agg.keys():
+        for key in list(agg.keys()):
             if key == "time_bucket":
                 aggregate_json["time_bucket"] = agg[key]
             elif key == "count":
@@ -110,7 +111,7 @@ def _generate_placeholder(aggreagte):
     :returns: (dict) placeholder copy"""
 
     placeholder = deepcopy(aggreagte)
-    for key, value in placeholder.items():
+    for key, value in list(placeholder.items()):
         if key == "time_bucket":
             continue
         elif key == "count":
@@ -156,7 +157,7 @@ def _valid_columns(node, target_sensors, target_feature_properties):
         if target_sensors:
             if sensor.name not in target_sensors:
                 continue
-        for val in sensor.observed_properties.values():
+        for val in list(sensor.observed_properties.values()):
             current_feature = val.split(".")[0]
             current_property = val.split(".")[1]
             if current_feature not in target_feature_properties:
@@ -164,7 +165,8 @@ def _valid_columns(node, target_sensors, target_feature_properties):
             # We will only check against properties if properties were specified
             # ex. magnetic_field.x, magnetic_field.y ...
             if target_feature_properties[current_feature]:
-                if current_property.lower() not in target_feature_properties[current_feature]:
+                target_properties = target_feature_properties[current_feature]
+                if current_property.lower() not in target_properties:
                     continue
             columns.add(val.split(".")[1].lower())
 
@@ -203,8 +205,10 @@ def aggregate(args, agg_label, agg_fn):
     :param agg_fn: (function) aggregate function that is being applied
     :returns: (list) of dictionary objects that can be dumped to JSON"""
 
-    expected = ("node", "feature", "start_datetime", "end_datetime", "sensors", "agg")
-    node, feature, start_dt, end_dt, sensors, agg_unit = (args.data.get(k) for k in expected)
+    expected = ("node", "feature", "start_datetime",
+                "end_datetime", "sensors", "agg")
+    node, feature, start_dt, end_dt, sensors, agg_unit = (args.data.get(k)
+                                                          for k in expected)
 
     # Format the datetime parameters
     start_dt = date_parse(start_dt).replace(tzinfo=None)
@@ -223,7 +227,10 @@ def aggregate(args, agg_label, agg_fn):
             target_feature_properties[feature] = None
 
     # Determine which columns, if any, can be aggregated from the target node
-    valid_columns = _valid_columns(node, target_sensors, target_feature_properties)
+    valid_columns = _valid_columns(node,
+                                   target_sensors,
+                                   target_feature_properties)
+
     if not valid_columns:
         raise ValueError("Your query returns no results. You have specified "
                          "filters which are likely contradictory (for example "
@@ -234,7 +241,10 @@ def aggregate(args, agg_label, agg_fn):
     obs_table = _reflect(feature.split(".")[0], RBase.metadata, r_engine)
 
     # Generate the necessary select statements and datetime delimiters
-    selects = _generate_aggregate_selects(obs_table, valid_columns, agg_fn, agg_unit)
+    selects = _generate_aggregate_selects(obs_table,
+                                          valid_columns,
+                                          agg_fn,
+                                          agg_unit)
 
     # Execute the query and return the formatted results
     query = select(selects).where(and_(

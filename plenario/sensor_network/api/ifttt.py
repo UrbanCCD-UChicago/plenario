@@ -29,7 +29,7 @@ def get_ifttt_observations():
         args['network'] = 'plenario_development'
         args['nodes'] = [input_args['triggerFields']['node']]
         args['feature'] = curated_map[input_args['triggerFields']['curated_property']].split('.')[0]
-        args['limit'] = input_args['limit'] if 'limit' in input_args.keys() else 50
+        args['limit'] = input_args['limit'] if 'limit' in list(input_args.keys()) else 50
         args['filter'] = json.dumps({'prop': curated_map[input_args['triggerFields']['curated_property']].split('.')[1],
                                      'op': input_args['triggerFields']['op'],
                                      'val': float(input_args['triggerFields']['val'])})
@@ -75,7 +75,7 @@ def get_ifttt_meta(field):
                  "value": node.id} for node in get_raw_metadata('nodes', validated_args)]
     elif field == 'curated_property':
         data = [{"label": curated_property,
-                 "value": curated_property} for curated_property in curated_map.keys()]
+                 "value": curated_property} for curated_property in list(curated_map.keys())]
 
     return make_ifttt_response(data)
 
