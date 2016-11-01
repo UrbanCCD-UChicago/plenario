@@ -5,11 +5,11 @@ from flask_admin import Admin, AdminIndexView, expose
 from flask_admin.menu import url_for
 from flask_login import current_user
 
-from admin_view import admin_views
+from .admin_view import admin_views
 from plenario.database import session
 from plenario.models.SensorNetwork import FeatureMeta
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, SensorMeta
-from views import blueprint, redis
+from .views import blueprint, redis
 
 
 class ApiaryIndexView(AdminIndexView):

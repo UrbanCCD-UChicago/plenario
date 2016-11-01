@@ -12,9 +12,9 @@ from plenario.database import session
 from plenario.models.SensorNetwork import NetworkMeta
 from plenario.sensor_network.redshift_ops import create_foi_table
 from plenario.sensor_network.redshift_ops import table_exists
-from validators import assert_json_enclosed_in_brackets
-from validators import map_to_redshift_type
-from validators import validate_node, validate_sensor_properties
+from .validators import assert_json_enclosed_in_brackets
+from .validators import map_to_redshift_type
+from .validators import validate_node, validate_sensor_properties
 
 
 # Based off a solution provided here:
@@ -123,8 +123,8 @@ class FOIMetaView(BaseMetaView):
         except TypeError:
             # This will occur if you are running without an address for a
             # Redshift DB - when we attempt to create a new table 
-            print("admin_view.FOIMetaView.on_model_change.err: {}"
-                  .format(traceback.format_exc()))
+            print(("admin_view.FOIMetaView.on_model_change.err: {}"
+                  .format(traceback.format_exc())))
 
 
 class SensorMetaView(BaseMetaView):

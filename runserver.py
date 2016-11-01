@@ -10,7 +10,7 @@ if os.environ.get('WORKER'):
     # Guard against worker being run multiple times on one machine.
     if not is_process_running("worker.py"):
         subprocess.Popen(["python", "worker.py"])
-        print "Spawned worker process."
+        print("Spawned worker process.")
     from plenario.update import create_worker
     application = create_worker()
 else:
