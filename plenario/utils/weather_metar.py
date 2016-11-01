@@ -43,6 +43,7 @@ def all_callSigns():
 
 
 def callSign2Wban(call_sign):
+    call_sign_wban_map = _make_call_sign_wban_map()
     return call_sign_wban_map.get(call_sign)
 
 
