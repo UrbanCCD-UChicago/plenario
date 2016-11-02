@@ -207,7 +207,7 @@ def update_weather():
     :returns (string) confirmation message"""
 
     # This should do the current month AND the previous month, just in case.
-    lastMonth_dt = datetime.now() - timedelta(days=1)
+    lastMonth_dt = datetime.now() - timedelta(days=4)
     lastMonth = lastMonth_dt.month
     lastYear = lastMonth_dt.year
 
