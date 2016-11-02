@@ -19,14 +19,14 @@ class WorkerBoss(object):
 
     def check_on_worker_threads(self, worker_threads):
 
-        for name, thread in worker_threads.items():
+        for name, thread in list(worker_threads.items()):
             if thread.is_alive():
                 continue
             worker_name = thread.getName()
             self.workers[worker_name] = "Dead"
 
     def rescue(self, worker_threads, worker_fn):
-        for name, thread in worker_threads.items():
+        for name, thread in list(worker_threads.items()):
             if thread.is_alive():
                 continue
             # Note that we cannot actually restart a thread. What we are doing
@@ -39,8 +39,8 @@ class WorkerBoss(object):
             self.workers[name] = "Revived"
 
     def terminate(self, worker_threads):
-        while any(thread.is_alive() for thread in worker_threads.values()):
-            for name, thread in worker_threads.items():
+        while any(thread.is_alive() for thread in list(worker_threads.values())):
+            for name, thread in list(worker_threads.items()):
                 if not thread.is_alive():
                     continue
                 thread.join(5)
@@ -52,7 +52,7 @@ class WorkerBoss(object):
         msg = "DoWork: {}, Active: {}, Protected: {}".format(self.do_work, self.active_worker_count, self.protected)
         logging.log(level=logging.INFO, msg=msg)
 
-        for name, status in self.workers.items():
+        for name, status in list(self.workers.items()):
             logging.log(level=logging.INFO, msg="{}: {}".format(name, status))
             msg += ", {}: {}".format(name, status)
 

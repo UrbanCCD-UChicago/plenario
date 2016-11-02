@@ -238,6 +238,8 @@ def aggregate(args, agg_label, agg_fn):
                          "you are aggregating for)")
 
     # Reflect the target feature of interest table
+    import pdb
+    pdb.set_trace()
     obs_table = _reflect(feature.split(".")[0], RBase.metadata, r_engine)
 
     # Generate the necessary select statements and datetime delimiters

@@ -17,7 +17,7 @@ endpoint_logic = {
     'detail-aggregate': lambda args: _detail_aggregate(args),
     # /detail?<args>
     # emulating row-removal features of _detail_response. Not very DRY, but it's the cleanest option.
-    'detail': lambda args: [{key: row[key] for key in row.keys()
+    'detail': lambda args: [{key: row[key] for key in list(row.keys())
                              if key not in ['point_date', 'hash', 'geom']} for row in
                             _detail(args)],
     # /datasets?<args>
@@ -38,7 +38,7 @@ shape_logic = {
     # /shapes/<shape>?<args>
     'export-shape': lambda args: _export_shape(args),
     # /shapes/<dataset>/<shape>?<args>
-    'aggregate-point-data': lambda args: [{key: row[key] for key in row.keys()
+    'aggregate-point-data': lambda args: [{key: row[key] for key in list(row.keys())
                                            if key not in ['hash', 'ogc_fid']}
                                           for row in _aggregate_point_data(args)]
 }

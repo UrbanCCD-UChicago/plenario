@@ -15,7 +15,7 @@ def get_ec2_instance_id():
     try:
         return requests.get(instance_id_url).text
     except requests.ConnectionError:
-        print "Could not find EC2 instance id..."
+        print("Could not find EC2 instance id...")
         return None
 
 
@@ -33,11 +33,11 @@ def get_autoscaling_group():
             InstanceIds=[get_ec2_instance_id()]
         )["AutoScalingInstances"][0]["AutoScalingGroupName"]
     except botocore.exceptions.ParamValidationError:
-        print "Bad params for autoscaling group ..."
+        print("Bad params for autoscaling group ...")
     except botocore.exceptions.NoRegionError:
-        print "Could not find autoscaling group region ..."
+        print("Could not find autoscaling group region ...")
     except botocore.exceptions.ClientError:
-        print "Could not create autoscaling client ..."
+        print("Could not create autoscaling client ...")
 
 
 AUTOSCALING_GROUP = get_autoscaling_group()
