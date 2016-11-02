@@ -1,0 +1,1 @@
+0 * * * * sudo fstrim /proc/$(sudo docker inspect --format='{{ .State.Pid }}' $(sudo docker ps -q))/root
