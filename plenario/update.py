@@ -21,7 +21,7 @@ def create_worker():
 
     @app.route('/update/weather', methods=['POST'])
     def weather():
-        tasks.update_weather()
+        submit_job({"endpoint": "update_weather", "query": None})
         return "Sent off weather task"
 
     @app.route('/update/<frequency>', methods=['POST'])
