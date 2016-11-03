@@ -7,6 +7,7 @@ import time
 import warnings
 
 
+from binascii import hexlify
 from flask import request, make_response
 from os import urandom
 
@@ -135,7 +136,7 @@ def submit_job(req):
     # Quickly generate a random hash. Collisions are highly unlikely!
     # Seems safer than relying on a counter in the database.
 
-    ticket = urandom(16).encode('hex')
+    ticket = hexlify(urandom(16)).decode("utf-8")
 
     set_request(ticket, req)
     set_result(ticket, "")

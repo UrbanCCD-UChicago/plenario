@@ -1,6 +1,6 @@
 language: python
 python:
-- '2.7.11'
+- '3.4'
 addons:
   postgresql: '9.4'
   apt:

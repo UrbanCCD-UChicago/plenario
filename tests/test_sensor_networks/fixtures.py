@@ -7,8 +7,6 @@ from random import randint, random
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
-from plenario.models.SensorNetwork import *
-
 
 class Fixtures:
 
@@ -170,3 +168,6 @@ class Fixtures:
 
     def kill_worker(self):
         os.kill(self.worker_process.pid, signal.SIGTERM)
+
+
+from plenario.models.SensorNetwork import *

@@ -1,8 +1,8 @@
 import json
 import time
 import unittest
+
 from .fixtures import Fixtures
-from plenario import create_app
 
 
 class TestSensorNetworks(unittest.TestCase):
@@ -236,7 +236,11 @@ class TestSensorNetworks(unittest.TestCase):
         response, result = self.get_result(url)
         total_count = 0
         for bucket in result["data"]:
-            total_count += list(bucket.values())[0]["count"]
+            for item in bucket.values():
+                try:
+                    total_count += item["count"]
+                except TypeError:
+                    pass
         self.assertEqual(total_count, 200)
 
     def test_query_endpoint_returns_correct_observation_count_total(self):
@@ -267,3 +271,6 @@ class TestSensorNetworks(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.fixtures.kill_worker()
+
+
+from plenario import create_app

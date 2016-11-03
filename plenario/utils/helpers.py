@@ -84,7 +84,7 @@ def slugify(text, delim='_'):
             word = normalize('NFKD', word).encode('ascii', 'ignore')
             if word:
                 result.append(word)
-        return delim.join(result)
+        return delim.join(str(result))
     else:
         return text
 
@@ -100,7 +100,7 @@ def send_mail(subject, recipient, body):
             region_name=AWS_REGION_NAME
         )
     except Exception as e:
-        print((e.message, 'Failed to connect to AWS SES. Email aborted.'))
+        print(e, 'Failed to connect to AWS SES. Email aborted.')
         return
 
     destination = {
@@ -128,7 +128,8 @@ def send_mail(subject, recipient, body):
             Message=message
         )
     except Exception as e:
-        print((e.message, "Failed to send email through AWS SES."))
+        print(e, "Failed to send email through AWS SES.")
+
 
 def reflect(table_name, metadata, engine):
     """Helper function for an oft repeated block of code.
