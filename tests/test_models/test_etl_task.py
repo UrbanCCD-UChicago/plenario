@@ -11,7 +11,7 @@ from plenario.models.ETLTask import add_task, fetch_task, delete_task
 from plenario.models.ETLTask import update_task, fetch_table_etl_status
 from plenario.update import create_worker
 from plenario.views import approve_dataset
-from tests.test_fixtures.post_data import roadworks_post_data
+from tests.fixtures.post_data import roadworks_post_data
 
 
 def cleanup():

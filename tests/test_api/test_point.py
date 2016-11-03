@@ -4,7 +4,7 @@ import urllib.request, urllib.parse, urllib.error
 from io import StringIO
 import csv
 
-from tests.test_fixtures.base_test import BasePlenarioTest, fixtures_path
+from tests.fixtures.base_test import BasePlenarioTest, fixtures_path
 
 # Filters
 # =======

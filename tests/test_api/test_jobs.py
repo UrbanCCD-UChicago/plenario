@@ -1,8 +1,8 @@
-import unittest
 import subprocess
-import random
+import unittest
 import zipfile
 
+import random
 from io import StringIO
 
 from plenario import create_app
@@ -11,11 +11,11 @@ from plenario.api.jobs import *
 from plenario.database import app_engine, session
 from plenario.models import MetaTable, ShapeMetadata
 from plenario.update import create_worker
-from plenario.utils.shapefile import Shapefile
 from plenario.utils.model_helpers import fetch_table, table_exists
+from plenario.utils.shapefile import Shapefile
 from plenario.views import approve_dataset, queue_update_dataset, delete_dataset
 from plenario.views import approve_shape, queue_update_shape, delete_shape
-from tests.points.api_tests import get_loop_rect
+from tests.test_api.test_point import get_loop_rect
 
 
 class TestJobs(unittest.TestCase):

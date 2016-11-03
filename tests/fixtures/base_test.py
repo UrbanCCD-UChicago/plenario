@@ -1,9 +1,9 @@
 import os
 import unittest
 
-from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta
-from tests.test_fixtures.point_meta import flu_path, landmarks_path
-from tests.test_fixtures.point_meta import crime_meta, crime_path
+from tests.fixtures.point_meta import flu_shot_meta, landmarks_meta
+from tests.fixtures.point_meta import flu_path, landmarks_path
+from tests.fixtures.point_meta import crime_meta, crime_path
 
 from plenario import create_app
 from plenario.database import session

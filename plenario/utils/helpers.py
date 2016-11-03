@@ -75,8 +75,7 @@ def slugify(text: str, delimiter: str = "_") -> str:
     """Given text, return lowercase unicode slug that gets as close as
     possible to the original. Will fail on Asian characters.
 
-    Based on http://flask.pocoo.org/snippets/5/
-    """
+    Based on http://flask.pocoo.org/snippets/5/"""
 
     punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.:;]+')
     result = []

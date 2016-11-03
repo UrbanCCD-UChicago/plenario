@@ -8,7 +8,7 @@ from plenario.database import session, app_engine as engine
 from plenario.models import ShapeMetadata
 from plenario.etl.shape import ShapeETL
 from plenario.utils.shapefile import Shapefile
-from tests.test_fixtures.base_test import BasePlenarioTest, FIXTURE_PATH, \
+from tests.fixtures.base_test import BasePlenarioTest, FIXTURE_PATH, \
     fixtures
 
 

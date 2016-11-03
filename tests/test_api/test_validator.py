@@ -7,8 +7,8 @@ from plenario import create_app
 from plenario.database import app_engine
 from plenario.etl.point import PlenarioETL
 from plenario.models import MetaTable
-from .api_tests import get_loop_rect
-from tests.test_fixtures.post_data import roadworks_post_data
+from tests.test_api.test_point import get_loop_rect
+from tests.fixtures.post_data import roadworks_post_data
 
 
 class TestValidator(unittest.TestCase):
