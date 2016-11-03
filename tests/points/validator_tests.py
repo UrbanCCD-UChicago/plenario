@@ -17,7 +17,7 @@ class TestValidator(unittest.TestCase):
         """A little util that does work I found myself repeating alot."""
 
         response = self.test_client.get('/v1/api/' + endpoint)
-        return json.loads(response.data)
+        return json.loads(response.data.decode('utf-8'))
 
     @classmethod
     def setUpClass(cls):

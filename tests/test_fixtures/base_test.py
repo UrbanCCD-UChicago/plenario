@@ -63,6 +63,9 @@ class BasePlenarioTest(unittest.TestCase):
         # Remove tables that we're about to recreate.
         # This doesn't happen in teardown because I find it helpful
         # to inspect them in the DB after running the tests.
+        import pdb
+        pdb.set_trace()
+
         meta_table_names = ['meta_master', 'meta_shape', 'etl_task']
         fixture_table_names = [fixture.table_name for key, fixture in fixtures.items()]
 

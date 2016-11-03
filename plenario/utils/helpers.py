@@ -71,22 +71,20 @@ def iter_column(idx, f):
     return col_type, null_values
 
 
-def slugify(text, delim='_'):
+def slugify(text: str, delimiter: str = "_") -> str:
+    """Given text, return lowercase unicode slug that gets as close as
+    possible to the original. Will fail on Asian characters.
+
+    Based on http://flask.pocoo.org/snippets/5/
     """
-    Given text, return lowercase ASCII slug that gets as close as possible to the original.
-    Will fail on Asian characters.
-    Taken from http://flask.pocoo.org/snippets/5/
-    """
-    if text:
-        punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.:;]+')
-        result = []
-        for word in punct_re.split(text.lower()):
-            word = normalize('NFKD', word).encode('ascii', 'ignore')
-            if word:
-                result.append(word)
-        return delim.join(str(result))
-    else:
-        return text
+
+    punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.:;]+')
+    result = []
+    for word in punct_re.split(text.lower()):
+        word = normalize('NFKD', word)
+        if word:
+            result.append(word)
+    return delimiter.join(result)
 
 
 def send_mail(subject, recipient, body):

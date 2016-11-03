@@ -402,7 +402,7 @@ def contrib_thankyou():
 
 def point_meta_from_submit_form(form, is_approved):
     columns, labels = form_columns(form)
-    name = slugify(form['dataset_name'], delim='_')[:50]
+    name = slugify(form['dataset_name'], delimiter='_')[:50]
 
     metatable = MetaTable(
         url=form['file_url'],

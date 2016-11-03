@@ -77,7 +77,7 @@ class MetaTable(Base):
             if name is None:
                 return None
             else:
-                return slugify(str(name), delim='_')
+                return slugify(str(name), delimiter='_')
 
         # Some combination of columns from which we can derive a point in space.
         assert (location or (latitude and longitude))
