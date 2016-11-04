@@ -58,7 +58,7 @@ class PointAPITests(BasePlenarioTest):
         """This bit of code seems to be repeated alot."""
         query = '/v1/api/' + query_string
         response = self.app.get(query)
-        return json.loads(response.data)
+        return json.loads(response.data.decode("utf-8"))
 
     # ========
     # datasets

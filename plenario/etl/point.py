@@ -144,29 +144,6 @@ class Staging(object):
         finally:
             conn.close()
 
-    def _add_unique_hash(table_name):
-        """
-        Adds an md5 hash column of the preexisting columns
-        and removes duplicate rows from a table.
-        :param table_name: Name of table to add hash to.
-        """
-        add_hash = '''
-        DROP TABLE IF EXISTS temp;
-        CREATE TABLE temp AS
-          SELECT DISTINCT *,
-                 md5(CAST(("{table_name}".*)AS text))
-                    AS hash FROM "{table_name}";
-        DROP TABLE "{table_name}";
-        ALTER TABLE temp RENAME TO "{table_name}";
-        ALTER TABLE "{table_name}" ADD PRIMARY KEY (hash);
-        '''.format(table_name=table_name)
-
-        try:
-            engine.execute(add_hash)
-        except Exception as e:
-            raise PlenarioETLError(repr(e) +
-                                   '\n Failed to deduplicate with ' + add_hash)
-
     '''Utility methods to generate columns
     into which we can dump the CSV data.'''
 
