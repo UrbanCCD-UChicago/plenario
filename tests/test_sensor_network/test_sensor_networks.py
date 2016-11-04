@@ -96,14 +96,14 @@ class TestSensorNetworks(unittest.TestCase):
 
     def test_download_queues_job_returns_ticket(self):
         _, data = self.get_result("/v1/api/sensor-networks/test_network/"
-                                  "download?sensors=sensor_01"
+                                  "download?sensors=sensor_02"
                                   "&nodes=test_node&features=vector")
         self.assertIn("ticket", data)
 
     def test_download_queues_job_returns_correct_result_for_good_args(self):
         queueing_response, data = self.get_result("/v1/api/sensor-networks/"
                                                   "test_network/download"
-                                                  "sensors=sensor_01"
+                                                  "sensors=sensor_02"
                                                   "&nodes=test_node"
                                                   "&features=vector"
                                                   "&start_datetime=2000-01-01")

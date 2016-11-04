@@ -21,32 +21,49 @@ from plenario_worker.clients import job_queue
 redisPool = redis.ConnectionPool(host=CACHE_CONFIG["CACHE_REDIS_HOST"], port=6379, db=0)
 JobsDB = redis.Redis(connection_pool=redisPool)
 
-
-def get_status(ticket):
-    return json.loads(JobsDB.get(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_status_" + ticket))
+prefix = CACHE_CONFIG["CACHE_KEY_PREFIX"]
 
 
-def set_status(ticket, status):
-    JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_status_" + ticket,
-               json.dumps(status, default=unknown_object_json_handler))
+def get_status(ticket: str):
+    cache_key = prefix + "_job_status_" + ticket
+    try:
+        return json.loads(JobsDB.get(cache_key).decode("utf-8"))
+    except AttributeError:
+        return None
 
 
-def get_request(ticket):
-    return json.loads(JobsDB.get(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_query_" + ticket))
+def set_status(ticket: str, status):
+    cache_key = prefix + "_job_status_" + ticket
+    JobsDB.set(
+        name=cache_key,
+        value=json.dumps(status, default=unknown_object_json_handler)
+    )
 
 
-def set_request(ticket, request_):
-    JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_query_" + ticket,
-               json.dumps(request_, default=unknown_object_json_handler))
+def get_request(ticket: str):
+    cache_key = prefix + "_job_query_" + ticket
+    return json.loads(JobsDB.get(cache_key).decode("utf-8"))
 
 
-def get_result(ticket):
-    return json.loads(JobsDB.get(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_result_" + ticket))
+def set_request(ticket: str, request_):
+    cache_key = prefix + "_job_query_" + ticket
+    JobsDB.set(
+        name=cache_key,
+        value=json.dumps(request_, default=unknown_object_json_handler)
+    )
 
 
-def set_result(ticket, result):
-    JobsDB.set(CACHE_CONFIG["CACHE_KEY_PREFIX"] + "_job_result_" + ticket,
-               json.dumps(result, default=unknown_object_json_handler))
+def get_result(ticket: str):
+    cache_key = prefix + "_job_result_" + ticket
+    return json.loads(JobsDB.get(cache_key).decode("utf-8"))
+
+
+def set_result(ticket: str, result):
+    cache_key = prefix + "_job_result_" + ticket
+    JobsDB.set(
+        name=cache_key,
+        value=json.dumps(result, default=unknown_object_json_handler)
+    )
 
 
 def get_flag(flag):
@@ -80,7 +97,7 @@ def worker_ready():
         return False
 
 
-def get_job(ticket):
+def get_job(ticket: str):
     if not ticket_exists(ticket):
         response = {"ticket": ticket, "error": "Job not found."}
         response = make_response(json.dumps(response, default=unknown_object_json_handler), 404)

@@ -127,7 +127,7 @@ def datadump():
 
 
 @crossdomain(origin="*")
-def get_datadump(ticket):
+def get_datadump(ticket: str):
     job = get_job(ticket)
     print(("{} point.get_datadump.job: {}".format(datetime.now(), job)))
     try:

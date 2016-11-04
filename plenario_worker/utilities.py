@@ -100,7 +100,7 @@ def update_instance_protection(worker_boss, autoscaling_client):
             worker_boss.protected = False
 
     except Exception as e:
-        if "is not in InService or EnteringStandby or Standby" in e:
+        if "is not in InService or EnteringStandby or Standby" in str(e):
             log("Could not apply INSTANCE PROTECTION: {}".format(e), "WORKER BOSS")
             log("INSTANCE TERMINATING!", "WORKER BOSS")
             worker_boss.do_work = False
