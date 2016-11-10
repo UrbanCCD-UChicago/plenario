@@ -1,28 +1,32 @@
-from metar.metar import Metar
 from plenario.database import app_engine as engine
-import requests
-import csv
-import os
 
-from lxml import etree
-from lxml.etree import fromstring
-from lxml import objectify
+# todo: not used
+# import requests
+# import csv
+# import os
+#
+# from lxml import etree
+# from lxml.etree import fromstring
+# from lxml import objectify
 
 # Example METAR URL: 'https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25&stationString=KORD'
 
-current_METAR_url = 'http://aviationweather.gov/adds/dataserver_current/current/'
+# todo: not used
+# current_METAR_url = 'http://aviationweather.gov/adds/dataserver_current
+# /current/'
 
 
-def _make_call_sign_wban_map():
-    try:
-        with open('plenario/utils/wban_to_call_sign.csv') as fp:
-            reader = csv.reader(fp)
-            # Discard header
-            next(reader)
-            call_sign_to_wban_map = {row[1]: row[0] for row in reader}
-        return call_sign_to_wban_map
-    except IOError as err:
-        raise IOError(str(err) + " -- running from {}".format(os.path.abspath(".")))
+# todo: covered by get_callsign_wban_code_map
+# def _make_call_sign_wban_map():
+#     try:
+#         with open('plenario/utils/wban_to_call_sign.csv') as fp:
+#             reader = csv.reader(fp)
+#             # Discard header
+#             next(reader)
+#             call_sign_to_wban_map = {row[1]: row[0] for row in reader}
+#         return call_sign_to_wban_map
+#     except IOError as err:
+#         raise IOError(str(err) + " -- running from {}".format(os.path.abspath(".")))
 
 
 # An example code:
@@ -31,115 +35,123 @@ def _make_call_sign_wban_map():
 # - Visibility is 2 statute miles
 # code = "METAR KEWR 111851Z VRB03G19KT 2SM R04R/3000VP6000FT TSRA BR FEW015 BKN040CB BKN065 OVC200 22/22 A2987 RMK AO2 PK WND 29028/1817 WSHFT 1812 TSB05RAB22 SLP114 FRQ LTGICCCCG TS OHD AND NW-N-E MOV NE P0013 T02270215"
 
-def getMetar(metar_string):
-    m = Metar(metar_string)
-    return m
+# todo: covered by parse_metar
+# def getMetar(metar_string):
+#     m = Metar(metar_string)
+#     return m
 
 
-def all_callSigns():
-    sql = "SELECT call_sign FROM weather_stations ORDER BY call_sign"
-    result = engine.execute(sql)
-    return [x[0] for x in result.fetchall()]
+# todo: covered by get_callsign_wban_code_map
+# def all_callSigns():
+#     sql = "SELECT call_sign FROM weather_stations ORDER BY call_sign"
+#     result = engine.execute(sql)
+#     return [x[0] for x in result.fetchall()]
 
 
-def callSign2Wban(call_sign):
-    call_sign_wban_map = _make_call_sign_wban_map()
-    return call_sign_wban_map.get(call_sign)
+# todo: covered by get_callsign_wban_code_map
+# def callSign2Wban(call_sign):
+#     call_sign_wban_map = _make_call_sign_wban_map()
+#     return call_sign_wban_map.get(call_sign)
 
 
-def wban2CallSign(wban_code):
-    sql = "SELECT call_sign FROM weather_stations where wban_code='%s'" % wban_code
-    result = engine.execute(sql)
-    # print "result=", result
-    x = result.first()
-    cs = None
-    if x:
-        cs = x[0]
-        # print "wban=", wban
-    else:
-        print(("could not find wban:", wban_code))
-    return cs
+# todo: covered by get_callsign_wban_code_map
+# def wban2CallSign(wban_code):
+#     sql = "SELECT call_sign FROM weather_stations where wban_code='%s'" % wban_code
+#     result = engine.execute(sql)
+#     # print "result=", result
+#     x = result.first()
+#     cs = None
+#     if x:
+#         cs = x[0]
+#         # print "wban=", wban
+#     else:
+#         print(("could not find wban:", wban_code))
+#     return cs
 
 
-def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban2callsigns=None):
-    xml_METAR_url = 'http://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25'
-    # Example of multiple stations: https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25&stationString=KORD,KMDW
-
-    if (all_stations == True):
-        # We should grab our list from weather_stations and only ask for 100 at a time. 
-        # print "all_callSigns is ", all_callSigns()
-        # print "len(all_callSigns) is ", len(all_callSigns())
-        # XXXXXX TOOO
-        pass
-    elif (call_signs and wban_codes):
-        print("error: define only call_signs or wban_codes and not both")
-    elif (wban_codes):
-        # Convert all wban_codes to call_signs
-        if (wban2callsigns):
-            call_signs = []
-            for wban in wban_codes:
-                if wban in wban2callsigns:
-                    call_signs.append(wban2callsigns[wban])
-        else:
-            call_signs = []
-            for wban_code in wban_codes:
-                call_sign = wban2CallSign(wban_code)
-                if (call_sign):
-                    call_signs.append(call_sign)
-
-    if (call_signs):
-        # OK, we have call signs now
-        xml_METAR_url += '&stationString='
-        xml_METAR_url += ','.join([x.upper() for x in call_signs])
-    else:
-        # XXXXXX: doing all stations
-        pass
-
-    print(("xml_METAR_url: '%s'" % xml_METAR_url))
-    return raw_metars_from_url(xml_METAR_url)
-
-
-def raw_metars_from_url(url):
-    req = requests.get(url)
-    xml = req.text
-
-    xml_u = xml.encode('utf-8')
-
-    parser = etree.XMLParser(ns_clean=True, recover=True, encoding='utf-8')
-    h = fromstring(xml_u, parser=parser)
-    # tree = etree.parse(StringIO(xml_u))
-    root = objectify.fromstring(xml_u)
-    # print "root is ", root, type(root)
-
-    metars = root['data']['METAR']
-
-    metar_raws = []
-    for m in metars:
-        metar_raw = m['raw_text'].text
-        metar_raws.append(metar_raw)
-
-    print(("completed len(metar_raws)= %d" % len(metar_raws)))
-    return metar_raws
+# todo: covered by update_metar
+# def getCurrentWeather(call_signs=None, wban_codes=None, all_stations=False, wban2callsigns=None):
+#     xml_METAR_url = 'http://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25'
+#     # Example of multiple stations: https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25&stationString=KORD,KMDW
+#
+#     if (all_stations == True):
+#         # We should grab our list from weather_stations and only ask for 100 at a time.
+#         # print "all_callSigns is ", all_callSigns()
+#         # print "len(all_callSigns) is ", len(all_callSigns())
+#         # XXXXXX TOOO
+#         pass
+#     elif (call_signs and wban_codes):
+#         print("error: define only call_signs or wban_codes and not both")
+#     elif (wban_codes):
+#         # Convert all wban_codes to call_signs
+#         if (wban2callsigns):
+#             call_signs = []
+#             for wban in wban_codes:
+#                 if wban in wban2callsigns:
+#                     call_signs.append(wban2callsigns[wban])
+#         else:
+#             call_signs = []
+#             for wban_code in wban_codes:
+#                 call_sign = wban2CallSign(wban_code)
+#                 if (call_sign):
+#                     call_signs.append(call_sign)
+#
+#     if (call_signs):
+#         # OK, we have call signs now
+#         xml_METAR_url += '&stationString='
+#         xml_METAR_url += ','.join([x.upper() for x in call_signs])
+#     else:
+#         # XXXXXX: doing all stations
+#         pass
+#
+#     print(("xml_METAR_url: '%s'" % xml_METAR_url))
+#     return raw_metars_from_url(xml_METAR_url)
 
 
-def getAllCurrentWeather():
-    all_metar_url = 'http://aviationweather.gov/adds/dataserver_current/current/metars.cache.xml'
-    return raw_metars_from_url(all_metar_url)
-    # all_calls = all_callSigns()
-    # all_metars = []
-    # for i in range(0, len(all_calls), 1000):
-    #     calls_range = all_calls[i:(i+1000)]
-    #     metars = getCurrentWeather(call_signs=calls_range)
-    #     all_metars.extend(metars)
-    #
-    # print "getAllCurrentWeather(): total metar collection is length", len(all_metars)
+# todo: covered by update_metar
+# def raw_metars_from_url(url):
+#     req = requests.get(url)
+#     xml = req.text
+#
+#     xml_u = xml.encode('utf-8')
+#
+#     parser = etree.XMLParser(ns_clean=True, recover=True, encoding='utf-8')
+#     h = fromstring(xml_u, parser=parser)
+#     # tree = etree.parse(StringIO(xml_u))
+#     root = objectify.fromstring(xml_u)
+#     # print "root is ", root, type(root)
+#
+#     metars = root['data']['METAR']
+#
+#     metar_raws = []
+#     for m in metars:
+#         metar_raw = m['raw_text'].text
+#         metar_raws.append(metar_raw)
+#
+#     print(("completed len(metar_raws)= %d" % len(metar_raws)))
+#     return metar_raws
 
 
-def getWban(obs):
-    if obs.station_id:
-        return callSign2Wban(obs.station_id)
-    else:
-        return None
+# todo: covered by update_metar
+# def getAllCurrentWeather():
+#     all_metar_url = 'http://aviationweather.gov/adds/dataserver_current/current/metars.cache.xml'
+#     return raw_metars_from_url(all_metar_url)
+#     # all_calls = all_callSigns()
+#     # all_metars = []
+#     # for i in range(0, len(all_calls), 1000):
+#     #     calls_range = all_calls[i:(i+1000)]
+#     #     metars = getCurrentWeather(call_signs=calls_range)
+#     #     all_metars.extend(metars)
+#     #
+#     # print "getAllCurrentWeather(): total metar collection is length", len(all_metars)
+
+
+# todo: covered by get_callsign_wban_code_map
+# def getWban(obs):
+#     if obs.station_id:
+#         return callSign2Wban(obs.station_id)
+#     else:
+#         return None
 
 
 def getSkyCondition(obs):
@@ -286,60 +298,65 @@ def getPrecip(obs):
     return precip_1hr, precip_3hr, precip_6hr, precip_24hr
 
 
-def dumpMetar(metar):
-    pass
+# todo: does nothing
+# def dumpMetar(metar):
+#     pass
 
 
-def getMetarVals(metar):
-    wban_code = getWban(metar)
-    call_sign = metar.station_id
-    datetime = metar.time
-    sky_condition, sky_condition_top = getSkyCondition(metar)
-    visibility = getVisibility(metar)
-    weather_types = getWeatherTypes(metar)
-    f = getTempFahrenheit(metar)
-    dp = getDewpointFahrenheit(metar)
-    wind_speed, wind_direction_int, wind_direction_cardinal, wind_gust = getWind(metar)
-    pressure = getPressure(metar)
-    pressure_sea_level = getPressureSeaLevel(metar)
-    # XXX do snow depth ("Usually found in the 06 and 18Z observations.")
-    # (XXX: snow depth not found in current metar parse, but could be wrong.)
-    precip_1hr, precip_3hr, precip_6hr, precip_24hr = getPrecip(metar)
-
-    # print "wban: ", wban_code
-    # print "datetime: ", datetime
-    # print "sky_condition: ", sky_condition
-    # print "sky_condition_top: ", sky_condition_top
-    # print "weather_types: ", weather_types
-    # print "temp: " , f, "F"
-    # print "dewpoint: ", dp, "F"
-    # print "wind speed:", wind_speed, "MPH", "wind_direction: ", wind_direction_int, "wind_direction_cardinal:", wind_direction_cardinal
-    # print "pressure: ", pressure, "IN"
-    # print "pressure (sea_level): ", pressure_sea_level, "IN"
-    # print "precip (1hr, 3hr, 6hr, 24hr):", precip_1hr, precip_3hr, precip_6hr, precip_24hr
-
-    return [wban_code, call_sign, datetime, sky_condition, sky_condition_top,
-            visibility, weather_types, f, dp,
-            wind_speed, wind_direction_int, wind_direction_cardinal, wind_gust,
-            pressure, pressure_sea_level,
-            precip_1hr, precip_3hr, precip_6hr, precip_24hr]
-
-
-def dumpRawMetar(raw_metar):
-    print(("raw_metar=", raw_metar))
-    obs = Metar(raw_metar)
-    dumpMetar(obs)
+# todo: covered by extract_metar_values
+# def getMetarVals(metar):
+#     wban_code = getWban(metar)
+#     call_sign = metar.station_id
+#     datetime = metar.time
+#     sky_condition, sky_condition_top = getSkyCondition(metar)
+#     visibility = getVisibility(metar)
+#     weather_types = getWeatherTypes(metar)
+#     f = getTempFahrenheit(metar)
+#     dp = getDewpointFahrenheit(metar)
+#     wind_speed, wind_direction_int, wind_direction_cardinal, wind_gust = getWind(metar)
+#     pressure = getPressure(metar)
+#     pressure_sea_level = getPressureSeaLevel(metar)
+#     # XXX do snow depth ("Usually found in the 06 and 18Z observations.")
+#     # (XXX: snow depth not found in current metar parse, but could be wrong.)
+#     precip_1hr, precip_3hr, precip_6hr, precip_24hr = getPrecip(metar)
+#
+#     # print "wban: ", wban_code
+#     # print "datetime: ", datetime
+#     # print "sky_condition: ", sky_condition
+#     # print "sky_condition_top: ", sky_condition_top
+#     # print "weather_types: ", weather_types
+#     # print "temp: " , f, "F"
+#     # print "dewpoint: ", dp, "F"
+#     # print "wind speed:", wind_speed, "MPH", "wind_direction: ", wind_direction_int, "wind_direction_cardinal:", wind_direction_cardinal
+#     # print "pressure: ", pressure, "IN"
+#     # print "pressure (sea_level): ", pressure_sea_level, "IN"
+#     # print "precip (1hr, 3hr, 6hr, 24hr):", precip_1hr, precip_3hr, precip_6hr, precip_24hr
+#
+#     return [wban_code, call_sign, datetime, sky_condition, sky_condition_top,
+#             visibility, weather_types, f, dp,
+#             wind_speed, wind_direction_int, wind_direction_cardinal, wind_gust,
+#             pressure, pressure_sea_level,
+#             precip_1hr, precip_3hr, precip_6hr, precip_24hr]
 
 
+# todo: does nothing
+# def dumpRawMetar(raw_metar):
+#     print(("raw_metar=", raw_metar))
+#     obs = Metar(raw_metar)
+#     dumpMetar(obs)
+
+
+# todo: does nothing
 ##allw = getAllCurrentWeather()
-
 # here's a list of Illinois-area wban_codes (from python scripts/get_weather_station_bboxes.py where whitelist_urls=['ce29323c565cbd4a97eb61c73426fb01']
-illinois_area_wbans = ['14855', '54808', '14834', '04838', '04876', '03887', '04871', '04873', '04831',
-                       '04879', '04996', '14880', '04899', '94892', '94891', '04890', '54831', '94870',
-                       '04894', '94854', '14842', '93822', '04807', '04808', '54811', '94822', '94846',
-                       '04868', '04845', '04896', '04867', '04866', '04889', '14816', '04862', '94866',
-                       '04880', '14819']
+# illinois_area_wbans = ['14855', '54808', '14834', '04838', '04876', '03887', '04871', '04873', '04831',
+#                        '04879', '04996', '14880', '04899', '94892', '94891', '04890', '54831', '94870',
+#                        '04894', '94854', '14842', '93822', '04807', '04808', '54811', '94822', '94846',
+#                        '04868', '04845', '04896', '04867', '04866', '04889', '14816', '04862', '94866',
+#                        '04880', '14819']
 
+
+# todo: does nothing
 ##illinois_w = getCurrentWeather(wban_codes=illinois_wbans)
 # metars = []
 # om = None
