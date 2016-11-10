@@ -1,13 +1,14 @@
 import calendar
 import metar.metar as metar
+import numpy
 import requests
 import pandas
 import operator
 import os
+import re
 import sys
 import tarfile
 import zipfile
-import re
 
 import plenario.utils.weather_metar as WeatherMetar
 
@@ -18,9 +19,9 @@ from ftplib import FTP
 from geoalchemy2 import Geometry
 from io import StringIO
 from slugify import slugify
-from sqlalchemy import BigInteger, and_, select, distinct, func, delete, insert
+from sqlalchemy import BigInteger, and_, select, distinct, func, delete
 from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float
-from sqlalchemy import join
+from sqlalchemy import join, create_engine
 from sqlalchemy.dialects.postgresql import ARRAY, FLOAT, VARCHAR
 from tempfile import NamedTemporaryFile
 
@@ -40,16 +41,6 @@ class WeatherError(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
         self.message = message
-
-
-# Used to convert column types from the pandas generated metar table to types
-# which are compatible with the existing table
-metar_dtypes = {
-    "precip_3h": FLOAT(),
-    "precip_6h": FLOAT(),
-    "precip_24h": FLOAT(),
-    "weather_types": ARRAY(VARCHAR)
-}
 
 
 def get_callsign_wban_code_map() -> dict:
@@ -105,6 +96,16 @@ def extract_metar_values(df: pandas.DataFrame) -> pandas.DataFrame:
     return df
 
 
+# Used to convert column types from the pandas generated metar table to types
+# which are compatible with the existing table
+metar_dtypes = {
+    "precip_3h": FLOAT(),
+    "precip_6h": FLOAT(),
+    "precip_24h": FLOAT(),
+    "weather_types": ARRAY(VARCHAR)
+}
+
+
 def update_metar() -> None:
     """Update the dat_weather_metar table with recently reported and unchecked
     NOAA weather observations. This method is meant to be idempotent."""
@@ -158,6 +159,32 @@ def update_metar() -> None:
     )
 
     engine.execute(insert_new_records)
+
+
+def update_weather(timespan: str) -> None:
+    """Update the dat_weather_observations_<hourly/daily/monthly> table with
+    quality-checked NOAA weather observations."""
+
+    # Get the source file containing all the weather observation data
+    current_year_month = datetime.now().strftime("%Y%m")
+    source_url = "http://www.ncdc.noaa.gov/orders/qclcd/QCLCD201610.zip"
+    source_url += "QCLCD{}.zip".format(current_year_month)
+    response = requests.get(source_url)
+
+    # Write it into a temporary zip file
+    temporary_zip = NamedTemporaryFile()
+    temporary_zip.file.write(response.content)
+
+    # Extract the text file for the target timespan into a pandas dataframe
+    numpy_zip = numpy.load(temporary_zip.name)
+    data_fname = "{}.txt".format(current_year_month + timespan)
+    data_file = NamedTemporaryFile()
+    data_file.file.write(numpy_zip[data_fname])
+    hourly_dframe = pandas.read_csv(data_file.name)
+
+    table_name = "dat_weather_observations_{}".format(timespan)
+    # todo: dataframe expands to something too large, crashes my computer
+    hourly_dframe.to_sql(table_name, engine, if_exists="replace")
 
 
 class WeatherETL(object):
@@ -950,63 +977,64 @@ class WeatherETL(object):
 
         return vals
 
-    def _transform_metars(self, metar_codes, weather_stations_list=None, banned_weather_stations_list=None):
-        metar_codes_idx = 0
-
-        self.clean_observations_metar = StringIO()
-        writer = UnicodeCSVWriter(self.clean_observations_metar)
-        self.out_header=["wban_code", "call_sign", "datetime", "sky_condition", "sky_condition_top",
-                         "visibility", "weather_types", "temp_fahrenheit", "dewpoint_fahrenheit",
-                         "wind_speed", "wind_direction", "wind_direction_cardinal", "wind_gust",
-                         "station_pressure", "sealevel_pressure",
-                         "precip_1hr","precip_3hr", "precip_6hr", "precip_24hr"]
-
-        writer.writerow(self.out_header)
-        row_count = 0
-        added_count = 0
-        for row in metar_codes:
-            row_count += 1
-            row_vals = self._parse_row_metar(row, self.out_header)
-
-            # XXX: convert row_dict['weather_types'] from a list of lists (e.g. [[None, None, None, '', 'BR', None]])
-            # to a string that looks like: "{{None, None, None, '', 'BR', None}}"
-
-            try:
-                weather_types_str = str(row_vals[self.out_header.index('weather_types')])
-            except IndexError:
-                print(('the offending row is', row_vals))
-                continue
-            #print "weather_types_str = '%s'" % weather_types_str
-            # literally just change '[' to '{' and ']' to '}'
-            weather_types_str = weather_types_str.replace('[', '{')
-            weather_types_str = weather_types_str.replace(']', '}')
-            row_vals[self.out_header.index('weather_types')] = weather_types_str
-            #print "_transform_metars(): changed row_vals[self.out_header.index('weather_types')] to ", weather_types_str
-
-            if (not row_vals):
-                continue
-            row_dict = dict(list(zip(self.out_header, row_vals)))
-
-            if (weather_stations_list is not None):
-                # Only include observations from the specified list of wban_code values
-                if (row_dict['wban_code'] not in weather_stations_list):
-                    continue
-
-            if (banned_weather_stations_list is not None):
-                if (row_dict['wban_code'] in banned_weather_stations_list):
-                    continue
-            if (self.debug==True):
-                print(("_transform_metars(): WRITING row_vals: '%s'"  % str(row_vals)))
-
-            # Making sure there is a WBAN code
-            if not row_vals[0]:
-                # This will happen for stations outside of the USA.
-                # Discard for now.
-                continue
-            added_count += 1
-            writer.writerow(row_vals)
-
-        return self.clean_observations_metar
+    # todo: covered by extract_metar_values
+    # def _transform_metars(self, metar_codes, weather_stations_list=None, banned_weather_stations_list=None):
+    #     metar_codes_idx = 0
+    #
+    #     self.clean_observations_metar = StringIO()
+    #     writer = UnicodeCSVWriter(self.clean_observations_metar)
+    #     self.out_header=["wban_code", "call_sign", "datetime", "sky_condition", "sky_condition_top",
+    #                      "visibility", "weather_types", "temp_fahrenheit", "dewpoint_fahrenheit",
+    #                      "wind_speed", "wind_direction", "wind_direction_cardinal", "wind_gust",
+    #                      "station_pressure", "sealevel_pressure",
+    #                      "precip_1hr","precip_3hr", "precip_6hr", "precip_24hr"]
+    #
+    #     writer.writerow(self.out_header)
+    #     row_count = 0
+    #     added_count = 0
+    #     for row in metar_codes:
+    #         row_count += 1
+    #         row_vals = self._parse_row_metar(row, self.out_header)
+    #
+    #         # XXX: convert row_dict['weather_types'] from a list of lists (e.g. [[None, None, None, '', 'BR', None]])
+    #         # to a string that looks like: "{{None, None, None, '', 'BR', None}}"
+    #
+    #         try:
+    #             weather_types_str = str(row_vals[self.out_header.index('weather_types')])
+    #         except IndexError:
+    #             print(('the offending row is', row_vals))
+    #             continue
+    #         #print "weather_types_str = '%s'" % weather_types_str
+    #         # literally just change '[' to '{' and ']' to '}'
+    #         weather_types_str = weather_types_str.replace('[', '{')
+    #         weather_types_str = weather_types_str.replace(']', '}')
+    #         row_vals[self.out_header.index('weather_types')] = weather_types_str
+    #         #print "_transform_metars(): changed row_vals[self.out_header.index('weather_types')] to ", weather_types_str
+    #
+    #         if (not row_vals):
+    #             continue
+    #         row_dict = dict(list(zip(self.out_header, row_vals)))
+    #
+    #         if (weather_stations_list is not None):
+    #             # Only include observations from the specified list of wban_code values
+    #             if (row_dict['wban_code'] not in weather_stations_list):
+    #                 continue
+    #
+    #         if (banned_weather_stations_list is not None):
+    #             if (row_dict['wban_code'] in banned_weather_stations_list):
+    #                 continue
+    #         if (self.debug==True):
+    #             print(("_transform_metars(): WRITING row_vals: '%s'"  % str(row_vals)))
+    #
+    #         # Making sure there is a WBAN code
+    #         if not row_vals[0]:
+    #             # This will happen for stations outside of the USA.
+    #             # Discard for now.
+    #             continue
+    #         added_count += 1
+    #         writer.writerow(row_vals)
+    #
+    #     return self.clean_observations_metar
 
 
     # todo: covered by parse_metar
@@ -1022,10 +1050,6 @@ class WeatherETL(object):
     #     assert(len(header) == len(vals))
     #     return vals
 
-
-    
-    
-    
     # Help parse a 'present weather' string like 'FZFG' (freezing fog) or 'BLSN' (blowing snow) or '-RA' (light rain)
     # When we are doing precip slurp as many as possible
     def _do_weather_parse(self, pw, mapping, multiple=False, local_debug=False):
@@ -1569,6 +1593,8 @@ class WeatherETL(object):
     # which will figure out the most recent hourly weather observation and
     # delete all metars before that datetime.
 
+
+# todo: refactor
 def clear_metars() -> None:
     """Remove all rows in the metar table older than the latest row in the
     hourly table."""
