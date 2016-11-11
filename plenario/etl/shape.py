@@ -91,7 +91,7 @@ class HashedShape(object):
         :return: SQLAlchemy Table
         """
 
-        with ETLFile(source_url=self.url, source_path=self.path) as file_helper:
+        with ETLFile(source_url=self.url, source_path=self.path, interpret_as='bytes') as file_helper:
 
             # Attempt insertion
             try:

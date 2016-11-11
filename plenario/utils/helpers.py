@@ -1,5 +1,6 @@
 import re
 from unicodedata import normalize
+import csv
 import string
 from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
@@ -9,7 +10,7 @@ from plenario.settings import MAIL_USERNAME, ADMIN_EMAILS, \
 import math
 from collections import namedtuple
 from sqlalchemy import Table
-
+from slugify import slugify as _slugify
 
 def get_size_in_degrees(meters, latitude):
     earth_circumference = 40041000.0  # meters, average circumference
@@ -54,7 +55,7 @@ def iter_column(idx, f):
              and null_values is whether null values were found and normalized.
     """
     f.seek(0)
-    reader = UnicodeCSVReader(f)
+    reader = csv.reader(f)
 
     # Discard the header
     next(reader)
@@ -72,18 +73,7 @@ def iter_column(idx, f):
 
 
 def slugify(text: str, delimiter: str = "_") -> str:
-    """Given text, return lowercase unicode slug that gets as close as
-    possible to the original. Will fail on Asian characters.
-
-    Based on http://flask.pocoo.org/snippets/5/"""
-
-    punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.:;]+')
-    result = []
-    for word in punct_re.split(text.lower()):
-        word = normalize('NFKD', word)
-        if word:
-            result.append(word)
-    return delimiter.join(result)
+    return _slugify(text, separator=delimiter)
 
 
 def send_mail(subject, recipient, body):

@@ -1,6 +1,7 @@
-import json
+# import json
 
-from csvkit.unicsv import UnicodeCSVReader
+# from csvkit.unicsv import UnicodeCSVReader
+import csv
 from geoalchemy2 import Geometry
 from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
 from sqlalchemy import select, func
@@ -167,7 +168,7 @@ class Staging(object):
         """
         Generate columns by scanning source CSV and inferring column types.
         """
-        reader = UnicodeCSVReader(f)
+        reader = csv.reader(f)
         # Always create columns with slugified names
         header = list(map(slugify, next(reader)))
 

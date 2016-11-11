@@ -306,7 +306,7 @@ def export_dataset_to_response(shapeset, data_type, query=None):
         # Write to that filename.
         OgrExport(export_format, export_path, shapeset.name, query).write_file()
         # Dump it in the response.
-        with open(export_path, 'r') as to_export:
+        with open(export_path, 'rb') as to_export:
             resp = make_response(to_export.read(), 200)
 
         extension = _shape_format_to_file_extension(export_format)
