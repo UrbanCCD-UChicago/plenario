@@ -116,7 +116,7 @@ def weather(table):
                 weather_data[value.wban_code].append(wd)
             else:
                 weather_data[value.wban_code] = [wd]
-            loc = bytearray.fromhex(value.location).decode()
+            loc = bytearray.fromhex(str(value.location)).decode("utf-8")
             sd['location'] = shapely.wkb.loads(loc).__geo_interface__
             station_data[value.wban_code] = sd
 

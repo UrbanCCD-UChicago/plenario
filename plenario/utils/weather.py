@@ -4,12 +4,14 @@ import metar.metar as metar
 import numpy
 import requests
 import pandas
+import pdb
 import odo
 import operator
 import os
 import re
 import sys
 import tarfile
+import types
 import zipfile
 
 import plenario.utils.weather_metar as WeatherMetar
@@ -20,7 +22,7 @@ from dateutil import relativedelta
 from ftplib import FTP
 from geoalchemy2 import Geometry
 from io import StringIO
-from pandas import to_numeric
+from pandas import to_numeric, to_datetime
 from slugify import slugify
 from sqlalchemy import BigInteger, and_, select, distinct, func, delete, join
 from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float
@@ -31,6 +33,19 @@ from tempfile import NamedTemporaryFile
 from plenario.database import session as session, app_engine as engine, Base
 from plenario.settings import DATA_DIR, DATABASE_CONN
 from plenario.utils.helpers import reflect
+
+
+def download_weather_source_files() -> None:
+    """Get the source file containing all the weather observation data"""
+
+    current_year_month = datetime.now().strftime("%Y%m")
+    source_url = "http://www.ncdc.noaa.gov/orders/qclcd/"
+    source_url += "QCLCD{}.zip".format(current_year_month)
+    response = requests.get(source_url)
+
+    weather_zip = open("/tmp/qclcd", mode="wb")
+    weather_zip.write(response.content)
+    weather_zip.close()
 
 
 def get_cardinal_direction(wind_direction: str) -> str:
@@ -74,6 +89,66 @@ def parse_metar(raw_metar: str) -> metar.Metar:
         return metar.Metar(raw_metar)
     except metar.ParserError:
         return None
+
+
+def extract_daily_values(series: pandas.Series) -> pandas.Series:
+    """Given a single row of data, perform all the daily transformations
+    required and return the transformed row."""
+
+    # wban_code = row[header.index('WBAN')]
+    # date = row[header.index('YearMonthDay')] # e.g. 20140801
+    # temp_max = self.getTemp(row[header.index('Tmax')])
+    # temp_min = self.getTemp(row[header.index('Tmin')])
+    # temp_avg = self.getTemp(row[header.index('Tavg')])
+    # departure_from_normal = self.floatOrNA(row[header.index('Depart')])
+    # dewpoint_avg = self.floatOrNA(row[header.index('DewPoint')])
+    # wetbulb_avg = self.floatOrNA(row[header.index('WetBulb')])
+    # weather_types_list = self._parse_weather_types(row[header.index('CodeSum')])
+    # snowice_depth = self.getPrecip(row[header.index('Depth')])
+    # snowice_waterequiv = self.getPrecip(row[header.index('Water1')]) # predict 'heart-attack snow'!
+    # snowfall = self.getPrecip(row[header.index('SnowFall')])
+    # precip_total= self.getPrecip(row[header.index('PrecipTotal')])
+    # station_pressure=self.floatOrNA(row[header.index('StnPressure')])
+    # sealevel_pressure=self.floatOrNA(row[header.index('SeaLevel')])
+    # resultant_windspeed = self.floatOrNA(row[header.index('ResultSpeed')])
+    # resultant_winddirection, resultant_winddirection_cardinal=self.parse_wind(resultant_windspeed, row[header.index('ResultDir')])
+    # avg_windspeed=self.floatOrNA(row[header.index('AvgSpeed')])
+    # max5_windspeed=self.floatOrNA(row[header.index('Max5Speed')])
+    # max5_winddirection, max5_winddirection_cardinal=self.parse_wind(max5_windspeed, row[header.index('Max5Dir')])
+    # max2_windspeed=self.floatOrNA(row[header.index('Max2Speed')])
+    # max2_winddirection, max2_winddirection_cardinal=self.parse_wind(max2_windspeed, row[header.index('Max2Dir')])
+
+    pdb.set_trace()
+
+    return pandas.Series({
+        "wban_code": series.wban,
+        "date": to_datetime(series.year_month_day),
+        "temp_max": to_numeric(series.tmax),
+        "temp_min": to_numeric(series.tmin),
+        "temp_avg": to_numeric(series.tavg),
+        "departure_from_normal": to_numeric(series.depart),
+        "dewpoint_avg": to_numeric(series.dewpoint),
+        "wetbulb_avg": to_numeric(series.wetbulb),
+        # "weather_types_list": parse_weather_types(series.codesum),
+        # "snowice_depth": get_precip(series.PrecipTotal),
+        "old_station_type": None,
+        "station_type": to_numeric(series.station_type, errors="coerce"),
+        "sky_condition": series.sky_condition,
+        "sky_condition_top": series.sky_condition.split(" ")[-1],
+        "visibility": to_numeric(series.visibility, errors="coerce"),
+        "weather_types": series.weather_type,
+        "drybulb_fahrenheit": to_numeric(series.dry_bulb_farenheit),
+        "wetbulb_fahrenheit": to_numeric(series.wet_bulb_farenheit),
+        "dewpoint_fahrenheit": to_numeric(series.dew_point_farenheit),
+        "relative_humidity": to_numeric(series.relative_humidity),
+        "wind_speed": to_numeric(series.wind_speed),
+        "wind_direction": series.wind_direction,
+        "wind_direction_cardinal": get_cardinal_direction(series.wind_direction),
+        "station_pressure": to_numeric(series.station_pressure),
+        "sealevel_pressure": to_numeric(series.sea_level_pressure),
+        "report_type": series.record_type,
+        "hourly_precip": to_numeric(series.hourly_precip)
+    })
 
 
 def extract_hourly_values(series: pandas.Series) -> pandas.Series:
@@ -139,6 +214,18 @@ def extract_metar_values(df: pandas.DataFrame) -> pandas.DataFrame:
     df.dropna(subset=["wban_code"], inplace=True)
 
     return df
+
+
+def extract_weather_values(timespan: str) -> types.FunctionType:
+    """Return a the appropriate extraction method for a given timespan."""
+
+    extract_methods = {
+        "metar": extract_metar_values,
+        "hourly": extract_hourly_values,
+        "daily": extract_daily_values
+    }
+
+    return extract_methods[timespan]
 
 
 def insert_new_weather_observations(temp: Table, target: Table) -> None:
@@ -216,32 +303,19 @@ def update_weather(timespans: list) -> None:
     """Update the dat_weather_observations_<hourly/daily/monthly> table with
     quality-checked NOAA weather observations."""
 
-    postgres_url = DATABASE_CONN
-
     # Enables update weather to take strings also
     timespans = [timespans] if not isinstance(timespans, list) else timespans
 
-    # # Get the source file containing all the weather observation data
-    current_year_month = datetime.now().strftime("%Y%m")
-    source_url = "http://www.ncdc.noaa.gov/orders/qclcd/"
-    source_url += "QCLCD{}.zip".format(current_year_month)
-    response = requests.get(source_url)
-
-    # Write it into a temporary zip file
-    temporary_zip = NamedTemporaryFile()
-    temporary_zip.file.write(response.content)
+    postgres_url = DATABASE_CONN
 
     # Generate a zip object that will let us pull individual files
-    numpy_zip = numpy.load(temporary_zip.name)
+    numpy_zip = numpy.load("/tmp/qclcd")
+    current_year_month = datetime.now().strftime("%Y%m")
 
     for timespan in timespans:
 
         tmp_table_name = postgres_url + "::tmp_weather_observations_" + timespan
         dat_table_name = postgres_url + "::dat_weather_observations_" + timespan
-
-        # These methods assume that the tmp and dat tables exist
-        tmp_table = odo.resource(tmp_table_name)
-        dat_table = odo.resource(dat_table_name)
 
         # Pull the file out of the zip, and load it into a temporary csv
         data_fname = "{}.txt".format(current_year_month + timespan)
@@ -255,21 +329,26 @@ def update_weather(timespans: list) -> None:
             dtype=str
         )
 
-        # Clean out the temporary table
-        engine.execute(delete(tmp_table))
-
         # Munge and load each chunk into a temporary table
         for df in dframe_chunks:
             df = df.rename(columns=snake_case)
             # todo: apply is slowest part of the code... (20m for 1.6mil rows)
-            df = df.apply(extract_hourly_values, axis=1)
+            df = df.apply(extract_weather_values(timespan), axis=1)
+            # Will do nothing if the table exists, otherwise create the table
+            # so that the table reflection with odo.resource doesn't fail
+            df.head(1).to_sql("dat_weather_observations_" + timespan)
+
             dshape = odo.discover(df)
             odo.odo(df, tmp_table_name, dshape=dshape)
 
+        tmp_table = odo.resource(tmp_table_name)
+        dat_table = odo.resource(dat_table_name)
         insert_new_weather_observations(tmp_table, dat_table)
 
+        # Clean out the temporary table
+        engine.execute(delete(tmp_table))
+
         staging_csv.close()
-    temporary_zip.close()
 
 
 def update_stations() -> None:
@@ -979,6 +1058,8 @@ class WeatherETL(object):
         intensities =  [('-','Light'),
                         ('+','Heavy')]
 
+        pdb.set_trace()
+
         (l, intensity) = self._do_weather_parse(l, intensities)
 
         vicinities = [('VC','Vicinity')]
@@ -1207,40 +1288,41 @@ class WeatherETL(object):
         self.metar_table = self._get_metar_table()
         self.metar_table.append_column(Column('id', BigInteger, primary_key=True))
         self.metar_table.create(engine, checkfirst=True)
-        
-    def _get_daily_table(self, name='dat'):
-        return Table('%s_weather_observations_daily' % name, Base.metadata,
-                            Column('wban_code', String(5), nullable=False),
-                            Column('date', Date, nullable=False),
-                            Column('temp_max', Float, index=True),
-                            Column('temp_min', Float, index=True),
-                            Column('temp_avg', Float, index=True),
-                            Column('departure_from_normal', Float),
-                            Column('dewpoint_avg', Float),
-                            Column('wetbulb_avg', Float),
-                            #Column('weather_types', ARRAY(String(16))), # column 'CodeSum',
-                            Column('weather_types', ARRAY(String)), # column 'CodeSum',
-                            Column("snowice_depth", Float),
-                            Column("snowice_waterequiv", Float),
-                            # XX: Not sure about meaning of 'Cool' and 'Heat' columns in daily table,
-                            #     based on documentation.
-                            Column('snowfall', Float),
-                            Column('precip_total', Float, index=True),
-                            Column('station_pressure', Float),
-                            Column('sealevel_pressure', Float),
-                            Column('resultant_windspeed', Float),
-                            Column('resultant_winddirection', String(3)), # appears to be 00 (000) to 36 (360)
-                            Column('resultant_winddirection_cardinal', String(3)), # e.g. NNE, NNW
-                            Column('avg_windspeed', Float),
-                            Column('max5_windspeed', Float),
-                            Column('max5_winddirection', String(3)), # 000 through 360, M for missing
-                            Column('max5_direction_cardinal', String(3)), # e.g. NNE, NNW
-                            Column('max2_windspeed', Float), 
-                            Column('max2_winddirection', String(3)), # 000 through 360, M for missing
-                            Column('max2_direction_cardinal', String(3)), # e.g. NNE, NNW
-                            Column('longitude', Float),
-                            Column('latitude', Float),
-                            keep_existing=True)
+
+    # todo: covered by odo.resource("dat_weather_observations_hourly")
+    # def _get_daily_table(self, name='dat'):
+    #     return Table('%s_weather_observations_daily' % name, Base.metadata,
+    #                         Column('wban_code', String(5), nullable=False),
+    #                         Column('date', Date, nullable=False),
+    #                         Column('temp_max', Float, index=True),
+    #                         Column('temp_min', Float, index=True),
+    #                         Column('temp_avg', Float, index=True),
+    #                         Column('departure_from_normal', Float),
+    #                         Column('dewpoint_avg', Float),
+    #                         Column('wetbulb_avg', Float),
+    #                         #Column('weather_types', ARRAY(String(16))), # column 'CodeSum',
+    #                         Column('weather_types', ARRAY(String)), # column 'CodeSum',
+    #                         Column("snowice_depth", Float),
+    #                         Column("snowice_waterequiv", Float),
+    #                         # XX: Not sure about meaning of 'Cool' and 'Heat' columns in daily table,
+    #                         #     based on documentation.
+    #                         Column('snowfall', Float),
+    #                         Column('precip_total', Float, index=True),
+    #                         Column('station_pressure', Float),
+    #                         Column('sealevel_pressure', Float),
+    #                         Column('resultant_windspeed', Float),
+    #                         Column('resultant_winddirection', String(3)), # appears to be 00 (000) to 36 (360)
+    #                         Column('resultant_winddirection_cardinal', String(3)), # e.g. NNE, NNW
+    #                         Column('avg_windspeed', Float),
+    #                         Column('max5_windspeed', Float),
+    #                         Column('max5_winddirection', String(3)), # 000 through 360, M for missing
+    #                         Column('max5_direction_cardinal', String(3)), # e.g. NNE, NNW
+    #                         Column('max2_windspeed', Float),
+    #                         Column('max2_winddirection', String(3)), # 000 through 360, M for missing
+    #                         Column('max2_direction_cardinal', String(3)), # e.g. NNE, NNW
+    #                         Column('longitude', Float),
+    #                         Column('latitude', Float),
+    #                         keep_existing=True)
 
     # todo: covered by odo.resource("dat_weather_observations_hourly")
     # def _get_hourly_table(self, name='dat'):
