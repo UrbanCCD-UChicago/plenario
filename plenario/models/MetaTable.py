@@ -97,7 +97,9 @@ class MetaTable(Base):
         self.observed_date = curried_slug(observed_date)
 
         assert url
-        self.source_url, self.source_url_hash = url, md5(url).hexdigest()
+        # Assume a URL has already been slugified,
+        # and can only contain ASCII characters
+        self.source_url, self.source_url_hash = url, md5(url.encode('ascii')).hexdigest()
         self.view_url = self._get_view_url_val(url)
 
         assert update_freq

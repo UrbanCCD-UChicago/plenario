@@ -9,7 +9,7 @@ from sqlalchemy.exc import ProgrammingError
 from plenario.database import session, app_engine, Base
 from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST
 from plenario.settings import DEFAULT_USER
-from plenario.utils.weather import WeatherETL, WeatherStationsETL
+# from plenario.utils.weather import WeatherETL
 
 
 sensor_meta_table_names = (
@@ -104,22 +104,23 @@ def init_user():
 
 
 def init_weather():
-    print('initializing NOAA weather stations')
-    s = WeatherStationsETL()
-    s.initialize()
-
-    print('initializing NOAA daily and hourly weather observations for %s/%s' %
-          (datetime.datetime.now().month, datetime.datetime.now().year))
-    print('this will take a few minutes ...')
-    e = WeatherETL()
-    try:
-        e.initialize_month(
-            datetime.datetime.now().year,
-            datetime.datetime.now().month
-        )
-    except Exception as e:
-        session.rollback()
-        raise e
+    pass
+    # print('initializing NOAA weather stations')
+    # s = WeatherStationsETL()
+    # s.initialize()
+    #
+    # print('initializing NOAA daily and hourly weather observations for %s/%s' %
+    #       (datetime.datetime.now().month, datetime.datetime.now().year))
+    # print('this will take a few minutes ...')
+    # e = WeatherETL()
+    # try:
+    #     e.initialize_month(
+    #         datetime.datetime.now().year,
+    #         datetime.datetime.now().month
+    #     )
+    # except Exception as e:
+    #     session.rollback()
+    #     raise e
 
 
 def init_worker_meta():
