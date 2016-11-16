@@ -1,15 +1,11 @@
-import datetime
+import sqlalchemy.exc
 import subprocess
 
-# TODO: Move this script under Flask-Script control
 from argparse import ArgumentParser
-from sqlalchemy.exc import ProgrammingError
 
-# Imports cause the meta tables to be created and added to Base.
-from plenario.database import session, app_engine, Base
-from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST
+from plenario.database import session, app_engine as engine, Base
+from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
 from plenario.settings import DEFAULT_USER
-# from plenario.utils.weather import WeatherETL
 
 
 sensor_meta_table_names = (
@@ -21,6 +17,20 @@ sensor_meta_table_names = (
 )
 
 
+# todo: remove "createdb plenario_test" step from the readme
+def create_database(database_name: str) -> None:
+    """Setup a database (schema) in postgresql. If the database already
+    exists, say so and move on."""
+
+    try:
+        connection = engine.connect()
+        connection.execute("commit")
+        connection.execute("create database %s" % database_name)
+        connection.close()
+    except sqlalchemy.exc.ProgrammingError:
+        print("%s database already exists!" % database_name)
+
+
 def create_tables(tables):
     """Helper to initialize the tables from the Base.metadata store
 
@@ -30,8 +40,8 @@ def create_tables(tables):
         if str(table) in tables:
             print("CREATE TABLE: {}".format(table))
             try:
-                table.create(bind=app_engine)
-            except ProgrammingError:
+                table.create(bind=engine)
+            except sqlalchemy.exc.ProgrammingError:
                 print("ALREADY EXISTS: {}".format(table))
 
 
@@ -42,9 +52,9 @@ def delete_tables(tables):
 
     for table in tables:
         try:
-            app_engine.execute("DROP TABLE {} CASCADE".format(table))
+            engine.execute("DROP TABLE {} CASCADE".format(table))
             print("DROP TABLE {}".format(table))
-        except ProgrammingError:
+        except sqlalchemy.exc.ProgrammingError:
             print("ALREADY DOESN'T EXIST: {}".format(table))
         
 
@@ -130,8 +140,13 @@ def init_worker_meta():
 def add_functions():
 
     def add_function(script_path):
-        args = 'PGPASSWORD=' + DB_PASSWORD + ' psql -h ' + DB_HOST + ' -U '
-        args += DB_USER + ' -d ' + DB_NAME + ' -f ' + script_path
+        args = 'PGPASSWORD=' + DB_PASSWORD
+        args += ' psql '
+        args += ' -h ' + DB_HOST
+        args += ' -U ' + DB_USER
+        args += ' -d ' + DB_NAME
+        args += ' -p ' + DB_PORT
+        args += ' -f ' + script_path
         subprocess.check_output(args, shell=True)
 
     add_function("./plenario/dbscripts/audit_trigger.sql")
@@ -168,6 +183,9 @@ def build_arg_parser():
 
 
 if __name__ == "__main__":
+
+    create_database("plenario_test")
+
     argparser = build_arg_parser()
     arguments = argparser.parse_args()
     init_db(arguments)
