@@ -141,6 +141,33 @@ def extract_metar_values(df: pandas.DataFrame) -> pandas.DataFrame:
     return df
 
 
+def insert_new_weather_observations(temp: Table, target: Table) -> None:
+    """Given two weather tables, insert the rows from the temp table which are
+    not found in the target table."""
+
+    # The sorted calls in this and the next query ensure that the order of
+    # the columns in the select and insert match up. Messing up the
+    # ordering causes an error, ex: insert into (x, y, z) (select x, z, y ... )
+    select_new_records = select(
+        sorted(temp.columns, key=lambda col: col.name)
+    ).select_from(join(
+        left=temp,
+        right=target,
+        onclause=and_(
+            temp.c.datetime == target.c.datetime,
+            temp.c.wban_code == target.c.wban_code
+        ),
+        isouter=True
+    )).where(target.c.datetime == None)
+
+    insert_new_records = target.insert().from_select(
+        names=sorted(target.columns, key=lambda col: col.name),
+        select=select_new_records
+    )
+
+    engine.execute(insert_new_records)
+
+
 # Used to convert column types from the pandas generated metar table to types
 # which are compatible with the existing table
 metar_dtypes = {
@@ -182,28 +209,7 @@ def update_metar() -> None:
 
     tmp_table = reflect("tmp_weather_observations_metar", Base.metadata, engine)
     dat_table = reflect("dat_weather_observations_metar", Base.metadata, engine)
-
-    # The sorted calls in this and the next query ensure that the order of
-    # the columns in the select and insert match up. Messing up the
-    # ordering causes an error, ex: insert into (x, y, z) (select x, z, y ... )
-    select_new_records = select(
-        sorted(tmp_table.columns, key=lambda col: col.name)
-    ).select_from(join(
-        left=tmp_table,
-        right=dat_table,
-        onclause=and_(
-            tmp_table.c.datetime == dat_table.c.datetime,
-            tmp_table.c.wban_code == dat_table.c.wban_code
-        ),
-        isouter=True
-    )).where(dat_table.c.datetime == None)
-
-    insert_new_records = dat_table.insert().from_select(
-        names=sorted(dat_table.columns, key=lambda col: col.name),
-        select=select_new_records
-    )
-
-    engine.execute(insert_new_records)
+    insert_new_weather_observations(tmp_table, dat_table)
 
 
 def update_weather(timespans: list) -> None:
@@ -232,15 +238,12 @@ def update_weather(timespans: list) -> None:
 
         tmp_table_name = postgres_url + "::tmp_weather_observations_" + timespan
         dat_table_name = postgres_url + "::dat_weather_observations_" + timespan
+
+        # These methods assume that the tmp and dat tables exist
         tmp_table = odo.resource(tmp_table_name)
         dat_table = odo.resource(dat_table_name)
 
-        # Clean out the temporary table
-        engine.execute(delete(tmp_table))
-        # Create the dat_table in case it doesn't exist
-        dat_table.create(checkfirst=True)
-
-        # Pull the file out of the zip, and load it into a pandas dataframe
+        # Pull the file out of the zip, and load it into a temporary csv
         data_fname = "{}.txt".format(current_year_month + timespan)
         staging_csv = NamedTemporaryFile(suffix=".csv")
         staging_csv.file.write(numpy_zip[data_fname])
@@ -252,31 +255,18 @@ def update_weather(timespans: list) -> None:
             dtype=str
         )
 
+        # Clean out the temporary table
+        engine.execute(delete(tmp_table))
+
+        # Munge and load each chunk into a temporary table
         for df in dframe_chunks:
             df = df.rename(columns=snake_case)
+            # todo: apply is slowest part of the code... (20m for 1.6mil rows)
             df = df.apply(extract_hourly_values, axis=1)
             dshape = odo.discover(df)
             odo.odo(df, tmp_table_name, dshape=dshape)
 
-        # todo: this exact update is performed in update metar as well
-        select_new_records = select(
-            sorted(tmp_table.columns, key=lambda col: col.name)
-        ).select_from(join(
-            left=tmp_table,
-            right=dat_table,
-            onclause=and_(
-                tmp_table.c.datetime == dat_table.c.datetime,
-                tmp_table.c.wban_code == dat_table.c.wban_code
-            ),
-            isouter=True
-        )).where(dat_table.c.datetime == None)
-
-        insert_new_records = dat_table.insert().from_select(
-            names=sorted(dat_table.columns, key=lambda col: col.name),
-            select=select_new_records
-        )
-
-        engine.execute(insert_new_records)
+        insert_new_weather_observations(tmp_table, dat_table)
 
         staging_csv.close()
     temporary_zip.close()
@@ -466,53 +456,54 @@ class WeatherETL(object):
                 except AttributeError:
                     continue
 
-    def _update(self, span=None):
-        new_table = Table('new_weather_observations_%s' % span, Base.metadata,
-                          Column('wban_code', String(5)), keep_existing=True)
-        dat_table = getattr(self, '%s_table' % span)
-        src_table = getattr(self, 'src_%s_table' % span)
-        from_sel_cols = ['wban_code']
-        if span == 'daily':
-            from_sel_cols.append('date')
-            src_date_col = src_table.c.date
-            dat_date_col = dat_table.c.date
-            new_table.append_column(Column('date', Date))
-            new_date_col = new_table.c.date
-        elif span == 'hourly':
-            from_sel_cols.append('datetime')
-            src_date_col = src_table.c.datetime
-            dat_date_col = dat_table.c.datetime
-            new_table.append_column(Column('datetime', DateTime))
-            new_date_col = new_table.c.datetime
-        new_table.drop(engine, checkfirst=True)
-        new_table.create(engine)
-        ins = new_table.insert()\
-                .from_select(from_sel_cols,
-                    select([src_table.c.wban_code, src_date_col])\
-                        .select_from(src_table.join(dat_table,
-                            and_(src_table.c.wban_code == dat_table.c.wban_code,
-                                 src_date_col == dat_date_col),
-                            isouter=True)
-                    ).where(dat_table.c.id == None)
-                )
-        #print "_update: span=%s: sql is'%s'" % (span, ins)
-        conn = engine.contextual_connect()
-        try:
-            conn.execute(ins)
-            new = True
-        except TypeError:
-            new = False
-        if new:
-            ins = dat_table.insert()\
-                    .from_select([c for c in dat_table.columns if c.name != 'id'],
-                        select([c for c in src_table.columns])\
-                            .select_from(src_table.join(new_table,
-                                and_(src_table.c.wban_code == new_table.c.wban_code,
-                                     src_date_col == new_date_col)
-                            ))
-                    )
-            #print "_update NEW : span=%s: sql is'%s'" % (span, ins)
-            conn.execute(ins)
+    # todo: covered by insert_new_weather_observations
+    # def _update(self, span=None):
+    #     new_table = Table('new_weather_observations_%s' % span, Base.metadata,
+    #                       Column('wban_code', String(5)), keep_existing=True)
+    #     dat_table = getattr(self, '%s_table' % span)
+    #     src_table = getattr(self, 'src_%s_table' % span)
+    #     from_sel_cols = ['wban_code']
+    #     if span == 'daily':
+    #         from_sel_cols.append('date')
+    #         src_date_col = src_table.c.date
+    #         dat_date_col = dat_table.c.date
+    #         new_table.append_column(Column('date', Date))
+    #         new_date_col = new_table.c.date
+    #     elif span == 'hourly':
+    #         from_sel_cols.append('datetime')
+    #         src_date_col = src_table.c.datetime
+    #         dat_date_col = dat_table.c.datetime
+    #         new_table.append_column(Column('datetime', DateTime))
+    #         new_date_col = new_table.c.datetime
+    #     new_table.drop(engine, checkfirst=True)
+    #     new_table.create(engine)
+    #     ins = new_table.insert()\
+    #             .from_select(from_sel_cols,
+    #                 select([src_table.c.wban_code, src_date_col])\
+    #                     .select_from(src_table.join(dat_table,
+    #                         and_(src_table.c.wban_code == dat_table.c.wban_code,
+    #                              src_date_col == dat_date_col),
+    #                         isouter=True)
+    #                 ).where(dat_table.c.id == None)
+    #             )
+    #     #print "_update: span=%s: sql is'%s'" % (span, ins)
+    #     conn = engine.contextual_connect()
+    #     try:
+    #         conn.execute(ins)
+    #         new = True
+    #     except TypeError:
+    #         new = False
+    #     if new:
+    #         ins = dat_table.insert()\
+    #                 .from_select([c for c in dat_table.columns if c.name != 'id'],
+    #                     select([c for c in src_table.columns])\
+    #                         .select_from(src_table.join(new_table,
+    #                             and_(src_table.c.wban_code == new_table.c.wban_code,
+    #                                  src_date_col == new_date_col)
+    #                         ))
+    #                 )
+    #         #print "_update NEW : span=%s: sql is'%s'" % (span, ins)
+    #         conn.execute(ins)
 
     def make_tables(self):
         self._make_daily_table()
@@ -1249,68 +1240,70 @@ class WeatherETL(object):
                             Column('max2_direction_cardinal', String(3)), # e.g. NNE, NNW
                             Column('longitude', Float),
                             Column('latitude', Float),
-                            keep_existing=True) 
+                            keep_existing=True)
 
-    def _get_hourly_table(self, name='dat'):
-        return Table('%s_weather_observations_hourly' % name, Base.metadata,
-                Column('wban_code', String(5), nullable=False),
-                Column('datetime', DateTime, nullable=False),
-                # AO1: without precipitation discriminator, AO2: with precipitation discriminator
-                Column('old_station_type', String(5)),
-                Column('station_type', Integer),
-                Column('sky_condition', String),
-                Column('sky_condition_top', String), # top-level sky condition, e.g.
-                                                        # if 'FEW018 BKN029 OVC100'
-                                                        # we have overcast at 10,000 feet (100 * 100).
-                                                        # BKN017TCU means broken clouds at 1700 feet w/ towering cumulonimbus
-                                                        # BKN017CB means broken clouds at 1700 feet w/ cumulonimbus
-                Column('visibility', Float), #  in Statute Miles
-                # XX in R: unique(unlist(strsplit(unlist(as.character(unique(x$WeatherType))), ' ')))
-                #Column('weather_types', ARRAY(String(16))),
-                Column('weather_types', ARRAY(String)),
-                Column('drybulb_fahrenheit', Float, index=True), # These can be NULL bc of missing data
-                Column('wetbulb_fahrenheit', Float), # These can be NULL bc of missing data
-                Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
-                Column('relative_humidity', Integer),
-                Column('wind_speed', Integer),
-                Column('wind_direction', String(3)), # 000 to 360
-                Column('wind_direction_cardinal', String(3)), # e.g. NNE, NNW
-                Column('station_pressure', Float),
-                Column('sealevel_pressure', Float),
-                Column('report_type', String), # Either 'AA' or 'SP'
-                Column('hourly_precip', Float, index=True),
-                Column('longitude', Float),
-                Column('latitude', Float),
-                keep_existing=True)
+    # todo: covered by odo.resource("dat_weather_observations_hourly")
+    # def _get_hourly_table(self, name='dat'):
+    #     return Table('%s_weather_observations_hourly' % name, Base.metadata,
+    #             Column('wban_code', String(5), nullable=False),
+    #             Column('datetime', DateTime, nullable=False),
+    #             # AO1: without precipitation discriminator, AO2: with precipitation discriminator
+    #             Column('old_station_type', String(5)),
+    #             Column('station_type', Integer),
+    #             Column('sky_condition', String),
+    #             Column('sky_condition_top', String), # top-level sky condition, e.g.
+    #                                                     # if 'FEW018 BKN029 OVC100'
+    #                                                     # we have overcast at 10,000 feet (100 * 100).
+    #                                                     # BKN017TCU means broken clouds at 1700 feet w/ towering cumulonimbus
+    #                                                     # BKN017CB means broken clouds at 1700 feet w/ cumulonimbus
+    #             Column('visibility', Float), #  in Statute Miles
+    #             # XX in R: unique(unlist(strsplit(unlist(as.character(unique(x$WeatherType))), ' ')))
+    #             #Column('weather_types', ARRAY(String(16))),
+    #             Column('weather_types', ARRAY(String)),
+    #             Column('drybulb_fahrenheit', Float, index=True), # These can be NULL bc of missing data
+    #             Column('wetbulb_fahrenheit', Float), # These can be NULL bc of missing data
+    #             Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
+    #             Column('relative_humidity', Integer),
+    #             Column('wind_speed', Integer),
+    #             Column('wind_direction', String(3)), # 000 to 360
+    #             Column('wind_direction_cardinal', String(3)), # e.g. NNE, NNW
+    #             Column('station_pressure', Float),
+    #             Column('sealevel_pressure', Float),
+    #             Column('report_type', String), # Either 'AA' or 'SP'
+    #             Column('hourly_precip', Float, index=True),
+    #             Column('longitude', Float),
+    #             Column('latitude', Float),
+    #             keep_existing=True)
 
-    def _get_metar_table(self, name='dat'):
-        return Table('%s_weather_observations_metar' % name, Base.metadata,
-                Column('wban_code', String(5), nullable=False),
-                Column('call_sign', String(5), nullable=False),  
-                Column('datetime', DateTime, nullable=False),
-                Column('sky_condition', String),
-                Column('sky_condition_top', String), # top-level sky condition, e.g.
-                                                        # if 'FEW018 BKN029 OVC100'
-                                                        # we have overcast at 10,000 feet (100 * 100).
-                                                        # BKN017TCU means broken clouds at 1700 feet w/ towering cumulonimbus
-                                                        # BKN017CB means broken clouds at 1700 feet w/ cumulonimbus
-                Column('visibility', Float), #  in Statute Miles
-                Column('weather_types', ARRAY(String)),
-                Column('temp_fahrenheit', Float, index=True), # These can be NULL bc of missing data
-                Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
-                Column('wind_speed', Integer),
-                Column('wind_direction', String(3)), # 000 to 360
-                Column('wind_direction_cardinal', String(3)), # e.g. NNE, NNW
-                Column('wind_gust', Integer),
-                Column('station_pressure', Float),
-                Column('sealevel_pressure', Float),
-                Column('precip_1hr', Float, index=True),
-                Column('precip_3hr', Float, index=True),
-                Column('precip_6hr', Float, index=True),
-                Column('precip_24hr', Float, index=True),
-                Column('longitude', Float),
-                Column('latitude', Float),
-                keep_existing=True)
+    # todo: covered by odo.resource("dat_weather_observations_metar")
+    # def _get_metar_table(self, name='dat'):
+    #     return Table('%s_weather_observations_metar' % name, Base.metadata,
+    #             Column('wban_code', String(5), nullable=False),
+    #             Column('call_sign', String(5), nullable=False),
+    #             Column('datetime', DateTime, nullable=False),
+    #             Column('sky_condition', String),
+    #             Column('sky_condition_top', String), # top-level sky condition, e.g.
+    #                                                     # if 'FEW018 BKN029 OVC100'
+    #                                                     # we have overcast at 10,000 feet (100 * 100).
+    #                                                     # BKN017TCU means broken clouds at 1700 feet w/ towering cumulonimbus
+    #                                                     # BKN017CB means broken clouds at 1700 feet w/ cumulonimbus
+    #             Column('visibility', Float), #  in Statute Miles
+    #             Column('weather_types', ARRAY(String)),
+    #             Column('temp_fahrenheit', Float, index=True), # These can be NULL bc of missing data
+    #             Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
+    #             Column('wind_speed', Integer),
+    #             Column('wind_direction', String(3)), # 000 to 360
+    #             Column('wind_direction_cardinal', String(3)), # e.g. NNE, NNW
+    #             Column('wind_gust', Integer),
+    #             Column('station_pressure', Float),
+    #             Column('sealevel_pressure', Float),
+    #             Column('precip_1hr', Float, index=True),
+    #             Column('precip_3hr', Float, index=True),
+    #             Column('precip_6hr', Float, index=True),
+    #             Column('precip_24hr', Float, index=True),
+    #             Column('longitude', Float),
+    #             Column('latitude', Float),
+    #             keep_existing=True)
 
     def _extract_fname(self, year_num, month_num):
         self.current_year = year_num
