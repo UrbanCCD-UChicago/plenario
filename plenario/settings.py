@@ -1,6 +1,3 @@
-import botocore.exceptions
-import boto3
-import requests
 from os import environ
 
 get = environ.get

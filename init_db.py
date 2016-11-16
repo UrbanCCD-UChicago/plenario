@@ -19,16 +19,29 @@ sensor_meta_table_names = (
 
 # todo: remove "createdb plenario_test" step from the readme
 def create_database(database_name: str) -> None:
-    """Setup a database (schema) in postgresql. If the database already
-    exists, say so and move on."""
+    """Setup a database (schema) in postgresql. If the database creation fails,
+    say why and move on."""
 
     try:
         connection = engine.connect()
         connection.execute("commit")
         connection.execute("create database %s" % database_name)
         connection.close()
-    except sqlalchemy.exc.ProgrammingError:
-        print("%s database already exists!" % database_name)
+    except sqlalchemy.exc.ProgrammingError as exc:
+        print(exc)
+
+
+# todo: remove "create extension postgis" step from the readme
+def create_postgis_extension() -> None:
+    """Setup the postgis extension in postgresql. If the extension creation
+    fails, say why and move on."""
+
+    try:
+        connection = engine.connect()
+        connection.execute("create extension postgis")
+        connection.close()
+    except sqlalchemy.exc.ProgrammingError as exc:
+        print(exc)
 
 
 def create_tables(tables):
@@ -41,7 +54,8 @@ def create_tables(tables):
             print("CREATE TABLE: {}".format(table))
             try:
                 table.create(bind=engine)
-            except sqlalchemy.exc.ProgrammingError:
+            except sqlalchemy.exc.ProgrammingError as exc:
+                print(exc)
                 print("ALREADY EXISTS: {}".format(table))
 
 
@@ -185,6 +199,7 @@ def build_arg_parser():
 if __name__ == "__main__":
 
     create_database("plenario_test")
+    create_postgis_extension()
 
     argparser = build_arg_parser()
     arguments = argparser.parse_args()
