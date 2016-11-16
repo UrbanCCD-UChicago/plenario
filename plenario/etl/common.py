@@ -35,7 +35,7 @@ class ETLFile(object):
         Assigns an open file object to self.file_handle
         """
         if self.is_local:
-            self.handle = open(self.source_path, 'r')
+            self.handle = open(self.source_path, 'rb')
         else:
             self._download_temp_file(self.source_url)
 

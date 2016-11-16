@@ -130,7 +130,7 @@ def import_shapefile_to_table(component_path, table_name):
         subprocess.check_call(args)
     except subprocess.CalledProcessError as e:
         print(('Failed to import dataset to postgres with ogr2ogr.' + str(args)))
-        raise OgrError(e.message)
+        raise OgrError(e)
     except OSError as e:
         print('Could not locate ogr2ogr. Do you have it installed?')
-        raise OgrError(e.message)
+        raise OgrError(e)

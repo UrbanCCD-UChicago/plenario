@@ -243,7 +243,7 @@ def getDewpointFahrenheit(obs):
 
 
 def getWind(obs):
-    from .weather import degToCardinal
+    from .weather import get_cardinal_direction
     wind_speed = None
     wind_speed_int = None
     wind_direction = None
@@ -258,7 +258,7 @@ def getWind(obs):
     if (obs.wind_dir):
         wind_direction = obs.wind_dir.value()
         wind_direction_int = int(round(float(wind_direction)))
-        wind_direction_cardinal = degToCardinal(wind_direction_int)
+        wind_direction_cardinal = get_cardinal_direction(wind_direction_int)
     if (obs.wind_gust):
         wind_gust = obs.wind_gust.value()
         wind_gust_int = int(round(float(wind_gust)))
