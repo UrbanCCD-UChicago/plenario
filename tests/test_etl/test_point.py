@@ -12,7 +12,7 @@ from init_db import init_meta
 from plenario.models import MetaTable
 
 pwd = os.path.dirname(os.path.realpath(__file__))
-fixtures_path = os.path.join(pwd, '../test_fixtures')
+fixtures_path = os.path.join(pwd, '../fixtures')
 
 
 def drop_if_exists(table_name):

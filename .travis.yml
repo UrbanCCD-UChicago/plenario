@@ -41,10 +41,13 @@ script:
 # Points (etc?) does some kind of setup that 
 # is useful to jobs (it fails otherwise)
 ###
-- nosetests tests/points/ -v
-- nosetests tests/shapes/ -v
+- nosetests tests/test_api/test_point -v
+- nosetests tests/test_api/test_shape -v
+- nosetests tests/test_api/test_validator -v
+- nosetests tests/test_etl/test_point -v
+- nosetests tests/test_sensor_network/test_sensor_networks -v
 - nosetests tests/submission/ -v
-- nosetests tests/test_sensor_networks/ -v
+
 deploy:
 - provider: elasticbeanstalk
   access_key_id:

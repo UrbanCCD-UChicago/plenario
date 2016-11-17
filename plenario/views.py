@@ -517,7 +517,7 @@ class GenericSuggestion(object):
 
         head = itertools.islice(r.iter_lines(), 1000)
         for line in head:
-            inp.write(line + '\n')
+            inp.write(line + b'\n')
         inp.seek(0)
         column_info = infer_csv_columns(inp)
 

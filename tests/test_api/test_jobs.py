@@ -185,7 +185,7 @@ class TestJobs(unittest.TestCase):
         # Queue the update job.
         with self.other_app.test_request_context():
             ticket = queue_update_dataset(source_url_hash).data
-            ticket = json.loads(ticket)['ticket']
+            ticket = json.loads(ticket.decode("utf-8"))['ticket']
         wait_on(ticket, 30)
         status = get_status(ticket)['status']
         self.assertIn(status, {'error', 'success'})
@@ -206,7 +206,7 @@ class TestJobs(unittest.TestCase):
         # Queue the deletion job.
         with self.other_app.test_request_context():
             ticket = delete_dataset(source_url_hash)
-            ticket = json.loads(ticket.data)['ticket']
+            ticket = json.loads(ticket.data.decode("utf-8"))['ticket']
         wait_on(ticket, 30)
         status = get_status(ticket)['status']
         self.assertIn(status, {'error', 'success'})
@@ -250,7 +250,7 @@ class TestJobs(unittest.TestCase):
         # Queue the update job.
         with self.other_app.test_request_context():
             ticket = queue_update_shape(shape_name).data
-            ticket = json.loads(ticket)['ticket']
+            ticket = json.loads(ticket.decode("utf-8"))['ticket']
         wait_on(ticket, 30)
         status = get_status(ticket)['status']
         self.assertIn(status, {'error', 'success'})
@@ -275,7 +275,7 @@ class TestJobs(unittest.TestCase):
         # Queue the update job.
         with self.other_app.test_request_context():
             ticket = queue_update_shape(shape_name).data
-            ticket = json.loads(ticket)['ticket']
+            ticket = json.loads(ticket.decode("utf-8"))['ticket']
 
         wait_on(ticket, 30)
 
@@ -299,7 +299,7 @@ class TestJobs(unittest.TestCase):
         # Queue the deletion job.
         with self.other_app.test_request_context():
             ticket = delete_shape(shape_name)
-            ticket = json.loads(ticket.data)['ticket']
+            ticket = json.loads(ticket.data.decode("utf-8"))['ticket']
 
         wait_on(ticket, 30)
 
@@ -321,7 +321,7 @@ class TestJobs(unittest.TestCase):
         # /datasets with a cachebuster at the end
         response = self.app.get(
             prefix + '/datasets?job=true&obs_date__ge=2010-07-08&' + str(random.randrange(0, 1000000)))
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response["ticket"]
         self.assertIsNotNone(ticket)
         self.assertIsNotNone(response["url"])
@@ -331,7 +331,7 @@ class TestJobs(unittest.TestCase):
         # retrieve job
         url = response["url"]
         response = self.app.get(url)
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         self.assertTrue(response["status"]["status"] in ["queued", "processing", "success"])
         self.assertIsNotNone(response["status"]["meta"]["queueTime"])
         self.assertEqual(response["ticket"], ticket)
@@ -343,7 +343,7 @@ class TestJobs(unittest.TestCase):
             time.sleep(1)
 
         response = self.app.get(url)
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         self.assertIsNotNone(response["status"]["meta"]["startTime"])
         self.assertIsNotNone(response["status"]["meta"]["endTime"])
         self.assertIsNotNone(response["status"]["meta"]["workers"])
@@ -358,7 +358,7 @@ class TestJobs(unittest.TestCase):
         # dummy job with a cachebuster at the end
         ticket = "for_sure_this_isnt_a_job_because_jobs_are_in_hex"
         response = self.app.get(prefix + "/jobs/" + ticket + "?&" + str(random.randrange(0, 1000000)))
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         self.assertEqual(response["ticket"], ticket)
         self.assertIsNotNone(response["error"])
 
@@ -373,7 +373,7 @@ class TestJobs(unittest.TestCase):
 
         # Purge workers
         response = self.app.get("/workers/purge")
-        self.assertEqual("class=\"worker" in response.get_data(), False)
+        self.assertEqual("class=\"worker" in response.get_data().decode("utf-8"), False)
 
     # ============================ ENDPOINT TESTS ============================ #
 
@@ -385,7 +385,7 @@ class TestJobs(unittest.TestCase):
         response = self.app.get(
             prefix + '/timeseries/?obs_date__ge=2013-09-22&obs_date__le=2013-10-1&agg=day&job=true&' + str(
                 random.randrange(0, 1000000)))
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response["ticket"]
         self.assertIsNotNone(ticket)
         self.assertIsNotNone(response["url"])
@@ -404,7 +404,7 @@ class TestJobs(unittest.TestCase):
         # retrieve job
         url = response["url"]
         response = self.app.get(url)
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
 
         self.assertFalse("error" in list(response.keys()))
         self.assertEqual(response["status"]["status"], "success")
@@ -422,7 +422,7 @@ class TestJobs(unittest.TestCase):
         response = self.app.get(
             prefix + '/detail-aggregate/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&agg=week&job=true&' + str(
                 random.randrange(0, 1000000)))
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response["ticket"]
         self.assertIsNotNone(ticket)
         self.assertIsNotNone(response["url"])
@@ -441,7 +441,7 @@ class TestJobs(unittest.TestCase):
         # retrieve job
         url = response["url"]
         response = self.app.get(url)
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         self.assertFalse("error" in list(response.keys()))
         self.assertEqual(response["status"]["status"], "success")
         self.assertEqual(response["request"]["query"]["dataset"], "flu_shot_clinics")
@@ -457,7 +457,7 @@ class TestJobs(unittest.TestCase):
         response = self.app.get(
             prefix + '/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&shape=chicago_neighborhoods&job=true&' + str(
                 random.randrange(0, 1000000)))
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response["ticket"]
         self.assertIsNotNone(ticket)
         self.assertIsNotNone(response["url"])
@@ -477,7 +477,7 @@ class TestJobs(unittest.TestCase):
         # retrieve job
         url = response["url"]
         response = self.app.get(url)
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         self.assertFalse("error" in list(response.keys()))
         self.assertEqual(response["status"]["status"], "success")
         self.assertEqual(len(response["result"]), 5)
@@ -490,7 +490,7 @@ class TestJobs(unittest.TestCase):
         response = self.app.get(
             prefix + '/datasets/?dataset_name=flu_shot_clinics&job=true&' + str(
                 random.randrange(0, 1000000)))
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response["ticket"]
         self.assertIsNotNone(ticket)
         self.assertIsNotNone(response["url"])
@@ -507,7 +507,7 @@ class TestJobs(unittest.TestCase):
         # retrieve job
         url = response["url"]
         response = self.app.get(url)
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         self.assertFalse("error" in list(response.keys()))
         self.assertEqual(response["status"]["status"], "success")
         self.assertEqual(len(response["result"]), 1)
@@ -524,7 +524,7 @@ class TestJobs(unittest.TestCase):
         response = self.app.get(
             prefix + '/fields/flu_shot_clinics?job=true&' + str(
                 random.randrange(0, 1000000)))
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response["ticket"]
         self.assertIsNotNone(ticket)
         self.assertIsNotNone(response["url"])
@@ -564,7 +564,7 @@ class TestJobs(unittest.TestCase):
         response = self.app.get(
             prefix + '/grid/?obs_date__ge=2013-1-1&obs_date__le=2014-1-1&dataset_name=flu_shot_clinics&location_geom__within=' + get_loop_rect() + '&job=true&' + str(
                 random.randrange(0, 1000000)))
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response["ticket"]
         self.assertIsNotNone(ticket)
         self.assertIsNotNone(response["url"])
@@ -585,7 +585,7 @@ class TestJobs(unittest.TestCase):
         # retrieve job
         url = response["url"]
         response = self.app.get(url)
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         self.assertFalse("error" in list(response.keys()))
         self.assertEqual(response["status"]["status"], "success")
         self.assertEqual(len(response["result"]["features"]), 4)
@@ -599,7 +599,7 @@ class TestJobs(unittest.TestCase):
     def test_export_shape_job(self):
 
         response = self.app.get("/v1/api/shapes/chicago_neighborhoods?job=true")
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response['ticket']
 
         self.assertIsNotNone(ticket)
@@ -612,14 +612,14 @@ class TestJobs(unittest.TestCase):
 
         url = response["url"]
         response = self.app.get(url)
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
 
         self.assertEqual(len(response['features']), 98)
 
     def test_export_shape_job_shapefile(self):
 
         response = self.app.get("/v1/api/shapes/chicago_neighborhoods?data_type=shapefile&job=true")
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response['ticket']
 
         self.assertIsNotNone(ticket)
@@ -634,7 +634,7 @@ class TestJobs(unittest.TestCase):
         url = response["url"]
         response = self.app.get(url)
 
-        file_content = StringIO(response.data)
+        file_content = StringIO(response.data.decode("utf-8"))
         as_zip = zipfile.ZipFile(file_content)
 
         # The Shapefile utility class takes a ZipFile, opens it,
@@ -647,7 +647,7 @@ class TestJobs(unittest.TestCase):
         url = '/v1/api/shapes/chicago_neighborhoods/landmarks/' \
               '?obs_date__ge=2000-09-22&obs_date__le=2013-10-1'
         response = self.app.get(url + '&job=true')
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response['ticket']
 
         self.assertIsNotNone(ticket)
@@ -662,7 +662,7 @@ class TestJobs(unittest.TestCase):
 
         url = response["url"]
         response = self.app.get(url)
-        data = json.loads(response.data)
+        data = json.loads(response.data.decode("utf-8"))
         neighborhoods = data['result']['features']
         self.assertEqual(len(neighborhoods), 54)
 
@@ -677,7 +677,7 @@ class TestJobs(unittest.TestCase):
         response = self.app.get(
             prefix + '/datadump?obs_date__ge=2000-1-1&obs_date__le=2014-1-1&dataset_name=flu_shot_clinics&' + str(
                 random.randrange(0, 1000000)))
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response["ticket"]
         self.assertIsNotNone(ticket)
         self.assertIsNotNone(response["url"])
@@ -694,12 +694,12 @@ class TestJobs(unittest.TestCase):
         # retrieve job
         url = response["url"]
         response = self.app.get(url)
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         self.assertIsNotNone(response["status"]["progress"])
 
         url = response["result"]["url"]
         response = self.app.get(url)
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
 
         self.assertEqual(len(response["data"]), 65)
         self.assertEqual(response["data"][0]["date"], "2013-09-22")
@@ -715,7 +715,7 @@ class TestJobs(unittest.TestCase):
         response = self.app.get(
             prefix + '/datadump?obs_date__ge=2000-1-1&obs_date__le=2014-1-1&dataset_name=flu_shot_clinics&' + str(
                 random.randrange(0, 1000000)))
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         ticket = response["ticket"]
         self.assertIsNotNone(ticket)
         self.assertIsNotNone(response["url"])
@@ -732,7 +732,7 @@ class TestJobs(unittest.TestCase):
         # retrieve job
         url = response["url"]
         response = self.app.get(url)
-        response = json.loads(response.get_data())
+        response = json.loads(response.get_data().decode("utf-8"))
         self.assertIsNotNone(response["status"]["progress"])
 
         url = response["result"]["url"]+"?data_type=csv"
