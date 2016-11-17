@@ -2,8 +2,9 @@ import sqlalchemy.exc
 import subprocess
 
 from argparse import ArgumentParser
+from sqlalchemy.engine.base import Engine
 
-from plenario.database import session, app_engine as engine, Base
+from plenario.database import session, app_engine, Base
 from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
 from plenario.settings import DEFAULT_USER
 
@@ -18,7 +19,7 @@ sensor_meta_table_names = (
 
 
 # todo: remove "createdb plenario_test" step from the readme
-def create_database(database_name: str) -> None:
+def create_database(engine: Engine, database_name: str) -> None:
     """Setup a database (schema) in postgresql. If the database creation fails,
     say why and move on."""
 
@@ -32,7 +33,7 @@ def create_database(database_name: str) -> None:
 
 
 # todo: remove "create extension postgis" step from the readme
-def create_postgis_extension() -> None:
+def create_postgis_extension(engine: Engine) -> None:
     """Setup the postgis extension in postgresql. If the extension creation
     fails, say why and move on."""
 
@@ -53,7 +54,7 @@ def create_tables(tables):
         if str(table) in tables:
             print("CREATE TABLE: {}".format(table))
             try:
-                table.create(bind=engine)
+                table.create(bind=app_engine)
             except sqlalchemy.exc.ProgrammingError as exc:
                 print(exc)
                 print("ALREADY EXISTS: {}".format(table))
@@ -66,7 +67,7 @@ def delete_tables(tables):
 
     for table in tables:
         try:
-            engine.execute("DROP TABLE {} CASCADE".format(table))
+            app_engine.execute("DROP TABLE {} CASCADE".format(table))
             print("DROP TABLE {}".format(table))
         except sqlalchemy.exc.ProgrammingError:
             print("ALREADY DOESN'T EXIST: {}".format(table))
@@ -198,8 +199,8 @@ def build_arg_parser():
 
 if __name__ == "__main__":
 
-    create_database("plenario_test")
-    create_postgis_extension()
+    create_database(app_engine, "plenario_test")
+    create_postgis_extension(app_engine)
 
     argparser = build_arg_parser()
     arguments = argparser.parse_args()

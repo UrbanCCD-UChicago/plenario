@@ -53,6 +53,8 @@ class PointAPITests(BasePlenarioTest):
     @classmethod
     def setUpClass(cls):
         super(PointAPITests, cls).setUpClass()
+        super(PointAPITests, cls).ingest_points()
+        super(PointAPITests, cls).ingest_shapes()
 
     def get_api_response(self, query_string):
         """This bit of code seems to be repeated alot."""
@@ -101,22 +103,18 @@ class PointAPITests(BasePlenarioTest):
         self.assertEqual(dataset_found['dataset_name'], 'crimes')
 
     def test_included_fields(self):
-        query = '/v1/api/datasets/?dataset_name=flu_shot_clinics&include_columns=true'
-        resp = self.app.get(query)
-        response_data = json.loads(resp.data)
-        cols = response_data['objects'][0]['columns']
-        self.assertEqual(len(cols), 17)
+        r = self.get_api_response('datasets/?dataset_name=flu_shot_clinics'
+                                  '&include_columns=true')
+        self.assertEqual(len(r['objects'][0]['columns']), 17)
 
     ''' /fields '''
 
     def test_fields(self):
-        query = 'v1/api/fields/flu_shot_clinics'
-        resp = self.app.get(query)
-        response_data = json.loads(resp.data)
+        r = self.get_api_response('fields/flu_shot_clinics')
 
         # Should be the same length
         # as the number of columns in the source dataset
-        self.assertEqual(len(response_data['objects']), 17)
+        self.assertEqual(len(r['objects']), 17)
 
     # ====================
     # /detail tree filters
@@ -143,34 +141,30 @@ class PointAPITests(BasePlenarioTest):
     # ============================
 
     def test_time_filter(self):
-        query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'
-        resp = self.app.get(query)
-        response_data = json.loads(resp.data)
-
-        self.assertEqual(response_data['meta']['total'], 5)
+        r = self.get_api_response('detail?dataset_name=flu_shot_clinics'
+                                  '&obs_date__ge=2013-09-22'
+                                  '&obs_date__le=2013-10-1')
+        self.assertEqual(r['meta']['total'], 5)
 
     def test_detail_with_0_hour_filter(self):
-        endpoint = '/v1/api/detail'
+        endpoint = 'detail'
         dataset_arg = '?dataset_name=flu_shot_clinics'
         date_args = '&obs_date__ge=2013-09-22&obs_date__le=2013-10-1'
         hour_arg = '&date__time_of_day_ge=0'
 
-        resp = self.app.get(endpoint + dataset_arg + date_args + hour_arg)
-        response_data = json.loads(resp.data)
-
-        self.assertEqual(response_data['meta']['total'], 5)
+        r = self.get_api_response(endpoint + dataset_arg + date_args + hour_arg)
+        self.assertEqual(r['meta']['total'], 5)
 
     def test_detail_with_both_hour_filters(self):
-        endpoint = '/v1/api/detail'
+        endpoint = 'detail'
         dataset_arg = '?dataset_name=crimes'
         date_args = '&obs_date__ge=2000'
         lower_hour_arg = '&date__time_of_day_ge=5'
         upper_hour_arg = '&date__time_of_day_le=17'
 
-        resp = self.app.get(endpoint + dataset_arg + date_args + upper_hour_arg + lower_hour_arg)
-        response_data = json.loads(resp.data)
-
-        self.assertEqual(response_data['meta']['total'], 3)
+        r = self.get_api_response(endpoint + dataset_arg + date_args +
+                                  upper_hour_arg + lower_hour_arg)
+        self.assertEqual(r['meta']['total'], 3)
 
     def test_csv_response(self):
         query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&data_type=csv'
@@ -189,11 +183,11 @@ class PointAPITests(BasePlenarioTest):
         self.assertTrue('longitude' in lines[0])
 
     def test_geojson_response(self):
-        query = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&data_type=geojson'
-        resp = self.app.get(query)
+        r = self.get_api_response('detail/?dataset_name=flu_shot_clinics'
+                                  '&obs_date__ge=2013-09-22'
+                                  '&obs_date__le=2013-10-1&data_type=geojson')
 
-        response_data = json.loads(resp.data)
-        points = response_data['features']
+        points = r['features']
 
         self.assertEqual(len(points), 5)
         attributes = points[0]
@@ -204,10 +198,11 @@ class PointAPITests(BasePlenarioTest):
     def test_space_filter(self):
         escaped_query_rect = get_loop_rect()
 
-        url = '/v1/api/detail/?dataset_name=flu_shot_clinics&obs_date__ge=2013-01-01&obs_date__le=2013-12-31&location_geom__within=' + escaped_query_rect
-        resp = self.app.get(url)
-        response_data = json.loads(resp.data)
-        self.assertEqual(response_data['meta']['total'], 5)
+        r = self.get_api_response('detail/?dataset_name=flu_shot_clinics'
+                                  '&obs_date__ge=2013-01-01'
+                                  '&obs_date__le=2013-12-31'
+                                  '&location_geom__within=' + escaped_query_rect)
+        self.assertEqual(r['meta']['total'], 5)
 
     def test_time_of_day(self):
         url = '/v1/api/detail/?dataset_name=crimes&obs_date__ge=2015-01-01&date__time_of_day_ge=6'

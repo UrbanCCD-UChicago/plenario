@@ -92,17 +92,7 @@ class BasePlenarioTest(unittest.TestCase):
 
     @classmethod
     def ingest_points(cls):
-        tables_to_drop = [
-            'flu_shot_clinics',
-            'landmarks',
-            'crimes',
-            'meta_master'
-            'etl_task'
-        ]
-        drop_tables(tables_to_drop)
-
-        init_meta()
-
+        drop_tables(("flu_shot_clinics", "landmarks", "crimes"))
         ingest_point_fixture(flu_shot_meta, flu_path)
         ingest_point_fixture(landmarks_meta, landmarks_path)
         ingest_point_fixture(crime_meta, crime_path)
