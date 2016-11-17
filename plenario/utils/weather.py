@@ -1,422 +1,44 @@
-import calendar
-import dateutil.parser
-import metar.metar as metar
-import numpy
 import requests
-import pandas
-import pdb
-import odo
-import operator
 import os
-import re
 import sys
 import tarfile
-import types
 import zipfile
-
-import plenario.utils.weather_metar as WeatherMetar
-
-from csvkit.unicsv import UnicodeCSVReader, UnicodeCSVWriter,FieldSizeLimitError
+import re
+from ftplib import FTP
+#from cStringIO import StringIO
+from io import StringIO
+from csvkit.unicsv import UnicodeCSVReader, UnicodeCSVWriter, \
+    UnicodeCSVDictReader, FieldSizeLimitError
+from dateutil import parser
 from datetime import datetime, date, timedelta
 from dateutil import relativedelta
-from ftplib import FTP
+import operator
+
+import calendar
+from plenario.database import session as session, app_engine as engine, \
+    Base
+from plenario.settings import DATA_DIR
+import sqlalchemy
+from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float, \
+    VARCHAR, BigInteger, and_, select, text, distinct, func
+from sqlalchemy.dialects.postgresql import ARRAY
 from geoalchemy2 import Geometry
-from io import StringIO
-from pandas import to_numeric, to_datetime
-from slugify import slugify
-from sqlalchemy import BigInteger, and_, select, distinct, func, delete, join
-from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float
-from sqlalchemy import delete
-from sqlalchemy.dialects.postgresql import ARRAY, FLOAT, VARCHAR
-from tempfile import NamedTemporaryFile
+from uuid import uuid4
+from metar.metar import ParserError
 
-from plenario.database import session as session, app_engine as engine, Base
-from plenario.settings import DATA_DIR, DATABASE_CONN
-from plenario.utils.helpers import reflect
+from .weather_metar import getMetar, getMetarVals, getAllCurrentWeather, getCurrentWeather
 
+# from http://stackoverflow.com/questions/7490660/converting-wind-direction-in-angles-to-text-words
+def degToCardinal(num):
+    val=int((num/22.5)+.5)
+    arr=["N","NNE","NE","ENE","E","ESE", "SE", "SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"]
+    return arr[(val % 16)]
 
-def download_weather_source_files() -> None:
-    """Get the source file containing all the weather observation data"""
 
-    current_year_month = datetime.now().strftime("%Y%m")
-    source_url = "http://www.ncdc.noaa.gov/orders/qclcd/"
-    source_url += "QCLCD{}.zip".format(current_year_month)
-    response = requests.get(source_url)
-
-    weather_zip = open("/tmp/qclcd", mode="wb")
-    weather_zip.write(response.content)
-    weather_zip.close()
-
-
-def get_cardinal_direction(wind_direction: str) -> str:
-    """Given a wind direction, convert it to its cardinal direction
-    equivalent. Based on: http://stackoverflow.com/questions/7490660"""
-
-    if wind_direction.strip() in ['VR', 'M', 'VRB']:
-        return "VRB"
-
-    try:
-        wind_direction = float(wind_direction)
-    except ValueError:
-        return None
-
-    val = int((wind_direction / 22.5) + 0.5)
-    cardinal_directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
-                           "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
-    return cardinal_directions[(val % 16)]
-
-
-def snake_case(name: str) -> str:
-    """Helper function to convert camelcased strings to snake_case. Copied
-    from this snippet: http://stackoverflow.com/questions/1175208."""
-
-    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
-
-
-def get_callsign_wban_code_map() -> dict:
-    """Generate map of callsigns to wban codes from weather_stations table."""
-
-    stations = reflect("weather_stations", Base.metadata, engine)
-    selection = select([stations.c.call_sign, stations.c.wban_code])
-    return dict(engine.execute(selection).fetchall())
-
-
-def parse_metar(raw_metar: str) -> metar.Metar:
-    """Attempt to convert a string to a metar object. Return nothing on fail."""
-
-    try:
-        return metar.Metar(raw_metar)
-    except metar.ParserError:
-        return None
-
-
-def extract_daily_values(series: pandas.Series) -> pandas.Series:
-    """Given a single row of data, perform all the daily transformations
-    required and return the transformed row."""
-
-    # wban_code = row[header.index('WBAN')]
-    # date = row[header.index('YearMonthDay')] # e.g. 20140801
-    # temp_max = self.getTemp(row[header.index('Tmax')])
-    # temp_min = self.getTemp(row[header.index('Tmin')])
-    # temp_avg = self.getTemp(row[header.index('Tavg')])
-    # departure_from_normal = self.floatOrNA(row[header.index('Depart')])
-    # dewpoint_avg = self.floatOrNA(row[header.index('DewPoint')])
-    # wetbulb_avg = self.floatOrNA(row[header.index('WetBulb')])
-    # weather_types_list = self._parse_weather_types(row[header.index('CodeSum')])
-    # snowice_depth = self.getPrecip(row[header.index('Depth')])
-    # snowice_waterequiv = self.getPrecip(row[header.index('Water1')]) # predict 'heart-attack snow'!
-    # snowfall = self.getPrecip(row[header.index('SnowFall')])
-    # precip_total= self.getPrecip(row[header.index('PrecipTotal')])
-    # station_pressure=self.floatOrNA(row[header.index('StnPressure')])
-    # sealevel_pressure=self.floatOrNA(row[header.index('SeaLevel')])
-    # resultant_windspeed = self.floatOrNA(row[header.index('ResultSpeed')])
-    # resultant_winddirection, resultant_winddirection_cardinal=self.parse_wind(resultant_windspeed, row[header.index('ResultDir')])
-    # avg_windspeed=self.floatOrNA(row[header.index('AvgSpeed')])
-    # max5_windspeed=self.floatOrNA(row[header.index('Max5Speed')])
-    # max5_winddirection, max5_winddirection_cardinal=self.parse_wind(max5_windspeed, row[header.index('Max5Dir')])
-    # max2_windspeed=self.floatOrNA(row[header.index('Max2Speed')])
-    # max2_winddirection, max2_winddirection_cardinal=self.parse_wind(max2_windspeed, row[header.index('Max2Dir')])
-
-    pdb.set_trace()
-
-    return pandas.Series({
-        "wban_code": series.wban,
-        "date": to_datetime(series.year_month_day),
-        "temp_max": to_numeric(series.tmax),
-        "temp_min": to_numeric(series.tmin),
-        "temp_avg": to_numeric(series.tavg),
-        "departure_from_normal": to_numeric(series.depart),
-        "dewpoint_avg": to_numeric(series.dewpoint),
-        "wetbulb_avg": to_numeric(series.wetbulb),
-        # "weather_types_list": parse_weather_types(series.codesum),
-        # "snowice_depth": get_precip(series.PrecipTotal),
-        "old_station_type": None,
-        "station_type": to_numeric(series.station_type, errors="coerce"),
-        "sky_condition": series.sky_condition,
-        "sky_condition_top": series.sky_condition.split(" ")[-1],
-        "visibility": to_numeric(series.visibility, errors="coerce"),
-        "weather_types": series.weather_type,
-        "drybulb_fahrenheit": to_numeric(series.dry_bulb_farenheit),
-        "wetbulb_fahrenheit": to_numeric(series.wet_bulb_farenheit),
-        "dewpoint_fahrenheit": to_numeric(series.dew_point_farenheit),
-        "relative_humidity": to_numeric(series.relative_humidity),
-        "wind_speed": to_numeric(series.wind_speed),
-        "wind_direction": series.wind_direction,
-        "wind_direction_cardinal": get_cardinal_direction(series.wind_direction),
-        "station_pressure": to_numeric(series.station_pressure),
-        "sealevel_pressure": to_numeric(series.sea_level_pressure),
-        "report_type": series.record_type,
-        "hourly_precip": to_numeric(series.hourly_precip)
-    })
-
-
-def extract_hourly_values(series: pandas.Series) -> pandas.Series:
-    """Given a single row of data, perform all the hourly transformations
-    required and return the transformed row."""
-
-    return pandas.Series({
-        "wban_code": series.wban,
-        "datetime": dateutil.parser.parse(series.date + series.time),
-        "old_station_type": None,
-        "station_type": to_numeric(series.station_type, errors="coerce"),
-        "sky_condition": series.sky_condition,
-        "sky_condition_top": series.sky_condition.split(" ")[-1],
-        "visibility": to_numeric(series.visibility, errors="coerce"),
-        "weather_types": series.weather_type,
-        "drybulb_fahrenheit": to_numeric(series.dry_bulb_farenheit),
-        "wetbulb_fahrenheit": to_numeric(series.wet_bulb_farenheit),
-        "dewpoint_fahrenheit": to_numeric(series.dew_point_farenheit),
-        "relative_humidity": to_numeric(series.relative_humidity),
-        "wind_speed": to_numeric(series.wind_speed),
-        "wind_direction": series.wind_direction,
-        "wind_direction_cardinal": get_cardinal_direction(series.wind_direction),
-        "station_pressure": to_numeric(series.station_pressure),
-        "sealevel_pressure": to_numeric(series.sea_level_pressure),
-        "report_type": series.record_type,
-        "hourly_precip": to_numeric(series.hourly_precip)
-    })
-
-
-def extract_metar_values(df: pandas.DataFrame) -> pandas.DataFrame:
-    """Generate a series of Metar objects from the python-metar library and use
-    them to create a new dataframe."""
-
-    # Covert the raw text column into a series of Metar objects, drop all the
-    # heathens that failed to convert
-    metars = df["raw_text"].apply(parse_metar).dropna()
-
-    # Extract and transform all the data using methods on the Metar objects
-    df = pandas.DataFrame()
-    # todo: this is terrible, we should only go through the dataframe once...
-    df["call_sign"] = metars.apply(lambda row: row.station_id)
-    df["datetime"] = metars.apply(lambda row: row.time)
-    df["sky_condition"] = metars.apply(lambda row: WeatherMetar.getSkyCondition(row)[0])
-    df["sky_condition_top"] = metars.apply(lambda row: WeatherMetar.getSkyCondition(row)[1])
-    df["visibility"] = metars.apply(WeatherMetar.getVisibility)
-    df["weather_types"] = metars.apply(lambda row: WeatherMetar.getWeatherTypes(row))
-    df["temp_fahrenheit"] = metars.apply(WeatherMetar.getTempFahrenheit)
-    df["dewpoint_fahrenheit"] = metars.apply(WeatherMetar.getDewpointFahrenheit)
-    df["wind_speed"] = metars.apply(lambda row: WeatherMetar.getWind(row)[0])
-    df["wind_direction"] = metars.apply(lambda row: WeatherMetar.getWind(row)[1])
-    df["wind_direction_cardinal"] = metars.apply(lambda row: WeatherMetar.getWind(row)[2])
-    df["wind_gust"] = metars.apply(lambda row: WeatherMetar.getWind(row)[3])
-    df["station_pressure"] = metars.apply(WeatherMetar.getPressure)
-    df["sealevel_pressure"] = metars.apply(WeatherMetar.getPressureSeaLevel)
-    df["precip_1h"] = metars.apply(lambda row: WeatherMetar.getPrecip(row)[0])
-    df["precip_3h"] = metars.apply(lambda row: WeatherMetar.getPrecip(row)[1])
-    df["precip_6h"] = metars.apply(lambda row: WeatherMetar.getPrecip(row)[2])
-    df["precip_24h"] = metars.apply(lambda row: WeatherMetar.getPrecip(row)[3])
-
-    # Derive wban codes from station callsigns
-    callsign_to_wban_map = get_callsign_wban_code_map()
-    df["wban_code"] = metars.apply(lambda row: callsign_to_wban_map.get(row.station_id))
-    df.dropna(subset=["wban_code"], inplace=True)
-
-    return df
-
-
-def extract_weather_values(timespan: str) -> types.FunctionType:
-    """Return a the appropriate extraction method for a given timespan."""
-
-    extract_methods = {
-        "metar": extract_metar_values,
-        "hourly": extract_hourly_values,
-        "daily": extract_daily_values
-    }
-
-    return extract_methods[timespan]
-
-
-def insert_new_weather_observations(temp: Table, target: Table) -> None:
-    """Given two weather tables, insert the rows from the temp table which are
-    not found in the target table."""
-
-    # The sorted calls in this and the next query ensure that the order of
-    # the columns in the select and insert match up. Messing up the
-    # ordering causes an error, ex: insert into (x, y, z) (select x, z, y ... )
-    select_new_records = select(
-        sorted(temp.columns, key=lambda col: col.name)
-    ).select_from(join(
-        left=temp,
-        right=target,
-        onclause=and_(
-            temp.c.datetime == target.c.datetime,
-            temp.c.wban_code == target.c.wban_code
-        ),
-        isouter=True
-    )).where(target.c.datetime == None)
-
-    insert_new_records = target.insert().from_select(
-        names=sorted(target.columns, key=lambda col: col.name),
-        select=select_new_records
-    )
-
-    engine.execute(insert_new_records)
-
-
-# Used to convert column types from the pandas generated metar table to types
-# which are compatible with the existing table
-metar_dtypes = {
-    "precip_3h": FLOAT(),
-    "precip_6h": FLOAT(),
-    "precip_24h": FLOAT(),
-    "weather_types": ARRAY(VARCHAR)
-}
-
-
-def update_metar() -> None:
-    """Update the dat_weather_metar table with recently reported and unchecked
-    NOAA weather observations. This method is meant to be idempotent."""
-
-    # Extract the metar cache csv into a pandas dataframe
-    metar_cache_response = requests.get(
-        "http://aviationweather.gov/adds/dataserver_current/current/"
-        "metars.cache.csv"
-    )
-    metar_csv = NamedTemporaryFile()
-    # Skip the 5 header lines that come with the csv to not break the parser
-    metar_csv.write(metar_cache_response.content.split(b"\n", 5)[-1])
-    metars = pandas.read_csv(
-        metar_csv.name,
-        delimiter=",",
-        parse_dates=["observation_time"]
-    )
-    metar_csv.close()
-
-    # Derive values from the raw text column into separate columns
-    metars = extract_metar_values(metars)
-
-    # To the database damn you
-    metars.to_sql(
-        "tmp_weather_observations_metar", engine,
-        if_exists="replace",
-        dtype=metar_dtypes
-    )
-
-    tmp_table = reflect("tmp_weather_observations_metar", Base.metadata, engine)
-    dat_table = reflect("dat_weather_observations_metar", Base.metadata, engine)
-    insert_new_weather_observations(tmp_table, dat_table)
-
-
-def update_weather(timespans: list) -> None:
-    """Update the dat_weather_observations_<hourly/daily/monthly> table with
-    quality-checked NOAA weather observations."""
-
-    # Enables update weather to take strings also
-    timespans = [timespans] if not isinstance(timespans, list) else timespans
-
-    postgres_url = DATABASE_CONN
-
-    # Generate a zip object that will let us pull individual files
-    numpy_zip = numpy.load("/tmp/qclcd")
-    current_year_month = datetime.now().strftime("%Y%m")
-
-    for timespan in timespans:
-
-        tmp_table_name = postgres_url + "::tmp_weather_observations_" + timespan
-        dat_table_name = postgres_url + "::dat_weather_observations_" + timespan
-
-        # Pull the file out of the zip, and load it into a temporary csv
-        data_fname = "{}.txt".format(current_year_month + timespan)
-        staging_csv = NamedTemporaryFile(suffix=".csv")
-        staging_csv.file.write(numpy_zip[data_fname])
-
-        # Returns an iterator used to break the csv up into manageable portions
-        dframe_chunks = pandas.read_csv(
-            staging_csv.name,
-            chunksize=100000,
-            dtype=str
-        )
-
-        # Munge and load each chunk into a temporary table
-        for df in dframe_chunks:
-            df = df.rename(columns=snake_case)
-            # todo: apply is slowest part of the code... (20m for 1.6mil rows)
-            df = df.apply(extract_weather_values(timespan), axis=1)
-            # Will do nothing if the table exists, otherwise create the table
-            # so that the table reflection with odo.resource doesn't fail
-            df.head(1).to_sql("dat_weather_observations_" + timespan)
-
-            dshape = odo.discover(df)
-            odo.odo(df, tmp_table_name, dshape=dshape)
-
-        tmp_table = odo.resource(tmp_table_name)
-        dat_table = odo.resource(dat_table_name)
-        insert_new_weather_observations(tmp_table, dat_table)
-
-        # Clean out the temporary table
-        engine.execute(delete(tmp_table))
-
-        staging_csv.close()
-
-
-def update_stations() -> None:
-    """Update the weather station listing in the weather_stations table.
-    Because the size of the source file is small (~3mb) and the number of
-    raw rows is small also (~30k), drop and replace the table each time the
-    method is run."""
-
-    # Read the source data into a temporary csv file
-    stations_csv = NamedTemporaryFile(mode="w")
-    ftp_client = FTP('ftp.ncdc.noaa.gov')
-    ftp_client.login()
-    ftp_client.retrlines(
-        cmd="RETR /pub/data/noaa/isd-history.csv",
-        # Custom callback avoids the random EOF I was encountering
-        callback=lambda line: stations_csv.file.write(line + "\n")
-    )
-    ftp_client.close()
-
-    # Create a dataframe from the csv, specifying datetime columns but letting
-    # pandas infer the types of the rest
-    stations = pandas.read_csv(
-        stations_csv.name,
-        delimiter=",",
-        parse_dates=["BEGIN", "END"]
-    )
-    stations_csv.close()
-
-    # Slugify column names and rename some to play nice with legacy code
-    stations = stations.rename(columns=lambda col: slugify(col, separator="_"))
-    stations = stations.rename(
-        columns={
-            "wban": "wban_code",
-            "ctry": "country",
-            "icao": "call_sign",
-            "elev_m": "elevation"
-        }
-    )
-
-    # Munge the data, dropping rows with missing values, duplicate and
-    # undesirable wbans, and funky location values
-    stations = stations.dropna(how="any")
-    stations = stations.drop_duplicates("wban_code")
-    stations = stations[stations["wban_code"] != 99999]
-    stations = stations[(stations["lon"] != 0) & (stations["lat"] != 0)]
-    stations.reset_index(drop=True, inplace=True)
-
-    # Condense the lat long columns to a location column containing a geometry
-    stations["location"] = stations[["lon", "lat"]].apply(
-        func=lambda row: "SRID=4326;POINT(%s %s)" % (row.lon, row.lat),
-        axis=1
-    )
-    del stations["lon"]
-    del stations["lat"]
-
-    # Insert the dataframe values into postgres, replacing the existing table
-    stations.to_sql(
-        "weather_stations", engine,
-        if_exists="replace",
-        dtype={"location": Geometry("point", 4326)}
-    )
-
-
-# ==============================================================================
-# ==============================================================================
-# ================================ THE WALL ====================================
-# ==============================================================================
-# ==============================================================================
+class WeatherError(Exception):
+    def __init__(self, message):
+        Exception.__init__(self, message)
+        self.message = message
 
 class WeatherETL(object):
     """ 
@@ -436,45 +58,44 @@ class WeatherETL(object):
     # - _extract(fname)
     #
     #
-
-    # todo: not used???
-    # weather_type_dict = {'+FC': 'TORNADO/WATERSPOUT',
-    #                  'FC': 'FUNNEL CLOUD',
-    #                  'TS': 'THUNDERSTORM',
-    #                  'GR': 'HAIL',
-    #                  'RA': 'RAIN',
-    #                  'DZ': 'DRIZZLE',
-    #                  'SN': 'SNOW',
-    #                  'SG': 'SNOW GRAINS',
-    #                  'GS': 'SMALL HAIL &/OR SNOW PELLETS',
-    #                  'PL': 'ICE PELLETS',
-    #                  'IC': 'ICE CRYSTALS',
-    #                  'FG': 'FOG', # 'FG+': 'HEAVY FOG (FG & LE.25 MILES VISIBILITY)',
-    #                  'BR': 'MIST',
-    #                  'UP': 'UNKNOWN PRECIPITATION',
-    #                  'HZ': 'HAZE',
-    #                  'FU': 'SMOKE',
-    #                  'VA': 'VOLCANIC ASH',
-    #                  'DU': 'WIDESPREAD DUST',
-    #                  'DS': 'DUSTSTORM',
-    #                  'PO': 'SAND/DUST WHIRLS',
-    #                  'SA': 'SAND',
-    #                  'SS': 'SANDSTORM',
-    #                  'PY': 'SPRAY',
-    #                  'SQ': 'SQUALL',
-    #                  'DR': 'LOW DRIFTING',
-    #                  'SH': 'SHOWER',
-    #                  'FZ': 'FREEZING',
-    #                  'MI': 'SHALLOW',
-    #                  'PR': 'PARTIAL',
-    #                  'BC': 'PATCHES',
-    #                  'BL': 'BLOWING',
-    #                  'VC': 'VICINITY'
-    #                  # Prefixes:
-    #                  # - LIGHT
-    #                  # + HEAVY
-    #                  # "NO SIGN" MODERATE
-    #              }
+    
+    weather_type_dict = {'+FC': 'TORNADO/WATERSPOUT',
+                     'FC': 'FUNNEL CLOUD',
+                     'TS': 'THUNDERSTORM',
+                     'GR': 'HAIL',
+                     'RA': 'RAIN',
+                     'DZ': 'DRIZZLE',
+                     'SN': 'SNOW',
+                     'SG': 'SNOW GRAINS',
+                     'GS': 'SMALL HAIL &/OR SNOW PELLETS',
+                     'PL': 'ICE PELLETS',
+                     'IC': 'ICE CRYSTALS',
+                     'FG': 'FOG', # 'FG+': 'HEAVY FOG (FG & LE.25 MILES VISIBILITY)',
+                     'BR': 'MIST',
+                     'UP': 'UNKNOWN PRECIPITATION',
+                     'HZ': 'HAZE',
+                     'FU': 'SMOKE',
+                     'VA': 'VOLCANIC ASH',
+                     'DU': 'WIDESPREAD DUST',
+                     'DS': 'DUSTSTORM',
+                     'PO': 'SAND/DUST WHIRLS',
+                     'SA': 'SAND',
+                     'SS': 'SANDSTORM',
+                     'PY': 'SPRAY',
+                     'SQ': 'SQUALL',
+                     'DR': 'LOW DRIFTING',
+                     'SH': 'SHOWER',
+                     'FZ': 'FREEZING',
+                     'MI': 'SHALLOW',
+                     'PR': 'PARTIAL',
+                     'BC': 'PATCHES',
+                     'BL': 'BLOWING',
+                     'VC': 'VICINITY'
+                     # Prefixes:
+                     # - LIGHT
+                     # + HEAVY
+                     # "NO SIGN" MODERATE
+                 }
 
     current_row = None
 
@@ -488,11 +109,54 @@ class WeatherETL(object):
             self.debug_filename = os.path.join(self.data_dir, 'weather_etl_debug_out.txt')
             sys.stderr.write( "writing out debug_file %s\n" % self.debug_filename)
             self.debug_outfile = open(self.debug_filename, 'w+')
+        self.wban2callsign_map = self.build_wban2callsign_map()
+
+    def build_wban2callsign_map(self):
+        #stations_table = Table('weather_stations', Base.metadata, 
+        #                       autoload=True, autoload_with=engine, extend_existing=True)
+        # ask stations_table for all rows where wban_code and call_sign are defined
+        sql = "SELECT wban_code, call_sign FROM weather_stations WHERE call_sign IS NOT NULL"
+        conn = engine.contextual_connect()
+        results = conn.execute(sql)
+        wban_callsigns = results.fetchall()
+        d = dict(wban_callsigns)
+        return d
+
+        
+    # WeatherETL.initialize_last(): for debugging purposes, only initialize the most recent month of weather data.
+    def initialize_last(self, start_line=0, end_line=None):
+        self.make_tables()
+        fname = self._extract_last_fname()
+        raw_hourly, raw_daily, file_type = self._extract(fname)
+        t_daily = self._transform_daily(raw_daily, file_type, start_line=start_line, end_line=end_line)
+        self._load_daily(t_daily)
+        t_hourly = self._transform_hourly(raw_hourly, file_type, start_line=start_line, end_line=end_line)
+        self._load_hourly(t_hourly)
+        self._update(span='daily')
+        self._update(span='hourly')
+        self._cleanup_temp_tables()
+
+    def initialize(self):
+        #print "WeatherETL.initialize()"
+        self.make_tables()
+        fnames = self._extract_fnames()
+        for fname in fnames:
+            if (self.debug==True):
+                print(("INITIALIZE: doing fname", fname))
+            self._do_etl(fname)
 
     def initialize_month(self, year, month, no_daily=False, no_hourly=False, weather_stations_list = None, banned_weather_stations_list = None, start_line=0, end_line=None):
         self.make_tables()
         fname = self._extract_fname(year,month)
         self._do_etl(fname, no_daily, no_hourly, weather_stations_list, banned_weather_stations_list, start_line, end_line)
+
+    # Import current observations, whatever they may be, for the specified list of station WBANs and/or banned station WBANs.
+    def metar_initialize_current(self, weather_stations_list = None, banned_weather_stations_list = None):
+        self.metar_make_tables()
+        # we want to pass this to some _metar_do_etl() function
+        self._metar_do_etl(weather_stations_list, banned_weather_stations_list)
+            
+
 
     ######################################################################
     # do_etl: perform the ETL on a given tar/zip file
@@ -526,6 +190,27 @@ class WeatherETL(object):
             # self._add_location(span='hourly') # XXX mcc: hmm
         #self._cleanup_temp_tables()
 
+    def _metar_do_etl(self,  weather_stations_list = None, banned_weather_stations_list = None):
+        # Below code hits the METAR server
+        # Don't bother calling any _extract_metar() function...
+
+        #metar_codes = getAllCurrentWeather()
+        if weather_stations_list:
+            # map wbans to call signs.
+            metar_codes = getCurrentWeather(wban_codes =weather_stations_list, wban2callsigns = self.wban2callsign_map)
+        else:
+            metar_codes = getAllCurrentWeather()
+            
+        
+        t_metars = self._transform_metars(metar_codes,
+                                          weather_stations_list,
+                                          banned_weather_stations_list)
+
+        #print "t_metars are: " ,t_metars
+        self._load_metar(t_metars)
+        self._update_metar()
+        self._metar_cleanup_temp_tables()
+
     def _cleanup_temp_tables(self):
         for span in ['daily', 'hourly']:
             for tname in ['src', 'new']:
@@ -535,55 +220,178 @@ class WeatherETL(object):
                 except AttributeError:
                     continue
 
-    # todo: covered by insert_new_weather_observations
-    # def _update(self, span=None):
-    #     new_table = Table('new_weather_observations_%s' % span, Base.metadata,
-    #                       Column('wban_code', String(5)), keep_existing=True)
-    #     dat_table = getattr(self, '%s_table' % span)
-    #     src_table = getattr(self, 'src_%s_table' % span)
-    #     from_sel_cols = ['wban_code']
-    #     if span == 'daily':
-    #         from_sel_cols.append('date')
-    #         src_date_col = src_table.c.date
-    #         dat_date_col = dat_table.c.date
-    #         new_table.append_column(Column('date', Date))
-    #         new_date_col = new_table.c.date
-    #     elif span == 'hourly':
-    #         from_sel_cols.append('datetime')
-    #         src_date_col = src_table.c.datetime
-    #         dat_date_col = dat_table.c.datetime
-    #         new_table.append_column(Column('datetime', DateTime))
-    #         new_date_col = new_table.c.datetime
-    #     new_table.drop(engine, checkfirst=True)
-    #     new_table.create(engine)
-    #     ins = new_table.insert()\
-    #             .from_select(from_sel_cols,
-    #                 select([src_table.c.wban_code, src_date_col])\
-    #                     .select_from(src_table.join(dat_table,
-    #                         and_(src_table.c.wban_code == dat_table.c.wban_code,
-    #                              src_date_col == dat_date_col),
-    #                         isouter=True)
-    #                 ).where(dat_table.c.id == None)
-    #             )
-    #     #print "_update: span=%s: sql is'%s'" % (span, ins)
-    #     conn = engine.contextual_connect()
-    #     try:
-    #         conn.execute(ins)
-    #         new = True
-    #     except TypeError:
-    #         new = False
-    #     if new:
-    #         ins = dat_table.insert()\
-    #                 .from_select([c for c in dat_table.columns if c.name != 'id'],
-    #                     select([c for c in src_table.columns])\
-    #                         .select_from(src_table.join(new_table,
-    #                             and_(src_table.c.wban_code == new_table.c.wban_code,
-    #                                  src_date_col == new_date_col)
-    #                         ))
-    #                 )
-    #         #print "_update NEW : span=%s: sql is'%s'" % (span, ins)
-    #         conn.execute(ins)
+    def _metar_cleanup_temp_tables(self):
+        for tname in ['src', 'new']:
+            try:
+                table = getattr(self, '%s_metar_table' % tname)
+                table.drop(engine, checkfirst=True)
+            except AttributeError:
+                continue
 
+    def _add_location(self, span=None):
+        """ 
+        Add latitude and longitude from weather station into observations table
+        """
+        start_day, end_day = calendar.monthrange(self.current_year, self.current_month)
+        range_start = '%s-%s-%s' % (self.current_year, self.current_month, 1)
+        range_end = '%s-%s-%s' % (self.current_year, self.current_month, end_day)
+        date_col = 'date'
+        table_name = 'dat_weather_observations_%s' % span
+        if span == 'hourly' or span == 'metar':
+            date_col = 'datetime'
+        upd = text("""
+            UPDATE %s SET 
+                longitude = subq.longitude,
+                latitude = subq.latitude
+            FROM (
+                SELECT 
+                    wban_code,
+                    st_x(location) as longitude,
+                    st_y(location) as latitude
+                FROM weather_stations
+            ) as subq
+            WHERE %s.wban_code = subq.wban_code
+               AND %s.%s <= :range_end
+               AND %s.%s >= :range_start
+               AND %s.longitude IS NULL
+               AND %s.latitude IS NULL
+        """ % (table_name, table_name, 
+               table_name, date_col,
+               table_name, date_col,
+               table_name, table_name)
+        )
+        conn = engine.contextual_connect()
+        conn.execute(upd, range_start=range_start, range_end=range_end)
+
+
+        
+    def _update(self, span=None):
+        new_table = Table('new_weather_observations_%s' % span, Base.metadata,
+                          Column('wban_code', String(5)), keep_existing=True)
+        dat_table = getattr(self, '%s_table' % span)
+        src_table = getattr(self, 'src_%s_table' % span)
+        from_sel_cols = ['wban_code']
+        if span == 'daily':
+            from_sel_cols.append('date')
+            src_date_col = src_table.c.date
+            dat_date_col = dat_table.c.date
+            new_table.append_column(Column('date', Date))
+            new_date_col = new_table.c.date
+        elif span == 'hourly':
+            from_sel_cols.append('datetime')
+            src_date_col = src_table.c.datetime
+            dat_date_col = dat_table.c.datetime
+            new_table.append_column(Column('datetime', DateTime))
+            new_date_col = new_table.c.datetime
+        new_table.drop(engine, checkfirst=True)
+        new_table.create(engine)
+        ins = new_table.insert()\
+                .from_select(from_sel_cols, 
+                    select([src_table.c.wban_code, src_date_col])\
+                        .select_from(src_table.join(dat_table,
+                            and_(src_table.c.wban_code == dat_table.c.wban_code,
+                                 src_date_col == dat_date_col),
+                            isouter=True)
+                    ).where(dat_table.c.id == None)
+                )
+        #print "_update: span=%s: sql is'%s'" % (span, ins)
+        conn = engine.contextual_connect()
+        try:
+            conn.execute(ins)
+            new = True
+        except TypeError:
+            new = False
+        if new:
+            ins = dat_table.insert()\
+                    .from_select([c for c in dat_table.columns if c.name != 'id'], 
+                        select([c for c in src_table.columns])\
+                            .select_from(src_table.join(new_table,
+                                and_(src_table.c.wban_code == new_table.c.wban_code,
+                                     src_date_col == new_date_col)
+                            ))
+                    )
+            #print "_update NEW : span=%s: sql is'%s'" % (span, ins)
+            conn.execute(ins)
+
+    def _update_metar(self):
+        #print "_update_metar()"
+        
+        new_table = Table('new_weather_observations_metar', Base.metadata,
+                          Column('wban_code', String(5)), keep_existing=True)  # intersection of src and dat -- only new records
+        dat_table = getattr(self, 'metar_table') # where we are eventually storing things
+        src_table = getattr(self, 'src_metar_table') # raw incoming data
+
+        #print "we have new_table: '%s'" % new_table
+        #print "we have dat_table: '%s'" % dat_table
+        #print "we have src_table: '%s'" % src_table
+        
+        from_sel_cols = ['wban_code', 'datetime']
+        src_date_col = src_table.c.datetime
+        dat_date_col = dat_table.c.datetime
+        new_table.append_column(Column('datetime', DateTime))
+        new_date_col = new_table.c.datetime
+        new_table.drop(engine, checkfirst=True)
+        try:
+            new_table.create(engine)
+        except sql.exc.ProgrammingError:
+            print("got ProgrammingError on new metar table create")
+            return None
+
+        ## Essentially, insert into the new observations table for any src observations that are not in the current dat observations.
+        #ins = """
+        #INSERT INTO new_weather_observations_metar (wban_code, date)
+        #SELECT src_weather_observations_metar.wban_code, src_weather_observations_metar.datetime
+        #FROM src_weather_observations_metar 
+        #LEFT OUTER JOIN dat_weather_observations_metar 
+        #ON src_weather_observations_metar.wban_code = dat_weather_observations_metar.wban_code 
+        #AND src_weather_observations_metar.datetime = dat_weather_observations_metar.datetime
+        #WHERE dat_weather_observations_metar.id IS NULL'
+        #"""
+
+        ins = new_table.insert()\
+                .from_select(from_sel_cols, 
+                    select([src_table.c.wban_code, src_date_col])\
+                        .select_from(src_table.join(dat_table,
+                            and_(src_table.c.wban_code == dat_table.c.wban_code,
+                                 src_date_col == dat_date_col),
+                            isouter=True)
+                    ).where(dat_table.c.id == None)
+                )
+
+
+        #print "_update_metar(): sql is'%s'" % ins
+        conn = engine.contextual_connect()
+        
+        try:
+            conn.execute(ins)
+            new = True
+        except TypeError:
+            new = False
+        except sql.exc.ProgrammingError:
+            print("got ProgrammingError on insert to new table")
+        if new:
+
+            # There were no new records.. soo, insert into the dat observations any records
+            # from src observations which match records in new observations.
+
+            # 'INSERT INTO dat_weather_observations_daily (wban_code, date, temp_max, temp_min, temp_avg, departure_from_normal, dewpoint_avg, wetbulb_avg, weather_types, snowice_depth, snowice_waterequiv, snowfall, precip_total, station_pressure, sealevel_pressure, resultant_windspeed, resultant_winddirection, resultant_winddirection_cardinal, avg_windspeed, max5_windspeed, max5_winddirection, max5_direction_cardinal, max2_windspeed, max2_winddirection, max2_direction_cardinal, longitude, latitude)
+
+            #ins = """
+            #INSERT INTO dat_weather_observations_metar (wban_code, call_sign, datetime, sky_condition, sky_condition_top, visibility
+            #SELECT ...
+            #"""
+            
+            ins = dat_table.insert()\
+                    .from_select([c for c in dat_table.columns if c.name != 'id'], 
+                        select([c for c in src_table.columns])\
+                            .select_from(src_table.join(new_table,
+                                and_(src_table.c.wban_code == new_table.c.wban_code,
+                                     src_date_col == new_date_col)
+                            ))
+                    )
+            conn.execute(ins)
+
+            
     def make_tables(self):
         self._make_daily_table()
         self._make_hourly_table()
@@ -761,12 +569,12 @@ class WeatherETL(object):
         station_pressure=self.floatOrNA(row[header.index('StnPressure')])
         sealevel_pressure=self.floatOrNA(row[header.index('SeaLevel')])
         resultant_windspeed = self.floatOrNA(row[header.index('ResultSpeed')])
-        resultant_winddirection, resultant_winddirection_cardinal=self.parse_wind(resultant_windspeed, row[header.index('ResultDir')])
+        resultant_winddirection, resultant_winddirection_cardinal=self.getWind(resultant_windspeed, row[header.index('ResultDir')])
         avg_windspeed=self.floatOrNA(row[header.index('AvgSpeed')])            
         max5_windspeed=self.floatOrNA(row[header.index('Max5Speed')])
-        max5_winddirection, max5_winddirection_cardinal=self.parse_wind(max5_windspeed, row[header.index('Max5Dir')])
+        max5_winddirection, max5_winddirection_cardinal=self.getWind(max5_windspeed, row[header.index('Max5Dir')])
         max2_windspeed=self.floatOrNA(row[header.index('Max2Speed')])
-        max2_winddirection, max2_winddirection_cardinal=self.parse_wind(max2_windspeed, row[header.index('Max2Dir')])
+        max2_winddirection, max2_winddirection_cardinal=self.getWind(max2_windspeed, row[header.index('Max2Dir')])
 
         vals = [wban_code,date,temp_max,temp_min,
                 temp_avg,departure_from_normal,
@@ -800,12 +608,12 @@ class WeatherETL(object):
         station_pressure=self.floatOrNA(row[header.index('Pressue Avg Station')]) # XXX Not me -- typo in header!
         sealevel_pressure=self.floatOrNA(row[header.index('Pressure Avg Sea Level')])
         resultant_windspeed = self.floatOrNA(row[header.index('Wind Speed')])
-        resultant_winddirection, resultant_winddirection_cardinal=self.parse_wind(resultant_windspeed, row[header.index('Wind Direction')])
+        resultant_winddirection, resultant_winddirection_cardinal=self.getWind(resultant_windspeed, row[header.index('Wind Direction')])
         avg_windspeed=self.floatOrNA(row[header.index('Wind Avg Speed')])            
         max5_windspeed=self.floatOrNA(row[header.index('Max 5 sec speed')])
-        max5_winddirection, max5_winddirection_cardinal=self.parse_wind(max5_windspeed, row[header.index('Max 5 sec Dir')])
+        max5_winddirection, max5_winddirection_cardinal=self.getWind(max5_windspeed, row[header.index('Max 5 sec Dir')])
         max2_windspeed=self.floatOrNA(row[header.index('Max 2 min speed')])
-        max2_winddirection, max2_winddirection_cardinal=self.parse_wind(max2_windspeed, row[header.index('Max 2 min Dir')])
+        max2_winddirection, max2_winddirection_cardinal=self.getWind(max2_windspeed, row[header.index('Max 2 min Dir')])
 
         vals= [wban_code,date,temp_max,temp_min,
                temp_avg,departure_from_normal,
@@ -932,7 +740,7 @@ class WeatherETL(object):
         rel_humidity = self.integerOrNA(row[header.index('RelativeHumidity')])
         wind_speed = self.integerOrNA(row[header.index('WindSpeed')])
         # XX mcc consider handling WindSpeedFlag == 's' for 'suspect'
-        wind_direction, wind_cardinal = self.parse_wind(wind_speed, row[header.index('WindDirection')])
+        wind_direction, wind_cardinal = self.getWind(wind_speed, row[header.index('WindDirection')])
         station_pressure = self.floatOrNA(row[header.index('StationPressure')])
         sealevel_pressure = self.floatOrNA(row[header.index('SeaLevelPressure')])
         hourly_precip = self.getPrecip(row[header.index('HourlyPrecip')])
@@ -995,7 +803,7 @@ class WeatherETL(object):
         dewpoint_F = self.floatOrNA(row[header.index('Dew Point Temp')])
         rel_humidity = self.integerOrNA(row[header.index('% Relative Humidity')])
         wind_speed = self.integerOrNA(row[header.index('Wind Speed (kt)')])
-        wind_direction, wind_cardinal = self.parse_wind(wind_speed, row[header.index('Wind Direction')])
+        wind_direction, wind_cardinal = self.getWind(wind_speed, row[header.index('Wind Direction')])
         station_pressure = self.floatOrNA(row[header.index('Station Pressure')])
         sealevel_pressure = self.floatOrNA(row[header.index('Sea Level Pressure')])
         hourly_precip = self.getPrecip(row[header.index('Precip. Total')])
@@ -1019,6 +827,82 @@ class WeatherETL(object):
 
         return vals
 
+    def _transform_metars(self, metar_codes, weather_stations_list=None, banned_weather_stations_list=None):
+        metar_codes_idx = 0
+
+        self.clean_observations_metar = StringIO()
+        writer = UnicodeCSVWriter(self.clean_observations_metar)
+        self.out_header=["wban_code", "call_sign", "datetime", "sky_condition", "sky_condition_top",
+                         "visibility", "weather_types", "temp_fahrenheit", "dewpoint_fahrenheit",
+                         "wind_speed", "wind_direction", "wind_direction_cardinal", "wind_gust",
+                         "station_pressure", "sealevel_pressure",
+                         "precip_1hr","precip_3hr", "precip_6hr", "precip_24hr"]
+
+        writer.writerow(self.out_header)
+        row_count = 0
+        added_count = 0
+        for row in metar_codes:
+            row_count += 1
+            row_vals = self._parse_row_metar(row, self.out_header)
+
+            # XXX: convert row_dict['weather_types'] from a list of lists (e.g. [[None, None, None, '', 'BR', None]])
+            # to a string that looks like: "{{None, None, None, '', 'BR', None}}"
+
+            try:
+                weather_types_str = str(row_vals[self.out_header.index('weather_types')])
+            except IndexError:
+                print(('the offending row is', row_vals))
+                continue
+            #print "weather_types_str = '%s'" % weather_types_str
+            # literally just change '[' to '{' and ']' to '}'
+            weather_types_str = weather_types_str.replace('[', '{')
+            weather_types_str = weather_types_str.replace(']', '}')
+            row_vals[self.out_header.index('weather_types')] = weather_types_str
+            #print "_transform_metars(): changed row_vals[self.out_header.index('weather_types')] to ", weather_types_str
+
+            if (not row_vals):
+                continue
+            row_dict = dict(list(zip(self.out_header, row_vals)))
+
+            if (weather_stations_list is not None):
+                # Only include observations from the specified list of wban_code values
+                if (row_dict['wban_code'] not in weather_stations_list):
+                    continue
+
+            if (banned_weather_stations_list is not None):
+                if (row_dict['wban_code'] in banned_weather_stations_list):
+                    continue
+            if (self.debug==True):
+                print(("_transform_metars(): WRITING row_vals: '%s'"  % str(row_vals)))
+
+            # Making sure there is a WBAN code
+            if not row_vals[0]:
+                # This will happen for stations outside of the USA.
+                # Discard for now.
+                continue
+            added_count += 1
+            writer.writerow(row_vals)
+
+        return self.clean_observations_metar
+
+
+
+    def _parse_row_metar(self, row, header):
+        try:
+            m = getMetar(row)
+        except ParserError:
+            return []
+        
+        vals = getMetarVals(m)
+        #print "_parse_row_metar(): header=", header
+        #print "_parse_row_metar(): vals=",vals
+        assert(len(header) == len(vals))        
+        return vals
+
+
+    
+    
+    
     # Help parse a 'present weather' string like 'FZFG' (freezing fog) or 'BLSN' (blowing snow) or '-RA' (light rain)
     # When we are doing precip slurp as many as possible
     def _do_weather_parse(self, pw, mapping, multiple=False, local_debug=False):
@@ -1057,8 +941,6 @@ class WeatherETL(object):
 
         intensities =  [('-','Light'),
                         ('+','Heavy')]
-
-        pdb.set_trace()
 
         (l, intensity) = self._do_weather_parse(l, intensities)
 
@@ -1203,7 +1085,7 @@ class WeatherETL(object):
                     self.debug_outfile.flush()
                 return None, None
 
-            wind_cardinal = get_cardinal_direction(wind_direction_int)
+            wind_cardinal = degToCardinal(wind_direction_int)
         if (wind_speed == 0):
             wind_direction = None
             wind_cardinal = None
@@ -1288,104 +1170,115 @@ class WeatherETL(object):
         self.metar_table = self._get_metar_table()
         self.metar_table.append_column(Column('id', BigInteger, primary_key=True))
         self.metar_table.create(engine, checkfirst=True)
+        
+    def _get_daily_table(self, name='dat'):
+        return Table('%s_weather_observations_daily' % name, Base.metadata,
+                            Column('wban_code', String(5), nullable=False),
+                            Column('date', Date, nullable=False),
+                            Column('temp_max', Float, index=True),
+                            Column('temp_min', Float, index=True),
+                            Column('temp_avg', Float, index=True),
+                            Column('departure_from_normal', Float),
+                            Column('dewpoint_avg', Float),
+                            Column('wetbulb_avg', Float),
+                            #Column('weather_types', ARRAY(String(16))), # column 'CodeSum',
+                            Column('weather_types', ARRAY(String)), # column 'CodeSum',
+                            Column("snowice_depth", Float),
+                            Column("snowice_waterequiv", Float),
+                            # XX: Not sure about meaning of 'Cool' and 'Heat' columns in daily table,
+                            #     based on documentation.
+                            Column('snowfall', Float),
+                            Column('precip_total', Float, index=True),
+                            Column('station_pressure', Float),
+                            Column('sealevel_pressure', Float),
+                            Column('resultant_windspeed', Float),
+                            Column('resultant_winddirection', String(3)), # appears to be 00 (000) to 36 (360)
+                            Column('resultant_winddirection_cardinal', String(3)), # e.g. NNE, NNW
+                            Column('avg_windspeed', Float),
+                            Column('max5_windspeed', Float),
+                            Column('max5_winddirection', String(3)), # 000 through 360, M for missing
+                            Column('max5_direction_cardinal', String(3)), # e.g. NNE, NNW
+                            Column('max2_windspeed', Float), 
+                            Column('max2_winddirection', String(3)), # 000 through 360, M for missing
+                            Column('max2_direction_cardinal', String(3)), # e.g. NNE, NNW
+                            Column('longitude', Float),
+                            Column('latitude', Float),
+                            keep_existing=True) 
 
-    # todo: covered by odo.resource("dat_weather_observations_hourly")
-    # def _get_daily_table(self, name='dat'):
-    #     return Table('%s_weather_observations_daily' % name, Base.metadata,
-    #                         Column('wban_code', String(5), nullable=False),
-    #                         Column('date', Date, nullable=False),
-    #                         Column('temp_max', Float, index=True),
-    #                         Column('temp_min', Float, index=True),
-    #                         Column('temp_avg', Float, index=True),
-    #                         Column('departure_from_normal', Float),
-    #                         Column('dewpoint_avg', Float),
-    #                         Column('wetbulb_avg', Float),
-    #                         #Column('weather_types', ARRAY(String(16))), # column 'CodeSum',
-    #                         Column('weather_types', ARRAY(String)), # column 'CodeSum',
-    #                         Column("snowice_depth", Float),
-    #                         Column("snowice_waterequiv", Float),
-    #                         # XX: Not sure about meaning of 'Cool' and 'Heat' columns in daily table,
-    #                         #     based on documentation.
-    #                         Column('snowfall', Float),
-    #                         Column('precip_total', Float, index=True),
-    #                         Column('station_pressure', Float),
-    #                         Column('sealevel_pressure', Float),
-    #                         Column('resultant_windspeed', Float),
-    #                         Column('resultant_winddirection', String(3)), # appears to be 00 (000) to 36 (360)
-    #                         Column('resultant_winddirection_cardinal', String(3)), # e.g. NNE, NNW
-    #                         Column('avg_windspeed', Float),
-    #                         Column('max5_windspeed', Float),
-    #                         Column('max5_winddirection', String(3)), # 000 through 360, M for missing
-    #                         Column('max5_direction_cardinal', String(3)), # e.g. NNE, NNW
-    #                         Column('max2_windspeed', Float),
-    #                         Column('max2_winddirection', String(3)), # 000 through 360, M for missing
-    #                         Column('max2_direction_cardinal', String(3)), # e.g. NNE, NNW
-    #                         Column('longitude', Float),
-    #                         Column('latitude', Float),
-    #                         keep_existing=True)
+    def _get_hourly_table(self, name='dat'):
+        return Table('%s_weather_observations_hourly' % name, Base.metadata,
+                Column('wban_code', String(5), nullable=False),
+                Column('datetime', DateTime, nullable=False),
+                # AO1: without precipitation discriminator, AO2: with precipitation discriminator
+                Column('old_station_type', String(5)),
+                Column('station_type', Integer),
+                Column('sky_condition', String),
+                Column('sky_condition_top', String), # top-level sky condition, e.g.
+                                                        # if 'FEW018 BKN029 OVC100'
+                                                        # we have overcast at 10,000 feet (100 * 100).
+                                                        # BKN017TCU means broken clouds at 1700 feet w/ towering cumulonimbus
+                                                        # BKN017CB means broken clouds at 1700 feet w/ cumulonimbus
+                Column('visibility', Float), #  in Statute Miles
+                # XX in R: unique(unlist(strsplit(unlist(as.character(unique(x$WeatherType))), ' ')))
+                #Column('weather_types', ARRAY(String(16))),
+                Column('weather_types', ARRAY(String)),
+                Column('drybulb_fahrenheit', Float, index=True), # These can be NULL bc of missing data
+                Column('wetbulb_fahrenheit', Float), # These can be NULL bc of missing data
+                Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
+                Column('relative_humidity', Integer),
+                Column('wind_speed', Integer),
+                Column('wind_direction', String(3)), # 000 to 360
+                Column('wind_direction_cardinal', String(3)), # e.g. NNE, NNW
+                Column('station_pressure', Float),
+                Column('sealevel_pressure', Float),
+                Column('report_type', String), # Either 'AA' or 'SP'
+                Column('hourly_precip', Float, index=True),
+                Column('longitude', Float),
+                Column('latitude', Float),
+                keep_existing=True)
 
-    # todo: covered by odo.resource("dat_weather_observations_hourly")
-    # def _get_hourly_table(self, name='dat'):
-    #     return Table('%s_weather_observations_hourly' % name, Base.metadata,
-    #             Column('wban_code', String(5), nullable=False),
-    #             Column('datetime', DateTime, nullable=False),
-    #             # AO1: without precipitation discriminator, AO2: with precipitation discriminator
-    #             Column('old_station_type', String(5)),
-    #             Column('station_type', Integer),
-    #             Column('sky_condition', String),
-    #             Column('sky_condition_top', String), # top-level sky condition, e.g.
-    #                                                     # if 'FEW018 BKN029 OVC100'
-    #                                                     # we have overcast at 10,000 feet (100 * 100).
-    #                                                     # BKN017TCU means broken clouds at 1700 feet w/ towering cumulonimbus
-    #                                                     # BKN017CB means broken clouds at 1700 feet w/ cumulonimbus
-    #             Column('visibility', Float), #  in Statute Miles
-    #             # XX in R: unique(unlist(strsplit(unlist(as.character(unique(x$WeatherType))), ' ')))
-    #             #Column('weather_types', ARRAY(String(16))),
-    #             Column('weather_types', ARRAY(String)),
-    #             Column('drybulb_fahrenheit', Float, index=True), # These can be NULL bc of missing data
-    #             Column('wetbulb_fahrenheit', Float), # These can be NULL bc of missing data
-    #             Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
-    #             Column('relative_humidity', Integer),
-    #             Column('wind_speed', Integer),
-    #             Column('wind_direction', String(3)), # 000 to 360
-    #             Column('wind_direction_cardinal', String(3)), # e.g. NNE, NNW
-    #             Column('station_pressure', Float),
-    #             Column('sealevel_pressure', Float),
-    #             Column('report_type', String), # Either 'AA' or 'SP'
-    #             Column('hourly_precip', Float, index=True),
-    #             Column('longitude', Float),
-    #             Column('latitude', Float),
-    #             keep_existing=True)
+    def _get_metar_table(self, name='dat'):
+        return Table('%s_weather_observations_metar' % name, Base.metadata,
+                Column('wban_code', String(5), nullable=False),
+                Column('call_sign', String(5), nullable=False),  
+                Column('datetime', DateTime, nullable=False),
+                Column('sky_condition', String),
+                Column('sky_condition_top', String), # top-level sky condition, e.g.
+                                                        # if 'FEW018 BKN029 OVC100'
+                                                        # we have overcast at 10,000 feet (100 * 100).
+                                                        # BKN017TCU means broken clouds at 1700 feet w/ towering cumulonimbus
+                                                        # BKN017CB means broken clouds at 1700 feet w/ cumulonimbus
+                Column('visibility', Float), #  in Statute Miles
+                Column('weather_types', ARRAY(String)),
+                Column('temp_fahrenheit', Float, index=True), # These can be NULL bc of missing data
+                Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
+                Column('wind_speed', Integer),
+                Column('wind_direction', String(3)), # 000 to 360
+                Column('wind_direction_cardinal', String(3)), # e.g. NNE, NNW
+                Column('wind_gust', Integer),
+                Column('station_pressure', Float),
+                Column('sealevel_pressure', Float),
+                Column('precip_1hr', Float, index=True),
+                Column('precip_3hr', Float, index=True),
+                Column('precip_6hr', Float, index=True),
+                Column('precip_24hr', Float, index=True),
+                Column('longitude', Float),
+                Column('latitude', Float),
+                keep_existing=True)
 
-    # todo: covered by odo.resource("dat_weather_observations_metar")
-    # def _get_metar_table(self, name='dat'):
-    #     return Table('%s_weather_observations_metar' % name, Base.metadata,
-    #             Column('wban_code', String(5), nullable=False),
-    #             Column('call_sign', String(5), nullable=False),
-    #             Column('datetime', DateTime, nullable=False),
-    #             Column('sky_condition', String),
-    #             Column('sky_condition_top', String), # top-level sky condition, e.g.
-    #                                                     # if 'FEW018 BKN029 OVC100'
-    #                                                     # we have overcast at 10,000 feet (100 * 100).
-    #                                                     # BKN017TCU means broken clouds at 1700 feet w/ towering cumulonimbus
-    #                                                     # BKN017CB means broken clouds at 1700 feet w/ cumulonimbus
-    #             Column('visibility', Float), #  in Statute Miles
-    #             Column('weather_types', ARRAY(String)),
-    #             Column('temp_fahrenheit', Float, index=True), # These can be NULL bc of missing data
-    #             Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
-    #             Column('wind_speed', Integer),
-    #             Column('wind_direction', String(3)), # 000 to 360
-    #             Column('wind_direction_cardinal', String(3)), # e.g. NNE, NNW
-    #             Column('wind_gust', Integer),
-    #             Column('station_pressure', Float),
-    #             Column('sealevel_pressure', Float),
-    #             Column('precip_1hr', Float, index=True),
-    #             Column('precip_3hr', Float, index=True),
-    #             Column('precip_6hr', Float, index=True),
-    #             Column('precip_24hr', Float, index=True),
-    #             Column('longitude', Float),
-    #             Column('latitude', Float),
-    #             keep_existing=True)
+    
+    def _extract_last_fname(self):
+        # XX: tar files are all old and not recent.
+        #tar_last = 
+        #tar_last = datetime(2007, 5, 1, 0, 0)
+        #tar_filename = '%s.tar.gz' % tar_last.strftime('%Y%m') 
+        #print 'tar_filename'
+
+        zip_last = datetime.now()
+        self.current_year = zip_last.year
+        self.current_month = zip_last.month
+        zip_filename = 'QCLCD%s.zip' % zip_last.strftime('%Y%m') 
+        return zip_filename
 
     def _extract_fname(self, year_num, month_num):
         self.current_year = year_num
@@ -1476,6 +1369,48 @@ class WeatherETL(object):
             self.debug_outfile.write("committed: '%s'" % ins_st)
             self.debug_outfile.flush()
 
+    def _load_metar(self, transformed_input):
+        transformed_input.seek(0)
+        #print "_load_metar(): transformed_input is ", transformed_input.getvalue()
+        transformed_input.seek(0)
+        skip_cols = ['id', 'latitude', 'longitude']
+        names = [c.name for c in self.metar_table.columns if c.name not in skip_cols]
+        self.src_metar_table = self._get_metar_table(name='src')
+        self.src_metar_table.drop(engine, checkfirst=True)
+
+        try:
+            self.src_metar_table.create(engine, checkfirst=True)
+        except sqlalchemy.exc.ProgrammingError:
+            print("got ProgrammingError on src metar table create")
+            return None
+
+        
+            
+        ins_st = "COPY src_weather_observations_metar ("
+        for idx, name in enumerate(names):
+            if idx < len(names) - 1:
+                ins_st += '%s, ' % name
+            else:
+                ins_st += '%s)' % name
+        else:
+            ins_st += "FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
+        #print "_load_metar() ins_st = ", ins_st
+        #print "transformed_input is", transformed_input.getvalue()
+        conn = engine.raw_connection()
+        cursor = conn.cursor()
+        if (self.debug==True): 
+            self.debug_outfile.write("\nCalling: '%s'\n" % ins_st)
+            self.debug_outfile.flush()
+        cursor.copy_expert(ins_st, transformed_input)
+
+        conn.commit()
+        if (self.debug == True):
+            self.debug_outfile.write("committed: '%s'" % ins_st)
+            self.debug_outfile.flush()
+        
+        pass
+
+            
     def _date_span(self, start, end):
         delta = timedelta(days=30)
         while (start.year, start.month) != (end.year, end.month):
@@ -1509,30 +1444,202 @@ class WeatherETL(object):
     # Given that this was the most recent month, year, call this function,
     # which will figure out the most recent hourly weather observation and
     # delete all metars before that datetime.
+    def clear_metars(self):
+        # build a datetime and then remove all metars after the max datetime
+        sql = "SELECT max (datetime) from dat_weather_observations_hourly;"
+        # given this time, delete all from dat_weather_observations_metar
+        #
+        print(("executing: ", sql))
+        conn = engine.contextual_connect()
+        results = conn.execute(sql)
+        res = results.fetchone()
+        if not res:
+            return
+        res_dt = res[0]
+        res_dt_str = datetime.strftime(res_dt, "%Y-%m-%d %H:%M:%S")
+        # given this most recent time, delete any metars from before that time
+        sql2 = "DELETE FROM dat_weather_observations_metar WHERE datetime < '%s'" % (res_dt_str)
+        print(("executing: " , sql2))
+        results = conn.execute(sql2)
 
 
-# todo: refactor
-def clear_metars() -> None:
-    """Remove all rows in the metar table older than the latest row in the
-    hourly table."""
+import pandas
+import geojson
 
-    # build a datetime and then remove all metars after the max datetime
-    hourlies = reflect("dat_weather_observations_hourly", Base.meta, engine)
-    metars = reflect("dat_weather_observations_metar", Base.meta, engine)
-    # sql = "SELECT max (datetime) from dat_weather_observations_hourly;"
-    # given this time, delete all from dat_weather_observations_metar
-    #
-    # print(("executing: ", sql))
-    # conn = engine.contextual_connect()
-    # results = conn.execute(sql)
-    selection = select([func.max(hourlies.datetime)])
-    result = engine.execute(selection).scalar()
-    max_datetime = datetime.strftime(result, "%Y-%m-%d %H:%M:%S")
-    # if not res:
-    #     return
-    # res_dt = res[0]
-    # given this most recent time, delete any metars from before that time
-    deletion = delete()
-    sql2 = "DELETE FROM dat_weather_observations_metar WHERE datetime < '%s'" % (res_dt_str)
-    print(("executing: " , sql2))
-    results = conn.execute(sql2)
+from ftplib import FTP
+from geoalchemy2 import Geometry
+from slugify import slugify
+from tempfile import NamedTemporaryFile
+
+
+def update_weather_stations():
+    """Update the weather station listing in the weather_stations table.
+    Because the size of the source file is small (~3mb) and the number of
+    raw rows is small also (~30k), drop and replace the table each time the
+    method is run."""
+
+    # Read the source data into a temporary csv file
+    stations_csv = NamedTemporaryFile(mode="w")
+    ftp_client = FTP('ftp.ncdc.noaa.gov')
+    ftp_client.login()
+    ftp_client.retrlines(
+        cmd="RETR /pub/data/noaa/isd-history.csv",
+        # Custom callback avoids the random EOF I was encountering
+        callback=lambda line: stations_csv.file.write(line + "\n")
+    )
+
+    # Create a dataframe from the csv, specifying datetime columns but letting
+    # pandas infer the types of the rest
+    stations = pandas.read_csv(
+        stations_csv.name,
+        delimiter=",",
+        parse_dates=["BEGIN", "END"]
+    )
+
+    # Slugify column names and rename some to play nice with legacy code
+    stations = stations.rename(columns=lambda col: slugify(col, separator="_"))
+    stations = stations.rename(
+        columns={
+            "wban": "wban_code",
+            "ctry": "country",
+            "icao": "call_sign",
+            "elev_m": "elevation"
+        }
+    )
+
+    # Munge the data, dropping rows with missing values, duplicate and
+    # undesirable wbans, and funky location values
+    stations = stations.dropna(how="any")
+    stations = stations.drop_duplicates("wban_code")
+    stations = stations[stations["wban_code"] != 99999]
+    stations = stations[(stations["lon"] != 0) & (stations["lat"] != 0)]
+    stations.reset_index(drop=True, inplace=True)
+
+    # Condense the lat long columns to a location column containing a geometry
+    stations["location"] = stations[["lon", "lat"]].apply(
+        func=lambda row: "SRID=4326;POINT(%s %s)" % (row.lon, row.lat),
+        axis=1
+    )
+    del stations["lon"]
+    del stations["lat"]
+
+    # Insert the dataframe values into postgres, replacing the existing table
+    stations.to_sql(
+        "weather_stations",
+        engine,
+        if_exists="replace",
+        dtype={"location": Geometry("point", 4326)}
+    )
+
+    ftp_client.close()
+    stations_csv.close()
+
+
+# class WeatherStationsETL(object):
+#     """
+#     Download, transform and create table with info about weather stations
+#     """
+#
+#     def __init__(self):
+#         self.stations_ftp = \
+#             'ftp.ncdc.noaa.gov'
+#         self.stations_file = \
+#             '/pub/data/noaa/isd-history.csv'
+#
+#     def initialize(self):
+#         self._extract()
+#         self._transform()
+#         self._make_station_table()
+#         try:
+#             self._load()
+#         except:
+#             print('weather stations already exist, updating instead')
+#             self._update_stations()
+#
+#     def update(self):
+#         self._extract()
+#         self._transform()
+#         # Doing this just so self.station_table is defined
+#         self._make_station_table()
+#         self._update_stations()
+#
+#     def _extract(self):
+#         """ Download CSV of station info from NOAA """
+#
+#         try:
+#             ftp = FTP(self.stations_ftp)
+#             ftp.login()
+#             stations = StringIO()
+#             ftp.retrbinary('RETR %s' % self.stations_file, stations.write)
+#             self.station_raw_info = stations
+#             self.station_raw_info.seek(0)
+#         except:
+#             self.station_info = None
+#             raise WeatherError('Unable to fetch station data from NOAA.')
+#
+#     def _transform(self):
+#         reader = UnicodeCSVReader(self.station_raw_info)
+#         header = ['wban_code', 'station_name', 'country',
+#                   'state', 'call_sign', 'location', 'elevation',
+#                   'begin', 'end']
+#         next(reader)
+#         self.clean_station_info = StringIO()
+#         all_rows = []
+#         wbans = []
+#
+#         for row in reader:
+#             wban = row[1]
+#             name = row[2]
+#             country = row[3]
+#             state = row[4]
+#             call_sign = ''
+#             lat = row[6].replace('+', '')
+#             lon = row[7].replace('+', '')
+#             elev = row[8].replace('+', '')
+#             begin = parser.parse(row[9]).isoformat()
+#             end = parser.parse(row[10]).isoformat()
+#
+#             if wban == '99999':
+#                 continue
+#             elif wban in wbans:
+#                 continue
+#             elif lat and lon:
+#                 location = 'SRID=4326;POINT(%s %s)' % (lon, lat)
+#                 wbans.append(wban)
+#                 all_rows.append([wban, name, country, state,
+#                     call_sign, location, elev, begin, end])
+#         writer = UnicodeCSVWriter(self.clean_station_info)
+#         writer.writerow(header)
+#         writer.writerows(all_rows)
+#         self.clean_station_info.seek(0)
+#
+#     def _make_station_table(self):
+#         self.station_table = Table('weather_stations', Base.metadata,
+#                 Column('wban_code', String(5), primary_key=True),
+#                 Column('station_name', String(100), nullable=False),
+#                 Column('country', String(2)),
+#                 Column('state', String(2)),
+#                 Column('call_sign', String(5)),
+#                 Column('location', Geometry('POINT', srid=4326)),
+#                 Column('elevation', Float),
+#                 Column('begin', Date),
+#                 Column('end', Date))
+#         self.station_table.create(engine, checkfirst=True)
+#
+#     def _load(self):
+#         names = [c.name for c in self.station_table.columns]
+#         ins_st = "COPY weather_stations FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
+#         conn = engine.raw_connection()
+#         cursor = conn.cursor()
+#         cursor.copy_expert(ins_st, self.clean_station_info)
+#         conn.commit()
+#         return 'bluh'
+#
+#     def _update_stations(self):
+#         reader = UnicodeCSVDictReader(self.clean_station_info)
+#         conn = engine.connect()
+#         for row in reader:
+#             station = session.query(self.station_table).filter(self.station_table.c.wban_code == row['wban_code']).all()
+#             if not station:
+#                 ins = self.station_table.insert().values(**row)
+#                 conn.execute(ins)
