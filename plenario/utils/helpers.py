@@ -1,5 +1,3 @@
-import re
-from unicodedata import normalize
 import csv
 import string
 from csvkit.unicsv import UnicodeCSVReader
@@ -35,7 +33,7 @@ def infer_csv_columns(inp):
                 that we can throw into a UnicodeCSVReader
     :return: List of `ColumnInfo`s
     """
-    reader = UnicodeCSVReader(inp)
+    reader = csv.reader(inp)
     header = next(reader)
     inp.seek(0)
     iter_output = [iter_column(col_idx, inp)

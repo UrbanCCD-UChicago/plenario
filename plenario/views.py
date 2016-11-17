@@ -11,7 +11,7 @@ from flask import make_response, request, redirect, url_for, render_template
 from flask import Blueprint, flash, session as flask_session
 from flask_login import login_required
 from flask_wtf import Form
-from io import BytesIO
+from io import StringIO
 from sqlalchemy import Table
 from sqlalchemy.exc import NoSuchTableError
 from urllib.parse import urlparse
@@ -513,11 +513,11 @@ class GenericSuggestion(object):
 
     def _infer_columns(self):
         r = requests.get(self.file_url, stream=True)
-        inp = BytesIO()
+        inp = StringIO()
 
         head = itertools.islice(r.iter_lines(), 1000)
         for line in head:
-            inp.write(line + b'\n')
+            inp.write(line.decode("utf-8") + '\n')
         inp.seek(0)
         column_info = infer_csv_columns(inp)
 
