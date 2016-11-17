@@ -79,13 +79,17 @@ class ETLFile(object):
         file_stream_request.raise_for_status()
 
         # Make this temporary file our file handle
-        self.handle = tempfile.TemporaryFile()
+        self.handle = tempfile.NamedTemporaryFile()
 
         # Download and write to disk in 1MB chunks.
         for chunk in file_stream_request.iter_content(chunk_size=1024*1024):
             if chunk:
                 self._handle.write(chunk)
                 self._handle.flush()
+
+        # todo: this possibly keeps the temporary file around, leading to a
+        # memory issue
+        self.handle = open(self.handle.name, "r")
 
 
 def add_unique_hash(table_name):

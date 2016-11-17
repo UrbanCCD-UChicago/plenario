@@ -200,7 +200,7 @@ class TestValidator(unittest.TestCase):
         # validator allows the query through).
         query = '/v1/api/detail?dataset_name=roadworks&obs_date__ge=2000'
         response = self.test_client.get(query)
-        data = json.loads(response.data)
+        data = json.loads(response.data.decode("utf-8"))
 
         self.assertGreaterEqual(len(data['objects']), 100)
 
