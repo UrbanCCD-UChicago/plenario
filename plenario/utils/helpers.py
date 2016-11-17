@@ -100,7 +100,7 @@ def send_mail(subject, recipient, body):
                 'Data': body
             },
             'Html': {
-                'Data': string.replace(body, '\r\n', '<br />')
+                'Data': str.replace(body, '\r\n', '<br />')
             }
         }
     }
