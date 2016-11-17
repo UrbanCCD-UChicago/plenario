@@ -1,3 +1,4 @@
+import codecs
 import os
 import json
 import re
@@ -636,7 +637,7 @@ def _grid(args):
     resp = api_response.geojson_response_base()
     for value in result_rows:
         if value[1]:
-            pt = shapely.wkb.loads(value[1].decode('hex'))
+            pt = shapely.wkb.loads(codecs.decode(value[1], "hex"))
             south, west = (pt.x - (size_x / 2)), (pt.y - (size_y / 2))
             north, east = (pt.x + (size_x / 2)), (pt.y + (size_y / 2))
             new_geom = shapely.geometry.box(south, west, north, east).__geo_interface__
