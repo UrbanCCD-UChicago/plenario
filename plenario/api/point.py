@@ -132,7 +132,9 @@ def get_datadump(ticket: str):
     job = get_job(ticket)
     print(("{} point.get_datadump.job: {}".format(datetime.now(), job)))
     try:
-        if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
+        job_data = json.loads(job.get_data().decode("utf-8"))
+        ticket_status = get_status(ticket)["status"]
+        if "error" not in job_data and ticket_status == "success":
             datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get(
                 "data_type") in ["json", "csv"] else "json"
 

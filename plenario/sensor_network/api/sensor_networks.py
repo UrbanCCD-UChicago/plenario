@@ -1,3 +1,4 @@
+import codecs
 import json
 import math
 import os
@@ -570,7 +571,7 @@ def store_chunk(chunk, chunk_count, chunk_number, request_id):
     :returns (dict) containing URL to download chunked data"""
 
     datadump_part = DataDump(
-        id=os.urandom(16).encode('hex'),
+        id=codecs.encode(os.urandom(16), "hex").decode("utf-8"),
         request=request_id,
         part=chunk_number,
         total=chunk_count,

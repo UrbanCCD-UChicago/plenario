@@ -103,7 +103,7 @@ class TestSensorNetworks(unittest.TestCase):
     def test_download_queues_job_returns_correct_result_for_good_args(self):
         queueing_response, data = self.get_result("/v1/api/sensor-networks/"
                                                   "test_network/download"
-                                                  "sensors=sensor_02"
+                                                  "?sensors=sensor_02"
                                                   "&nodes=test_node"
                                                   "&features=vector"
                                                   "&start_datetime=2000-01-01")
@@ -131,8 +131,7 @@ class TestSensorNetworks(unittest.TestCase):
                ']]}}'
         url = "/v1/api/sensor-networks/test_network/nodes?geom={}".format(geom)
         _, result = self.get_result(url)
-        self.assertEqual(result["meta"]["total"], 0)
-        # self.assertIn("error", result)
+        self.assertIn("error", result)
 
     def test_geom_filter_for_node_metadata_bad_filter(self):
         # Malformed filter
@@ -231,7 +230,7 @@ class TestSensorNetworks(unittest.TestCase):
 
     def test_aggregate_endpoint_returns_correct_observation_count(self):
         url = "/v1/api/sensor-networks/test_network/aggregate?node=test_node"
-        url += "&function=avg&feature=vector"
+        url += "&function=avg&feature=vector.x"
         url += "&start_datetime=2016-10-01&end_datetime=2016-10-03"
         response, result = self.get_result(url)
         total_count = 0

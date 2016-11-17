@@ -7,6 +7,8 @@ from random import randint, random
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
+from plenario.settings import DB_USER, DB_PASSWORD, DB_HOST, DB_NAME, DB_PORT
+
 
 class Fixtures:
 
@@ -47,10 +49,10 @@ class Fixtures:
         os.environ["DB_NAME"] = "sensor_meta_test"
         os.environ["RS_NAME"] = "sensor_obs_test"
 
-        self.user = os.environ["DB_USER"]
-        self.host = os.environ["DB_HOST"]
-        self.port = os.environ["DB_PORT"]
-        self.password = os.environ["DB_PASSWORD"]
+        self.user = DB_USER
+        self.host = DB_HOST
+        self.port = DB_PORT
+        self.password = DB_PASSWORD
 
         self.base_db_url = "postgresql://{}:{}@{}:{}".format(
             self.user, self.password, self.host, self.port
