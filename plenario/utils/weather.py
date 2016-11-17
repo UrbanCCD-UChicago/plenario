@@ -1464,7 +1464,6 @@ class WeatherETL(object):
 
 
 import pandas
-import geojson
 
 from ftplib import FTP
 from geoalchemy2 import Geometry

@@ -160,7 +160,7 @@ def add_functions():
         args += ' -h ' + DB_HOST
         args += ' -U ' + DB_USER
         args += ' -d ' + DB_NAME
-        args += ' -p ' + DB_PORT
+        args += ' -p ' + str(DB_PORT)
         args += ' -f ' + script_path
         subprocess.check_output(args, shell=True)
 
