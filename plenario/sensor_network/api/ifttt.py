@@ -28,7 +28,6 @@ curated_map = {"temperature": "temperature.temperature",
                "10 micron particulate matter": "particulate_matter.10"}
 
 
-# TODO: error list?
 @crossdomain(origin="*")
 def get_ifttt_observations():
     """Performs the query detailed by the IFTTT user's
