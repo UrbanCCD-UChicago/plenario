@@ -190,10 +190,7 @@ def weather_fill():
 
     ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
     validator_result = ValidatorProxy(data)
-
-
-    job = make_job_response("weather_fill", validator_result)
-    return job
+    return make_job_response("weather_fill", validator_result)
 
 
 def weather_fill_impl(args):
@@ -202,7 +199,7 @@ def weather_fill_impl(args):
     year = args.data['year']
     etl = WeatherETL()
     etl.initialize_month(year, month, weather_stations_list=wbans)
-    return make_response("The ETL process completed without error.", 200)
+    return {'weatherResult': 'The ETL process completed without an exception.'}
 
 
 '''
