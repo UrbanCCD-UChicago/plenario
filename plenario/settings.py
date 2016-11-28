@@ -89,7 +89,7 @@ def get_ec2_instance_id():
 
     instance_id_url = "http://169.254.169.254/latest/meta-data/instance-id"
     try:
-        return requests.get(instance_id_url).text
+        return requests.get(instance_id_url, timeout=0.5).text
     except requests.ConnectionError as err:
         print err.message
 

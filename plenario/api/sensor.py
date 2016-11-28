@@ -1,10 +1,18 @@
 from plenario.api.common import cache, CACHE_TIMEOUT, make_cache_key, crossdomain, date_json_handler, RESPONSE_LIMIT
+from plenario.api.jobs import make_job_response
+from plenario.api.response import make_error
 from plenario.utils.helpers import get_size_in_degrees
 from plenario.database import session, app_engine as engine, Base
 from flask import request, make_response
 from sqlalchemy import Table, func
+from sqlalchemy.exc import SQLAlchemyError
+import sqlalchemy as sa
 import json
 import shapely.wkb, shapely.geometry
+from collections import namedtuple
+
+
+from plenario.utils.weather import WeatherETL
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
@@ -86,6 +94,102 @@ def weather(table):
     resp = make_response(json.dumps(resp, default=date_json_handler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
+
+def year_if_valid(year_str):
+    """
+    Returns int from 2000 to 2020 if year_str is valid. Otherwise False
+    :param year_str:
+    :return: False | int
+    """
+    valid_years = [n + 2000 for n in range(20)]  # 2000 through 2019
+    return _string_in_int_range(year_str, valid_years)
+
+
+def month_if_valid(month_str):
+    """
+    Returns int from 1 to 12 if month_str is valid. Otherwise False.
+    :param month_str: String submitted by user in month field
+    :return: False | int
+    """
+    valid_months = [n + 1 for n in range(12)]  # 1 through 12
+    return _string_in_int_range(month_str, valid_months)
+
+
+def _string_in_int_range(maybe_int, int_range):
+    # No nulls, empties
+    if not maybe_int:
+        return False
+    # Can we cast it?
+    try:
+        as_int = int(maybe_int)
+    except ValueError:
+        return False
+    # Is it in the range?
+    return as_int if as_int in int_range else False
+
+
+def wban_if_valid(wban):
+    """
+    :param wban: User-submitted WBAN code
+    :return: wban code as provided if valid, otherwise False
+    """
+
+    if not wban:
+        return False
+
+    try:
+        stations_table = Table('weather_stations', Base.metadata,
+                               autoload=True, autoload_with=engine, extend_existing=True)
+        q = sa.select([stations_table.c["wban_code"]]).where(stations_table.c["wban_code"] == wban)
+        result = session.execute(q)
+    except SQLAlchemyError:
+        session.rollback()
+        return False
+
+    matched_wban = result.first()
+    if not bool(matched_wban):
+        return False
+
+    return wban
+
+
+@crossdomain(origin="*")
+def weather_fill():
+    args = request.args.copy()
+    month = month_if_valid(args.get('month'))
+    year = year_if_valid(args.get('year'))
+    if not year:
+        return make_error("Must supply a year between 2000 and 2019", 400)
+    if not month:
+        return make_error("Must supply month as number between 1 and 12", 400)
+    wban = wban_if_valid(args.get('wban'))
+    if not wban:
+        return make_error("WBAN provided is not available. Check /weather-stations", 400)
+
+    data = {
+        "month": month,
+        "year": year,
+        "wban": wban,
+        "job": True  # WHE: Not sure if this is necessary
+    }
+
+    ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
+    validator_result = ValidatorProxy(data)
+
+
+    job = make_job_response("weather_fill", validator_result)
+    return job
+
+
+def weather_fill_impl(args):
+    wban = args.data['wban']
+    month = args.data['month']
+    year = args.data['year']
+    etl = WeatherETL()
+    etl.initialize_month(year, month, weather_stations_list=[wban])
+    return make_response("The ETL process completed without error.", 200)
+
 
 '''
 make_query is a holdover from the old API implementation that used Master Table
