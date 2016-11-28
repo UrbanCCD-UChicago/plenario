@@ -129,7 +129,7 @@ def _string_in_int_range(maybe_int, int_range):
     return as_int if as_int in int_range else False
 
 
-def wban_if_valid(wban):
+def wban_is_valid(wban):
     """
     :param wban: User-submitted WBAN code
     :return: wban code as provided if valid, otherwise False
@@ -151,26 +151,40 @@ def wban_if_valid(wban):
     if not bool(matched_wban):
         return False
 
-    return wban
+    return True
+
+
+def wban_list_if_valid(wban_list_str):
+    if not wban_list_str:
+        return False
+    wban_candidate_list = wban_list_str.split(',')
+
+    # If user submits a _lot_ of WBANs, the inefficiency of
+    # making one DB call per WBAN will be noticeable.
+    # But assuming a handful (< 10) at a time, this is fine for a feature
+    # that is designed as a kludge that we do not officially support.
+    return [w for w in wban_candidate_list if wban_is_valid(w)]
 
 
 @crossdomain(origin="*")
 def weather_fill():
     args = request.args.copy()
-    month = month_if_valid(args.get('month'))
     year = year_if_valid(args.get('year'))
     if not year:
         return make_error("Must supply a year between 2000 and 2019", 400)
+
+    month = month_if_valid(args.get('month'))
     if not month:
         return make_error("Must supply month as number between 1 and 12", 400)
-    wban = wban_if_valid(args.get('wban'))
-    if not wban:
-        return make_error("WBAN provided is not available. Check /weather-stations", 400)
+
+    wbans = wban_list_if_valid(args.get('wbans'))
+    if not wbans:
+        return make_error("WBAN list misformatted or no WBANS provided are available. Check /weather-stations", 400)
 
     data = {
         "month": month,
         "year": year,
-        "wban": wban,
+        "wbans": wbans,
         "job": True  # WHE: Not sure if this is necessary
     }
 
@@ -183,11 +197,11 @@ def weather_fill():
 
 
 def weather_fill_impl(args):
-    wban = args.data['wban']
+    wbans = args.data['wbans']
     month = args.data['month']
     year = args.data['year']
     etl = WeatherETL()
-    etl.initialize_month(year, month, weather_stations_list=[wban])
+    etl.initialize_month(year, month, weather_stations_list=wbans)
     return make_response("The ETL process completed without error.", 200)
 
 
