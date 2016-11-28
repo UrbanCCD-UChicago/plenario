@@ -28,7 +28,7 @@ install:
 - sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
 - sudo -u postgres psql -c "CREATE DATABASE plenario_test;"
 - sudo -u postgres psql -c "CREATE EXTENSION postgis;" plenario_test
-- python init_db.py
+- python init_db.py -m -u -f -k
 script:
 ###
 # Something strange is up with our tests

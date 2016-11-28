@@ -5,6 +5,7 @@ actual work that needs to be done."""
 from plenario.api.point import _timeseries, _detail, _detail_aggregate, _meta
 from plenario.api.point import _grid, _datadump
 from plenario.api.shape import _aggregate_point_data, _export_shape
+from plenario.api.sensor import weather_fill_impl
 from plenario.tasks import add_dataset, delete_dataset, update_dataset
 from plenario.tasks import add_shape, update_shape, delete_shape
 from plenario.tasks import update_weather, frequency_update
@@ -31,7 +32,8 @@ endpoint_logic = {
     # 'ping': lambda args: {'hello': 'from worker {}'.format(worker_id)}
     'ping': lambda args: {'hello': 'from a worker!'},
 
-    'observation_datadump': lambda args: get_observation_datadump(args)
+    'observation_datadump': lambda args: get_observation_datadump(args),
+    'weather_fill': lambda args: weather_fill_impl(args)
 }
 
 shape_logic = {

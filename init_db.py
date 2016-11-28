@@ -80,9 +80,9 @@ def init_db(args):
     print("================")
     if not any(vars(args).values()):
         # No specific arguments specified. Run it all!
-        add_functions()
         init_meta()
         create_tables(sensor_meta_table_names)
+        add_functions()
         init_user()
         init_worker_meta()
         init_weather()

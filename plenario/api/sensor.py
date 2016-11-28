@@ -137,6 +137,113 @@ def weather(table):
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
+
+def year_if_valid(year_str):
+    """
+    Returns int from 2000 to 2020 if year_str is valid. Otherwise False
+    :param year_str:
+    :return: False | int
+    """
+    valid_years = [n + 2000 for n in range(20)]  # 2000 through 2019
+    return _string_in_int_range(year_str, valid_years)
+
+
+def month_if_valid(month_str):
+    """
+    Returns int from 1 to 12 if month_str is valid. Otherwise False.
+    :param month_str: String submitted by user in month field
+    :return: False | int
+    """
+    valid_months = [n + 1 for n in range(12)]  # 1 through 12
+    return _string_in_int_range(month_str, valid_months)
+
+
+def _string_in_int_range(maybe_int, int_range):
+    # No nulls, empties
+    if not maybe_int:
+        return False
+    # Can we cast it?
+    try:
+        as_int = int(maybe_int)
+    except ValueError:
+        return False
+    # Is it in the range?
+    return as_int if as_int in int_range else False
+
+
+def wban_is_valid(wban):
+    """
+    :param wban: User-submitted WBAN code
+    :return: wban code as provided if valid, otherwise False
+    """
+
+    if not wban:
+        return False
+
+    try:
+        stations_table = Table('weather_stations', Base.metadata,
+                               autoload=True, autoload_with=engine, extend_existing=True)
+        q = sa.select([stations_table.c["wban_code"]]).where(stations_table.c["wban_code"] == wban)
+        result = session.execute(q)
+    except SQLAlchemyError:
+        session.rollback()
+        return False
+
+    matched_wban = result.first()
+    if not bool(matched_wban):
+        return False
+
+    return True
+
+
+def wban_list_if_valid(wban_list_str):
+    if not wban_list_str:
+        return False
+    wban_candidate_list = wban_list_str.split(',')
+
+    # If user submits a _lot_ of WBANs, the inefficiency of
+    # making one DB call per WBAN will be noticeable.
+    # But assuming a handful (< 10) at a time, this is fine for a feature
+    # that is designed as a kludge that we do not officially support.
+    return [w for w in wban_candidate_list if wban_is_valid(w)]
+
+
+@crossdomain(origin="*")
+def weather_fill():
+    args = request.args.copy()
+    year = year_if_valid(args.get('year'))
+    if not year:
+        return make_error("Must supply a year between 2000 and 2019", 400)
+
+    month = month_if_valid(args.get('month'))
+    if not month:
+        return make_error("Must supply month as number between 1 and 12", 400)
+
+    wbans = wban_list_if_valid(args.get('wbans'))
+    if not wbans:
+        return make_error("WBAN list misformatted or no WBANS provided are available. Check /weather-stations", 400)
+
+    data = {
+        "month": month,
+        "year": year,
+        "wbans": wbans,
+        "job": True  # WHE: Not sure if this is necessary
+    }
+
+    ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
+    validator_result = ValidatorProxy(data)
+    return make_job_response("weather_fill", validator_result)
+
+
+def weather_fill_impl(args):
+    wbans = args.data['wbans']
+    month = args.data['month']
+    year = args.data['year']
+    etl = WeatherETL()
+    etl.initialize_month(year, month, weather_stations_list=wbans)
+    return {'weatherResult': 'The ETL process completed without an exception.'}
+
+
 '''
 make_query is a holdover from the old API implementation that used Master Table
 '''
