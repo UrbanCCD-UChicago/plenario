@@ -6,7 +6,7 @@ from flask import make_response, Blueprint
 from common import cache, make_cache_key
 from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, \
     get_observations, get_feature_metadata, get_sensor_metadata, get_aggregations, get_observations_download, \
-    get_observation_nearest
+    get_observation_nearest, check_metadata
 from plenario.sensor_network.api.ifttt import get_ifttt_observations, get_ifttt_meta, ifttt_status, ifttt_test_setup
 from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
 from sensor import weather_stations, weather
@@ -53,6 +53,8 @@ api.add_url_rule(prefix + '/sensor-networks/<network>/features/<feature>', 'feat
 
 api.add_url_rule(prefix + '/sensor-networks/<network>/sensors', 'sensors', get_sensor_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network>/sensors/<sensor>', 'sensors', get_sensor_metadata)
+
+api.add_url_rule(prefix + '/sensor-networks/<network>/check', 'check', check_metadata)
 
 # IFTTT
 api.add_url_rule('/ifttt/v1/status', 'ifttt_status', ifttt_status)

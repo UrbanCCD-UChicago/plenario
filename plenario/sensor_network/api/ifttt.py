@@ -30,9 +30,8 @@ curated_map = {"temperature": "temperature.temperature",
 
 @crossdomain(origin="*")
 def get_ifttt_observations():
-    """Performs the query detailed by the IFTTT user's
-       input arguments and returns the formatted response.
-       Essentially acts as a shim to /query?filter
+    """Performs the query detailed by the IFTTT user's input arguments and
+       returns the formatted response. Essentially acts as a shim to /query?filter
        to satisfy IFTTT request and return format.
 
        :endpoint: /ifttt/v1/triggers/property_comparison

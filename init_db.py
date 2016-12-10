@@ -15,9 +15,10 @@ from plenario.utils.weather import WeatherETL, WeatherStationsETL
 sensor_meta_table_names = (
     "sensor__network_metadata",
     "sensor__node_metadata",
-    "sensor__features_of_interest",
-    "sensor__sensors",
-    "sensor__sensor_to_node"
+    "sensor__feature_metadata",
+    "sensor__sensor_metadata",
+    "sensor__sensor_to_node",
+    "sensor__feature_to_network"
 )
 
 

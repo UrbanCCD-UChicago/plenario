@@ -7,17 +7,17 @@ from sqlalchemy.exc import ProgrammingError
 from plenario.database import redshift_engine
 
 
-def create_foi_table(foi_name, properties):
+def create_foi_table(table_name, properties):
     """Create a new foi table
 
-       :param foi_name: name of feature
+       :param table_name: name of table in network__feature form, i.e. array_of_things__temperature
        :param properties: list of {'name': name, 'type': type} dictionaries """
 
     op = ('CREATE TABLE {} ('
           '"node_id" VARCHAR NOT NULL, '
           'datetime TIMESTAMP WITHOUT TIME ZONE NOT NULL, '
           '"meta_id" DOUBLE PRECISION NOT NULL, '
-          '"sensor" VARCHAR NOT NULL, ').format(foi_name)
+          '"sensor" VARCHAR NOT NULL, ').format(table_name)
     for prop in properties:
         op = (op + '"{}" {}, '.format(prop['name'], prop['type']))
     op = (op + ('PRIMARY KEY ("node_id", datetime)) '

@@ -8,12 +8,18 @@ from plenario.utils.model_helpers import knn
 
 sensor_to_node = Table('sensor__sensor_to_node',
                        Base.metadata,
-                       Column('sensor', String, ForeignKey('sensor__sensors.name')),
+                       Column('sensor', String, ForeignKey('sensor__sensor_metadata.name')),
                        Column('network', String),
                        Column('node', String),
                        ForeignKeyConstraint(['network', 'node'],
                                             ['sensor__node_metadata.sensor_network', 'sensor__node_metadata.id'])
                        )
+
+feature_to_network = Table('sensor__feature_to_network',
+                           Base.metadata,
+                           Column('feature', String, ForeignKey('sensor__feature_metadata.name')),
+                           Column('network', String, ForeignKey('sensor__network_metadata.name'))
+                           )
 
 
 class NetworkMeta(Base):
@@ -76,7 +82,7 @@ class NodeMeta(Base):
 
 
 class SensorMeta(Base):
-    __tablename__ = 'sensor__sensors'
+    __tablename__ = 'sensor__sensor_metadata'
 
     name = Column(String, primary_key=True)
     observed_properties = Column(JSONB)
@@ -101,7 +107,7 @@ class SensorMeta(Base):
 
         rp = session.execute("""
             select distinct name
-            from sensor__sensors_view
+            from sensor__sensor_metadata
             where invert ?| '{}'
         """.format("{" + ",".join(features) + "}"))
 
@@ -112,9 +118,10 @@ class SensorMeta(Base):
 
 
 class FeatureMeta(Base):
-    __tablename__ = 'sensor__features_of_interest'
+    __tablename__ = 'sensor__feature_metadata'
 
     name = Column(String, primary_key=True)
+    networks = relationship('NetworkMeta', secondary='sensor__feature_to_network')
     observed_properties = Column(JSONB)
 
     @staticmethod

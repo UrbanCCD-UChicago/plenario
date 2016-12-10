@@ -10,6 +10,6 @@ create or replace function invert(j jsonb) returns jsonb as $$
     return result;
 $$ language plv8;
 
-create view sensor__sensors_view as
+create view sensor__sensor_metadata_view as
   select name, invert(observed_properties)
-  from sensor__sensors;
+  from sensor__sensor_metadata;

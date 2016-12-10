@@ -41,7 +41,7 @@ class BaseMetaView(ModelView):
 
     def is_accessible(self):
         return current_user.is_authenticated
-    
+
     def inaccessible_callback(self, name, **kwargs):
         return redirect(url_for('auth.login'))
 
@@ -61,7 +61,7 @@ class NetworkMetaView(BaseMetaView):
 
 class NodeMetaView(BaseMetaView):
     column_list = ("id", "sensor_network", "location", "sensors", "info")
-    
+
     def geom_to_latlng(self, *args):
         geom = args[1].location
         query = self.session.query(func.ST_X(geom), func.ST_Y(geom))
@@ -94,20 +94,22 @@ class NodeMetaView(BaseMetaView):
 
 
 class FOIMetaView(BaseMetaView):
-    column_list = ("name", "observed_properties", "info")
+    column_list = ("name", "observed_properties", "info", "networks")
     form_extra_fields = {
         "name": StringField("Name"),
-        "info": StringField("Info"),
+        "info": StringField("Info")
     }
 
     form_edit_rules = [
         CustomizableField('name', field_args={'readonly': True}),
+        CustomizableField('networks', field_args=None),
         CustomizableField('observed_properties', field_args=None),
         CustomizableField('info', field_args=None)
     ]
 
     def on_model_change(self, form, model, is_created):
-        name = form.name.data
+        feature_name = form.name.data
+        table_names = [network.name + "__" + feature_name for network in form.networks.data]
         properties = form.observed_properties.data
         coerced_properties = deepcopy(properties)
         assert_json_enclosed_in_brackets(properties)
@@ -116,10 +118,11 @@ class FOIMetaView(BaseMetaView):
             map_to_redshift_type(property_dict)
 
         try:
-            if not table_exists(name):
-                foi_properties = [{"name": e["name"], "type": e["type"]}
-                                  for e in coerced_properties]
-                create_foi_table(name, foi_properties)
+            for name in table_names:
+                if not table_exists(name):
+                    foi_properties = [{"name": e["name"], "type": e["type"]}
+                                      for e in coerced_properties]
+                    create_foi_table(name, foi_properties)
         except TypeError:
             # This will occur if you are running without an address for a
             # Redshift DB - when we attempt to create a new table 

@@ -35,11 +35,12 @@ def reflect(table_name, metadata, engine):
     )
 
 
-def map_unknown_to_foi(unknown, sensor_properties):
+def map_unknown_to_foi(network, unknown, sensor_properties):
     """Given a valid unknown feature row, distribute the data stored within
     to the corresponding feature of interest tables by using the mapping
     defined by a sensor's observed properties.
 
+    :param network: (string) network name
     :param unknown: (object) a row returned from a SQLAlchemy query
     :param sensor_properties: (dict) holds mappings from node key to FOI"""
 
@@ -54,7 +55,7 @@ def map_unknown_to_foi(unknown, sensor_properties):
         foi_insert_vals[foi].append((prop, value))
 
     for foi, insert_vals in foi_insert_vals.items():
-        insert = "insert into {} (node_id, datetime, node_config, sensor, {}) values ({})"
+        insert = "insert into {}__{} (node_id, datetime, node_config, sensor, {}) values ({})"
         columns = ", ".join(val[0] for val in insert_vals)
 
         values = "'{}', '{}', '{}', '{}', ".format(
@@ -64,25 +65,27 @@ def map_unknown_to_foi(unknown, sensor_properties):
             unknown.sensor
         ) + ", ".join(repr(val[1]) for val in insert_vals)
 
-        rshift_engine.execute(insert.format(foi, columns, values))
+        rshift_engine.execute(insert.format(network, foi, columns, values))
 
-        delete = "delete from unknownfeature where node_id = '{}' and datetime = '{}' and node_config = '{}' and sensor = '{}'"
-        delete = delete.format(unknown.node_id, unknown.datetime, unknown.node_config, unknown.sensor)
+        delete = "delete from {}__unknown_feature where node_id = '{}' " \
+                 "and datetime = '{}' and node_config = '{}' and sensor = '{}'"
+        delete = delete.format(network, unknown.node_id, unknown.datetime, unknown.node_config, unknown.sensor)
 
         rshift_engine.execute(delete)
 
 
-def unknown_features_resolve(target_sensor):
+def unknown_features_resolve(network, target_sensor):
     """When the issues for a sensor with an unknown error have been resolved,
     attempt to recover sensor readings that were originally suspended in the
     unknowns table and insert them into the correct feature of interest table.
 
+    :param network: (string) network name
     :param target_sensor: (str) resolved sensor"""
 
-    sensors = reflect("sensor__sensors", psql_base.metadata, psql_engine)
-    unknowns = reflect("unknown_feature", rshift_base.metadata, rshift_engine)
+    sensors = reflect("sensor__sensor_metadata", psql_base.metadata, psql_engine)
+    unknowns = reflect(network + "unknown_feature", rshift_base.metadata, rshift_engine)
 
-    # Grab the set of keys that are used to assert if an unkown is correct
+    # Grab the set of keys that are used to assert if an unknown is correct
     c_obs_props = sensors.c.observed_properties
     c_name = sensors.c.name
 
@@ -98,7 +101,7 @@ def unknown_features_resolve(target_sensor):
         unknown_data = loads(unknown.data)
         if not all(key in sensor_properties.keys() for key in unknown_data.keys()):
             continue
-        map_unknown_to_foi(unknown, sensor_properties)
+        map_unknown_to_foi(network, unknown, sensor_properties)
 
 
 @blueprint.route("/apiary/send_message", methods=["POST"])
@@ -106,12 +109,13 @@ def unknown_features_resolve(target_sensor):
 def send_message():
     try:
         data = loads(request.data)
+        key_name = data["network"] + '__' + data["sensor"]
         if data["value"].upper() == "RESOLVE":
-            unknown_features_resolve(data["name"])
-            print "AOTMapper_" + data["name"]
-            redis.delete("AOTMapper_" + data["name"])
+            unknown_features_resolve(data["network"], data["sensor"])
+            print key_name
+            redis.delete(key_name)
         else:
-            redis.set(name="AOTMapper_" + data["name"], value=dumps(data["value"]))
+            redis.set(name=key_name, value=dumps(data["value"]))
         return make_response("Message received successfully!", 200)
     except (KeyError, ValueError):
         return make_response(format_exc(), 500)

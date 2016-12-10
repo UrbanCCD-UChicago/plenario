@@ -72,7 +72,7 @@ def get_sensor_metadata(network, sensor=None):
 
     :endpoint: /sensor-networks/<network_name>/sensors/<sensor>
     :param network: (str) name from sensor__network_metadata
-    :param sensor: (str) name from sensor__sensors
+    :param sensor: (str) name from sensor__sensor_metadata
     :returns: (json) response"""
 
     args = dict(request.args.to_dict(), **{
@@ -95,9 +95,9 @@ def get_feature_metadata(network, feature=None):
     """Return metadata about features for some network. If no feature is
     specified, return metadata about all features within the network.
 
-    :endpoint: /sensor-networks/<network_name>/features_of_interest/<feature>
+    :endpoint: /sensor-networks/<network_name>/features/<feature>
     :param network: (str) network name from sensor__network_metadata
-    :param feature: (str) name from sensor__features_of_interest
+    :param feature: (str) name from sensor__feature_metadata
     :returns: (json) response"""
 
     args = dict(request.args.to_dict(), **{
@@ -111,6 +111,46 @@ def get_feature_metadata(network, feature=None):
         return bad_request(validated_args.errors)
 
     return get_metadata("features", validated_args)
+
+
+@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+@crossdomain(origin="*")
+def check_metadata(network):
+    """Validate all the provided parameters, returning lists of those
+    that are valid and invalid. This is primarily for the socket server
+    to validate user parameters in a single query.
+
+    :endpoint: /sensor-networks/<network_name>/check
+    :param network: (str) network name from sensor__network_metadata
+    :returns: (json) response"""
+
+    args = {"network": network}
+    validated_args = sensor_network_validate(RequiredFeatureValidator(only=("network",)), args)
+    if validated_args.errors:
+        return bad_request(validated_args.errors)
+
+    resp = {
+        "meta": {},
+        "data": [
+            check_field("nodes", request.args.get("nodes"), NodeMeta.index(network)),
+            check_field("features", request.args.get("features"), FeatureMeta.index(network)),
+            check_field("sensors", request.args.get("sensors"), SensorMeta.index(network))
+        ]}
+    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
+def check_field(field, values, valid):
+    return {
+        "field": field,
+        "valid":
+            [val for val in values.split(',') if val in valid]
+            if values is not None else [],
+        "invalid":
+            [val for val in values.split(',') if val not in valid]
+            if values is not None else []
+    }
 
 
 @crossdomain(origin="*")
@@ -237,8 +277,7 @@ def observation_query(args, table):
     by the /query and /download endpoints.
 
     :param args: (ValidatorResult) contains arguments in the data property
-    :param table: (SQLAlchemy.Table) represents a database table
-    :param condition: asdkfjhgasdfkjhgasdkfjhgasdfkjhgasdf"""
+    :param table: (SQLAlchemy.Table) represents a database table"""
 
     nodes = args.data.get("nodes")
     start_dt = args.data.get("start_datetime")
@@ -266,8 +305,7 @@ def get_raw_metadata(target, args):
 
     :param target: (str) which kind of metadata to return rows for
     :param args: (ValidatorResult) validated query arguments
-    :returns: (list) of row proxies
-              (Response) 400 for a query that would lead to nothing"""
+    :returns: (list) of row proxies"""
 
     metadata_args = {
         "target": target,
@@ -340,7 +378,7 @@ def format_node_metadata(node):
 def format_sensor_metadata(sensor):
     """Response format for network metadata.
 
-    :param sensor: (Row) sensor__sensors object
+    :param sensor: (Row) sensor__sensor_metadata object
     :returns: (dict) formatted result"""
 
     sensor_response = {
@@ -355,7 +393,7 @@ def format_sensor_metadata(sensor):
 def format_feature_metadata(feature):
     """Response format for network metadata.
 
-    :param feature: (Row) sensor__features_of_interest object
+    :param feature: (Row) sensor__feature_metadata object
     :returns: (dict) formatted result"""
 
     feature_response = {
@@ -389,7 +427,7 @@ def format_observation(obs, table):
         'meta_id': obs.meta_id,
         'datetime': obs.datetime.isoformat().split('+')[0],
         'sensor': obs.sensor,
-        'feature': table.name,
+        'feature': table.name.split('__')[1],
         'results': {}
     }
 
@@ -414,7 +452,7 @@ def get_observation_queries(args):
 
     for feature in result:
         tables.append(Table(
-            feature.name, meta,
+            args.data["network"] + '__' + feature.name, meta,
             autoload=True,
             autoload_with=redshift_engine
         ))
@@ -465,7 +503,7 @@ def get_observation_nearest_query(args):
     if not nearest_nodes_rp:
         return "No nodes could be found nearby with your target feature."
 
-    feature = reflect(feature, MetaData(), redshift_engine)
+    feature = reflect(network + '__' + feature, MetaData(), redshift_engine)
 
     result = None
     for row in nearest_nodes_rp:
@@ -614,10 +652,10 @@ def metadata(target, network=None, nodes=None, sensors=None, features=None, geom
         if not meta_levels[key]:
             msg = "Given your parameters, we could not find your target {} " \
                   "within {}, {}".format(
-                      target,
-                      current_state[i - 1][0],
-                      current_state[i - 1][1]
-                  )
+                target,
+                current_state[i - 1][0],
+                current_state[i - 1][1]
+            )
             raise ValueError(msg)
 
         if key == target:
@@ -681,7 +719,7 @@ def filter_meta(meta_level, upper_filter_values, filter_values, geojson):
 def jsonify(args, data, status_code):
     """Returns a JSON response, I prefer this to the flask provided one because
     it doesn't sort the keys. Meaning we can keep the meta header at the top,
-    which feels alot better.
+    which feels a lot better.
 
     :param args: (ValidatorResult) validated query arguements
     :param data: (list) of json formatted results
