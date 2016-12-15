@@ -2,6 +2,7 @@ import traceback
 from datetime import datetime, timedelta
 from functools import wraps
 
+from celery import Celery
 from raven import Client
 from sqlalchemy.exc import NoSuchTableError, InternalError
 
@@ -12,10 +13,13 @@ from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
 from plenario.models.ETLTask import update_task, ETLStatus
 from plenario.models.ETLTask import delete_task, add_task
-from plenario.settings import PLENARIO_SENTRY_URL
+from plenario.settings import PLENARIO_SENTRY_URL, CELERY_BROKER_URL, CELERY_RESULT_BACKEND
 from plenario.utils.weather import WeatherETL
 
 client = Client(PLENARIO_SENTRY_URL) if PLENARIO_SENTRY_URL else None
+
+
+worker = Celery("worker", broker=CELERY_BROKER_URL, backend=CELERY_RESULT_BACKEND)
 
 
 def task_complete_msg(task_name, mt):

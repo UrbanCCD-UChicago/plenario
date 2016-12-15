@@ -74,3 +74,7 @@ MAINTENANCE = False
 
 # SQS Jobs Queue
 JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-queue-test')
+
+# Celery
+CELERY_BROKER_URL = get("CELERY_BROKER_URL") or REDIS_HOST
+CELERY_RESULT_BACKEND = get("CELERY_RESULT_BACKEND") or "db+" + DATABASE_CONN
