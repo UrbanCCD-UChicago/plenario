@@ -3,6 +3,6 @@ from flask_bcrypt import Bcrypt
 # imported by plenario.__init__
 bcrypt = Bcrypt()
 
-from .MetaTable import MetaTable, DataDump, Workers
+from .MetaTable import MetaTable, DataDump
 from .ShapeMetadata import ShapeMetadata
 from .User import User

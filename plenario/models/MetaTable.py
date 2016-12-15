@@ -1,5 +1,4 @@
 import json
-import traceback
 from collections import namedtuple
 from datetime import datetime
 from hashlib import md5
@@ -50,7 +49,7 @@ class MetaTable(Base):
     contributor_organization = Column(String)
     contributor_email = Column(String)
     result_ids = Column(ARRAY(String))
-    column_names = Column(JSONB)  # storage format {'<COLUMN_NAME>': '<COLUMN_TYPE>'}
+    column_names = Column(JSONB)  # {'<COLUMN_NAME>': '<COLUMN_TYPE>'}
 
     def __init__(self, url, human_name, observed_date,
                  approved_status=False, update_freq='yearly',
@@ -402,6 +401,27 @@ class MetaTable(Base):
         rows = [[count, time_bucket.date()] for _, time_bucket, count in rows]
         return header + rows
 
+    @classmethod
+    def get_all_with_etl_status(cls):
+        """
+        :return: Every row of meta_shape joined with celery task status.
+        """
+
+        query = '''
+            SELECT m.*, c.*
+                FROM meta_master AS m
+                LEFT JOIN celery_taskmeta AS c
+                  ON c.id = (
+                    SELECT id FROM celery_taskmeta
+                    WHERE task_id = ANY(m.result_ids)
+                    ORDER BY date_done DESC
+                    LIMIT 1
+                  )
+            WHERE m.approved_status = 'true'
+        '''
+
+        return list(session.execute(query))
+
 
 class DataDump(Base):
     __tablename__ = "plenario_datadump"
@@ -423,39 +443,3 @@ class DataDump(Base):
 
     def get_id(self):
         return self.id
-
-
-class Workers(Base):
-    __tablename__ = "plenario_workers"
-    name = Column(String(32), primary_key=True)
-    timestamp = Column(String(32), nullable=False)
-    uptime = Column(Integer, nullable=False)
-    job = Column(String(32), nullable=True)
-    jobcounter = Column(Integer, nullable=False)
-
-    def __init__(self, name, uptime):
-        self.name = name
-        self.timestamp = str(datetime.now())
-        self.uptime = uptime
-        self.jobcounter = 0
-
-    def check_in(self):
-        self.timestamp = str(datetime.now())
-
-    def register_job(self, job):
-        self.job = job
-
-    def deregister_job(self):
-        if self.job:
-            self.jobcounter += 1
-        self.job = None
-
-    @classmethod
-    def purge(cls):
-        try:
-            session.query(cls).delete()
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            traceback.print_exc()
-            print(("Problem purging plenario_workers: {}".format(e)))

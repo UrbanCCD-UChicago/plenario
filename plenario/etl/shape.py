@@ -92,17 +92,9 @@ class HashedShape(object):
         """
 
         with ETLFile(source_url=self.url, source_path=self.path, interpret_as='bytes') as file_helper:
-
-            # Attempt insertion
-            try:
-                with zipfile.ZipFile(file_helper.handle) as shapefile_zip:
-                    import_shapefile(shapefile_zip=shapefile_zip,
-                                     table_name=self.name)
-            except zipfile.BadZipfile:
-                raise PlenarioETLError("Source file was not a valid .zip")
-            except ShapefileError as e:
-                raise PlenarioETLError("Failed to import shapefile.\n{}".
-                                       format(repr(e)))
+            handle = open(file_helper.handle.name, "rb")
+            with zipfile.ZipFile(handle) as shapefile_zip:
+                import_shapefile(shapefile_zip, self.name)
 
         add_unique_hash(self.name)
         return reflect(self.name)

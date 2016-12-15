@@ -87,10 +87,6 @@ class ETLFile(object):
                 self._handle.write(chunk)
                 self._handle.flush()
 
-        # todo: this possibly keeps the temporary file around, leading to a
-        # memory issue
-        self.handle = open(self.handle.name, "r")
-
 
 def add_unique_hash(table_name):
     """

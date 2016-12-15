@@ -18,10 +18,9 @@ from urllib.parse import urlparse
 from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
-from plenario.api.jobs import get_status
 from plenario.database import session, Base, app_engine as engine
-from plenario.models import MetaTable, User, ShapeMetadata, Workers
-from plenario.models.ETLTask import ETLType, add_task
+from plenario.models import MetaTable, User, ShapeMetadata
+from plenario.models.ETLTask import ETLType
 from plenario.models.ETLTask import fetch_pending_tables, fetch_table_etl_status
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 
@@ -82,11 +81,11 @@ def approve_shape_view(dataset_name):
 def approve_shape(dataset_name):
 
     meta = session.query(ShapeMetadata).get(dataset_name)
-    meta.approved_status = True
-    session.commit()
+    ticket = worker.add_shape.delay(dataset_name).id
 
-    worker.add_shape.delay(dataset_name)
-    add_task(meta.dataset_name, ETLType['shapeset'])
+    meta.approved_status = True
+    meta.celery_task_id = ticket
+    session.commit()
 
     send_approval_email(
         meta.human_name,
@@ -105,11 +104,11 @@ def approve_dataset_view(source_url_hash):
 def approve_dataset(source_url_hash):
 
     meta = session.query(MetaTable).get(source_url_hash)
-    meta.approved_status = True
-    session.commit()
+    ticket = worker.add_dataset.delay(meta.dataset_name).id
 
-    worker.add_dataset.delay(meta.dataset_name)
-    add_task(meta.dataset_name, ETLType['dataset'])
+    meta.approved_status = True
+    meta.result_ids = [ticket]
+    session.commit()
 
     send_approval_email(
         meta.human_name,
@@ -215,7 +214,7 @@ def submit(context):
         else:
             meta = point_meta_from_submit_form(form, is_approved=is_admin)
     except RuntimeError as e:
-        context['error_msg'] = e.message
+        context['error_msg'] = str(e)
         return render_with_context(context)
 
     else:
@@ -224,11 +223,13 @@ def submit(context):
         if is_admin:
             meta.is_approved = True
             if is_shapefile:
-                worker.add_shape.delay(meta.dataset_name)
-                add_task(meta.dataset_name, ETLType['shapeset'])
+                ticket = worker.add_shape.delay(meta.dataset_name).id
+                meta.celery_task_id = ticket
+                session.commit()
             else:
-                worker.add_dataset(meta.dataset_name)
-                add_task(meta.dataset_name, ETLType['dataset'])
+                ticket = worker.add_dataset.delay(meta.dataset_name).id
+                meta.result_ids = [ticket]
+                session.commit()
         else:
             return send_submission_email(
                 meta.human_name,
@@ -284,8 +285,8 @@ def form_columns(form):
 
 
 def csv_already_submitted(url):
-    hash = md5(url).hexdigest()
-    return session.query(MetaTable).get(hash) is not None
+    digest = md5(bytes(url, encoding="utf-8")).hexdigest()
+    return session.query(MetaTable).get(digest) is not None
 
 
 def shape_already_submitted(name):
@@ -576,8 +577,8 @@ class SocrataSuggestion(object):
 def view_datasets():
     datasets_pending = fetch_pending_tables(MetaTable)
     shapes_pending = fetch_pending_tables(ShapeMetadata)
-    datasets = fetch_table_etl_status(ETLType['dataset'])
-    shapesets = fetch_table_etl_status(ETLType['shapeset'])
+    datasets = MetaTable.get_all_with_etl_status()
+    shapesets = ShapeMetadata.get_all_with_etl_status()
 
     return render_template('admin/view-datasets.html',
                            datasets_pending=datasets_pending,
@@ -595,18 +596,19 @@ def dataset_status():
     if source_url_hash:
         name = session.query(MetaTable).get(source_url_hash).dataset_name
 
-    results = fetch_table_etl_status(ETLType['dataset'], name)
-    results += fetch_table_etl_status(ETLType['shapeset'], name)
+    results = MetaTable.get_all_with_etl_status()
+    results += ShapeMetadata.get_all_with_etl_status()
 
     r = []
     for result in results:
         tb = None
-        if result.error:
-            tb = result.error \
+        if result.traceback:
+            tb = result.traceback \
                 .replace('\r\n', '<br />') \
                 .replace('\n\r', '<br />') \
                 .replace('\n', '<br />') \
                 .replace('\r', '<br />')
+
         d = {
             'human_name': result.human_name,
             'status': result.status,
@@ -680,7 +682,11 @@ def edit_shape(dataset_name):
 
 @views.route('/update-shape/<dataset_name>')
 def update_shape_view(dataset_name):
-    worker.update_shape.delay(dataset_name)
+
+    meta = session.query(ShapeMetadata).get(dataset_name)
+    ticket = worker.update_shape.delay(dataset_name).id
+    meta.celery_task_id = ticket
+    session.commit()
     return redirect(url_for('views.view_datasets'))
 
 
@@ -786,6 +792,7 @@ def edit_dataset(source_url_hash):
 @views.route('/admin/delete-dataset/<source_url_hash>')
 @login_required
 def delete_dataset_view(source_url_hash):
+
     meta = session.query(MetaTable).get(source_url_hash)
     worker.delete_dataset.delay(meta.dataset_name)
     return redirect(url_for('views.view_datasets'))
@@ -793,17 +800,15 @@ def delete_dataset_view(source_url_hash):
 
 @views.route('/update-dataset/<source_url_hash>')
 def update_dataset_view(source_url_hash):
+
     meta = session.query(MetaTable).get(source_url_hash)
-    worker.update_dataset(meta.dataset_name)
+    ticket = worker.update_dataset.delay(meta.dataset_name).id
+
+    meta.result_ids = [ticket]
+    session.add(meta)
+    session.commit()
+
     return redirect(url_for('views.view_datasets'))
-
-
-@views.route('/check-update/<ticket>')
-def check_update(ticket):
-    r = {'status': get_status(ticket)}
-    resp = make_response(json.dumps(r))
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
 
 
 ''' Shape monitoring '''
@@ -812,6 +817,7 @@ def check_update(ticket):
 @views.route('/admin/shape-status/')
 @login_required
 def shape_status():
+
     table_name = request.args['dataset_name']
     shape_meta = fetch_table_etl_status(ETLType['shapeset'], table_name)[0]
     return render_template('admin/shape-status.html', shape=shape_meta)
@@ -820,5 +826,6 @@ def shape_status():
 @views.route('/admin/delete-shape/<table_name>')
 @login_required
 def delete_shape_view(table_name):
+
     worker.delete_shape.delay(table_name)
     return redirect(url_for('views.view_datasets'))
