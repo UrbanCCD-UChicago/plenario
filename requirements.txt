@@ -33,7 +33,6 @@ MarkupSafe==0.23
 marshmallow==2.9.1
 git+https://github.com/datamade/python-metar.git#egg=metar
 openpyxl==2.2.0b1
-pandas==0.19.1
 passlib==1.6.5
 psycopg2==2.6.2
 pycparser==2.14
