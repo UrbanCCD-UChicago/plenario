@@ -9,4 +9,4 @@ apps = {
     "worker": worker
 }
 
-application = apps["worker"] if getenv("WORKER", None) else apps["server"]
+application = apps["worker"]() if getenv("WORKER", None) else apps["server"]()
