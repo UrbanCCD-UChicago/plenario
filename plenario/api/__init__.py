@@ -9,7 +9,7 @@ from plenario.sensor_network.api.sensor_networks import get_network_metadata, ge
     get_observation_nearest
 from plenario.sensor_network.api.ifttt import get_ifttt_observations, get_ifttt_meta, ifttt_status, ifttt_test_setup
 from .point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
-from .sensor import weather_stations, weather
+from .sensor import weather_stations, weather, weather_fill
 from .shape import get_all_shape_datasets, \
     export_shape, aggregate_point_data
 
