@@ -40,7 +40,7 @@ def get_meta(name: str):
 
 
 @worker.task()
-def health():
+def health() -> bool:
     """Shows that the worker is still recieving messages."""
 
     return True
@@ -93,7 +93,7 @@ def update_shape(name: str) -> bool:
 
 
 @worker.task()
-def delete_shape(name):
+def delete_shape(name) -> bool:
     """Delete the table and meta information for an approved shapeset."""
 
     metashape = reflect("meta_shape", Base.metadata, engine)
@@ -103,7 +103,7 @@ def delete_shape(name):
 
 
 @worker.task()
-def frequency_update(frequency):
+def frequency_update(frequency) -> bool:
     """Queue an update task for all the tables whose corresponding meta info
     is part of this frequency group.
 
@@ -127,38 +127,35 @@ def frequency_update(frequency):
         print("submitted job")
         submit_job({"endpoint": "update_shape", "query": m.dataset_name})
 
-    return '%s updates queued.' % frequency
+    return True
 
 
 @worker.task()
-def update_metar():
-    """Run a METAR update.
-
-    :returns (string) confirmation message"""
+def update_metar() -> True:
+    """Run a METAR update."""
 
     w = WeatherETL()
     w.metar_initialize_current()
-    return 'Added current metars'
+    return True
 
 
 @worker.task()
-def clean_metar():
+def clean_metar() -> True:
     """Given the latest datetime available in hourly observations table,
     delete all metar records older than that datetime. Records which exist
     in the hourly table are the quality-controlled versions of records that
     existed in the metar table."""
 
     WeatherETL().clear_metars()
+    return True
 
 
 @worker.task()
-def update_weather():
-    """Run a weather update.
-
-    :returns (string) confirmation message"""
+def update_weather() -> True:
+    """Run a weather update."""
 
     # This should do the current month AND the previous month, just in case.
-    last_month_dt = datetime.now() - timedelta(days=4)
+    last_month_dt = datetime.now() - timedelta(days=7)
     last_month = last_month_dt.month
     last_year = last_month_dt.year
 
@@ -167,4 +164,4 @@ def update_weather():
     if last_month != month:
         w.initialize_month(last_year, last_month)
     w.initialize_month(year, month)
-    return 'Added weather for %s %s' % (month, year)
+    return True
