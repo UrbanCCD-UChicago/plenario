@@ -54,3 +54,4 @@ WTForms==2.1
 xlrd==1.0.0
 
 celery
+flower
