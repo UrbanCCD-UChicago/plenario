@@ -207,6 +207,7 @@ class TestSensorNetworks(unittest.TestCase):
         url += "&start_datetime=2016-10-01&end_datetime=2016-10-03"
         response = self.app.get(url)
         result = json.loads(response.data)
+        print result
         self.assertEqual(result["meta"]["total"], 48)
 
     def test_aggregate_endpoint_returns_correct_observation_count(self):

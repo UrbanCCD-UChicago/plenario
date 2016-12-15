@@ -164,7 +164,7 @@ class NodeAggregateValidator(SensorNetworkValidator):
     valid_sensor_aggs = ("minute", "hour", "day", "week", "month", "year")
 
     node = fields.Str(required=True, validate=validate_nodes)
-    features = fields.List(fields.Str(), required=True, validate=validate_features)
+    feature = fields.Str(required=True, validate=validate_features)
     function = fields.Str(missing="avg", default="avg", validate=lambda x: x.lower() in aggregate_fn_map)
 
     agg = fields.Str(default="hour", missing="hour", validate=lambda x: x in NodeAggregateValidator.valid_sensor_aggs)

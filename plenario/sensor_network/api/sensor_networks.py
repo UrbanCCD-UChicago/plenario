@@ -268,7 +268,7 @@ def get_aggregations(network):
 
     request_args = dict(request.args.to_dict(), **{
         "network": network,
-        "feature": request.args.get("feature").split(",") if request.args.get("feature") else None,
+        "feature": request.args.get("feature") if request.args.get("feature") else None,
     })
 
     request_args = sanitize_args(request_args)
@@ -281,6 +281,7 @@ def get_aggregations(network):
         result = aggregate_fn_map[validated_args.data.get("function")](validated_args)
     except ValueError as err:
         return bad_request(err.message)
+
     return jsonify(validated_args, result, 200)
 
 
@@ -733,10 +734,10 @@ def jsonify(args, data, status_code):
     it doesn't sort the keys. Meaning we can keep the meta header at the top,
     which feels a lot better.
 
-    :param args: (ValidatorResult) validated query arguements
+    :param args: (ValidatorResult) validated query arguments
     :param data: (list) of json formatted results
     :param status_code: (int) response status code
-    :returns: (Response) HTTP reponse containing JSON"""
+    :returns: (Response) HTTP response containing JSON"""
 
     resp = json_response_base(args, data, args.data)
     resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
