@@ -2,11 +2,11 @@ language: python
 python:
 - '2.7.11'
 addons:
-  postgresql: '9.4'
+  postgresql: '9.5'
   apt:
     packages:
     - gdal-bin
-    - postgresql-9.4-postgis-2.2
+    - postgresql-9.5-postgis-2.3
 services:
 - postgresql
 - redis-server
@@ -28,7 +28,7 @@ install:
 - sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
 - sudo -u postgres psql -c "CREATE DATABASE plenario_test;"
 - sudo -u postgres psql -c "CREATE EXTENSION postgis;" plenario_test
-- python init_db.py
+- python init_db.py -m -u -f -k
 script:
 ###
 # Something strange is up with our tests
