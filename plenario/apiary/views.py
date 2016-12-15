@@ -83,7 +83,7 @@ def unknown_features_resolve(network, target_sensor):
     :param target_sensor: (str) resolved sensor"""
 
     sensors = reflect("sensor__sensor_metadata", psql_base.metadata, psql_engine)
-    unknowns = reflect(network + "unknown_feature", rshift_base.metadata, rshift_engine)
+    unknowns = reflect(network + "__unknown_feature", rshift_base.metadata, rshift_engine)
 
     # Grab the set of keys that are used to assert if an unknown is correct
     c_obs_props = sensors.c.observed_properties

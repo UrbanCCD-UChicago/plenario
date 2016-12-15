@@ -204,7 +204,7 @@ def aggregate(args, agg_label, agg_fn):
     :returns: (list) of dictionary objects that can be dumped to JSON"""
 
     expected = ("node", "feature", "start_datetime", "end_datetime", "sensors", "agg")
-    node, feature, start_dt, end_dt, sensors, agg_unit = (args.data.get(k) for k in expected)
+    network, node, feature, start_dt, end_dt, sensors, agg_unit = (args.data.get(k) for k in expected)
 
     # Format the datetime parameters
     start_dt = date_parse(start_dt).replace(tzinfo=None)
@@ -231,7 +231,7 @@ def aggregate(args, agg_label, agg_fn):
                          "you are aggregating for)")
 
     # Reflect the target feature of interest table
-    obs_table = _reflect(feature.split(".")[0], RBase.metadata, r_engine)
+    obs_table = _reflect(network + "__" + feature.split(".")[0], RBase.metadata, r_engine)
 
     # Generate the necessary select statements and datetime delimiters
     selects = _generate_aggregate_selects(obs_table, valid_columns, agg_fn, agg_unit)
