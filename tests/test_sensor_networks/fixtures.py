@@ -23,21 +23,22 @@ class Fixtures:
         finally:
             conn.close()
 
-    def _create_foi_table(self, table_schema):
+    def _create_foi_table(self, network, table_schema):
         """A postgres friendly version of the redshift method that shares
         the same name.
 
+        :param network: (string) network name
         :param table_schema: (dict) {"name": "<name>", "properties": [ ... ]}
         :returns: None"""
 
         print "create table {}".format(table_schema["name"])
 
-        create_table = ("CREATE TABLE {} ("
+        create_table = ("CREATE TABLE {}__{} ("
                         "\"node_id\" VARCHAR NOT NULL,"
                         "datetime TIMESTAMP WITHOUT TIME ZONE NOT NULL,"
                         "\"meta_id\" DOUBLE PRECISION NOT NULL,"
                         "\"sensor\" VARCHAR NOT NULL,"
-                        "").format(table_schema["name"])
+                        "").format(network, table_schema["name"])
 
         for i, prop in enumerate(table_schema["properties"]):
             create_table += '"{}" {} '.format(prop['name'], prop['type'])
@@ -135,8 +136,8 @@ class Fixtures:
                 session.rollback()
 
     def generate_mock_observations(self):
-        self._create_foi_table({"name": "vector", "properties": [{"name": "x", "type": "float"}, {"name": "y", "type": "float"}]})
-        self._create_foi_table({"name": "temperature", "properties": [{"name": "temperature", "type": "float"}]})
+        self._create_foi_table("test_network", {"name": "vector", "properties": [{"name": "x", "type": "float"}, {"name": "y", "type": "float"}]})
+        self._create_foi_table("test_network", {"name": "temperature", "properties": [{"name": "temperature", "type": "float"}]})
         print "Populating records ",
 
         date_string = "2016-10-{} {}:{}:{}"
@@ -154,13 +155,13 @@ class Fixtures:
             )
 
             self.rs_engine.execute("""
-                insert into vector (node_id, datetime, meta_id, sensor, x, y)
+                insert into test_network__vector (node_id, datetime, meta_id, sensor, x, y)
                 values ('test_node', '{}', '{}', 'sensor_02', {}, {})
                 """.format(record_date, randint(0, 100), random(), random())
             )
 
             self.rs_engine.execute("""
-                insert into temperature (node_id, datetime, meta_id, sensor, temperature)
+                insert into test_network__temperature (node_id, datetime, meta_id, sensor, temperature)
                 values ('test_node', '{}', '{}', 'sensor_01', {})
                 """.format(record_date, randint(0, 100), random(), random())
             )

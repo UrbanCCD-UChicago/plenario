@@ -34,7 +34,10 @@ def get_network_metadata(network=None):
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
-    return get_metadata("network", validated_args)
+    try:
+        return get_metadata("network", validated_args)
+    except ValueError as err:
+        return bad_request(err.message)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -60,7 +63,10 @@ def get_node_metadata(network, node=None):
         return bad_request(validated_args.errors)
     validated_args = sanitize_validated_args(validated_args)
 
-    return get_metadata("nodes", validated_args)
+    try:
+        return get_metadata("nodes", validated_args)
+    except ValueError as err:
+        return bad_request(err.message)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -86,7 +92,10 @@ def get_sensor_metadata(network, sensor=None):
         return bad_request(validated_args.errors)
     validated_args = sanitize_validated_args(validated_args)
 
-    return get_metadata("sensors", validated_args)
+    try:
+        return get_metadata("sensors", validated_args)
+    except ValueError as err:
+        return bad_request(err.message)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -110,7 +119,10 @@ def get_feature_metadata(network, feature=None):
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
-    return get_metadata("features", validated_args)
+    try:
+        return get_metadata("features", validated_args)
+    except ValueError as err:
+        return bad_request(err.message)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
