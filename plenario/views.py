@@ -1,5 +1,4 @@
 import itertools
-import json
 import re
 import requests
 
@@ -7,7 +6,7 @@ import plenario.tasks as worker
 
 from collections import namedtuple
 from hashlib import md5
-from flask import make_response, request, redirect, url_for, render_template
+from flask import request, redirect, url_for, render_template
 from flask import Blueprint, flash, session as flask_session
 from flask_login import login_required
 from flask_wtf import Form
@@ -20,8 +19,6 @@ from wtforms.validators import DataRequired
 
 from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata
-from plenario.models.ETLTask import ETLType
-from plenario.models.ETLTask import fetch_pending_tables, fetch_table_etl_status
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 
 views = Blueprint('views', __name__)
@@ -819,7 +816,7 @@ def update_dataset_view(source_url_hash):
 def shape_status():
 
     table_name = request.args['dataset_name']
-    shape_meta = fetch_table_etl_status(ETLType['shapeset'], table_name)[0]
+    shape_meta = ShapeMetadata.get_metadata_with_etl_result(table_name)
     return render_template('admin/shape-status.html', shape=shape_meta)
 
 
@@ -829,3 +826,15 @@ def delete_shape_view(table_name):
 
     worker.delete_shape.delay(table_name)
     return redirect(url_for('views.view_datasets'))
+
+
+def fetch_pending_tables(model):
+    """Used in views.py, fetch all records corresponding to tables pending
+    administrator approval. These tables exist in the master tables, but their
+    corresponding records have not been ingested.
+
+    :param model: (class) ORM Class corresponding to a meta table
+    :returns: (list) contains all records for which is_approved is false"""
+
+    query = session.query(model).filter(model.approved_status != True)
+    return query.all()
