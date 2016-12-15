@@ -3,9 +3,9 @@ import json
 import re
 import requests
 
+import plenario.tasks as worker
+
 from collections import namedtuple
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
 from hashlib import md5
 from flask import make_response, request, redirect, url_for, render_template
 from flask import Blueprint, flash, session as flask_session
@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
-from plenario.api.jobs import submit_job, get_status, get_job # job_queue
+from plenario.api.jobs import get_status
 from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata, Workers
 from plenario.models.ETLTask import ETLType, add_task
@@ -72,121 +72,27 @@ def terms_view():
     return render_template('terms.html')
 
 
-# @views.route('/workers')
-# def workers():
-#     q = session.query(Workers).all()
-#     workerlist = [row.__dict__ for row in q]
-#     now = datetime.now()
-#     nominal = 0
-#     loaded = 0
-#     dead = 0
-#
-#     for worker in workerlist:
-#
-#         if not worker["job"]:
-#             continue
-#
-#         job = json.loads(get_job(worker["job"]).get_data())
-#
-#         if job.get("error"):
-#             worker["status"] = "dead"
-#             worker["jobinfo"] = {
-#                 "status": "TIMED OUT",
-#                 "workers": "",
-#                 "queuetime": "",
-#                 "worktime": "",
-#                 "endpoint": ""
-#             }
-#             continue
-#
-#         if job["status"]["meta"].get("lastStartTime"):
-#             diff = relativedelta(
-#                 now,
-#                 datetime.strptime(job["status"]["meta"]["lastStartTime"],
-#                                   "%Y-%m-%d %H:%M:%S.%f"))
-#
-#         else:
-#             diff = relativedelta(now,
-#                                                     datetime.strptime(job["status"]["meta"]["startTime"],
-#                                                                           "%Y-%m-%d %H:%M:%S.%f"))
-#         worker["jobinfo"] = {
-#             "status": job["status"]["status"],
-#             "workers": ", ".join(job["status"]["meta"]["workers"]),
-#             "queuetime": job["status"]["meta"]["queueTime"],
-#             "worktime": " {}h {}m {}s".format(diff.hours, diff.minutes, diff.seconds).replace(
-#                 " 0h ", "  ").replace(" 0m ", " ")[1:],
-#             "endpoint": job["request"]["endpoint"]
-#         }
-#
-#         lastseen = (now - datetime.strptime(worker["timestamp"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds()
-#         if lastseen > 1200 or worker.get("status"):
-#             worker["status"] = "dead"
-#             dead += 1
-#         elif lastseen > 300:
-#             worker["status"] = "overload"
-#             loaded += 1
-#         elif lastseen > 60:
-#             worker["status"] = "load"
-#             loaded += 1
-#         else:
-#             worker["status"] = "nominal"
-#             nominal += 1
-#
-#         diff = relativedelta(now, datetime.fromtimestamp(worker["uptime"]))
-#         worker["humanized_uptime"] = " {}d {}h {}m {}s".format(
-#             diff.days, diff.hours, diff.minutes, diff.seconds).replace(
-#             " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
-#         diff = relativedelta(datetime.fromtimestamp(lastseen),
-#                                                     datetime.fromtimestamp(0))
-#         worker["lastseen"] = " {}d {}h {}m {}s ago".format(
-#             diff.days, diff.hours, diff.minutes, diff.seconds).replace(
-#             " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
-#
-#     workerlist.sort(key=lambda worker: worker["name"])
-#     # jobs = job_queue.attributes['ApproximateNumberOfMessages']
-#     workercounts = {
-#         "total": len(workerlist),
-#         "nominal": nominal,
-#         "loaded": loaded,
-#         "dead": dead
-#     }
-#     return render_template('workers.html', workers=workerlist,
-#                            workercounts=workercounts, queuelength=jobs, overload=(jobs>=8))
-
-# @views.route('/workers/purge')
-# def purge_workers():
-#     Workers.purge()
-#     return redirect(url_for('views.workers'))
-
-'''Approve a dataset'''
-
-
-# TODO: Catch an email exception and flash email failure
-
-
 @views.route('/admin/approve-shape/<dataset_name>')
 @login_required
 def approve_shape_view(dataset_name):
-    return approve_shape(dataset_name)
+    approve_shape(dataset_name)
+    return redirect(url_for('views.view_datasets'))
 
 
 def approve_shape(dataset_name):
+
     meta = session.query(ShapeMetadata).get(dataset_name)
     meta.approved_status = True
     session.commit()
 
-    # Send ingest task to SQS.
-    job = {"endpoint": "add_shape", "query": meta.dataset_name}
-    ticket = submit_job(job)
-
-    # Create and record task status.
+    worker.add_shape.delay(dataset_name)
     add_task(meta.dataset_name, ETLType['shapeset'])
 
-    # Let the fans know.
-    send_approval_email(meta.human_name, meta.contributor_name,
-                        meta.contributor_email)
-
-    return ticket
+    send_approval_email(
+        meta.human_name,
+        meta.contributor_name,
+        meta.contributor_email
+    )
 
 
 @views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
@@ -197,19 +103,19 @@ def approve_dataset_view(source_url_hash):
 
 
 def approve_dataset(source_url_hash):
-    # Approve it
+
     meta = session.query(MetaTable).get(source_url_hash)
     meta.approved_status = True
     session.commit()
 
-    send_approval_email(meta.human_name,
-                        meta.contributor_name,
-                        meta.contributor_email)
-
+    worker.add_dataset.delay(meta.dataset_name)
     add_task(meta.dataset_name, ETLType['dataset'])
 
-    job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
-    return submit_job(job)
+    send_approval_email(
+        meta.human_name,
+        meta.contributor_name,
+        meta.contributor_email
+    )
 
 
 def send_approval_email(dataset_name, contributor_name, contributor_email):
@@ -316,21 +222,19 @@ def submit(context):
         # Successfully stored the metadata
         # Now fire ingestion task...
         if is_admin:
-
             meta.is_approved = True
-
             if is_shapefile:
-                job = {"endpoint": "add_shape", "query": meta.dataset_name}
-                submit_job(job)
+                worker.add_shape.delay(meta.dataset_name)
                 add_task(meta.dataset_name, ETLType['shapeset'])
             else:
-                job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
-                submit_job(job)
+                worker.add_dataset(meta.dataset_name)
                 add_task(meta.dataset_name, ETLType['dataset'])
         else:
-            return send_submission_email(meta.human_name,
-                                         meta.contributor_name,
-                                         meta.contributor_email)
+            return send_submission_email(
+                meta.human_name,
+                meta.contributor_name,
+                meta.contributor_email
+            )
         return view_datasets()
 
 
@@ -345,7 +249,7 @@ def suggest(context):
             raise RuntimeError(msg)
     except RuntimeError as e:
         # Something was jank with that suggestion.
-        context['error_msg'] = e.message
+        context['error_msg'] = str(e)
         return render_with_context(context)
     else:
         # Merge exsting context into new context so that no values
@@ -776,13 +680,8 @@ def edit_shape(dataset_name):
 
 @views.route('/update-shape/<dataset_name>')
 def update_shape_view(dataset_name):
-    return queue_update_shape(dataset_name)
-
-
-def queue_update_shape(dataset_name):
-    job = {"endpoint": "update_shape", "query": dataset_name}
-    ticket = submit_job(job)
-    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
+    worker.update_shape.delay(dataset_name)
+    return redirect(url_for('views.view_datasets'))
 
 
 class EditDatasetForm(Form):
@@ -887,23 +786,16 @@ def edit_dataset(source_url_hash):
 @views.route('/admin/delete-dataset/<source_url_hash>')
 @login_required
 def delete_dataset_view(source_url_hash):
-    return delete_dataset(source_url_hash)
-
-
-def delete_dataset(source_url_hash):
-    ticket = submit_job({'endpoint': 'delete_dataset', 'query': source_url_hash})
-    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
+    meta = session.query(MetaTable).get(source_url_hash)
+    worker.delete_dataset.delay(meta.dataset_name)
+    return redirect(url_for('views.view_datasets'))
 
 
 @views.route('/update-dataset/<source_url_hash>')
 def update_dataset_view(source_url_hash):
-    return queue_update_dataset(source_url_hash)
-
-
-def queue_update_dataset(source_url_hash):
-    job = {"endpoint": "update_dataset", "query": source_url_hash}
-    ticket = submit_job(job)
-    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
+    meta = session.query(MetaTable).get(source_url_hash)
+    worker.update_dataset(meta.dataset_name)
+    return redirect(url_for('views.view_datasets'))
 
 
 @views.route('/check-update/<ticket>')
@@ -928,9 +820,5 @@ def shape_status():
 @views.route('/admin/delete-shape/<table_name>')
 @login_required
 def delete_shape_view(table_name):
-    return delete_shape(table_name)
-
-
-def delete_shape(table_name):
-    ticket = submit_job({'endpoint': 'delete_shape', 'query': table_name})
-    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
+    worker.delete_shape.delay(table_name)
+    return redirect(url_for('views.view_datasets'))

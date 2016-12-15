@@ -16,7 +16,7 @@ from plenario.utils.weather import WeatherETL
 client = Client(PLENARIO_SENTRY_URL) if PLENARIO_SENTRY_URL else None
 
 worker = Celery(
-    "tasks",
+    "worker",
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND
 )
