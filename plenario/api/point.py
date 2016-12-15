@@ -25,15 +25,7 @@ from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONV
 from plenario.api.jobs import make_job_response, submit_job, get_job, set_status, get_status, set_request, get_request, \
     get_result, set_flag, get_flag
 from plenario.models import MetaTable, DataDump
-from plenario.database import fast_count, windowed_query
-
-# Use the standard pool if this is just the app,
-# but use the shared connection pool if this
-# is the worker. It's more efficient!
-if os.environ.get('WORKER'):
-    from worker import session
-else:
-    from plenario.database import session
+from plenario.database import fast_count, windowed_query, session
 
 
 # ======

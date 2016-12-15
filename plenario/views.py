@@ -19,6 +19,7 @@ from wtforms.validators import DataRequired
 
 from plenario.database import session, Base, app_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata
+from plenario.settings import FLOWER_URL
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 
 views = Blueprint('views', __name__)
@@ -587,42 +588,8 @@ def view_datasets():
 @views.route('/admin/dataset-status/')
 @login_required
 def dataset_status():
-    source_url_hash = request.args.get("source_url_hash")
 
-    name = None
-    if source_url_hash:
-        name = session.query(MetaTable).get(source_url_hash).dataset_name
-
-    results = MetaTable.get_all_with_etl_status()
-    results += ShapeMetadata.get_all_with_etl_status()
-
-    r = []
-    for result in results:
-        tb = None
-        if result.traceback:
-            tb = result.traceback \
-                .replace('\r\n', '<br />') \
-                .replace('\n\r', '<br />') \
-                .replace('\n', '<br />') \
-                .replace('\r', '<br />')
-
-        d = {
-            'human_name': result.human_name,
-            'status': result.status,
-            'task_id': result.task_id,
-            'traceback': tb,
-            'date_done': None,
-        }
-
-        try:
-            d['source_url_hash'] = result.source_url_hash  # Point dataset.
-        except AttributeError:
-            d['source_url_hash'] = result.dataset_name  # Shape dataset.
-
-        if result.date_done:
-            d['date_done'] = result.date_done.strftime('%B %d, %Y %H:%M'),
-        r.append(d)
-    return render_template('admin/dataset-status.html', results=r, name=name)
+    return redirect(FLOWER_URL)
 
 
 class EditShapeForm(Form):

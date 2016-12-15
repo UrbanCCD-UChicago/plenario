@@ -18,6 +18,7 @@ Flask-Login==0.3.2
 Flask-Mail==0.9.1
 Flask-Principal==0.4.0
 Flask-Security==1.7.5
+Flask-Script
 Flask-SQLAlchemy==2.1
 Flask-WTF==0.12
 futures==3.0.5

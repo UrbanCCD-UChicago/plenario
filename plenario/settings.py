@@ -71,3 +71,4 @@ MAINTENANCE = False
 # Celery
 CELERY_BROKER_URL = get("CELERY_BROKER_URL") or "redis://localhost:6379/0"
 CELERY_RESULT_BACKEND = get("CELERY_RESULT_BACKEND") or "db+" + DATABASE_CONN
+FLOWER_URL = get("FLOWER_URL") or "http://localhost:5555"
