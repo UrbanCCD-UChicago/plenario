@@ -16,7 +16,7 @@ from plenario.api.common import unknown_object_json_handler
 from plenario.api.response import export_dataset_to_response
 from plenario.api.response import form_csv_detail_response
 from plenario.utils.model_helpers import fetch_table
-from plenario_worker.clients import job_queue
+# from plenario_worker.clients import job_queue
 
 redisPool = redis.ConnectionPool(host=CACHE_CONFIG["CACHE_REDIS_HOST"], port=6379, db=0)
 JobsDB = redis.Redis(connection_pool=redisPool)
@@ -161,22 +161,22 @@ def submit_job(req):
     set_status(ticket, {"status": "queued", "meta": {"queueTime": str(datetime.datetime.now())}})
     touch_ticket_expiry(ticket)
 
-    # Send this *last* after everything is ready.
-    if job_queue is not None:
-        job_queue.send_message(
-            MessageBody="plenario_job",
-            MessageAttributes={
-                "ticket": {
-                    "DataType": "String",
-                    "StringValue": str(ticket)
-                }, str(ticket): {
-                    "DataType": "String",
-                    "StringValue": "ticket"
-                }
-            }
-        )
-    else:
-        temporary_worker(ticket, req)
+    # # Send this *last* after everything is ready.
+    # if job_queue is not None:
+    #     job_queue.send_message(
+    #         MessageBody="plenario_job",
+    #         MessageAttributes={
+    #             "ticket": {
+    #                 "DataType": "String",
+    #                 "StringValue": str(ticket)
+    #             }, str(ticket): {
+    #                 "DataType": "String",
+    #                 "StringValue": "ticket"
+    #             }
+    #         }
+    #     )
+    # else:
+    #     temporary_worker(ticket, req)
 
     try:
         logfile = open("/opt/python/log/sender.log", "a")
@@ -192,73 +192,72 @@ def submit_job(req):
 
 def cancel_job(ticket):
 
-    response = job_queue.receive_messages(message_attributes=[ticket])
-    if len(response) > 0:
-        job_queue.delete_message(response[0])
-        return ticket
-    return None
+    # response = job_queue.receive_messages(message_attributes=[ticket])
+    # if len(response) > 0:
+        # job_queue.delete_message(response[0])
+    return ticket
+    # return None
 
 
-def temporary_worker(ticket, job_request):
-    """For situations in local development where queue system is not present,
-    spin up a temporary worker thread to accomplish a job right away. This is
-    a very distilled version of worker.py - possibly a good reference for
-    learning about the main worker system.
-
-    :param ticket: (str) ID of job status stored within Redis
-    :param job_request: (dict) contains API endpoint and query arguments"""
-
-    import traceback
-
-    from collections import namedtuple
-    from threading import Thread
-
-    from plenario.api.response import convert_result_geoms
-    from plenario.api.validator import convert
-    from plenario_worker.utilities import log
-    from plenario_worker.endpoints import endpoint_logic, shape_logic
-    from plenario_worker.endpoints import etl_logic
-    from plenario_worker.ticket import set_ticket_error, set_ticket_queued
-    from plenario_worker.ticket import set_ticket_success
-
-    ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
-
-    endpoint = job_request["endpoint"]
-    query_args = job_request["query"]
-    status = {"meta": {"startTime": datetime.datetime.now()}}
-    set_ticket_queued(status, ticket, "Queued", "temp")
-
-    # Note that this section is idential to logic check in worker.py
-    # TODO: Extract this and the worker's into a separate method
-    def do_work(endpoint, query_args, ticket):
-        try:
-            if endpoint in endpoint_logic:
-                # These keys are used for the datadump endpoint
-                query_args["jobsframework_ticket"] = ticket
-                query_args["jobsframework_workerid"] = "temp"
-                query_args["jobsframework_workerbirthtime"] = datetime.datetime.now()
-                convert(query_args)
-                query_args = ValidatorProxy(query_args)
-                result = endpoint_logic[endpoint](query_args)
-            elif endpoint in shape_logic:
-                convert(query_args)
-                query_args = ValidatorProxy(query_args)
-                result = shape_logic[endpoint](query_args)
-                if endpoint == 'aggregate-point-data' and query_args.data.get('data_type') != 'csv':
-                    result = convert_result_geoms(result)
-            elif endpoint in etl_logic:
-                if endpoint in ('update_weather', 'update_metar'):
-                    result = etl_logic[endpoint]()
-                else:
-                    result = etl_logic[endpoint](query_args)
-            else:
-                set_ticket_error(status, ticket, "Invalid endpoint specified.",  "temp")
-            set_ticket_success(ticket, result)
-        except Exception as exc:
-            set_ticket_error(status, ticket, traceback.format_exc(exc), "temp")
-
-    temp_thread = Thread(target=lambda: do_work(endpoint, query_args, ticket))
-    temp_thread.start()
-    log("Beginning work on endpoint: {}, with args: {}"
-        .format(endpoint, query_args), "temp")
-
+# def temporary_worker(ticket, job_request):
+#     """For situations in local development where queue system is not present,
+#     spin up a temporary worker thread to accomplish a job right away. This is
+#     a very distilled version of worker.py - possibly a good reference for
+#     learning about the main worker system.
+#
+#     :param ticket: (str) ID of job status stored within Redis
+#     :param job_request: (dict) contains API endpoint and query arguments"""
+#
+#     import traceback
+#
+#     from collections import namedtuple
+#     from threading import Thread
+#
+#     from plenario.api.response import convert_result_geoms
+#     from plenario.api.validator import convert
+#     from plenario_worker.utilities import log
+#     from plenario_worker.endpoints import endpoint_logic, shape_logic
+#     from plenario_worker.endpoints import etl_logic
+#     from plenario_worker.ticket import set_ticket_error, set_ticket_queued
+#     from plenario_worker.ticket import set_ticket_success
+#
+#     ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
+#
+#     endpoint = job_request["endpoint"]
+#     query_args = job_request["query"]
+#     status = {"meta": {"startTime": datetime.datetime.now()}}
+#     set_ticket_queued(status, ticket, "Queued", "temp")
+#
+#     # Note that this section is idential to logic check in worker.py
+#     # TODO: Extract this and the worker's into a separate method
+#     def do_work(endpoint, query_args, ticket):
+#         try:
+#             if endpoint in endpoint_logic:
+#                 # These keys are used for the datadump endpoint
+#                 query_args["jobsframework_ticket"] = ticket
+#                 query_args["jobsframework_workerid"] = "temp"
+#                 query_args["jobsframework_workerbirthtime"] = datetime.datetime.now()
+#                 convert(query_args)
+#                 query_args = ValidatorProxy(query_args)
+#                 result = endpoint_logic[endpoint](query_args)
+#             elif endpoint in shape_logic:
+#                 convert(query_args)
+#                 query_args = ValidatorProxy(query_args)
+#                 result = shape_logic[endpoint](query_args)
+#                 if endpoint == 'aggregate-point-data' and query_args.data.get('data_type') != 'csv':
+#                     result = convert_result_geoms(result)
+#             elif endpoint in etl_logic:
+#                 if endpoint in ('update_weather', 'update_metar'):
+#                     result = etl_logic[endpoint]()
+#                 else:
+#                     result = etl_logic[endpoint](query_args)
+#             else:
+#                 set_ticket_error(status, ticket, "Invalid endpoint specified.",  "temp")
+#             set_ticket_success(ticket, result)
+#         except Exception as exc:
+#             set_ticket_error(status, ticket, traceback.format_exc(exc), "temp")
+#
+#     temp_thread = Thread(target=lambda: do_work(endpoint, query_args, ticket))
+#     temp_thread.start()
+#     log("Beginning work on endpoint: {}, with args: {}"
+#         .format(endpoint, query_args), "temp")
