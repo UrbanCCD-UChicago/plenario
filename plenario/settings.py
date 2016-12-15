@@ -4,7 +4,6 @@ get = environ.get
 
 SECRET_KEY = get('SECRET_KEY', 'abcdefghijklmnop')
 PLENARIO_SENTRY_URL = get('PLENARIO_SENTRY_URL', None)
-CELERY_SENTRY_URL = get('CELERY_SENTRY_URL', None)
 DATA_DIR = '/tmp'
 
 # Travis CI relies on the default values to build correctly,
@@ -48,18 +47,15 @@ DEFAULT_USER = {
     'password': get('DEFAULT_USER_PASSWORD', 'changemeplz')
 }
 
-AWS_ACCESS_KEY = get('AWS_ACCESS_KEY_ID', '')
+# Amazon Web Services
+AWS_ACCESS_KEY = get('AWS_ACCESS_KEY', '')
 AWS_SECRET_KEY = get('AWS_SECRET_KEY', '')
-S3_BUCKET = get('S3_BUCKET', '')
 AWS_REGION_NAME = get('AWS_REGION_NAME', 'us-east-1')
+S3_BUCKET = get('S3_BUCKET', '')
 
 # Email address for notifying site administrators
 # Expect comma-delimited list of emails.
-email_list = get('ADMIN_EMAILS')
-if email_list:
-    ADMIN_EMAILS = email_list.split(',')
-else:
-    ADMIN_EMAILS = []
+ADMIN_EMAILS = get('ADMIN_EMAILS').split(',') if get('ADMIN_EMAILS') else []
 
 # For emailing users. ('MAIL_USERNAME' is an email address.)
 MAIL_SERVER = get('MAIL_SERVER', 'smtp.gmail.com')
@@ -72,9 +68,6 @@ MAIL_PASSWORD = get('MAIL_PASSWORD', '')
 # Toggle maintenence mode
 MAINTENANCE = False
 
-# SQS Jobs Queue
-JOBS_QUEUE = get('JOBS_QUEUE', 'plenario-queue-test')
-
 # Celery
-CELERY_BROKER_URL = get("CELERY_BROKER_URL") or REDIS_HOST
+CELERY_BROKER_URL = get("CELERY_BROKER_URL") or "redis://localhost:6379/0"
 CELERY_RESULT_BACKEND = get("CELERY_RESULT_BACKEND") or "db+" + DATABASE_CONN
