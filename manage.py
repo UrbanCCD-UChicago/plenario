@@ -33,7 +33,7 @@ def worker():
 
 @manager.command
 def monitor():
-    subprocess.call(["flower", "-A", "plenario.tasks", "persistent=True"])
+    subprocess.call(["flower", "-A", "plenario.tasks", "--persistent"])
 
 
 @manager.command
