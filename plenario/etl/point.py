@@ -86,13 +86,16 @@ class Staging(object):
         Create the staging table. Will be named s_[dataset_name]
         """
         with self.file_helper as helper:
+
+            text_handle = open(helper.handle.name, "rt")
+
             if not self.cols:
                 # We couldn't get the column metadata from an existing table
-                self.cols = self._from_inference(helper.handle)
+                self.cols = self._from_inference(text_handle)
 
             # Grab the handle to build a table from the CSV
             try:
-                self.table = self._make_table(helper.handle)
+                self.table = self._make_table(text_handle)
                 add_unique_hash(self.table.name)
                 self.table = Table(self.name, MetaData(),
                                    autoload_with=engine, extend_existing=True)
