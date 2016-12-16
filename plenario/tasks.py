@@ -105,27 +105,23 @@ def delete_shape(name) -> bool:
 @worker.task()
 def frequency_update(frequency) -> bool:
     """Queue an update task for all the tables whose corresponding meta info
-    is part of this frequency group.
+    is part of this frequency group."""
 
-    :param frequency: (string) how often these tables are meant to be updated,
-                               can be: often, daily, weekly, monthly, yearly
-    :returns (string) confirmation message"""
-
-    md = session.query(MetaTable) \
+    point_metas = session.query(MetaTable) \
         .filter(MetaTable.update_freq == frequency) \
         .filter(MetaTable.date_added != None) \
         .all()
-    for m in md:
-        print("submitted job")
-        submit_job({"endpoint": "update_dataset", "query": m.source_url_hash})
 
-    md = session.query(ShapeMetadata) \
+    for point in point_metas:
+        update_dataset.delay(point.dataset_name)
+
+    shape_metas = session.query(ShapeMetadata) \
         .filter(ShapeMetadata.update_freq == frequency) \
         .filter(ShapeMetadata.is_ingested == True) \
         .all()
-    for m in md:
-        print("submitted job")
-        submit_job({"endpoint": "update_shape", "query": m.dataset_name})
+    
+    for shape_meta in shape_metas:
+        update_shape.delay(shape_meta.dataset_name)
 
     return True
 
