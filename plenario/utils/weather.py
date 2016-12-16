@@ -8,8 +8,7 @@ import re
 from ftplib import FTP
 #from cStringIO import StringIO
 from io import StringIO
-from csvkit.unicsv import UnicodeCSVReader, UnicodeCSVWriter, \
-    UnicodeCSVDictReader, FieldSizeLimitError
+from csvkit.unicsv import FieldSizeLimitError
 from dateutil import parser
 from datetime import datetime, date, timedelta
 from dateutil import relativedelta
@@ -462,9 +461,9 @@ class WeatherETL(object):
             with zipfile.ZipFile(fpath, 'r') as zf:
                 for name in zf.namelist():
                     if name.endswith('hourly.txt'):
-                        raw_weather_hourly.write(zf.open(name).read())
+                        raw_weather_hourly.write(zf.open(name).read().decode("utf-8"))
                     elif name.endswith('daily.txt'):
-                        raw_weather_daily.write(zf.open(name).read())
+                        raw_weather_daily.write(zf.open(name).read().decode("utf-8"))
         return raw_weather_hourly, raw_weather_daily, file_type
 
     ########################################
@@ -473,18 +472,15 @@ class WeatherETL(object):
     ########################################
     ########################################
     def _transform_daily(self, raw_weather, file_type,  weather_stations_list = None, banned_weather_stations_list=None, start_line=0, end_line=None):
+
         raw_weather.seek(0)
-        # NOTE: not using UnicodeCSVReader because it.. (ironically) won't let us bail on a unicode error [mcc]
-        #reader = UnicodeCSVReader(raw_weather)
-        #header = reader.next() # skip header
-        raw_header= raw_weather.readline() # skip header
-        raw_header.strip()
-        header = raw_header.split(',')
+        raw_header = raw_weather.readline()
+
+        header = raw_header.strip().split(',')
         header = [x.strip() for x in header]
-        #print "header is ", header
 
         self.clean_observations_daily = StringIO()
-        writer = UnicodeCSVWriter(self.clean_observations_daily)
+        writer = csv.writer(self.clean_observations_daily)
         self.out_header = ["wban_code","date","temp_max","temp_min",
                            "temp_avg","departure_from_normal",
                            "dewpoint_avg", "wetbulb_avg","weather_types",
@@ -640,13 +636,13 @@ class WeatherETL(object):
     def _transform_hourly(self, raw_weather, file_type,  weather_stations_list = None,  banned_weather_stations_list=None, start_line=0, end_line=None):
         raw_weather.seek(0)
         # XXX mcc: should probably convert this to DIY CSV parsing a la _transform_daily()
-        reader = UnicodeCSVReader(raw_weather)
+        reader = csv.reader(raw_weather)
         header = next(reader)
         # strip leading and trailing whitespace from header (e.g. from tarfiles)
         header = [x.strip() for x in header]
 
         self.clean_observations_hourly = StringIO()
-        writer = UnicodeCSVWriter(self.clean_observations_hourly)
+        writer = csv.writer(self.clean_observations_hourly)
         self.out_header = ["wban_code","datetime","old_station_type","station_type", \
                            "sky_condition","sky_condition_top","visibility",\
                            "weather_types","drybulb_fahrenheit","wetbulb_fahrenheit",\
@@ -1507,7 +1503,7 @@ class WeatherStationsETL(object):
             raise WeatherError('Unable to fetch station data from NOAA.')
 
     def _transform(self):
-        reader = UnicodeCSVReader(self.station_raw_info)
+        reader = csv.reader(self.station_raw_info)
         header = ['wban_code', 'station_name', 'country',
                   'state', 'call_sign', 'location', 'elevation',
                   'begin', 'end']
@@ -1537,7 +1533,7 @@ class WeatherStationsETL(object):
                 wbans.append(wban)
                 all_rows.append([wban, name, country, state,
                     call_sign, location, elev, begin, end])
-        writer = UnicodeCSVWriter(self.clean_station_info)
+        writer = csv.writer(self.clean_station_info)
         writer.writerow(header)
         writer.writerows(all_rows)
         self.clean_station_info.seek(0)
@@ -1565,7 +1561,7 @@ class WeatherStationsETL(object):
         return 'bluh'
 
     def _update_stations(self):
-        reader = UnicodeCSVDictReader(self.clean_station_info)
+        reader = csv.DictReader(self.clean_station_info)
         conn = engine.connect()
         for row in reader:
             station = session.query(self.station_table).filter(self.station_table.c.wban_code == row['wban_code']).all()
