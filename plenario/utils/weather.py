@@ -1,3 +1,4 @@
+import csv
 import requests
 import os
 import sys
@@ -831,7 +832,7 @@ class WeatherETL(object):
         metar_codes_idx = 0
 
         self.clean_observations_metar = StringIO()
-        writer = UnicodeCSVWriter(self.clean_observations_metar)
+        writer = csv.writer(self.clean_observations_metar)
         self.out_header=["wban_code", "call_sign", "datetime", "sky_condition", "sky_condition_top",
                          "visibility", "weather_types", "temp_fahrenheit", "dewpoint_fahrenheit",
                          "wind_speed", "wind_direction", "wind_direction_cardinal", "wind_gust",
