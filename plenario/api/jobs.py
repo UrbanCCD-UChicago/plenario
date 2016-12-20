@@ -4,18 +4,17 @@ import datetime
 import json
 import redis
 import time
+import pickle
 import warnings
 
 
 from binascii import hexlify
-from flask import request, make_response
+from flask import request, jsonify
 from os import urandom
 
 from plenario.database import Base, app_engine as engine
 from plenario.settings import CACHE_CONFIG
 from plenario.api.common import unknown_object_json_handler
-from plenario.api.response import export_dataset_to_response
-from plenario.api.response import form_csv_detail_response
 from plenario.utils.helpers import reflect
 from plenario.utils.model_helpers import fetch_table
 # from plenario_worker.clients import job_queue
@@ -100,36 +99,13 @@ def worker_ready():
 
 
 def get_job(ticket: str):
-    if not ticket_exists(ticket):
-        response = {"ticket": ticket, "error": "Job not found."}
-        response = make_response(json.dumps(response, default=unknown_object_json_handler), 404)
-        response.headers['Content-Type'] = 'application/json'
-        return response
 
-    req = get_request(ticket)
-    result = get_result(ticket)
-    status = get_status(ticket)
+    celery_taskmeta = reflect("celery_taskmeta", Base.metadata, engine)
+    query = celery_taskmeta.select().where(celery_taskmeta.c.task_id == ticket)
+    job_meta = dict(query.execute().first().items())
+    job_meta["result"] = pickle.loads(job_meta["result"])
 
-    if status['status'] == "success":
-        # Here we need to do some legwork to find out what kind of response the
-        # user wants. This is to address endpoints such as export-shape, which
-        # can return many different downloadable format types.
-        if req['endpoint'] == "export-shape":
-            # TODO: Here, the work is not being done by the worker. Need to
-            # TODO: correct this.
-            shapeset = fetch_table(req['query']['shapeset'])
-            data_type = req['query']['data_type']
-            return export_dataset_to_response(shapeset, data_type, result)
-        elif hasattr(req['query'], 'get') and req['query'].get('data_type') == 'csv':
-            # Exports CSV files for aggregate-point-data and detail-aggregate.
-            # This method appends geom to remove on its own.
-            return form_csv_detail_response([], result)
-
-    response = {"ticket": ticket, "request": req, "result": result, "status": status}
-    response = make_response(json.dumps(response, default=unknown_object_json_handler), 200)
-    response.headers['Content-Type'] = 'application/json'
-
-    return response
+    return job_meta
 
 
 def make_job_response(endpoint, validated_query):
@@ -191,75 +167,3 @@ def submit_job(req):
 
     return ticket
 
-
-def cancel_job(ticket):
-
-    # response = job_queue.receive_messages(message_attributes=[ticket])
-    # if len(response) > 0:
-        # job_queue.delete_message(response[0])
-    return ticket
-    # return None
-
-
-# def temporary_worker(ticket, job_request):
-#     """For situations in local development where queue system is not present,
-#     spin up a temporary worker thread to accomplish a job right away. This is
-#     a very distilled version of worker.py - possibly a good reference for
-#     learning about the main worker system.
-#
-#     :param ticket: (str) ID of job status stored within Redis
-#     :param job_request: (dict) contains API endpoint and query arguments"""
-#
-#     import traceback
-#
-#     from collections import namedtuple
-#     from threading import Thread
-#
-#     from plenario.api.response import convert_result_geoms
-#     from plenario.api.validator import convert
-#     from plenario_worker.utilities import log
-#     from plenario_worker.endpoints import endpoint_logic, shape_logic
-#     from plenario_worker.endpoints import etl_logic
-#     from plenario_worker.ticket import set_ticket_error, set_ticket_queued
-#     from plenario_worker.ticket import set_ticket_success
-#
-#     ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
-#
-#     endpoint = job_request["endpoint"]
-#     query_args = job_request["query"]
-#     status = {"meta": {"startTime": datetime.datetime.now()}}
-#     set_ticket_queued(status, ticket, "Queued", "temp")
-#
-#     # Note that this section is idential to logic check in worker.py
-#     # TODO: Extract this and the worker's into a separate method
-#     def do_work(endpoint, query_args, ticket):
-#         try:
-#             if endpoint in endpoint_logic:
-#                 # These keys are used for the datadump endpoint
-#                 query_args["jobsframework_ticket"] = ticket
-#                 query_args["jobsframework_workerid"] = "temp"
-#                 query_args["jobsframework_workerbirthtime"] = datetime.datetime.now()
-#                 convert(query_args)
-#                 query_args = ValidatorProxy(query_args)
-#                 result = endpoint_logic[endpoint](query_args)
-#             elif endpoint in shape_logic:
-#                 convert(query_args)
-#                 query_args = ValidatorProxy(query_args)
-#                 result = shape_logic[endpoint](query_args)
-#                 if endpoint == 'aggregate-point-data' and query_args.data.get('data_type') != 'csv':
-#                     result = convert_result_geoms(result)
-#             elif endpoint in etl_logic:
-#                 if endpoint in ('update_weather', 'update_metar'):
-#                     result = etl_logic[endpoint]()
-#                 else:
-#                     result = etl_logic[endpoint](query_args)
-#             else:
-#                 set_ticket_error(status, ticket, "Invalid endpoint specified.",  "temp")
-#             set_ticket_success(ticket, result)
-#         except Exception as exc:
-#             set_ticket_error(status, ticket, traceback.format_exc(exc), "temp")
-#
-#     temp_thread = Thread(target=lambda: do_work(endpoint, query_args, ticket))
-#     temp_thread.start()
-#     log("Beginning work on endpoint: {}, with args: {}"
-#         .format(endpoint, query_args), "temp")

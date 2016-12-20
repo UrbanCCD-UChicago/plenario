@@ -15,6 +15,3 @@ cron:
  - name: "yearly"
    url: "/update/yearly"
    schedule: "0 0 2 4 *"
-# - name: "datadump_cleanup"
-#   url: "/purge/datadump"
-#   schedule: "0 * * * *"

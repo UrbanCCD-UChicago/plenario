@@ -22,8 +22,8 @@ manager = Manager(application)
 
 
 @manager.command
-def server():
-    application.run(host="0.0.0.0", port="5000")
+def runserver():
+    application.run(host="0.0.0.0", port=5000, debug=True)
 
 
 @manager.command
