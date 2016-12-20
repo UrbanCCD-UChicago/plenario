@@ -22,6 +22,19 @@ def drop_if_exists(table_name):
     except NoSuchTableError:
         pass
 
+def drop_with_audit_triggers_if_exists(table_name):
+    try:
+        auditTable = "audit." + table_name + "_history"
+        auditConstraint = table_name + "_history_action_check"
+        delConstraint = "ALTER TABLE {} DROP CONSTRAINT {};".format(auditTable, auditConstraint)
+        app_engine.execute(delConstraint)
+        dropTable = "DROP TABLE {};".format(auditTable)
+        app_engine.execute(dropTable)
+        t = Table(table_name, MetaData(), extend_existing=True)
+        t.drop(app_engine, checkfirst=True)
+    except:
+        pass
+
 
 def drop_meta(table_name):
     del_ = "DELETE FROM meta_master WHERE dataset_name = '{}';".format(table_name)
@@ -179,7 +192,7 @@ class StagingTableTests(TestCase):
         self.assertEqual(len(all_rows), 4)
 
     def test_update_with_change(self):
-        drop_if_exists(self.unloaded_meta.dataset_name)
+        drop_with_audit_triggers_if_exists(self.unloaded_meta.dataset_name)
 
         etl = PlenarioETL(self.unloaded_meta, source_path=self.radio_path)
         table = etl.add()
@@ -193,7 +206,7 @@ class StagingTableTests(TestCase):
         self.assertEqual(changed_date, date(1993, 11, 10))
 
     def test_new_table(self):
-        drop_if_exists(self.unloaded_meta.dataset_name)
+        drop_with_audit_triggers_if_exists(self.unloaded_meta.dataset_name)
 
         etl = PlenarioETL(self.unloaded_meta, source_path=self.radio_path)
         new_table = etl.add()
