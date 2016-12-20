@@ -41,7 +41,7 @@ class TestValidator(unittest.TestCase):
 
         self.assertTrue(len(resp_data['meta']['message']) == 2)
         self.assertEqual(resp_data['meta']['message']['dataset_name'], ['Invalid table name: crimez.'])
-        self.assertEqual(resp_data['meta']['message']['obs_date__ge'], ['Not a valid date.'])
+        self.assertIn('Not a valid date', resp_data['meta']['message']['obs_date__ge'][0])
 
     def test_validator_bad_column_name(self):
         endpoint = 'detail'

@@ -138,6 +138,7 @@ class Staging(object):
         conn = engine.raw_connection()
         try:
             with conn.cursor() as cursor:
+                f.seek(0)
                 cursor.copy_expert(copy_st, f)
                 conn.commit()
                 return table

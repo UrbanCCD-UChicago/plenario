@@ -6,7 +6,7 @@ addons:
   apt:
     packages:
     - gdal-bin
-    - postgresql-9.4-postgis-2.2
+    - postgresql-9.4-postgis-2.3
 services:
 - postgresql
 - redis-server

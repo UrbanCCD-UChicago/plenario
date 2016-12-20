@@ -34,7 +34,7 @@ manager = Manager(application)
 def runserver():
     """Start up plenario server"""
 
-    application.run(host="0.0.0.0", port=5000, debug=True)
+    application.run(host="0.0.0.0", port=5000)
 
 
 @manager.command
@@ -71,6 +71,7 @@ def pg():
 @manager.command
 def rs():
     """Psql into redshift"""
+
     print("[plenario] Connecting to %s" % REDSHIFT_CONN)
     wait(subprocess.Popen([
         "env", "PGPASSWORD=%s" % RS_PASSWORD,
@@ -80,6 +81,14 @@ def rs():
         "-U", RS_USER,
         "-p", str(RS_PORT),
     ]))
+
+
+@manager.command
+def test():
+    """Run nosetests"""
+
+    nose_commands = ["nosetests", "-s", "tests", "-vv"]
+    wait(subprocess.Popen(nose_commands))
 
 
 def wait(process):
