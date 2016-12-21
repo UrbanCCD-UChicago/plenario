@@ -94,30 +94,30 @@ class TestSensorNetworks(unittest.TestCase):
                                   "features")
         self.assertEqual(data["meta"]["total"], 2)
 
-    def test_download_queues_job_returns_ticket(self):
-        _, data = self.get_result("/v1/api/sensor-networks/test_network/"
-                                  "download?sensors=sensor_02"
-                                  "&nodes=test_node&features=vector")
-        self.assertIn("ticket", data)
-
-    def test_download_queues_job_returns_correct_result_for_good_args(self):
-        queueing_response, data = self.get_result("/v1/api/sensor-networks/"
-                                                  "test_network/download"
-                                                  "?sensors=sensor_02"
-                                                  "&nodes=test_node"
-                                                  "&features=vector"
-                                                  "&start_datetime=2000-01-01")
-
-        ticket = data["ticket"]
-        ticket_url = "v1/api/jobs/{}".format(ticket)
-        _, ticket_result = self.get_result(ticket_url)
-
-        while ticket_result["status"]["status"] not in {"error", "success"}:
-            _, ticket_result = self.get_result(ticket_url)
-            time.sleep(1)
-
-        _, download_result = self.get_result(ticket_result["result"]["url"])
-        self.assertEqual(len(download_result["data"]), 300)
+    # def test_download_queues_job_returns_ticket(self):
+    #     _, data = self.get_result("/v1/api/sensor-networks/test_network/"
+    #                               "download?sensors=sensor_02"
+    #                               "&nodes=test_node&features=vector")
+    #     self.assertIn("ticket", data)
+    #
+    # def test_download_queues_job_returns_correct_result_for_good_args(self):
+    #     queueing_response, data = self.get_result("/v1/api/sensor-networks/"
+    #                                               "test_network/download"
+    #                                               "?sensors=sensor_02"
+    #                                               "&nodes=test_node"
+    #                                               "&features=vector"
+    #                                               "&start_datetime=2000-01-01")
+    #
+    #     ticket = data["ticket"]
+    #     ticket_url = "v1/api/jobs/{}".format(ticket)
+    #     _, ticket_result = self.get_result(ticket_url)
+    #
+    #     while ticket_result["status"]["status"] not in {"error", "success"}:
+    #         _, ticket_result = self.get_result(ticket_url)
+    #         time.sleep(1)
+    #
+    #     _, download_result = self.get_result(ticket_result["result"]["url"])
+    #     self.assertEqual(len(download_result["data"]), 300)
 
     def test_geom_filter_for_node_metadata_empty_filter(self):
         # Geom box in the middle of the lake, should return no results
