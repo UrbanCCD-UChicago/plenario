@@ -303,6 +303,8 @@ def _detail(args):
 
 
 def datadump(**kwargs):
+    """Export the result of a detail query in geojson or csv format. Returns a
+    generator that yields pieces of the export."""
 
     if kwargs.get("data_type") == "json":
         return datadump_json(**kwargs)
@@ -310,6 +312,9 @@ def datadump(**kwargs):
 
 
 def datadump_json(**kwargs):
+    """Export the result of a detail query as valid geojson, where each row is
+    formatted as a feature with its column-value pairs stored in the properties
+    field. Plenario derived columns are hidden."""
 
     class ValidatorResultProxy(object):
         pass
@@ -320,15 +325,22 @@ def datadump_json(**kwargs):
     columns = [c.name for c in dataset.c]
     query = detail_query(vr_proxy)
 
+    buffer = ""
+    chunksize = 1000
     rowcount = fast_count(query)
     rownum = 0
 
     yield '{"type": "FeatureCollection", "features": ['
 
-    for row in windowed_query(query, dataset.c.point_date, 10000):
+    for row in windowed_query(query, dataset.c.point_date, chunksize):
         rownum += 1
         wkb = row.geom
-        geom = shapely.wkb.loads(wkb.desc, hex=True).__geo_interface__
+
+        try:
+            geom = shapely.wkb.loads(wkb.desc, hex=True).__geo_interface__
+        except AttributeError:
+            continue
+
         geojson = {
             "type": "Feature",
             "geometry": geom,
@@ -338,13 +350,22 @@ def datadump_json(**kwargs):
         del geojson["properties"]["hash"]
 
         if rownum != rowcount:
-            yield json.dumps(geojson, default=unknown_object_json_handler) + ","
+            buffer += json.dumps(geojson, default=unknown_object_json_handler)
+            buffer += ","
         else:
-            yield json.dumps(geojson, default=unknown_object_json_handler)
-    yield "]}"
+            buffer += json.dumps(geojson, default=unknown_object_json_handler)
+
+        if rownum % chunksize == 0:
+            yield buffer
+            buffer = ""
+
+    yield buffer + "]}"
 
 
 def datadump_csv(**kwargs):
+    """Export the result of a detail query as a comma-delimited csv file. The
+    header row is taken directly from the table's column list, with Plenario
+    derived values hidden."""
 
     class ValidatorResultProxy(object):
         pass
@@ -355,7 +376,7 @@ def datadump_csv(**kwargs):
     query = detail_query(vr_proxy)
 
     rownum = 0
-    chunksize = 10000
+    chunksize = 1000
     hide = {"geom", "hash"}
 
     buffer = io.StringIO()
