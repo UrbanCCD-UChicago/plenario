@@ -198,11 +198,10 @@ class TestValidator(unittest.TestCase):
 
         # Perform a query on the newly added dataset (to check if the
         # validator allows the query through).
-        query = '/v1/api/detail?dataset_name=roadworks&obs_date__ge=2000'
+        query = '/v1/api/detail?dataset_name=roadworks&obs_date__ge=2000-01-01'
         response = self.test_client.get(query)
-        data = json.loads(response.data.decode("utf-8"))
 
-        self.assertGreaterEqual(len(data['objects']), 100)
+        self.assertEqual(response.status_code, 200)
 
     def test_approves_non_obs_date_datetime_args(self):
 
