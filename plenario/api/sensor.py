@@ -41,7 +41,7 @@ def weather_stations():
 
         for value in values:
             d = {f: getattr(value, f) for f in fieldnames}
-            loc = bytearray.fromhex(value.location).decode()
+            loc = bytes(value.location.data)
             d['location'] = shapely.wkb.loads(loc).__geo_interface__
             resp['objects'].append(d)
 
@@ -116,7 +116,7 @@ def weather(table):
                 weather_data[value.wban_code].append(wd)
             else:
                 weather_data[value.wban_code] = [wd]
-            loc = bytearray.fromhex(str(value.location)).decode("utf-8")
+            loc = bytes(value.location.data)
             sd['location'] = shapely.wkb.loads(loc).__geo_interface__
             station_data[value.wban_code] = sd
 
