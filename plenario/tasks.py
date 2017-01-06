@@ -2,7 +2,6 @@ from celery import Celery
 from datetime import datetime, timedelta
 from raven import Client
 
-from plenario.api.jobs import submit_job
 from plenario.database import session as session, Base, app_engine as engine
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL

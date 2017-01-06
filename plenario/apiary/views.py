@@ -14,10 +14,10 @@ from plenario.database import session as psql_session
 from plenario.database import Base as psql_base, app_engine as psql_engine
 from plenario.database import redshift_Base as rshift_base
 from plenario.database import redshift_engine as rshift_engine
-from plenario.settings import REDIS_HOST_SAFE
+from plenario.settings import REDIS_HOST
 
 blueprint = Blueprint("apiary", __name__)
-redis = Redis(REDIS_HOST_SAFE)
+redis = Redis(REDIS_HOST)
 
 
 def reflect(table_name, metadata, engine):
