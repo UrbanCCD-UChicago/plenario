@@ -6,7 +6,7 @@ from plenario.database import session, app_engine as engine
 from plenario.etl.common import ETLFile, PlenarioETLError, add_unique_hash,\
     delete_absent_hashes
 from plenario.utils.shapefile import import_shapefile, ShapefileError
-from sqlalchemy import Table, MetaData
+from sqlalchemy import Table, MetaData, select
 
 
 def reflect(table_name):
@@ -58,20 +58,23 @@ class ShapeETL:
     def _hash_update(staging, existing):
         delete_absent_hashes(staging.name, existing.name)
 
+        # Ensures column alignment in upcoming selection and insertion
+        column_names = sorted([col.name for col in existing.columns])
+        columns = [staging.c[name] for name in column_names]
+
         # Select all records from staging
         # whose hashes are not present in existing.
         join_condition = staging.c['hash'] == existing.c['hash']
-        sel = staging.select()\
-            .select_from(staging.outerjoin(existing, join_condition)).\
-            where(existing.c['hash'] == None)
+        selection = select(columns).select_from(
+            staging.outerjoin(existing, join_condition)
+        ).where(existing.c['hash'] == None)
 
         # Insert those into existing
-        col_names = [col.name for col in existing.columns]
-        ins = existing.insert().from_select(col_names, sel)
+        insertion = existing.insert().from_select(column_names, selection)
         try:
-            engine.execute(ins)
+            engine.execute(insertion)
         except Exception as e:
-            raise PlenarioETLError(repr(e) + '\n' + str(sel))
+            raise PlenarioETLError(repr(e) + '\n' + str(selection))
 
 
 class HashedShape(object):
