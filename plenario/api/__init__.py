@@ -3,14 +3,14 @@ from time import sleep
 
 from flask import make_response, Blueprint
 
-from common import cache, make_cache_key
+from .common import cache, make_cache_key
 from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, \
     get_observations, get_feature_metadata, get_sensor_metadata, get_aggregations, get_observations_download, \
     get_observation_nearest
 from plenario.sensor_network.api.ifttt import get_ifttt_observations, get_ifttt_meta, ifttt_status, ifttt_test_setup
-from point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump, get_datadump, get_job_view
-from sensor import weather_stations, weather, weather_fill
-from shape import get_all_shape_datasets, \
+from .point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump_view, get_job_view
+from .sensor import weather_stations, weather, weather_fill
+from .shape import get_all_shape_datasets, \
     export_shape, aggregate_point_data
 
 API_VERSION = '/v1'
@@ -35,8 +35,7 @@ api.add_url_rule(prefix + '/shapes/<polygon_dataset_name>/<point_dataset_name>',
 
 api.add_url_rule(prefix + '/jobs/<ticket>', view_func=get_job_view, methods=['GET'])
 
-api.add_url_rule(prefix + '/datadump', 'datadump', datadump)
-api.add_url_rule(prefix + '/datadump/<ticket>', 'get_datadump', get_datadump)
+api.add_url_rule(prefix + '/datadump', 'datadump', datadump_view)
 
 # sensor networks
 api.add_url_rule(prefix + '/sensor-networks', 'sensor_networks', get_network_metadata)

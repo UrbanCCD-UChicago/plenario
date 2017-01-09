@@ -17,4 +17,4 @@ def is_process_running(process_name):
 
 if __name__ == '__main__':
 
-    print is_process_running("worker.py")
+    print(is_process_running("worker.py"))

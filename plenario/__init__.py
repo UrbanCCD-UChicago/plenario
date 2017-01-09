@@ -1,5 +1,4 @@
 from flask import Flask, render_template, redirect, url_for, request
-from flask_sqlalchemy import SQLAlchemy
 from raven.contrib.flask import Sentry
 
 from plenario.settings import DATABASE_CONN
@@ -9,11 +8,11 @@ sentry = None
 if PLENARIO_SENTRY_URL:
     sentry = Sentry(dsn=PLENARIO_SENTRY_URL)
 
-db = SQLAlchemy()
 # NOTE: Models must be imported after initializing the db
 # object since the models themselves need to import db.
 from plenario.models.SensorNetwork import FeatureMeta, SensorMeta
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta
+
 
 def create_app():
     # API depends on the tables in the database to exist.

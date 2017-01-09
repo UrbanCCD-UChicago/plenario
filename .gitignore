@@ -41,3 +41,6 @@ _scripts/
 
 # Virtualenv
 _venv/
+
+# Flower
+flower.*

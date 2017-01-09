@@ -7,7 +7,7 @@ from plenario.models import bcrypt
 
 
 def get_uuid():
-    return unicode(uuid4())
+    return str(uuid4())
 
 
 class User(Base):

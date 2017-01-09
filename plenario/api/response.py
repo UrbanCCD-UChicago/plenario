@@ -12,6 +12,7 @@ from datetime import datetime
 from flask import make_response, request
 from itertools import groupby
 from operator import itemgetter
+from functools import reduce
 
 
 def make_error(msg, status_code):
@@ -113,7 +114,7 @@ def form_csv_detail_response(to_remove, rows, dataset_names=None):
     else:
         # Column headers from arbitrary row,
         # then the values from all the others
-        csv_resp = [rows[0].keys()] + [row.values() for row in rows]
+        csv_resp = [list(rows[0].keys())] + [list(row.values()) for row in rows]
 
     resp = make_response(make_csv(csv_resp), 200)
 
@@ -294,7 +295,7 @@ def _shape_format_to_file_extension(requested_format):
 
 
 def export_dataset_to_response(shapeset, data_type, query=None):
-    export_format = unicode.lower(unicode(data_type))
+    export_format = str.lower(str(data_type))
 
     # Make a filename that we are reasonably sure to be unique and not occupied by anyone else.
     sacrifice_file = tempfile.NamedTemporaryFile()
@@ -305,7 +306,7 @@ def export_dataset_to_response(shapeset, data_type, query=None):
         # Write to that filename.
         OgrExport(export_format, export_path, shapeset.name, query).write_file()
         # Dump it in the response.
-        with open(export_path, 'r') as to_export:
+        with open(export_path, 'rb') as to_export:
             resp = make_response(to_export.read(), 200)
 
         extension = _shape_format_to_file_extension(export_format)
@@ -318,7 +319,7 @@ def export_dataset_to_response(shapeset, data_type, query=None):
 
     except Exception as e:
         error_message = 'Failed to export shape dataset {}'.format(shapeset.name)
-        print repr(e)
+        print((repr(e)))
         return make_response(error_message, 500)
     finally:
         # Don't leave that file hanging around.

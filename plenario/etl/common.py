@@ -18,13 +18,14 @@ class ETLFile(object):
 
     Implements context manager interface with __enter__ and __exit__.
     """
-    def __init__(self, source_path=None, source_url=None):
+    def __init__(self, source_path=None, source_url=None, interpret_as='text'):
         if source_path and source_url:
             raise RuntimeError('ETLFile takes exactly one of source_path and source_url. Both were given.')
 
         if not source_path and not source_url:
             raise RuntimeError('ETLFile takes exactly one of source_path and source_url. Neither were given.')
 
+        self.interpret_as = interpret_as
         self.source_path = source_path
         self.source_url = source_url
         self.is_local = bool(source_path)
@@ -35,7 +36,8 @@ class ETLFile(object):
         Assigns an open file object to self.file_handle
         """
         if self.is_local:
-            self.handle = open(self.source_path, 'r')
+            file_type = 'rb' if self.interpret_as == 'bytes' else 'r'
+            self.handle = open(self.source_path, file_type)
         else:
             self._download_temp_file(self.source_url)
 
@@ -77,7 +79,7 @@ class ETLFile(object):
         file_stream_request.raise_for_status()
 
         # Make this temporary file our file handle
-        self.handle = tempfile.TemporaryFile()
+        self.handle = tempfile.NamedTemporaryFile()
 
         # Download and write to disk in 1MB chunks.
         for chunk in file_stream_request.iter_content(chunk_size=1024*1024):

@@ -1,12 +1,12 @@
 language: python
 python:
-- '2.7.11'
+- '3.5'
 addons:
   postgresql: '9.4'
   apt:
     packages:
     - gdal-bin
-    - postgresql-9.4-postgis-2.2
+    - postgresql-9.4-postgis-2.3
 services:
 - postgresql
 - redis-server
@@ -41,10 +41,13 @@ script:
 # Points (etc?) does some kind of setup that 
 # is useful to jobs (it fails otherwise)
 ###
-- nosetests tests/points/ -v
-- nosetests tests/shapes/ -v
-- nosetests tests/submission/ -v
-- nosetests tests/test_sensor_networks/ -v
+- nosetests --nologcapture tests/test_api/test_point.py -v
+- nosetests --nologcapture tests/test_api/test_shape.py -v
+- nosetests --nologcapture tests/test_api/test_validator.py -v
+- nosetests --nologcapture tests/test_etl/test_point.py -v
+- nosetests --nologcapture tests/submission/ -v
+- nosetests --nologcapture tests/test_sensor_network/test_sensor_networks.py -v
+
 deploy:
 - provider: elasticbeanstalk
   access_key_id:
@@ -53,7 +56,7 @@ deploy:
     secure: OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ=
   region: us-east-1
   app: plenario
-  env: plenario-app-prod-docker
+  env: plenario-server
   bucket_name: elasticbeanstalk-us-east-1-031052761859
 - provider: elasticbeanstalk
   access_key_id:
@@ -62,7 +65,7 @@ deploy:
     secure: OcNlZr8vhlFKlSKEurZc1+NM/7exhr7JpOX4rJ6CqS1bly5Lh5UZ+GupZO7CM640nDrqwzQBKrkqDqPjwqEsbKIEU8NuDpfbG0/uRI4Ab/fhbPLzQPihLTjgkqI8ZlpSJ93K8fX2UC3SrVkyv29xzNZHlNp/q7GBaA95JRzelqQ=
   region: us-east-1
   app: plenario
-  env: plenario-worker-prod-docker
+  env: plenario-worker
   bucket_name: elasticbeanstalk-us-east-1-031052761859
 notifications:
   slack:

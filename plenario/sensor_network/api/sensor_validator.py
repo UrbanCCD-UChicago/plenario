@@ -8,7 +8,7 @@ from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
 from plenario.database import session
 from plenario.models.SensorNetwork import NodeMeta, NetworkMeta, FeatureMeta, SensorMeta
-from sensor_aggregate_functions import aggregate_fn_map
+from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
 
 valid_sensor_aggs = ("minute", "hour", "day", "week", "month", "year")
 
@@ -19,7 +19,7 @@ def validate_network(network):
 
 
 def validate_nodes(nodes):
-    if isinstance(nodes, basestring):
+    if isinstance(nodes, str):
         nodes = [nodes]
     valid_nodes = NodeMeta.index()
     for node in nodes:
@@ -28,7 +28,7 @@ def validate_nodes(nodes):
 
 
 def validate_features(features):
-    if isinstance(features, basestring):
+    if isinstance(features, str):
         features = [features]
     valid_features = FeatureMeta.index()
     for feature in features:
@@ -38,7 +38,7 @@ def validate_features(features):
 
 
 def validate_sensors(sensors):
-    if isinstance(sensors, basestring):
+    if isinstance(sensors, str):
         sensors = [sensors]
     valid_sensors = SensorMeta.index()
     for sensor in sensors:
@@ -144,7 +144,7 @@ def convert(request_args):
 
     :returns: converted dictionary"""
 
-    for key, value in request_args.items():
+    for key, value in list(request_args.items()):
         try:
             request_args[key] = converters[key](value)
         except (KeyError, TypeError, AttributeError, NoSuchTableError):

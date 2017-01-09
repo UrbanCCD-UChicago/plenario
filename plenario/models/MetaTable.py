@@ -1,5 +1,4 @@
 import json
-import traceback
 from collections import namedtuple
 from datetime import datetime
 from hashlib import md5
@@ -50,7 +49,7 @@ class MetaTable(Base):
     contributor_organization = Column(String)
     contributor_email = Column(String)
     result_ids = Column(ARRAY(String))
-    column_names = Column(JSONB)  # storage format {'<COLUMN_NAME>': '<COLUMN_TYPE>'}
+    column_names = Column(JSONB)  # {'<COLUMN_NAME>': '<COLUMN_TYPE>'}
 
     def __init__(self, url, human_name, observed_date,
                  approved_status=False, update_freq='yearly',
@@ -77,7 +76,7 @@ class MetaTable(Base):
             if name is None:
                 return None
             else:
-                return slugify(unicode(name), delim=u'_')
+                return slugify(str(name), delimiter='_')
 
         # Some combination of columns from which we can derive a point in space.
         assert (location or (latitude and longitude))
@@ -97,7 +96,9 @@ class MetaTable(Base):
         self.observed_date = curried_slug(observed_date)
 
         assert url
-        self.source_url, self.source_url_hash = url, md5(url).hexdigest()
+        # Assume a URL has already been slugified,
+        # and can only contain ASCII characters
+        self.source_url, self.source_url_hash = url, md5(url.encode('ascii')).hexdigest()
         self.view_url = self._get_view_url_val(url)
 
         assert update_freq
@@ -181,7 +182,7 @@ class MetaTable(Base):
         # Make the DB call
         result = session.query(*attrs). \
             filter(cls.dataset_name.in_(dataset_names))
-        meta_list = [dict(zip(attr_names, row)) for row in result]
+        meta_list = [dict(list(zip(attr_names, row))) for row in result]
 
         # We need to coerce datetimes to strings
         date_attrs = ['date_added', 'obs_from', 'obs_to']
@@ -400,60 +401,23 @@ class MetaTable(Base):
         rows = [[count, time_bucket.date()] for _, time_bucket, count in rows]
         return header + rows
 
-
-class DataDump(Base):
-    __tablename__ = "plenario_datadump"
-    id = Column(String(32), primary_key=True)
-    request = Column(String(32), nullable=False)
-    part = Column(Integer, nullable=False)
-    total = Column(Integer, nullable=False)
-    data = Column(Text)
-
-    def __init__(self, id, request, part, total, data):
-        self.id = id
-        self.request = request
-        self.part = part
-        self.total = total
-        self.data = data
-
-    def get_data(self):
-        return self.data
-
-    def get_id(self):
-        return self.id
-
-
-class Workers(Base):
-    __tablename__ = "plenario_workers"
-    name = Column(String(32), primary_key=True)
-    timestamp = Column(String(32), nullable=False)
-    uptime = Column(Integer, nullable=False)
-    job = Column(String(32), nullable=True)
-    jobcounter = Column(Integer, nullable=False)
-
-    def __init__(self, name, uptime):
-        self.name = name
-        self.timestamp = str(datetime.now())
-        self.uptime = uptime
-        self.jobcounter = 0
-
-    def check_in(self):
-        self.timestamp = str(datetime.now())
-
-    def register_job(self, job):
-        self.job = job
-
-    def deregister_job(self):
-        if self.job:
-            self.jobcounter += 1
-        self.job = None
-
     @classmethod
-    def purge(cls):
-        try:
-            session.query(cls).delete()
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            traceback.print_exc()
-            print("Problem purging plenario_workers: {}".format(e))
+    def get_all_with_etl_status(cls):
+        """
+        :return: Every row of meta_shape joined with celery task status.
+        """
+
+        query = '''
+            SELECT m.*, c.*
+                FROM meta_master AS m
+                LEFT JOIN celery_taskmeta AS c
+                  ON c.id = (
+                    SELECT id FROM celery_taskmeta
+                    WHERE task_id = ANY(m.result_ids)
+                    ORDER BY date_done DESC
+                    LIMIT 1
+                  )
+            WHERE m.approved_status = 'true'
+        '''
+
+        return list(session.execute(query))

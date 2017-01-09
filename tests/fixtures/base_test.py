@@ -1,9 +1,9 @@
 import os
 import unittest
 
-from tests.test_fixtures.point_meta import flu_shot_meta, landmarks_meta
-from tests.test_fixtures.point_meta import flu_path, landmarks_path
-from tests.test_fixtures.point_meta import crime_meta, crime_path
+from tests.fixtures.point_meta import flu_shot_meta, landmarks_meta
+from tests.fixtures.point_meta import flu_path, landmarks_path
+from tests.fixtures.point_meta import crime_meta, crime_path
 
 from plenario import create_app
 from plenario.database import session
@@ -19,7 +19,7 @@ fixtures_path = pwd
 FIXTURE_PATH = pwd
 
 
-def ingest_from_fixture(fixture_meta, fname):
+def ingest_point_fixture(fixture_meta, fname):
     md = MetaTable(**fixture_meta)
     session.add(md)
     session.commit()
@@ -35,7 +35,7 @@ def drop_tables(table_names):
     session.commit()
 
 
-class Fixture(object):
+class ShapeFixture(object):
     def __init__(self, human_name, file_name):
         self.human_name = human_name
         self.table_name = ShapeMetadata.make_table_name(human_name)
@@ -43,17 +43,17 @@ class Fixture(object):
         self.update_freq = 'yearly'
 
 
-fixtures = {
-    'city': Fixture(human_name=u'Chicago City Limits',
-                    file_name='chicago_city_limits.zip'),
-    'streets': Fixture(human_name=u'Pedestrian Streets',
-                       file_name='chicago_pedestrian_streets.zip'),
-    'zips': Fixture(human_name=u'Zip Codes',
-                    file_name='chicago_zip_codes.zip'),
-    'neighborhoods': Fixture(human_name=u'Chicago Neighborhoods',
-                             file_name='chicago_neighborhoods.zip'),
-    'changed_neighborhoods': Fixture(human_name=u'Chicago Neighborhoods',
-                                     file_name='chicago_neighborhoods_changed.zip', )
+shape_fixtures = {
+    'city': ShapeFixture(human_name='Chicago City Limits',
+                         file_name='chicago_city_limits.zip'),
+    'streets': ShapeFixture(human_name='Pedestrian Streets',
+                            file_name='chicago_pedestrian_streets.zip'),
+    'zips': ShapeFixture(human_name='Zip Codes',
+                         file_name='chicago_zip_codes.zip'),
+    'neighborhoods': ShapeFixture(human_name='Chicago Neighborhoods',
+                                  file_name='chicago_neighborhoods.zip'),
+    'changed_neighborhoods': ShapeFixture(human_name='Chicago Neighborhoods',
+                                          file_name='chicago_neighborhoods_changed.zip', )
 }
 
 
@@ -63,46 +63,40 @@ class BasePlenarioTest(unittest.TestCase):
         # Remove tables that we're about to recreate.
         # This doesn't happen in teardown because I find it helpful
         # to inspect them in the DB after running the tests.
-        meta_table_names = ['meta_master', 'meta_shape', 'etl_task']
-        fixture_table_names = [fixture.table_name for key, fixture in fixtures.iteritems()]
 
-        drop_tables(meta_table_names + fixture_table_names)
+        meta_table_names = ['meta_master', 'meta_shape', 'etl_task']
+        drop_tables(meta_table_names)
 
         # Re-add meta tables
         init_meta()
         init_worker_meta()
 
-        # Fully ingest the fixtures
-        BasePlenarioTest.ingest_fixture(fixtures['city'])
-        BasePlenarioTest.ingest_fixture(fixtures['streets'])
-        BasePlenarioTest.ingest_fixture(fixtures['zips'])
-        BasePlenarioTest.ingest_fixture(fixtures['neighborhoods'])
+        cls.app = create_app().test_client()
+
+    @classmethod
+    def ingest_shapes(cls):
+        fixtures = [f for k, f in shape_fixtures.items() if k != 'changed_neighborhoods']
+        fixture_table_names = [f.table_name for f in fixtures]
+        drop_tables(fixture_table_names)
+        session.commit()
+
+        for fixture in fixtures:
+            cls.ingest_fixture(fixture)
 
         # Add a dummy dataset to the metadata without ingesting a shapefile for it
-        cls.dummy_name = ShapeMetadata.add(human_name=u'Dummy Name',
+        cls.dummy_name = ShapeMetadata.add(human_name='Dummy Name',
                                            source_url=None,
                                            update_freq='yearly',
                                            approved_status=False).dataset_name
         session.commit()
 
-        tables_to_drop = [
-            'flu_shot_clinics',
-            'landmarks',
-            'crimes',
-            'meta_master'
-            'etl_task'
-        ]
-        drop_tables(tables_to_drop)
-
-        init_meta()
-
-        ingest_from_fixture(flu_shot_meta, flu_path)
-        ingest_from_fixture(landmarks_meta, landmarks_path)
-        ingest_from_fixture(crime_meta, crime_path)
-
-        cls.app = create_app().test_client()
-
-        '''/detail'''
+    @classmethod
+    def ingest_points(cls):
+        drop_tables(("flu_shot_clinics", "landmarks", "crimes"))
+        ingest_point_fixture(flu_shot_meta, flu_path)
+        ingest_point_fixture(landmarks_meta, landmarks_path)
+        ingest_point_fixture(crime_meta, crime_path)
+        session.commit()
 
     @staticmethod
     def ingest_fixture(fixture):

@@ -1,5 +1,4 @@
-import re
-from unicodedata import normalize
+import csv
 import string
 from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
@@ -9,7 +8,7 @@ from plenario.settings import MAIL_USERNAME, ADMIN_EMAILS, \
 import math
 from collections import namedtuple
 from sqlalchemy import Table
-
+from slugify import slugify as _slugify
 
 def get_size_in_degrees(meters, latitude):
     earth_circumference = 40041000.0  # meters, average circumference
@@ -34,8 +33,8 @@ def infer_csv_columns(inp):
                 that we can throw into a UnicodeCSVReader
     :return: List of `ColumnInfo`s
     """
-    reader = UnicodeCSVReader(inp)
-    header = reader.next()
+    reader = csv.reader(inp)
+    header = next(reader)
     inp.seek(0)
     iter_output = [iter_column(col_idx, inp)
                    for col_idx in range(len(header))]
@@ -54,10 +53,10 @@ def iter_column(idx, f):
              and null_values is whether null values were found and normalized.
     """
     f.seek(0)
-    reader = UnicodeCSVReader(f)
+    reader = csv.reader(f)
 
     # Discard the header
-    reader.next()
+    next(reader)
 
     col = []
     for row in reader:
@@ -71,22 +70,8 @@ def iter_column(idx, f):
     return col_type, null_values
 
 
-def slugify(text, delim=u'_'):
-    """
-    Given text, return lowercase ASCII slug that gets as close as possible to the original.
-    Will fail on Asian characters.
-    Taken from http://flask.pocoo.org/snippets/5/
-    """
-    if text:
-        punct_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.:;]+')
-        result = []
-        for word in punct_re.split(text.lower()):
-            word = normalize('NFKD', word).encode('ascii', 'ignore')
-            if word:
-                result.append(word)
-        return unicode(delim.join(result))
-    else:
-        return text
+def slugify(text: str, delimiter: str = "_") -> str:
+    return _slugify(text, separator=delimiter)
 
 
 def send_mail(subject, recipient, body):
@@ -100,7 +85,7 @@ def send_mail(subject, recipient, body):
             region_name=AWS_REGION_NAME
         )
     except Exception as e:
-        print e.message, 'Failed to connect to AWS SES. Email aborted.'
+        print(e, 'Failed to connect to AWS SES. Email aborted.')
         return
 
     destination = {
@@ -115,7 +100,7 @@ def send_mail(subject, recipient, body):
                 'Data': body
             },
             'Html': {
-                'Data': string.replace(body, '\r\n', '<br />')
+                'Data': str.replace(body, '\r\n', '<br />')
             }
         }
     }
@@ -128,7 +113,8 @@ def send_mail(subject, recipient, body):
             Message=message
         )
     except Exception as e:
-        print e.message, "Failed to send email through AWS SES."
+        print(e, "Failed to send email through AWS SES.")
+
 
 def reflect(table_name, metadata, engine):
     """Helper function for an oft repeated block of code.

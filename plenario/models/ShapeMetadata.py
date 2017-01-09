@@ -54,10 +54,10 @@ class ShapeMetadata(Base):
         :return: Every row of meta_shape joined with celery task status.
         """
         shape_query = '''
-            SELECT meta.*, celery.status
+            SELECT meta.*, c.*
             FROM meta_shape as meta
-            LEFT JOIN celery_taskmeta as celery
-            ON celery.task_id = meta.celery_task_id
+            LEFT JOIN celery_taskmeta as c
+            ON c.task_id = meta.celery_task_id
             WHERE meta.approved_status = TRUE;
         '''
 
@@ -78,7 +78,7 @@ class ShapeMetadata(Base):
         attrs = as_is_attrs + [bbox]
 
         result = session.query(*attrs).filter(cls.is_ingested)
-        listing = [dict(zip(attr_names, row)) for row in result]
+        listing = [dict(list(zip(attr_names, row))) for row in result]
 
         for dataset in listing:
             dataset['date_added'] = str(dataset['date_added'])

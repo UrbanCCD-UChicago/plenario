@@ -3,7 +3,7 @@ import metar
 from metar.metar import Metar, ParserError
 from plenario.database import app_engine as engine
 import grequests
-from plenario.utils.weather import degToCardinal
+from plenario.utils.weather import get_cardinal_direction
 
 import pdb
 from lxml import etree
@@ -224,7 +224,7 @@ def getWind(obs):
     if (obs.wind_dir):
         wind_direction = obs.wind_dir.value()
         wind_direction_int = int(round(float(wind_direction)))
-        wind_direction_cardinal = degToCardinal(wind_direction_int)
+        wind_direction_cardinal = get_cardinal_direction(wind_direction_int)
     if (obs.wind_gust):
         wind_gust = obs.wind_gust.value()    
     

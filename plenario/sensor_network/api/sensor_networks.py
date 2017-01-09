@@ -1,16 +1,17 @@
+import csv
+import io
 import json
-import math
-import os
 from collections import OrderedDict
 from datetime import datetime, timedelta
 
 from dateutil.parser import parse as dt_parse
-from flask import request, make_response
+from flask import request, make_response, Response, stream_with_context
 from shapely import wkb
-from sqlalchemy import MetaData, Table, func as sqla_fn, and_, asc, desc
+from sqlalchemy import MetaData, Table, func as sqla_fn, and_, asc
 
 from plenario.api.common import cache, crossdomain
 from plenario.api.common import make_cache_key, unknown_object_json_handler
+from plenario.database import windowed_query
 from plenario.utils.helpers import reflect
 
 # Cache timeout of 5 minutes
@@ -168,7 +169,6 @@ def get_observation_nearest(network):
     return jsonify(validated_args, [result], 200)
 
 
-@cache.cached(timeout=CACHE_TIMEOUT * 10, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def get_observations_download(network):
     """Queue a datadump job for raw sensor network observations and return
@@ -192,11 +192,15 @@ def get_observations_download(network):
     if validated_args.errors:
         return bad_request(validated_args.errors)
 
-    validated_args.data["query_fn"] = "aot_point"
-    validated_args.data["datadump_urlroot"] = request.url_root
-    validated_args = sanitize_validated_args(validated_args)
-    job = make_job_response("observation_datadump", validated_args)
-    return job
+    stream = get_observation_datadump_csv(**validated_args.data)
+
+    network = validated_args.data["network"]
+    fmt = "csv"  # validated_args.data["data_type"]
+    content_disposition = 'attachment; filename={}.{}'.format(network, fmt)
+
+    attachment = Response(stream_with_context(stream), mimetype="text/%s" % fmt)
+    attachment.headers["Content-Disposition"] = content_disposition
+    return attachment
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -346,7 +350,7 @@ def format_sensor_metadata(sensor):
 
     sensor_response = {
         'name': sensor.name,
-        'properties': sensor.observed_properties.values(),
+        'properties': list(sensor.observed_properties.values()),
         'info': sensor.info
     }
 
@@ -494,98 +498,48 @@ def get_observation_nearest_query(args):
     return format_observation(result, feature)
 
 
-def get_observation_datadump(args):
+def get_observation_datadump_csv(**kwargs):
     """Query and store large amounts of raw sensor network observations for
     download.
 
     :param args: (ValidatorResult) validated query arguments
     :returns (dict) containing URL to download chunked data"""
 
-    limit = args.data.get("limit")
-    request_id = args.data.get("jobsframework_ticket")
-    observation_queries = get_observation_queries(args)
+    class ValidatorResultProxy(object):
+        pass
+    vr_proxy = ValidatorResultProxy()
+    vr_proxy.data = kwargs
 
-    if type(observation_queries) != list:
-        return observation_queries
+    queries_and_tables = get_observation_queries(vr_proxy)
 
-    row_count = 0
-    for query, table in observation_queries:
-        row_count += fast_count(query)
+    rownum = 0
+    chunksize = 10
 
-    if limit and limit < row_count:
-        row_count = limit
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
 
-    chunk_size = 1000.0
-    chunk_count = math.ceil(row_count / chunk_size)
+    for query, table in queries_and_tables:
 
-    # Note that the streaming of datadump results relies, for better or worse,
-    # very strictly on the number each chunk has. Make sure to increment the
-    # chunk number BEFORE adding it, as the place of 0 is reserved for the
-    # meta chunk.
-    chunk_number = 0
+        writer.writerow([c.name for c in table.c])
 
-    chunk = list()
-    features = set()
-    for query, table in observation_queries:
-        features.add(table.name.lower())
-        for row in query.yield_per(1).enable_eagerloads(False):
-            chunk.append(format_observation(row, table))
+        # Chunk sizes of 25000 seem to be the sweet spot. The windowed_query
+        # doesn't take that long to calculate the query bounds, and the results
+        # are large enough that download speed is decent
+        for row in windowed_query(query, table.c.datetime, 25000):
 
-            if len(chunk) >= chunk_size:
-                chunk_number += 1
-                store_chunk(chunk, chunk_count, chunk_number, request_id)
-                chunk = list()
+            rownum += 1
+            writer.writerow([getattr(row, c) for c in row.keys()])
 
-    if len(chunk) > 0 and chunk_number < chunk_count:
-        chunk_number += 1
-        store_chunk(chunk, chunk_count, chunk_number, request_id)
+            if rownum % chunksize == 0:
+                yield buffer.getvalue()
+                buffer.close()
+                buffer = io.StringIO()
+                writer = csv.writer(buffer)
 
-    meta_chunk = '{{"startTime": "{}", "endTime": "{}", "workers": {}, "features": {}}}'.format(
-        get_status(request_id)["meta"]["startTime"],
-        str(datetime.now()),
-        json.dumps([args.data["jobsframework_workerid"]]),
-        json.dumps(list(features))
-    )
+        writer.writerow([])
 
-    dump = DataDump(request_id, request_id, 0, chunk_count, meta_chunk)
-
-    session.add(dump)
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        raise e
-
-    return {"url": args.data["datadump_urlroot"] + "v1/api/datadump/" + request_id}
-
-
-def store_chunk(chunk, chunk_count, chunk_number, request_id):
-    """Copy a set of row data to a holding table in postgres. Used to
-    accumulate query results that can then be streamed to the user.
-
-    :param chunk: (list) containing 1000 rows of feature data
-    :param chunk_count: (int) maximum number of chunks
-    :param chunk_number: (int) the number of the current chunk
-    :param request_id: (str) the ticket of the current job
-    :returns (dict) containing URL to download chunked data"""
-
-    datadump_part = DataDump(
-        id=os.urandom(16).encode('hex'),
-        request=request_id,
-        part=chunk_number,
-        total=chunk_count,
-        data=json.dumps(chunk, default=str)
-    )
-
-    session.add(datadump_part)
-    session.commit()
-
-    status = get_status(request_id)
-    status["progress"] = {"done": chunk_number, "total": chunk_count}
-    set_status(request_id, status)
-
-    # Supress datadump cleanup
-    set_flag(request_id + "_suppresscleanup", True, 10800)
+    yield buffer.getvalue()
+    buffer.close()
 
 
 def metadata(target, network=None, nodes=None, sensors=None, features=None, geom=None):
@@ -609,7 +563,7 @@ def metadata(target, network=None, nodes=None, sensors=None, features=None, geom
     ])
 
     for i, key in enumerate(meta_levels):
-        current_state = meta_levels.items()
+        current_state = list(meta_levels.items())
         value = meta_levels[key]
 
         if key == "network":
@@ -666,7 +620,7 @@ def filter_meta(meta_level, upper_filter_values, filter_values, geojson):
             valid_values += [sensor.name for sensor in node.sensors]
     elif meta_level == "features":
         for sensor in upper_filter_values:
-            valid_values += [p.split(".")[0] for p in sensor.observed_properties.values()]
+            valid_values += [p.split(".")[0] for p in list(sensor.observed_properties.values())]
 
     if type(filter_values) != list and filter_values is not None:
         filter_values = [filter_values]
@@ -750,14 +704,11 @@ def sanitize_validated_args(args):
     return args
 
 
-from plenario.api.jobs import get_status, set_status, set_flag, make_job_response
-from plenario.database import fast_count
 from plenario.database import session, redshift_session, redshift_engine
-from plenario.models import DataDump
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.api.validator import SensorNetworkValidator, DatadumpValidator, sensor_network_validate
 from plenario.sensor_network.api.sensor_validator import NodeAggregateValidator, RequiredFeatureValidator
 from plenario.sensor_network.api.sensor_validator import NearMeValidator
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, FeatureMeta, SensorMeta
-from sensor_aggregate_functions import aggregate_fn_map
+from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
 from plenario.api.condition_builder import parse_tree

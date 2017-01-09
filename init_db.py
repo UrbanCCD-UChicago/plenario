@@ -1,15 +1,12 @@
-import datetime
+import sqlalchemy.exc
 import subprocess
 
-# TODO: Move this script under Flask-Script control
 from argparse import ArgumentParser
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.engine.base import Engine
 
-# Imports cause the meta tables to be created and added to Base.
 from plenario.database import session, app_engine, Base
-from plenario.models import User
-from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DEFAULT_USER
-from plenario.utils.weather import WeatherETL, WeatherStationsETL
+from plenario.settings import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
+from plenario.settings import DEFAULT_USER
 
 
 sensor_meta_table_names = (
@@ -21,6 +18,33 @@ sensor_meta_table_names = (
 )
 
 
+# todo: remove "createdb plenario_test" step from the readme
+def create_database(engine: Engine, database_name: str) -> None:
+    """Setup a database (schema) in postgresql. If the database creation fails,
+    say why and move on."""
+
+    try:
+        connection = engine.connect()
+        connection.execute("commit")
+        connection.execute("create database %s" % database_name)
+        connection.close()
+    except sqlalchemy.exc.ProgrammingError as exc:
+        print(exc)
+
+
+# todo: remove "create extension postgis" step from the readme
+def create_postgis_extension(engine: Engine) -> None:
+    """Setup the postgis extension in postgresql. If the extension creation
+    fails, say why and move on."""
+
+    try:
+        connection = engine.connect()
+        connection.execute("create extension postgis")
+        connection.close()
+    except sqlalchemy.exc.ProgrammingError as exc:
+        print(exc)
+
+
 def create_tables(tables):
     """Helper to initialize the tables from the Base.metadata store
 
@@ -28,11 +52,12 @@ def create_tables(tables):
 
     for table in Base.metadata.sorted_tables:
         if str(table) in tables:
-            print "CREATE TABLE: {}".format(table)
+            print("CREATE TABLE: {}".format(table))
             try:
                 table.create(bind=app_engine)
-            except ProgrammingError:
-                print "ALREADY EXISTS: {}".format(table)
+            except sqlalchemy.exc.ProgrammingError as exc:
+                print(exc)
+                print("ALREADY EXISTS: {}".format(table))
 
 
 def delete_tables(tables):
@@ -43,17 +68,16 @@ def delete_tables(tables):
     for table in tables:
         try:
             app_engine.execute("DROP TABLE {} CASCADE".format(table))
-            print "DROP TABLE {}".format(table)
-        except ProgrammingError:
-            print "ALREADY DOESN'T EXIST: {}".format(table)
+            print("DROP TABLE {}".format(table))
+        except sqlalchemy.exc.ProgrammingError:
+            print("ALREADY DOESN'T EXIST: {}".format(table))
         
 
-
 def init_db(args):
-    print ""
-    print "================"
-    print "Plenario INIT DB"
-    print "================"
+    print("")
+    print("================")
+    print("Plenario INIT DB")
+    print("================")
     if not any(vars(args).values()):
         # No specific arguments specified. Run it all!
         init_meta()
@@ -87,36 +111,41 @@ def init_user():
     create_tables(("plenario_user",))
 
     if DEFAULT_USER['name']:
+        from plenario.models import User
         if session.query(User).count() > 0:
-            print 'Users already exist. Skipping this step.'
+            print('Users already exist. Skipping this step.')
             return
 
-        print 'Creating default user %s' % DEFAULT_USER['name']
+        print('Creating default user %s' % DEFAULT_USER['name'])
         user = User(**DEFAULT_USER)
         session.add(user)
         try:
             session.commit()
         except Exception as e:
             session.rollback()
-            print "Problem while creating default user: ", e
+            print("Problem while creating default user: ", e)
     else:
-        print 'No default user specified. Skipping this step.'
+        print('No default user specified. Skipping this step.')
 
 
 def init_weather():
-    print 'initializing NOAA weather stations'
-    s = WeatherStationsETL()
-    s.initialize()
-
-    print 'initializing NOAA daily and hourly weather observations for %s/%s' % (
-        datetime.datetime.now().month, datetime.datetime.now().year)
-    print 'this will take a few minutes ...'
-    e = WeatherETL()
-    try:
-        e.initialize_month(datetime.datetime.now().year, datetime.datetime.now().month)
-    except Exception as e:
-        session.rollback()
-        raise e
+    pass
+    # print('initializing NOAA weather stations')
+    # s = WeatherStationsETL()
+    # s.initialize()
+    #
+    # print('initializing NOAA daily and hourly weather observations for %s/%s' %
+    #       (datetime.datetime.now().month, datetime.datetime.now().year))
+    # print('this will take a few minutes ...')
+    # e = WeatherETL()
+    # try:
+    #     e.initialize_month(
+    #         datetime.datetime.now().year,
+    #         datetime.datetime.now().month
+    #     )
+    # except Exception as e:
+    #     session.rollback()
+    #     raise e
 
 
 def init_worker_meta():
@@ -124,10 +153,16 @@ def init_worker_meta():
 
 
 def add_functions():
+
     def add_function(script_path):
-        args = 'PGPASSWORD=' + DB_PASSWORD + ' psql -h ' + DB_HOST + ' -U ' + DB_USER + ' -d ' + DB_NAME + ' -f ' + script_path
+        args = 'PGPASSWORD=' + DB_PASSWORD
+        args += ' psql '
+        args += ' -h ' + DB_HOST
+        args += ' -U ' + DB_USER
+        args += ' -d ' + DB_NAME
+        args += ' -p ' + str(DB_PORT)
+        args += ' -f ' + script_path
         subprocess.check_output(args, shell=True)
-        # Using shell=True otherwise it seems that aws doesn't have the proper paths.
 
     add_function("./plenario/dbscripts/audit_trigger.sql")
     add_function("./plenario/dbscripts/point_from_location.sql")
@@ -163,6 +198,10 @@ def build_arg_parser():
 
 
 if __name__ == "__main__":
+
+    create_database(app_engine, "plenario_test")
+    create_postgis_extension(app_engine)
+
     argparser = build_arg_parser()
     arguments = argparser.parse_args()
     init_db(arguments)

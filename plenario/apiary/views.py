@@ -14,10 +14,10 @@ from plenario.database import session as psql_session
 from plenario.database import Base as psql_base, app_engine as psql_engine
 from plenario.database import redshift_Base as rshift_base
 from plenario.database import redshift_engine as rshift_engine
-from plenario.settings import REDIS_HOST_SAFE
+from plenario.settings import REDIS_HOST
 
 blueprint = Blueprint("apiary", __name__)
-redis = Redis(REDIS_HOST_SAFE)
+redis = Redis(REDIS_HOST)
 
 
 def reflect(table_name, metadata, engine):
@@ -48,12 +48,12 @@ def map_unknown_to_foi(unknown, sensor_properties):
 
     foi_insert_vals = defaultdict(list)
 
-    for key, value in loads(unknown.data).items():
+    for key, value in list(loads(unknown.data).items()):
         foi = sensor_properties[key].split(".")[0]
         prop = sensor_properties[key].split(".")[1]
         foi_insert_vals[foi].append((prop, value))
 
-    for foi, insert_vals in foi_insert_vals.items():
+    for foi, insert_vals in list(foi_insert_vals.items()):
         insert = "insert into {} (node_id, datetime, node_config, sensor, {}) values ({})"
         columns = ", ".join(val[0] for val in insert_vals)
 
@@ -96,7 +96,7 @@ def unknown_features_resolve(target_sensor):
 
     for unknown in target_unknowns:
         unknown_data = loads(unknown.data)
-        if not all(key in sensor_properties.keys() for key in unknown_data.keys()):
+        if not all(key in list(sensor_properties.keys()) for key in list(unknown_data.keys())):
             continue
         map_unknown_to_foi(unknown, sensor_properties)
 
@@ -108,7 +108,7 @@ def send_message():
         data = loads(request.data)
         if data["value"].upper() == "RESOLVE":
             unknown_features_resolve(data["name"])
-            print "AOTMapper_" + data["name"]
+            print(("AOTMapper_" + data["name"]))
             redis.delete("AOTMapper_" + data["name"])
         else:
             redis.set(name="AOTMapper_" + data["name"], value=dumps(data["value"]))

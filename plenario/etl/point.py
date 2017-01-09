@@ -1,6 +1,7 @@
-import json
+# import json
 
-from csvkit.unicsv import UnicodeCSVReader
+# from csvkit.unicsv import UnicodeCSVReader
+import csv
 from geoalchemy2 import Geometry
 from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
 from sqlalchemy import select, func
@@ -85,13 +86,16 @@ class Staging(object):
         Create the staging table. Will be named s_[dataset_name]
         """
         with self.file_helper as helper:
+
+            text_handle = open(helper.handle.name, "rt")
+
             if not self.cols:
                 # We couldn't get the column metadata from an existing table
-                self.cols = self._from_inference(helper.handle)
+                self.cols = self._from_inference(text_handle)
 
             # Grab the handle to build a table from the CSV
             try:
-                self.table = self._make_table(helper.handle)
+                self.table = self._make_table(text_handle)
                 add_unique_hash(self.table.name)
                 self.table = Table(self.name, MetaData(),
                                    autoload_with=engine, extend_existing=True)
@@ -134,6 +138,7 @@ class Staging(object):
         conn = engine.raw_connection()
         try:
             with conn.cursor() as cursor:
+                f.seek(0)
                 cursor.copy_expert(copy_st, f)
                 conn.commit()
                 return table
@@ -143,29 +148,6 @@ class Staging(object):
             raise PlenarioETLError(e)
         finally:
             conn.close()
-
-    def _add_unique_hash(table_name):
-        """
-        Adds an md5 hash column of the preexisting columns
-        and removes duplicate rows from a table.
-        :param table_name: Name of table to add hash to.
-        """
-        add_hash = '''
-        DROP TABLE IF EXISTS temp;
-        CREATE TABLE temp AS
-          SELECT DISTINCT *,
-                 md5(CAST(("{table_name}".*)AS text))
-                    AS hash FROM "{table_name}";
-        DROP TABLE "{table_name}";
-        ALTER TABLE temp RENAME TO "{table_name}";
-        ALTER TABLE "{table_name}" ADD PRIMARY KEY (hash);
-        '''.format(table_name=table_name)
-
-        try:
-            engine.execute(add_hash)
-        except Exception as e:
-            raise PlenarioETLError(repr(e) +
-                                   '\n Failed to deduplicate with ' + add_hash)
 
     '''Utility methods to generate columns
     into which we can dump the CSV data.'''
@@ -190,9 +172,9 @@ class Staging(object):
         """
         Generate columns by scanning source CSV and inferring column types.
         """
-        reader = UnicodeCSVReader(f)
+        reader = csv.reader(f)
         # Always create columns with slugified names
-        header = map(slugify, reader.next())
+        header = list(map(slugify, next(reader)))
 
         cols = []
         for col_idx, col_name in enumerate(header):
@@ -424,7 +406,7 @@ def update_meta(metatable, table):
 
         metatable.column_names = {
             c.name: str(c.type) for c in metatable.column_info()
-            if c.name not in {u'geom', u'point_date', u'hash'}
+            if c.name not in {'geom', 'point_date', 'hash'}
         }
 
         session.add(metatable)

@@ -123,7 +123,7 @@ class FeatureMeta(Base):
         for node in session.query(NodeMeta).all():
             if network_name is None or node.sensor_network.lower() == network_name.lower():
                 for sensor in node.sensors:
-                    for prop in sensor.observed_properties.itervalues():
+                    for prop in sensor.observed_properties.values():
                         features.append(prop.split('.')[0].lower())
         return list(set(features))
 

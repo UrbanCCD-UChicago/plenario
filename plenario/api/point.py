@@ -1,38 +1,29 @@
-import os
+import codecs
+import csv
+import io
 import json
 import re
-import math
-import random
 import shapely.geometry
 import shapely.wkb
-import copy
 import sqlalchemy
 import traceback
-import warnings
-
-import response as api_response
 
 from collections import OrderedDict
-from datetime import datetime
-from flask import request, Response
 from dateutil import parser
+from flask import request, Response, jsonify, stream_with_context
+
 from plenario.api.common import cache, crossdomain, CACHE_TIMEOUT
 from plenario.api.common import make_cache_key, unknown_object_json_handler
 from plenario.api.condition_builder import parse_tree
-from plenario.api.validator import DatasetRequiredValidator, NoGeoJSONDatasetRequiredValidator
-from plenario.api.validator import NoDefaultDatesValidator, validate, NoGeoJSONValidator, has_tree_filters, converters
-from plenario.api.jobs import make_job_response, submit_job, get_job, set_status, get_status, set_request, get_request, \
-    get_result, set_flag, get_flag
-from plenario.models import MetaTable, DataDump
-from plenario.database import fast_count, windowed_query
+from plenario.api.jobs import make_job_response, get_job
+from plenario.api.validator import DatasetRequiredValidator
+from plenario.api.validator import NoGeoJSONDatasetRequiredValidator
+from plenario.api.validator import NoDefaultDatesValidator, NoGeoJSONValidator
+from plenario.api.validator import validate, has_tree_filters
+from plenario.database import fast_count, windowed_query, session
+from plenario.models import MetaTable
 
-# Use the standard pool if this is just the app,
-# but use the shared connection pool if this
-# is the worker. It's more efficient!
-if os.environ.get('WORKER'):
-    from worker import session
-else:
-    from plenario.database import session
+from . import response as api_response
 
 
 # ======
@@ -43,7 +34,7 @@ else:
 # Flask context. So we define a wrapper here to access it.
 @crossdomain(origin="*")
 def get_job_view(ticket):
-    return get_job(ticket)
+    return jsonify(get_job(ticket))
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -101,111 +92,24 @@ def detail():
         return api_response.detail_response(result_rows, validator_result)
 
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def datadump():
+def datadump_view():
+
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
               'obs_date__le', 'offset', 'date__time_of_day_ge',
-              'date__time_of_day_le', 'limit', 'job')
+              'date__time_of_day_le', 'limit', 'job', 'data_type')
     validator = DatasetRequiredValidator(only=fields)
     validator_result = validate(validator, request.args.to_dict())
 
-    # Get origin IP for Denial-of-Service protection
-    origin_ip = request.headers.get("X-Forwarded-For")
-    if not origin_ip:
-        origin_ip = request.remote_addr
+    stream = datadump(**validator_result.data)
 
-    # Keep URL root to form download link later
-    validator_result.data["datadump_urlroot"] = request.url_root
+    dataset = validator_result.data["dataset"].name
+    fmt = validator_result.data["data_type"]
+    content_disposition = 'attachment; filename={}.{}'.format(dataset, fmt)
 
-    # Set job to True just to be canonical
-    validator_result.data["job"] = True
-
-    job = make_job_response("datadump", validator_result)
-    log("===== DATADUMP {} REQUESTED BY {} =====".format(json.loads(job.get_data())["ticket"], origin_ip))
-    return job
-
-
-@crossdomain(origin="*")
-def get_datadump(ticket):
-    job = get_job(ticket)
-    print "{} point.get_datadump.job: {}".format(datetime.now(), job)
-    try:
-        if not "error" in json.loads(job.get_data()) and get_status(ticket)["status"] == "success":
-            datatype = request.args.get("data_type") if request.args.get("data_type") and request.args.get(
-                "data_type") in ["json", "csv"] else "json"
-
-            # Send data from Postgres in sequence in JSON format
-            def stream_json():
-                counter = 0
-                row = session.query(DataDump).filter(
-                    sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
-                # Make headers for JSON.
-                metadata = json.loads(row.get_data())
-                yield """{{"startTime": "{}", "endTime": "{}", "workers": {}, "data": [""".format(
-                    metadata["startTime"], metadata["endTime"], json.dumps(metadata["workers"]))
-                counter += 1
-                # The "total" in the status lists the largest part number.
-                # In reality, there are total+1 parts because the header occupies part 0.
-                # So we also want to go up to the total as well. Don't worry,
-                # logic in the _datadump ensures that total is the largest part number.
-                while counter <= get_status(ticket)["progress"]["total"]:
-                    # Using one() here in order to assert quality data
-                    # If one() fails (not that it should) then that means
-                    # that the datadump is bad and should not be served.
-                    row = session.query(DataDump).filter(
-                        sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
-                    # Return result with the list brackets [] sliced off.
-                    yield row.get_data()[1:-1]
-                    if counter < get_status(ticket)["progress"]["total"]: yield ","
-                    counter += 1
-                # Finish off JSON syntax
-                yield "]}"
-
-            # Send data from Postgres in sequence in CSV format
-            def stream_csv():
-                counter = 0
-                row = session.query(DataDump).filter(
-                    sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
-                # Make headers for CSV.
-                metadata = json.loads(row.get_data())
-                columns = [str(c) for c in metadata["columns"]]
-                # Uncomment to enable CSV metadata
-                # yield "# STARTTIME: {}\n# ENDTIME: {}\n# WORKERS: {}\n".format(metadata["startTime"], metadata["endTime"], ", ".join(metadata["workers"]))
-                yield ",".join([json.dumps(column) for column in columns]) + "\n"
-                counter += 1
-                while counter <= get_status(ticket)["progress"]["total"]:
-                    row = session.query(DataDump).filter(
-                        sqlalchemy.and_(DataDump.request == ticket, DataDump.part == counter)).one()
-                    for csvrow in json.loads(row.get_data()):
-                        yield ",".join(
-                            [json.dumps(csvrow[key].encode("utf-8")) if type(
-                                csvrow[key]) is unicode else json.dumps(str(csvrow[key]))
-                             for key in columns]) + "\n"
-                    counter += 1
-
-            # Set the streaming generator (JSON by default)
-            stream_data = stream_json
-            if datatype == "csv":
-                stream_data = stream_csv
-
-            response = Response(stream_data(), mimetype="text/{}".format(datatype))
-            job_request = get_request(ticket)
-
-            try:
-                response.headers["Content-Disposition"] = "attachment; filename=\"{}.datadump.{}\"".format(
-                    get_request(ticket)["query"]["dataset"], datatype)
-            except KeyError:
-                network_name = job_request["query"]["network"]
-                content_disposition = "attachement; filename={}.datadump.{}"
-                content_disposition = content_disposition.format(network_name, datatype)
-                response.headers["Content-Disposition"] = content_disposition
-            return response
-        else:
-            return job
-    except:
-        traceback.print_exc()
-        return job
+    attachment = Response(stream_with_context(stream), mimetype="text/%s" % fmt)
+    attachment.headers["Content-Disposition"] = content_disposition
+    return attachment
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -275,7 +179,7 @@ def _timeseries(args):
     if has_tree_filters(args.data):
         # Timeseries is a little tricky. If there aren't filters,
         # it would be ridiculous to build a condition tree for every one.
-        for field, value in args.data.items():
+        for field, value in list(args.data.items()):
             if 'filter' in field:
                 # This pattern matches the last occurrence of the '__' pattern.
                 # Prevents an error that is caused by dataset names with trailing
@@ -351,8 +255,8 @@ def _detail_aggregate(args):
             args.data, ignore=['obs_date__ge', 'obs_date__le']
         )
 
-    dataset_conditions = {k: v for k, v in args.data.items() if 'filter' in k}
-    for tablename, condition_tree in dataset_conditions.items():
+    dataset_conditions = {k: v for k, v in list(args.data.items()) if 'filter' in k}
+    for tablename, condition_tree in list(dataset_conditions.items()):
         # This pattern matches the last occurrence of the '__' pattern.
         # Prevents an error that is caused by dataset names with trailing
         # underscores.
@@ -391,143 +295,106 @@ def _detail(args):
         columns = [c.name for c in dataset.columns]
         if shapeset:
             columns += [c.name for c in shapeset.columns]
-        return [OrderedDict(zip(columns, row)) for row in q.all()]
+        return [OrderedDict(list(zip(columns, row))) for row in q.all()]
     except Exception as e:
         session.rollback()
         msg = "Failed to fetch records."
         return api_response.make_raw_error("{}: {}".format(msg, e))
 
 
-def _datadump(args):
-    """Chunk and store an arbitrarily large query result to be delivered to
-    users through a download. Defaults to returning observations from Plenario
-    databases.
+def datadump(**kwargs):
+    """Export the result of a detail query in geojson or csv format. Returns a
+    generator that yields pieces of the export."""
 
-    :param args: (ValidatorResult) carries all meta information
-    :returns: (ValidatorResult) with download link defined"""
+    if kwargs.get("data_type") == "json":
+        return datadump_json(**kwargs)
+    return datadump_csv(**kwargs)
 
-    requestid = args.data.get("jobsframework_ticket")
 
+def datadump_json(**kwargs):
+    """Export the result of a detail query as valid geojson, where each row is
+    formatted as a feature with its column-value pairs stored in the properties
+    field. Plenario derived columns are hidden."""
+
+    class ValidatorResultProxy(object):
+        pass
+    vr_proxy = ValidatorResultProxy()
+    vr_proxy.data = kwargs
+
+    dataset = kwargs["dataset"]
+    columns = [c.name for c in dataset.c]
+    query = detail_query(vr_proxy)
+
+    buffer = ""
     chunksize = 1000
-    original_validated = copy.deepcopy(args)
+    rowcount = fast_count(query)
+    rownum = 0
 
-    # Number of rows to exceed in order to start
-    # deferring job (to allow other jobs to complete first)
-    row_threshold = 100000
+    yield '{"type": "FeatureCollection", "features": ['
 
-    query = original_validated.data
+    for row in windowed_query(query, dataset.c.point_date, chunksize):
+        rownum += 1
+        wkb = row.geom
 
-    # Calculate query parameters
-    log("===== STARTING WORK ON DATADUMP {} =====".format(args.data["jobsframework_ticket"]))
-    log("-> Query: {}".format(json.dumps(query, default=unknown_object_json_handler)))
-    rows = fast_count(detail_query(args))
-    log("-> Dump contains {} rows.".format(rows))
-
-    if rows > row_threshold:
-        # Bake-in "niceness" in datadump;
-        # Since datadumps can be time-consuming,
-        # throttle them by deferring 50% of them for
-        # 10 seconds later (letting other jobs run).
-        if random.random() < 0.5:
-            log("-> Deferring dump due to size.")
-            return {"jobsframework_metacommands": ["defer", {"setTimeout": 10}]}
-
-    chunks = int(math.ceil(rows / float(chunksize)))
-
-    status = get_status(requestid)
-    status["progress"] = {"done": 0, "total": chunks}
-    set_status(requestid, status)
-
-    q = detail_query(args)
-    columns = [c.name for c in args.data.get('dataset').columns if c.name not in ['point_date', 'hash', 'geom']]
-
-    def add_chunk(chunk):
-        chunk = [OrderedDict(zip(columns, row)) for row in chunk]
-        chunk = [{column: row[column] for column in columns} for row in chunk]
-        dump = DataDump(os.urandom(16).encode('hex'), requestid, part, chunks,
-                        json.dumps(chunk, default=unknown_object_json_handler))
-        session.add(dump)
         try:
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            print "DATADUMP ERROR: {}".format(e)
-            traceback.print_exc()
-            raise e
+            geom = shapely.wkb.loads(wkb.desc, hex=True).__geo_interface__
+        except AttributeError:
+            continue
 
-        status = get_status(requestid)
-        status["progress"] = {"done": part, "total": chunks}
-        set_status(requestid, status)
+        geojson = {
+            "type": "Feature",
+            "geometry": geom,
+            "properties": dict(zip(columns, row))
+        }
+        del geojson["properties"]["geom"]
+        del geojson["properties"]["hash"]
 
-        # Supress datadump cleanup
-        set_flag(requestid + "_suppresscleanup", True, 10800)
+        if rownum != rowcount:
+            buffer += json.dumps(geojson, default=unknown_object_json_handler)
+            buffer += ","
+        else:
+            buffer += json.dumps(geojson, default=unknown_object_json_handler)
 
-    part = 0
-    chunk = []
-    count = 0
-    for row in windowed_query(q, args.data.get('dataset').c.point_date, chunksize):
-        chunk.append(row)
-        count += 1
-        if count >= chunksize:
-            count = 0
-            part += 1
-            add_chunk(chunk)
-            chunk = []
-    # Finish leftovers
-    if len(chunk) > 0:
-        part += 1
-        add_chunk(chunk)
+        if rownum % chunksize == 0:
+            yield buffer
+            buffer = ""
 
-    metadata = """{{"startTime": "{}", "endTime": "{}", "workers": {}, "columns": {}}}""".format(
-        get_status(requestid)["meta"]["startTime"], str(datetime.now()),
-        json.dumps([args.data["jobsframework_workerid"]]),
-        json.dumps(columns))
-    dump = DataDump(requestid, requestid, 0, chunks, metadata)
-    session.add(dump)
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        print "DATADUMP ERROR: {}".format(e)
-        traceback.print_exc()
-        raise e
-
-    log("===== DATADUMP COMPLETE =====")
-
-    return {"url": args.data["datadump_urlroot"] + "v1/api/datadump/" + requestid}
+    yield buffer + "]}"
 
 
-# Datadump utilities =======================
-def cleanup_datadump():
-    def _cleanup_datadump(requestid):
-        try:
-            session.query(DataDump).filter(DataDump.request == requestid).delete()
-            session.commit()
-            log("---> Removed request {} from database.".format(requestid))
-        except Exception as e:
-            session.rollback()
-            traceback.print_exc()
-            log("---> Problem while clearing datadump request: {}".format(e))
-            print "ERROR IN DATADUMP: COULD NOT CLEAN UP:", e
+def datadump_csv(**kwargs):
+    """Export the result of a detail query as a comma-delimited csv file. The
+    header row is taken directly from the table's column list, with Plenario
+    derived values hidden."""
 
-    for requestid, in session.query(DataDump.request).distinct():
-        print(requestid)
-        if not get_flag(requestid + "_suppresscleanup"):
-            _cleanup_datadump(requestid)
+    class ValidatorResultProxy(object):
+        pass
+    vr_proxy = ValidatorResultProxy()
+    vr_proxy.data = kwargs
 
+    dataset = kwargs["dataset"]
+    query = detail_query(vr_proxy)
 
-def log(msg):
-    try:
-        logfile = open("/opt/python/log/api.log", "a")
-    except IOError:
-        warnings.warn("/opt/python/log/api.log not found - writing to current "
-                      "directory", RuntimeWarning)
-        logfile = open("./api.log", "a")
-    logfile.write("{} - {}\n".format(datetime.now(), msg))
-    logfile.close()
+    rownum = 0
+    chunksize = 1000
+    hide = {"geom", "hash"}
 
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow([c.name for c in dataset.c if c not in hide])
 
-# ==========================================
+    for row in windowed_query(query, dataset.c.point_date, chunksize):
+        rownum += 1
+        writer.writerow([getattr(row, c) for c in row.keys() if c not in hide])
+
+        if rownum % chunksize == 0:
+            yield buffer.getvalue()
+            buffer.close()
+            buffer = io.StringIO()
+            writer = csv.writer(buffer)
+
+    yield buffer.getvalue()
+    buffer.close()
 
 
 def detail_query(args, aggregate=False):
@@ -546,7 +413,7 @@ def detail_query(args, aggregate=False):
         )
 
     # Sort out the filter conditions from the rest of the user arguments.
-    filters = {k: v for k, v in args.data.items() if 'filter' in k}
+    filters = {k: v for k, v in list(args.data.items()) if 'filter' in k}
 
     # Get upset if they specify more than a dataset and shapeset filter.
     if len(filters) > 2:
@@ -610,8 +477,8 @@ def _grid(args):
 
     # We only build conditions from values with a key containing 'filter'.
     # Therefore we only build dataset conditions from condition trees.
-    dataset_conditions = {k: v for k, v in args.data.items() if 'filter' in k}
-    for tablename, condition_tree in dataset_conditions.items():
+    dataset_conditions = {k: v for k, v in list(args.data.items()) if 'filter' in k}
+    for tablename, condition_tree in list(dataset_conditions.items()):
 
         tablename = tablename.split('__')[0]
 
@@ -636,7 +503,7 @@ def _grid(args):
     resp = api_response.geojson_response_base()
     for value in result_rows:
         if value[1]:
-            pt = shapely.wkb.loads(value[1].decode('hex'))
+            pt = shapely.wkb.loads(codecs.decode(value[1], "hex"))
             south, west = (pt.x - (size_x / 2)), (pt.y - (size_y / 2))
             north, east = (pt.x + (size_x / 2)), (pt.y + (size_y / 2))
             new_geom = shapely.geometry.box(south, west, north, east).__geo_interface__
@@ -696,7 +563,7 @@ def _meta(args):
                 )
             )
 
-    metadata_records = [dict(zip(cols_to_return, row)) for row in q.all()]
+    metadata_records = [dict(list(zip(cols_to_return, row))) for row in q.all()]
     for record in metadata_records:
         try:
             if record.get('bbox') is not None:
@@ -704,7 +571,7 @@ def _meta(args):
                 record['bbox'] = json.loads(record['bbox'])
             # format columns in the expected way
             record['columns'] = [{'field_name': k, 'field_type': v}
-                                 for k, v in record['column_names'].items()]
+                                 for k, v in list(record['column_names'].items())]
         except Exception as e:
             args.warnings.append(e.message)
 
@@ -735,12 +602,12 @@ def request_args_to_condition_tree(request_args, ignore=list()):
         ignored.add(val)
 
     # If the key wasn't convertable, it meant that it was a column key.
-    columns = {k: v for k, v in request_args.items() if k not in ignored}
+    columns = {k: v for k, v in list(request_args.items()) if k not in ignored}
 
     ctree = {"op": "and", "val": []}
 
     # Add AND conditions based on query string parameters.
-    for k, v in columns.items():
+    for k, v in list(columns.items()):
         k = k.split('__')
         if k[0] == 'obs_date':
             k[0] = 'point_date'

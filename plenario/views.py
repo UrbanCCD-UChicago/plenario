@@ -1,29 +1,25 @@
 import itertools
-import json
 import re
-from cStringIO import StringIO
-from collections import namedtuple
-from datetime import datetime
-from hashlib import md5
-from urlparse import urlparse
-
-import dateutil.relativedelta
 import requests
-import sqlalchemy
-from flask import make_response, request, redirect, url_for, render_template, \
-    Blueprint, flash, session as flask_session
+
+import plenario.tasks as worker
+
+from collections import namedtuple
+from hashlib import md5
+from flask import request, redirect, url_for, render_template
+from flask import Blueprint, flash, session as flask_session
 from flask_login import login_required
 from flask_wtf import Form
+from io import StringIO
 from sqlalchemy import Table
 from sqlalchemy.exc import NoSuchTableError
+from urllib.parse import urlparse
 from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
-from plenario.api.jobs import submit_job, get_status, get_job, job_queue
 from plenario.database import session, Base, app_engine as engine
-from plenario.models import MetaTable, User, ShapeMetadata, Workers
-from plenario.models.ETLTask import ETLType, add_task
-from plenario.models.ETLTask import fetch_pending_tables, fetch_table_etl_status
+from plenario.models import MetaTable, User, ShapeMetadata
+from plenario.settings import FLOWER_URL
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
 
 views = Blueprint('views', __name__)
@@ -73,121 +69,27 @@ def terms_view():
     return render_template('terms.html')
 
 
-@views.route('/workers')
-def workers():
-    q = session.query(Workers).all()
-    workerlist = [row.__dict__ for row in q]
-    now = datetime.now()
-    nominal = 0
-    loaded = 0
-    dead = 0
-
-    for worker in workerlist:
-
-        if not worker["job"]:
-            continue
-
-        job = json.loads(get_job(worker["job"]).get_data())
-
-        if job.get("error"):
-            worker["status"] = "dead"
-            worker["jobinfo"] = {
-                "status": "TIMED OUT",
-                "workers": "",
-                "queuetime": "",
-                "worktime": "",
-                "endpoint": ""
-            }
-            continue
-
-        if job["status"]["meta"].get("lastStartTime"):
-            diff = dateutil.relativedelta.relativedelta(
-                now,
-                datetime.strptime(job["status"]["meta"]["lastStartTime"],
-                                  "%Y-%m-%d %H:%M:%S.%f"))
-
-        else:
-            diff = dateutil.relativedelta.relativedelta(now,
-                                                    datetime.strptime(job["status"]["meta"]["startTime"],
-                                                                          "%Y-%m-%d %H:%M:%S.%f"))
-        worker["jobinfo"] = {
-            "status": job["status"]["status"],
-            "workers": ", ".join(job["status"]["meta"]["workers"]),
-            "queuetime": job["status"]["meta"]["queueTime"],
-            "worktime": " {}h {}m {}s".format(diff.hours, diff.minutes, diff.seconds).replace(
-                " 0h ", "  ").replace(" 0m ", " ")[1:],
-            "endpoint": job["request"]["endpoint"]
-        }
-
-        lastseen = (now - datetime.strptime(worker["timestamp"], "%Y-%m-%d %H:%M:%S.%f")).total_seconds()
-        if lastseen > 1200 or worker.get("status"):
-            worker["status"] = "dead"
-            dead += 1
-        elif lastseen > 300:
-            worker["status"] = "overload"
-            loaded += 1
-        elif lastseen > 60:
-            worker["status"] = "load"
-            loaded += 1
-        else:
-            worker["status"] = "nominal"
-            nominal += 1
-
-        diff = dateutil.relativedelta.relativedelta(now, datetime.fromtimestamp(worker["uptime"]))
-        worker["humanized_uptime"] = " {}d {}h {}m {}s".format(
-            diff.days, diff.hours, diff.minutes, diff.seconds).replace(
-            " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
-        diff = dateutil.relativedelta.relativedelta(datetime.fromtimestamp(lastseen),
-                                                    datetime.fromtimestamp(0))
-        worker["lastseen"] = " {}d {}h {}m {}s ago".format(
-            diff.days, diff.hours, diff.minutes, diff.seconds).replace(
-            " 0d ", "  ").replace(" 0h ", " ").replace(" 0m ", " ")[1:]
-
-    workerlist.sort(key=lambda worker: worker["name"])
-    jobs = job_queue.attributes['ApproximateNumberOfMessages']
-    workercounts = {
-        "total": len(workerlist),
-        "nominal": nominal,
-        "loaded": loaded,
-        "dead": dead
-    }
-    return render_template('workers.html', workers=workerlist,
-                           workercounts=workercounts, queuelength=jobs, overload=(jobs>=8))
-
-@views.route('/workers/purge')
-def purge_workers():
-    Workers.purge()
-    return redirect(url_for('views.workers'))
-
-'''Approve a dataset'''
-
-
-# TODO: Catch an email exception and flash email failure
-
-
 @views.route('/admin/approve-shape/<dataset_name>')
 @login_required
 def approve_shape_view(dataset_name):
-    return approve_shape(dataset_name)
+    approve_shape(dataset_name)
+    return redirect(url_for('views.view_datasets'))
 
 
 def approve_shape(dataset_name):
+
     meta = session.query(ShapeMetadata).get(dataset_name)
+    ticket = worker.add_shape.delay(dataset_name).id
+
     meta.approved_status = True
+    meta.celery_task_id = ticket
     session.commit()
 
-    # Send ingest task to SQS.
-    job = {"endpoint": "add_shape", "query": meta.dataset_name}
-    ticket = submit_job(job)
-
-    # Create and record task status.
-    add_task(meta.dataset_name, ETLType['shapeset'])
-
-    # Let the fans know.
-    send_approval_email(meta.human_name, meta.contributor_name,
-                        meta.contributor_email)
-
-    return ticket
+    send_approval_email(
+        meta.human_name,
+        meta.contributor_name,
+        meta.contributor_email
+    )
 
 
 @views.route('/admin/approve-dataset/<source_url_hash>', methods=['GET', 'POST'])
@@ -198,19 +100,19 @@ def approve_dataset_view(source_url_hash):
 
 
 def approve_dataset(source_url_hash):
-    # Approve it
+
     meta = session.query(MetaTable).get(source_url_hash)
+    ticket = worker.add_dataset.delay(meta.dataset_name).id
+
     meta.approved_status = True
+    meta.result_ids = [ticket]
     session.commit()
 
-    send_approval_email(meta.human_name,
-                        meta.contributor_name,
-                        meta.contributor_email)
-
-    add_task(meta.dataset_name, ETLType['dataset'])
-
-    job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
-    return submit_job(job)
+    send_approval_email(
+        meta.human_name,
+        meta.contributor_name,
+        meta.contributor_email
+    )
 
 
 def send_approval_email(dataset_name, contributor_name, contributor_email):
@@ -310,28 +212,28 @@ def submit(context):
         else:
             meta = point_meta_from_submit_form(form, is_approved=is_admin)
     except RuntimeError as e:
-        context['error_msg'] = e.message
+        context['error_msg'] = str(e)
         return render_with_context(context)
 
     else:
         # Successfully stored the metadata
         # Now fire ingestion task...
         if is_admin:
-
             meta.is_approved = True
-
             if is_shapefile:
-                job = {"endpoint": "add_shape", "query": meta.dataset_name}
-                submit_job(job)
-                add_task(meta.dataset_name, ETLType['shapeset'])
+                ticket = worker.add_shape.delay(meta.dataset_name).id
+                meta.celery_task_id = ticket
+                session.commit()
             else:
-                job = {"endpoint": "add_dataset", "query": meta.source_url_hash}
-                submit_job(job)
-                add_task(meta.dataset_name, ETLType['dataset'])
+                ticket = worker.add_dataset.delay(meta.dataset_name).id
+                meta.result_ids = [ticket]
+                session.commit()
         else:
-            return send_submission_email(meta.human_name,
-                                         meta.contributor_name,
-                                         meta.contributor_email)
+            return send_submission_email(
+                meta.human_name,
+                meta.contributor_name,
+                meta.contributor_email
+            )
         return view_datasets()
 
 
@@ -346,7 +248,7 @@ def suggest(context):
             raise RuntimeError(msg)
     except RuntimeError as e:
         # Something was jank with that suggestion.
-        context['error_msg'] = e.message
+        context['error_msg'] = str(e)
         return render_with_context(context)
     else:
         # Merge exsting context into new context so that no values
@@ -370,7 +272,7 @@ def form_columns(form):
 
     labels = {}
     columns = []
-    for k, v in form.iteritems():
+    for k, v in form.items():
         if k.startswith('col_name_'):
             # key_type_observed_date
             key = k.replace("col_name_", "")
@@ -381,8 +283,8 @@ def form_columns(form):
 
 
 def csv_already_submitted(url):
-    hash = md5(url).hexdigest()
-    return session.query(MetaTable).get(hash) is not None
+    digest = md5(bytes(url, encoding="utf-8")).hexdigest()
+    return session.query(MetaTable).get(digest) is not None
 
 
 def shape_already_submitted(name):
@@ -403,7 +305,7 @@ def contrib_thankyou():
 
 def point_meta_from_submit_form(form, is_approved):
     columns, labels = form_columns(form)
-    name = slugify(form['dataset_name'], delim=u'_')[:50]
+    name = slugify(form['dataset_name'], delimiter='_')[:50]
 
     metatable = MetaTable(
         url=form['file_url'],
@@ -518,7 +420,7 @@ class GenericSuggestion(object):
 
         head = itertools.islice(r.iter_lines(), 1000)
         for line in head:
-            inp.write(line + '\n')
+            inp.write(line.decode("utf-8") + '\n')
         inp.seek(0)
         column_info = infer_csv_columns(inp)
 
@@ -673,8 +575,8 @@ class SocrataSuggestion(object):
 def view_datasets():
     datasets_pending = fetch_pending_tables(MetaTable)
     shapes_pending = fetch_pending_tables(ShapeMetadata)
-    datasets = fetch_table_etl_status(ETLType['dataset'])
-    shapesets = fetch_table_etl_status(ETLType['shapeset'])
+    datasets = MetaTable.get_all_with_etl_status()
+    shapesets = ShapeMetadata.get_all_with_etl_status()
 
     return render_template('admin/view-datasets.html',
                            datasets_pending=datasets_pending,
@@ -686,41 +588,8 @@ def view_datasets():
 @views.route('/admin/dataset-status/')
 @login_required
 def dataset_status():
-    source_url_hash = request.args.get("source_url_hash")
 
-    name = None
-    if source_url_hash:
-        name = session.query(MetaTable).get(source_url_hash).dataset_name
-
-    results = fetch_table_etl_status(ETLType['dataset'], name)
-    results += fetch_table_etl_status(ETLType['shapeset'], name)
-
-    r = []
-    for result in results:
-        tb = None
-        if result.error:
-            tb = result.error \
-                .replace('\r\n', '<br />') \
-                .replace('\n\r', '<br />') \
-                .replace('\n', '<br />') \
-                .replace('\r', '<br />')
-        d = {
-            'human_name': result.human_name,
-            'status': result.status,
-            'task_id': result.task_id,
-            'traceback': tb,
-            'date_done': None,
-        }
-
-        try:
-            d['source_url_hash'] = result.source_url_hash  # Point dataset.
-        except AttributeError:
-            d['source_url_hash'] = result.dataset_name  # Shape dataset.
-
-        if result.date_done:
-            d['date_done'] = result.date_done.strftime('%B %d, %Y %H:%M'),
-        r.append(d)
-    return render_template('admin/dataset-status.html', results=r, name=name)
+    return redirect(FLOWER_URL)
 
 
 class EditShapeForm(Form):
@@ -777,13 +646,12 @@ def edit_shape(dataset_name):
 
 @views.route('/update-shape/<dataset_name>')
 def update_shape_view(dataset_name):
-    return queue_update_shape(dataset_name)
 
-
-def queue_update_shape(dataset_name):
-    job = {"endpoint": "update_shape", "query": dataset_name}
-    ticket = submit_job(job)
-    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
+    meta = session.query(ShapeMetadata).get(dataset_name)
+    ticket = worker.update_shape.delay(dataset_name).id
+    meta.celery_task_id = ticket
+    session.commit()
+    return redirect(url_for('views.view_datasets'))
 
 
 class EditDatasetForm(Form):
@@ -843,12 +711,12 @@ def edit_dataset(source_url_hash):
 
             # Would prefer to just get the names from the metadata
             # without needing to reflect.
-            fieldnames = table.columns.keys()
+            fieldnames = list(table.columns.keys())
             pk_name = [p.name for p in table.primary_key][0]
             pk = table.c[pk_name]
             num_rows = session.query(pk).count()
 
-        except sqlalchemy.exc.NoSuchTableError:
+        except NoSuchTableError:
             # dataset has been approved, but perhaps still processing.
             pass
 
@@ -888,31 +756,23 @@ def edit_dataset(source_url_hash):
 @views.route('/admin/delete-dataset/<source_url_hash>')
 @login_required
 def delete_dataset_view(source_url_hash):
-    return delete_dataset(source_url_hash)
 
-
-def delete_dataset(source_url_hash):
-    ticket = submit_job({'endpoint': 'delete_dataset', 'query': source_url_hash})
-    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
+    meta = session.query(MetaTable).get(source_url_hash)
+    worker.delete_dataset.delay(meta.dataset_name)
+    return redirect(url_for('views.view_datasets'))
 
 
 @views.route('/update-dataset/<source_url_hash>')
 def update_dataset_view(source_url_hash):
-    return queue_update_dataset(source_url_hash)
 
+    meta = session.query(MetaTable).get(source_url_hash)
+    ticket = worker.update_dataset.delay(meta.dataset_name).id
 
-def queue_update_dataset(source_url_hash):
-    job = {"endpoint": "update_dataset", "query": source_url_hash}
-    ticket = submit_job(job)
-    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
+    meta.result_ids = [ticket]
+    session.add(meta)
+    session.commit()
 
-
-@views.route('/check-update/<ticket>')
-def check_update(ticket):
-    r = {'status': get_status(ticket)}
-    resp = make_response(json.dumps(r))
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
+    return redirect(url_for('views.view_datasets'))
 
 
 ''' Shape monitoring '''
@@ -921,17 +781,27 @@ def check_update(ticket):
 @views.route('/admin/shape-status/')
 @login_required
 def shape_status():
+
     table_name = request.args['dataset_name']
-    shape_meta = fetch_table_etl_status(ETLType['shapeset'], table_name)[0]
+    shape_meta = ShapeMetadata.get_metadata_with_etl_result(table_name)
     return render_template('admin/shape-status.html', shape=shape_meta)
 
 
 @views.route('/admin/delete-shape/<table_name>')
 @login_required
 def delete_shape_view(table_name):
-    return delete_shape(table_name)
+
+    worker.delete_shape.delay(table_name)
+    return redirect(url_for('views.view_datasets'))
 
 
-def delete_shape(table_name):
-    ticket = submit_job({'endpoint': 'delete_shape', 'query': table_name})
-    return make_response(json.dumps({'status': 'success', 'ticket': ticket}))
+def fetch_pending_tables(model):
+    """Used in views.py, fetch all records corresponding to tables pending
+    administrator approval. These tables exist in the master tables, but their
+    corresponding records have not been ingested.
+
+    :param model: (class) ORM Class corresponding to a meta table
+    :returns: (list) contains all records for which is_approved is false"""
+
+    query = session.query(model).filter(model.approved_status != True)
+    return query.all()
