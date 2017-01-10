@@ -103,7 +103,7 @@ class WeatherETL(object):
         self.base_url = 'http://www.ncdc.noaa.gov/orders/qclcd'
         self.data_dir = data_dir
         self.debug_outfile = sys.stdout
-        self.debug = debug
+        self.debug = True
         self.out_header = None
         if (self.debug == True):
             self.debug_filename = os.path.join(self.data_dir, 'weather_etl_debug_out.txt')

@@ -25,9 +25,4 @@ def create_worker():
     def check_health():
         return tasks.health.delay().id
 
-    # @app.route('/purge/datadump', methods=['POST'])
-    # def purge_datadump():
-    #     cleanup_datadump()
-    #     return "Cleaned datadump table."
-
     return app
