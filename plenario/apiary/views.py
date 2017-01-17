@@ -63,7 +63,7 @@ def map_unknown_to_foi(unknown, sensor_properties):
         rshift_engine.execute(insert.format(foi, columns, values))
 
         delete = "delete from unknownfeature where node_id = '{}' and datetime = '{}' and meta_id = '{}' and sensor = '{}'"
-        delete = delete.format(unknown.node_id, unknown.datetime, unknown.node_config, unknown.sensor)
+        delete = delete.format(unknown.node_id, unknown.datetime, unknown.meta_id, unknown.sensor)
 
         rshift_engine.execute(delete)
 
