@@ -1,12 +1,8 @@
-import os, sys
-sys.path.insert(0, os.path.abspath("../.."))
-
 from collections import defaultdict
 from flask import Blueprint, make_response, request
 from json import dumps, loads
 from redis import Redis
 from sqlalchemy import Table
-from sqlalchemy.inspection import inspect
 from traceback import format_exc
 
 from plenario.database import redshift_session as rshift_session
@@ -105,7 +101,7 @@ def unknown_features_resolve(target_sensor):
 # @login_required
 def send_message():
     try:
-        data = loads(request.data)
+        data = loads(request.data.decode("utf-8"))
         if data["value"].upper() == "RESOLVE":
             unknown_features_resolve(data["name"])
             print(("AOTMapper_" + data["name"]))
@@ -115,7 +111,3 @@ def send_message():
         return make_response("Message received successfully!", 200)
     except (KeyError, ValueError):
         return make_response(format_exc(), 500)
-
-
-if __name__ == "__main__":
-    unknown_features_resolve("TMP112")

@@ -17,7 +17,11 @@ def validate_sensor_properties(observed_properties):
             features[feature.name].append(property_dict["name"])
 
     for feature_property in list(observed_properties.values()):
-        feat, prop = feature_property.split(".")
+        try:
+            feat, prop = feature_property.split(".")
+        except ValueError:
+            raise ValidationError('Feature specified without property: {}'
+                                  .format(feature_property))
         if feat not in features:
             raise ValidationError('Bad FOI name: "{}"'.format(feat))
         if prop not in features[feat]:

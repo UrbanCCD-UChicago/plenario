@@ -2,7 +2,7 @@ version: 1
 cron:
  - name: "often"
    url: "/update/often"
-   schedule: "*/15 * * * *"
+   schedule: "*/30 * * * *"
  - name: "daily"
    url: "/update/daily"
    schedule: "0 8 * * *"
@@ -15,3 +15,6 @@ cron:
  - name: "yearly"
    url: "/update/yearly"
    schedule: "0 0 2 4 *"
+ - name: "weather"
+   url: "/update/weather"
+   schedule: "0 4 * * *"
