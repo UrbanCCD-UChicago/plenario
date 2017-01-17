@@ -1,8 +1,10 @@
+import sys
+
 from collections import defaultdict
 from flask import Blueprint, make_response, request
 from json import dumps, loads
 from redis import Redis
-from sqlalchemy import Table
+from sqlalchemy import func, Table
 from traceback import format_exc
 
 from plenario.database import redshift_session as rshift_session
@@ -75,26 +77,45 @@ def unknown_features_resolve(target_sensor):
 
     :param target_sensor: (str) resolved sensor"""
 
+    print("[apiary] Resolving: {}".format(target_sensor))
+
     sensors = reflect("sensor__sensors", psql_base.metadata, psql_engine)
     unknowns = reflect("unknown_feature", rshift_base.metadata, rshift_engine)
 
-    # Grab the set of keys that are used to assert if an unkown is correct
+    # Grab the set of keys that are used to assert if an unknown is correct
     c_obs_props = sensors.c.observed_properties
-    c_name = sensors.c.name
+    q = psql_session.query(c_obs_props).filter(sensors.c.name == target_sensor)
+    sensor_properties = q.first()[0]
 
-    q = psql_session.query(c_obs_props)
-    sensor_properties = q.filter(c_name == target_sensor).first()[0]
+    print("[apiary] Most up to date map: {}".format(sensor_properties))
 
     # Grab all the candidate unknown observations
     c_sensor = unknowns.c.sensor
-    target_unknowns = rshift_session.query(unknowns).filter(c_sensor == target_sensor)
-    target_unknowns = target_unknowns.all()
+    target_unknowns = rshift_session \
+        .query(unknowns) \
+        .filter(c_sensor == target_sensor)
 
+    unresolved_count = rshift_session \
+        .query(func.count(unknowns.c.datetime)) \
+        .filter(c_sensor == target_sensor) \
+        .scalar()
+
+    print("[apiary] Attempting to resolve {} rows".format(unresolved_count))
+
+    resolved = 0
     for unknown in target_unknowns:
+
         unknown_data = loads(unknown.data)
-        if not all(key in list(sensor_properties.keys()) for key in list(unknown_data.keys())):
+        unknown_properties = list(unknown_data.keys())
+        known_properties = list(sensor_properties.keys())
+
+        if not all(key in known_properties for key in unknown_properties):
             continue
+
         map_unknown_to_foi(unknown, sensor_properties)
+        resolved += 1
+
+    print("\n[apiary] Resolved {} / {} rows".format(resolved, unresolved_count))
 
 
 @blueprint.route("/apiary/send_message", methods=["POST"])
