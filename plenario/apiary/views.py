@@ -50,19 +50,19 @@ def map_unknown_to_foi(unknown, sensor_properties):
         foi_insert_vals[foi].append((prop, value))
 
     for foi, insert_vals in list(foi_insert_vals.items()):
-        insert = "insert into {} (node_id, datetime, node_config, sensor, {}) values ({})"
+        insert = "insert into {} (node_id, datetime, meta_id, sensor, {}) values ({})"
         columns = ", ".join(val[0] for val in insert_vals)
 
         values = "'{}', '{}', '{}', '{}', ".format(
             unknown.node_id,
             unknown.datetime,
-            unknown.node_config,
+            unknown.meta_id,
             unknown.sensor
         ) + ", ".join(repr(val[1]) for val in insert_vals)
 
         rshift_engine.execute(insert.format(foi, columns, values))
 
-        delete = "delete from unknownfeature where node_id = '{}' and datetime = '{}' and node_config = '{}' and sensor = '{}'"
+        delete = "delete from unknownfeature where node_id = '{}' and datetime = '{}' and meta_id = '{}' and sensor = '{}'"
         delete = delete.format(unknown.node_id, unknown.datetime, unknown.node_config, unknown.sensor)
 
         rshift_engine.execute(delete)
