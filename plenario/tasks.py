@@ -150,7 +150,7 @@ def update_weather() -> True:
     """Run a weather update."""
 
     # This should do the current month AND the previous month, just in case.
-    last_month_dt = datetime.now() - timedelta(days=17)
+    last_month_dt = datetime.now() - timedelta(days=7)
     last_month = last_month_dt.month
     last_year = last_month_dt.year
 
