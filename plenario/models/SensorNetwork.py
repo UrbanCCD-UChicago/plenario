@@ -31,6 +31,26 @@ class NetworkMeta(Base):
     def __repr__(self):
         return '<Network "{}">'.format(self.name)
 
+    def tree(self):
+        return {n.id: n.tree() for n in self.nodes}
+
+    def sensors(self):
+
+        keys = []
+        for sensor in self.tree().values():
+            keys += sensor
+
+        return keys
+
+    def features(self):
+
+        keys = []
+        for sensor in self.tree().values():
+            for feature in sensor.values():
+                keys += feature.keys()
+
+        return set([k.split(".")[0] for k in keys])
+
 
 class NodeMeta(Base):
     __tablename__ = 'sensor__node_metadata'
@@ -44,9 +64,13 @@ class NodeMeta(Base):
     column_editable_list = ("sensors", "info")
 
     @staticmethod
-    def index(network_name=None):
-        nodes = session.query(NodeMeta).all()
-        return [node.id.lower() for node in nodes if node.sensor_network == network_name or network_name is None]
+    def all(network_name):
+        query = NodeMeta.query.filter(NodeMeta.sensor_network == network_name)
+        return query.all()
+
+    @staticmethod
+    def index(network_name):
+        return [node.id for node in NodeMeta.all(network_name)]
 
     @staticmethod
     def nearest_neighbor_to(lng, lat, network, features):
@@ -74,6 +98,9 @@ class NodeMeta(Base):
     def __repr__(self):
         return '<Node "{}">'.format(self.id)
 
+    def tree(self):
+        return {s.name: s.tree() for s in self.sensors}
+
 
 class SensorMeta(Base):
     __tablename__ = 'sensor__sensors'
@@ -81,15 +108,6 @@ class SensorMeta(Base):
     name = Column(String, primary_key=True)
     observed_properties = Column(JSONB)
     info = Column(JSONB)
-
-    @staticmethod
-    def index(network_name=None):
-        sensors = []
-        for node in session.query(NodeMeta).all():
-            if network_name is None or node.sensor_network.lower() == network_name.lower():
-                for sensor in node.sensors:
-                    sensors.append(sensor.name.lower())
-        return list(set(sensors))
 
     @staticmethod
     def get_sensors_from_features(features):
@@ -109,6 +127,9 @@ class SensorMeta(Base):
 
     def __repr__(self):
         return '<Sensor "{}">'.format(self.name)
+
+    def tree(self):
+        return {v: k for k, v in self.observed_properties.items()}
 
 
 class FeatureMeta(Base):
