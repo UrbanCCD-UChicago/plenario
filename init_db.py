@@ -14,7 +14,8 @@ sensor_meta_table_names = (
     "sensor__node_metadata",
     "sensor__features_of_interest",
     "sensor__sensors",
-    "sensor__sensor_to_node"
+    "sensor__sensor_to_node",
+    "sensor__feature_to_network"
 )
 
 
