@@ -239,19 +239,11 @@ def get_observations(network):
     if validated.errors:
         return bad_request(validated.errors)
 
-    nodes = validated.data["nodes"]
-    sensors = validated.data["sensors"]
-    limit = validated.data["limit"]
-    offset = validated.data["offset"]
-
     import pdb
     pdb.set_trace()
 
     table = Redshift[network + "__" + feature]
-    query = table.query
-    query = query.filter(table.node.in_(nodes)) if nodes else query
-    query = query.filter(table.sensor.in_(sensors)) if sensors else query
-    query = query.limit(limit).offset(offset)
+    query = observation_query(table, **validated.data)
 
     data = list()
     for obs in query:
@@ -345,28 +337,31 @@ def get_aggregations(network):
     return jsonify(validated_args, result, 200)
 
 
-def observation_query(args, table):
+def observation_query(table, **kwargs):
     """Constructs a query used to fetch raw data from a Redshift table. Used
-    by the /query and /download endpoints.
+    by the /query and /download endpoints."""
 
-    :param args: (ValidatorResult) contains arguments in the data property
-    :param table: (SQLAlchemy.Table) represents a database table
-    :param condition: asdkfjhgasdfkjhgasdkfjhgasdfkjhgasdf"""
+    nodes = kwargs.get("nodes")
+    sensors = kwargs.get("sensors")
+    limit = kwargs.get("limit")
+    offset = kwargs.get("offset")
 
-    nodes = args.data.get("nodes")
-    start_dt = args.data.get("start_datetime")
-    end_dt = args.data.get("end_datetime")
-    sensors = args.data.get("sensors")
-    limit = args.data.get("limit")
-    offset = args.data.get("offset")
-    condition = parse_tree(table, args.data.get("filter")) if args.data.get("filter") else None
+    start_dt = datetime.now() - timedelta(days=7) \
+        if kwargs.get("start_datetime") is None \
+        else kwargs["start_datetime"]
+    end_dt = datetime.now() \
+        if kwargs.get("end_datetime") is None \
+        else kwargs["end_datetime"]
+    condition = parse_tree(table, kwargs.get("filter")) \
+        if kwargs.get("filter") \
+        else None
 
     q = redshift_session.query(table)
-    q = q.filter(table.c.datetime >= start_dt)
-    q = q.filter(table.c.datetime < end_dt)
+    q = q.filter(table.datetime >= start_dt)
+    q = q.filter(table.datetime < end_dt)
 
-    q = q.filter(sqla_fn.lower(table.c.node_id).in_(nodes)) if nodes else q
-    q = q.filter(sqla_fn.lower(table.c.sensor).in_(sensors)) if sensors else q
+    q = q.filter(sqla_fn.lower(table.node_id).in_(nodes)) if nodes else q
+    q = q.filter(sqla_fn.lower(table.sensor).in_(sensors)) if sensors else q
     q = q.filter(condition) if condition is not None else q
     q = q.limit(limit) if limit else q
     q = q.offset(offset) if offset else q
