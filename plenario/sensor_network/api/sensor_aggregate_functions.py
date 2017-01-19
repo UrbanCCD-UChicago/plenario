@@ -2,14 +2,22 @@ from collections import defaultdict
 from copy import deepcopy
 from datetime import timedelta
 
+from datetime import datetime, timedelta
 from dateutil.parser import parse as date_parse
 from sqlalchemy import and_, func, Table, asc
+from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.sql import select
 
 from plenario.database import redshift_Base as RBase
 from plenario.database import redshift_session as r_session
-from plenario.database import session, redshift_engine as r_engine
+from plenario.database import redshift_engine
 from plenario.models.SensorNetwork import NodeMeta
+
+
+# Reflect all Redshift tables
+base = automap_base()
+base.prepare(redshift_engine, reflect=True)
+Redshift = {k: v for k, v in base.classes.items()}
 
 
 def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
@@ -88,10 +96,10 @@ def _generate_aggregate_selects(table, target_columns, agg_fn, agg_unit):
     :param agg_unit: (str) used by date_trunc to generate time buckets
     :returns: (list) containing SQLAlchemy prepared statements"""
 
-    selects = [func.date_trunc(agg_unit, table.c.datetime).label("time_bucket")]
+    selects = [func.date_trunc(agg_unit, table.datetime).label("time_bucket")]
 
     meta_columns = ("node_id", "datetime", "meta_id", "sensor")
-    for col in table.c:
+    for col in table.__table__.c:
         if col.name in meta_columns:
             continue
         if col.name not in target_columns:
@@ -148,9 +156,7 @@ def _valid_columns(node, target_sensors, target_feature_properties):
     :param target_feature_properties: (dict) map of target FOI properties
     :returns: (set) column keys to be used in the aggregate query"""
 
-    select_node_meta = session.query(NodeMeta).filter(NodeMeta.id == node)
-    target_node = select_node_meta.first()
-    sensors = target_node.sensors
+    sensors = node.sensors
 
     columns = set()
     for sensor in sensors:
@@ -205,26 +211,24 @@ def aggregate(args, agg_label, agg_fn):
     :param agg_fn: (function) aggregate function that is being applied
     :returns: (list) of dictionary objects that can be dumped to JSON"""
 
-    expected = ("node", "feature", "start_datetime",
-                "end_datetime", "sensors", "agg")
-    node, feature, start_dt, end_dt, sensors, agg_unit = (args.data.get(k)
-                                                          for k in expected)
+    network = args['network']
+    agg_unit = args['agg']
+    node = args['node']
+    feature = args['feature']
+    sensors = args.get('sensors')
 
-    # Format the datetime parameters
-    start_dt = date_parse(start_dt).replace(tzinfo=None)
-    end_dt = date_parse(end_dt).replace(tzinfo=None)
+    start_dt = datetime.now() - timedelta(days=7) \
+        if args.get('start_datetime') is None \
+        else args['start_datetime']
 
-    target_features = feature
+    end_dt = datetime.now() \
+        if args.get('end_datetime') is None \
+        else args['end_datetime']
+
     target_sensors = sensors
 
     # Generate a map of the target features and properties
-    target_feature_properties = dict()
-    for feature in target_features:
-        try:
-            feature, f_property = feature.split(".")
-            target_feature_properties.setdefault(feature, []).append(f_property)
-        except ValueError:
-            target_feature_properties[feature] = None
+    target_feature_properties = {feature.name: d['name'] for d in feature.observed_properties}
 
     # Determine which columns, if any, can be aggregated from the target node
     valid_columns = _valid_columns(node,
@@ -238,7 +242,7 @@ def aggregate(args, agg_label, agg_fn):
                          "you are aggregating for)")
 
     # Reflect the target feature of interest table
-    obs_table = _reflect(feature.split(".")[0], RBase.metadata, r_engine)
+    obs_table = Redshift[network.name + "__" + feature.name]
 
     # Generate the necessary select statements and datetime delimiters
     selects = _generate_aggregate_selects(obs_table,
@@ -248,8 +252,8 @@ def aggregate(args, agg_label, agg_fn):
 
     # Execute the query and return the formatted results
     query = select(selects).where(and_(
-        obs_table.c.datetime >= start_dt,
-        obs_table.c.datetime < end_dt
+        obs_table.datetime >= start_dt,
+        obs_table.datetime < end_dt
     )).group_by("time_bucket").order_by(asc("time_bucket"))
 
     results = r_session.execute(query).fetchall()

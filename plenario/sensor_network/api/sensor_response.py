@@ -35,7 +35,10 @@ def json_response_base(validator, data, query=''):
     }
 
     if validator:
-        meta['message'] = validator.warnings
+        try:
+            meta['message'] = validator.warnings
+        except AttributeError:
+            meta['message'] = None
         meta['query'] = query
 
     return {

@@ -8,7 +8,7 @@ from marshmallow.exceptions import ValidationError
 from marshmallow.fields import Field, List, DateTime, Integer, String
 from marshmallow.validate import Range
 from shapely import wkb
-from sqlalchemy import MetaData, Table, func as sqla_fn, and_, asc
+from sqlalchemy import MetaData, Table, func as sqla_fn, and_, asc, desc
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -98,7 +98,9 @@ class Validator(Schema):
     start_datetime = DateTime()
     end_datetime = DateTime()
 
+    agg = String(missing="hour")
     filter = String(allow_none=True, missing=None, default=None)
+    function = String(missing="avg")
     limit = Integer(missing=1000)
     offset = Integer(missing=0, validate=Range(0))
 
@@ -214,13 +216,11 @@ def get_feature_metadata(network: str, feature: str = None) -> Response:
 
 
 @crossdomain(origin="*")
-def get_observations(network):
+def get_observations(network: str) -> Response:
     """Return raw sensor network observations for a single feature within
     the specified network.
 
-    :endpoint: /sensor-networks/<network-name>/query?feature=<feature>
-    :param network: (str) network name
-    :returns: (json) response"""
+    :endpoint: /sensor-networks/<network-name>/query?feature=<feature>"""
 
     nodes = request.args.get("nodes")
     sensors = request.args.get("sensors")
@@ -239,28 +239,23 @@ def get_observations(network):
     if validated.errors:
         return bad_request(validated.errors)
 
-    import pdb
-    pdb.set_trace()
-
     table = Redshift[network + "__" + feature]
     query = observation_query(table, **validated.data)
 
     data = list()
     for obs in query:
-        data += format_observation(obs, table)
-    data.sort(key=lambda x: x["datetime"])
+        data.append(format_observation(obs, table))
 
-    return jsonify(data)
+    return jsonify(json_response_base(validated, data, args))
 
 
 @crossdomain(origin="*")
-def get_observation_nearest(network):
+def get_observation_nearest(network: str) -> Response:
     """Return a single observation from the node nearest to the specified
     long, lat coordinate.
 
-    :endpoint: /sensor-networks/<network-name>/near-me?lng=<lng>&lat=<lat>&feature=<feature>
-    :param network: (str) network name
-    :returns: (json) response"""
+    :endpoint: /sensor-networks/<network-name>/nearest
+               ?lng=<lng>&lat=<lat>&feature=<feature>"""
 
     args = dict(request.args.to_dict(), **{"network": network})
 
@@ -274,32 +269,32 @@ def get_observation_nearest(network):
 
 
 @crossdomain(origin="*")
-def get_observations_download(network):
-    """Queue a datadump job for raw sensor network observations and return
-    links to check on its status and eventual download. Has a longer cache
-    timeout than the other endpoints -- datadumps are a lot of work.
+def get_observations_download(network: str) -> Response:
+    """Stream a sensor network's bulk records to a csv file.
 
-    :endpoint: /sensor-networks/<network-name>/download
-    :param network: (str) network name
-    :returns: (json) response"""
+    :endpoint: /sensor-networks/<network-name>/download"""
 
-    args = dict(request.args.to_dict(), **{
+    nodes = request.args.get("nodes")
+    sensors = request.args.get("sensors")
+    features = request.args.get("features")
+
+    args = request.args.to_dict()
+    args.update({
         "network": network,
-        "nodes": request.args["nodes"].split(",") if request.args.get("nodes") else None,
-        "sensors": request.args["sensors"].split(",") if request.args.get("sensors") else None,
-        "features": request.args["features"].split(",") if request.args.get("features") else None
+        "feature": features.split(",") if features else [],
+        "nodes": nodes.split(",") if nodes else [],
+        "sensors": sensors.split(",") if sensors else [],
     })
 
-    fields = ('network', 'nodes', 'start_datetime', 'end_datetime',
-              'limit', 'geom', 'features', 'sensors', 'offset')
-    validated_args = sensor_network_validate(DatadumpValidator(only=fields), args)
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
+    validator = Validator()
+    validated = validator.load(args)
+    if validated.errors:
+        return bad_request(validated.errors)
 
-    stream = get_observation_datadump_csv(**validated_args.data)
+    stream = get_observation_datadump_csv(**validated.data)
 
-    network = validated_args.data["network"]
-    fmt = "csv"  # validated_args.data["data_type"]
+    network = validated.data["network"]
+    fmt = "csv"
     content_disposition = 'attachment; filename={}.{}'.format(network, fmt)
 
     attachment = Response(stream_with_context(stream), mimetype="text/%s" % fmt)
@@ -309,40 +304,43 @@ def get_observations_download(network):
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
-def get_aggregations(network):
+def get_aggregations(network: str) -> Response:
     """Aggregate individual node observations up to larger units of time.
     Do so by applying aggregate functions on all observations found within
     a specified window of time.
 
-    :endpoint: /sensor-networks/<network-name>/aggregate
-    :param network: (str) from sensor__network_metadata
-    :returns: (json) response"""
+    :endpoint: /sensor-networks/<network-name>/aggregate"""
 
-    fields = ("network", "node", "sensors", "feature", "function",
-              "start_datetime", "end_datetime", "agg")
+    node = request.args.get("node")
+    sensors = request.args.get("sensors")
+    feature = request.args.get("feature")
 
-    request_args = dict(request.args.to_dict(), **{
+    args = request.args.to_dict()
+    args.update({
         "network": network,
-        "feature": request.args.get("feature").split(",") if request.args.get("feature") else None,
+        "feature": feature,
+        "node": node,
+        "sensors": sensors.split(",") if sensors else [],
     })
 
-    validated_args = sensor_network_validate(NodeAggregateValidator(only=fields), request_args)
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
+    validator = Validator()
+    validated = validator.load(args)
+    if validated.errors:
+        return bad_request(validated.errors)
 
     try:
-        result = aggregate_fn_map[validated_args.data.get("function")](validated_args)
+        result = aggregate_fn_map[validated.data.get("function")](validated.data)
     except ValueError as err:
-        return bad_request(err.message)
-    return jsonify(validated_args, result, 200)
+        return bad_request(err)
+    return jsonify(json_response_base(validated, result, args))
 
 
 def observation_query(table, **kwargs):
     """Constructs a query used to fetch raw data from a Redshift table. Used
     by the /query and /download endpoints."""
 
-    nodes = kwargs.get("nodes")
-    sensors = kwargs.get("sensors")
+    nodes = [n.id for n in kwargs.get("nodes")]
+    sensors = [s.name for s in kwargs.get("sensors")]
     limit = kwargs.get("limit")
     offset = kwargs.get("offset")
 
@@ -363,6 +361,7 @@ def observation_query(table, **kwargs):
     q = q.filter(sqla_fn.lower(table.node_id).in_(nodes)) if nodes else q
     q = q.filter(sqla_fn.lower(table.sensor).in_(sensors)) if sensors else q
     q = q.filter(condition) if condition is not None else q
+    q = q.order_by(desc(table.datetime))
     q = q.limit(limit) if limit else q
     q = q.offset(offset) if offset else q
 
@@ -476,6 +475,8 @@ def format_observation(obs, table):
     :param obs: (Row) row from a redshift table for a single feature
     :param table: (SQLAlchemy.Table) table object for a single feature
     :returns: (dict) formatted result"""
+
+    table = table.__table__
 
     obs_response = {
         'node': obs.node_id,
@@ -608,15 +609,16 @@ def get_observation_datadump_csv(**kwargs):
     yield buffer.getvalue()
     buffer.close()
 
+
 def sanitize_validated_args():
 
     pass
 
 
-from plenario.database import session, redshift_session, redshift_engine
+from plenario.database import redshift_session, redshift_engine
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
-from plenario.api.validator import SensorNetworkValidator, DatadumpValidator, sensor_network_validate
-from plenario.sensor_network.api.sensor_validator import NodeAggregateValidator, RequiredFeatureValidator
+from plenario.api.validator import DatadumpValidator, sensor_network_validate
+from plenario.sensor_network.api.sensor_validator import NodeAggregateValidator
 from plenario.sensor_network.api.sensor_validator import NearMeValidator
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, FeatureMeta, SensorMeta
 from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
