@@ -9,21 +9,15 @@ from marshmallow.fields import Field, List, DateTime, Integer, String
 from marshmallow.validate import Range
 from shapely import wkb
 from sqlalchemy import MetaData, Table, func as sqla_fn, and_, asc, desc
-from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm.exc import NoResultFound
 
 from plenario.api.common import cache, crossdomain
 from plenario.api.common import make_cache_key
-from plenario.database import windowed_query, redshift_engine
+from plenario.database import windowed_query
 from plenario.utils.helpers import reflect
 
 # Cache timeout of 5 minutes
 CACHE_TIMEOUT = 60 * 10
-
-# Reflect all Redshift tables
-base = automap_base()
-base.prepare(redshift_engine, reflect=True)
-Redshift = {k: v for k, v in base.classes.items()}
 
 
 class Network(Field):
@@ -239,7 +233,8 @@ def get_observations(network: str) -> Response:
     if validated.errors:
         return bad_request(validated.errors)
 
-    table = Redshift[network + "__" + feature]
+    redshift_base.metadata.reflect()
+    table = redshift_base.metadata.tables[network + "__" + feature]
     query = observation_query(table, **validated.data)
 
     data = list()
@@ -329,7 +324,8 @@ def get_aggregations(network: str) -> Response:
         return bad_request(validated.errors)
 
     try:
-        result = aggregate_fn_map[validated.data.get("function")](validated.data)
+        aggregate_fn = aggregate_fn_map[validated.data.get("function")]
+        result = aggregate_fn(validated.data)
     except ValueError as err:
         return bad_request(err)
     return jsonify(json_response_base(validated, result, args))
@@ -343,58 +339,21 @@ def observation_query(table, **kwargs):
     sensors = [s.name for s in kwargs.get("sensors")]
     limit = kwargs.get("limit")
     offset = kwargs.get("offset")
-
-    start_dt = datetime.now() - timedelta(days=7) \
-        if kwargs.get("start_datetime") is None \
-        else kwargs["start_datetime"]
-    end_dt = datetime.now() \
-        if kwargs.get("end_datetime") is None \
-        else kwargs["end_datetime"]
-    condition = parse_tree(table, kwargs.get("filter")) \
-        if kwargs.get("filter") \
-        else None
+    start_dt = kwargs.get("start_datetime")
+    end_dt = kwargs.get("end_datetime")
+    condition = kwargs.get("filter")
 
     q = redshift_session.query(table)
-    q = q.filter(table.datetime >= start_dt)
-    q = q.filter(table.datetime < end_dt)
-
-    q = q.filter(sqla_fn.lower(table.node_id).in_(nodes)) if nodes else q
-    q = q.filter(sqla_fn.lower(table.sensor).in_(sensors)) if sensors else q
+    q = q.filter(table.c.datetime >= start_dt) if start_dt else q
+    q = q.filter(table.c.datetime < end_dt) if end_dt else q
+    q = q.filter(sqla_fn.lower(table.c.node_id).in_(nodes)) if nodes else q
+    q = q.filter(sqla_fn.lower(table.c.sensor).in_(sensors)) if sensors else q
     q = q.filter(condition) if condition is not None else q
-    q = q.order_by(desc(table.datetime))
+    q = q.order_by(desc(table.c.datetime))
     q = q.limit(limit) if limit else q
     q = q.offset(offset) if offset else q
 
     return q
-
-
-def get_raw_metadata(target, kwargs):
-    """Returns all valid metadata rows for a target metadata table given args.
-
-    :param target: (str) which kind of metadata to return rows for
-    :param kwargs: (ValidatorResult) validated query arguments
-    :returns: (list) of row proxies
-              (Response) 400 for a query that would lead to nothing"""
-
-    metadata_args = {
-        "target": target,
-        "network": kwargs.get("network"),
-        "nodes": kwargs.get("nodes"),
-        "sensors": kwargs.get("sensors"),
-        "features": kwargs.get("features"),
-        "geom": kwargs.get("geom")
-    }
-    return metadata(**metadata_args)
-
-
-def get_metadata(target, args):
-    """Returns all valid metadata for a target metadata table given args. The
-    results are formatted and turned into a response object.
-
-    :param target: (str) which kind of metadata to return rows for
-    :param args: (ValidatorResult) validated query arguments"""
-
-    return get_raw_metadata(target, args)
 
 
 def format_network_metadata(network):
@@ -476,8 +435,6 @@ def format_observation(obs, table):
     :param table: (SQLAlchemy.Table) table object for a single feature
     :returns: (dict) formatted result"""
 
-    table = table.__table__
-
     obs_response = {
         'node': obs.node_id,
         'meta_id': obs.meta_id,
@@ -503,8 +460,6 @@ def get_observation_queries(args):
     meta = MetaData()
 
     result = get_raw_metadata("features", args)
-    if type(result) != list:
-        return result
 
     for feature in result:
         tables.append(Table(
@@ -529,9 +484,6 @@ def get_observation_nearest_query(args):
     properties = args.data["feature"]
     network = args.data["network"]
     point_dt = args.data["datetime"]
-
-    if type(point_dt) != datetime:
-        point_dt = dt_parse(point_dt)
 
     nearest_nodes_rp = NodeMeta.nearest_neighbor_to(
         lng, lat, network=network, features=[properties]
@@ -610,16 +562,19 @@ def get_observation_datadump_csv(**kwargs):
     buffer.close()
 
 
+def get_raw_metadata():
+
+    pass
+
+
 def sanitize_validated_args():
 
     pass
 
 
-from plenario.database import redshift_session, redshift_engine
+from plenario.database import redshift_session, redshift_engine, redshift_Base as redshift_base
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
-from plenario.api.validator import DatadumpValidator, sensor_network_validate
-from plenario.sensor_network.api.sensor_validator import NodeAggregateValidator
+from plenario.api.validator import sensor_network_validate
 from plenario.sensor_network.api.sensor_validator import NearMeValidator
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, FeatureMeta, SensorMeta
 from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
-from plenario.api.condition_builder import parse_tree
