@@ -99,6 +99,17 @@ class Validator(Schema):
     offset = Integer(missing=0, validate=Range(0))
 
 
+@crossdomain(origin="*")
+def get_network_map(network: str) -> Response:
+    """Map of network and the relationships of the elements it contains."""
+
+    try:
+        network = NetworkMeta.query.get(network)
+    except NoResultFound:
+        bad_request("Invalid network name: %s" % network)
+    return jsonify(network.tree())
+
+
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def get_network_metadata(network: str = None) -> Response:
