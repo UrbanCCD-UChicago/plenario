@@ -8,16 +8,10 @@ from sqlalchemy import and_, func, Table, asc
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.sql import select
 
-from plenario.database import redshift_Base as RBase
-from plenario.database import redshift_session as r_session
+from plenario.database import redshift_Base as redshift_base
+from plenario.database import redshift_session as r_session, redshift_Base
 from plenario.database import redshift_engine
 from plenario.models.SensorNetwork import NodeMeta
-
-
-# Reflect all Redshift tables
-base = automap_base()
-base.prepare(redshift_engine, reflect=True)
-Redshift = {k: v for k, v in base.classes.items()}
 
 
 def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
@@ -77,7 +71,7 @@ def _format_aggregates(aggregates, agg_label, agg_unit, start_dt, end_dt):
             elif key == "count":
                 aggregate_json["count"] = agg[key]
             elif "count" in key:
-                aggregate_json[key.split("_")[0]]["count"] = agg[key]
+                aggregate_json[key.rsplit("_", 1)[0]]["count"] = agg[key]
             else:
                 aggregate_json[key][agg_label] = agg[key]
 
@@ -96,10 +90,10 @@ def _generate_aggregate_selects(table, target_columns, agg_fn, agg_unit):
     :param agg_unit: (str) used by date_trunc to generate time buckets
     :returns: (list) containing SQLAlchemy prepared statements"""
 
-    selects = [func.date_trunc(agg_unit, table.datetime).label("time_bucket")]
+    selects = [func.date_trunc(agg_unit, table.c.datetime).label("time_bucket")]
 
     meta_columns = ("node_id", "datetime", "meta_id", "sensor")
-    for col in table.__table__.c:
+    for col in table.c:
         if col.name in meta_columns:
             continue
         if col.name not in target_columns:
@@ -241,8 +235,8 @@ def aggregate(args, agg_label, agg_fn):
                          "filtering on a sensor which doesn't have the feature "
                          "you are aggregating for)")
 
-    # Reflect the target feature of interest table
-    obs_table = Redshift[network.name + "__" + feature.name]
+    redshift_base.metadata.reflect()
+    obs_table = redshift_base.metadata.tables[network.name + "__" + feature.name]
 
     # Generate the necessary select statements and datetime delimiters
     selects = _generate_aggregate_selects(obs_table,
@@ -252,8 +246,8 @@ def aggregate(args, agg_label, agg_fn):
 
     # Execute the query and return the formatted results
     query = select(selects).where(and_(
-        obs_table.datetime >= start_dt,
-        obs_table.datetime < end_dt
+        obs_table.c.datetime >= start_dt,
+        obs_table.c.datetime < end_dt
     )).group_by("time_bucket").order_by(asc("time_bucket"))
 
     results = r_session.execute(query).fetchall()
