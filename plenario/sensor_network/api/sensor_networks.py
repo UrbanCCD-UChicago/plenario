@@ -1,7 +1,7 @@
 import csv
 import io
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from flask import request, Response, stream_with_context, jsonify
 from marshmallow import Schema
 from marshmallow.exceptions import ValidationError
@@ -273,22 +273,30 @@ def get_observations_download(network: str) -> Response:
     sensors = request.args.get("sensors")
     features = request.args.get("features")
 
-    args = request.args.to_dict()
-    args.update({
+    kwargs = request.args.to_dict()
+    kwargs.update({
         "network": network,
-        "feature": features.split(",") if features else [],
+        "features": features.split(",") if features else [],
         "nodes": nodes.split(",") if nodes else [],
         "sensors": sensors.split(",") if sensors else [],
     })
 
     validator = Validator()
-    validated = validator.load(args)
-    if validated.errors:
-        return bad_request(validated.errors)
+    deserialized = validator.load(kwargs)
+    if deserialized.errors:
+        return bad_request(deserialized.errors)
 
-    stream = get_observation_datadump_csv(**validated.data)
+    if not kwargs["nodes"]:
+        kwargs["nodes"] = [n.id for n in deserialized.data['network'].nodes]
+    if not kwargs["sensors"]:
+        kwargs["sensors"] = deserialized.data['network'].sensors()
+    if not kwargs["features"]:
+        kwargs["features"] = deserialized.data['network'].features()
 
-    network = validated.data["network"]
+    deserialized = validator.load(kwargs)
+    stream = get_observation_datadump_csv(**deserialized.data)
+
+    network = deserialized.data["network"]
     fmt = "csv"
     content_disposition = 'attachment; filename={}.{}'.format(network, fmt)
 
@@ -444,31 +452,27 @@ def format_observation(obs, table):
         'results': {}
     }
 
-    for prop in (set([c.name for c in table.c]) - {'node_id', 'datetime', 'sensor', 'meta_id'}):
+    meta_properties = {'node_id', 'datetime', 'sensor', 'meta_id'}
+    all_properties = set([c.name for c in table.c])
+    for prop in all_properties - meta_properties:
         obs_response['results'][prop] = getattr(obs, prop)
 
     return obs_response
 
 
 def get_observation_queries(args):
-    """Generate queries used to get raw feature of interest rows from Redshift.
-
-    :param args: (ValidatorResult) validated query arguments
-    :returns: (list) of SQLAlchemy query objects"""
+    """Queries used to get raw feature of interest rows from Redshift."""
 
     tables = []
-    meta = MetaData()
+    network = args.data['network']
+    features = args.data['features']
 
-    result = get_raw_metadata("features", args)
+    for feature in features:
+        table_name = network.name + '__' + feature.name
+        table = reflect(table_name, MetaData(), redshift_engine)
+        tables.append(table)
 
-    for feature in result:
-        tables.append(Table(
-            feature.name, meta,
-            autoload=True,
-            autoload_with=redshift_engine
-        ))
-
-    return [(observation_query(args, table), table) for table in tables]
+    return [(observation_query(table, **args.data), table) for table in tables]
 
 
 def get_observation_nearest_query(args):
@@ -520,10 +524,7 @@ def get_observation_nearest_query(args):
 
 def get_observation_datadump_csv(**kwargs):
     """Query and store large amounts of raw sensor network observations for
-    download.
-
-    :param args: (ValidatorResult) validated query arguments
-    :returns (dict) containing URL to download chunked data"""
+    download."""
 
     class ValidatorResultProxy(object):
         pass

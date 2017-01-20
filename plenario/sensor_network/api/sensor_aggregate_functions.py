@@ -1,17 +1,11 @@
 from collections import defaultdict
 from copy import deepcopy
-from datetime import timedelta
-
 from datetime import datetime, timedelta
-from dateutil.parser import parse as date_parse
 from sqlalchemy import and_, func, Table, asc
-from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.sql import select
 
 from plenario.database import redshift_Base as redshift_base
-from plenario.database import redshift_session as r_session, redshift_Base
-from plenario.database import redshift_engine
-from plenario.models.SensorNetwork import NodeMeta
+from plenario.database import redshift_session as r_session
 
 
 def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
