@@ -130,7 +130,8 @@ def get_network_metadata(network: str = None) -> Response:
     if network is None:
         networks = NetworkMeta.query.all()
 
-    return jsonify([format_network_metadata(n) for n in networks])
+    result = [format_network_metadata(n) for n in networks]
+    return jsonify(json_response_base(validated, result, args))
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -158,7 +159,8 @@ def get_node_metadata(network: str, node: str = None) -> Response:
     elif node not in network.tree():
         return bad_request("Invalid node {} for {}".format(node, network))
 
-    return jsonify([format_node_metadata(n) for n in nodes])
+    result = [format_node_metadata(n) for n in nodes]
+    return jsonify(json_response_base(validated, result, args))
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -188,7 +190,8 @@ def get_sensor_metadata(network: str, sensor: str = None) -> Response:
     elif sensor not in network.sensors():
         return bad_request("Invalid sensor {} for {}".format(sensor, network))
 
-    return jsonify([format_sensor_metadata(s) for s in sensors])
+    result = [format_sensor_metadata(s) for s in sensors]
+    return jsonify(json_response_base(validated, result, args))
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -217,7 +220,8 @@ def get_feature_metadata(network: str, feature: str = None) -> Response:
     elif all(feature not in f for f in network.features()):
         return bad_request("Invalid feature {} for {}".format(feature, network))
 
-    return jsonify([format_feature_metadata(f) for f in features])
+    result = [format_feature_metadata(f) for f in features]
+    return jsonify(json_response_base(validated, result, args))
 
 
 @crossdomain(origin="*")
