@@ -463,7 +463,7 @@ def format_observation(obs, table):
         'meta_id': obs.meta_id,
         'datetime': obs.datetime.isoformat().split('+')[0],
         'sensor': obs.sensor,
-        'feature': table.name,
+        'feature': table.name.split('__')[-1],
         'results': {}
     }
 
