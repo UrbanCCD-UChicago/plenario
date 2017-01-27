@@ -1,4 +1,5 @@
 from flask import Flask, render_template, redirect, url_for, request
+from flask_cors import CORS
 from raven.contrib.flask import Sentry
 
 from plenario.settings import DATABASE_CONN
@@ -36,6 +37,7 @@ def create_app():
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
     bcrypt.init_app(app)
+    CORS(app)
 
     if sentry:
         sentry.init_app(app)
