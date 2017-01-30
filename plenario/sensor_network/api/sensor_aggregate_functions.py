@@ -135,14 +135,9 @@ def _reflect(table_name, metadata, engine):
     )
 
 
-def _valid_columns(node, target_sensors, target_feature_properties):
+def _valid_columns(node, target_sensors, target_features, target_properties=None):
     """Retrieve the set of valid feature properties to return, given
-    feature and sensor filters.
-
-    :param node: (str) node id
-    :param target_sensors: (list) containing sensor ids
-    :param target_feature_properties: (dict) map of target FOI properties
-    :returns: (set) column keys to be used in the aggregate query"""
+    feature and sensor filters."""
 
     sensors = node.sensors
 
@@ -154,14 +149,10 @@ def _valid_columns(node, target_sensors, target_feature_properties):
         for val in list(sensor.observed_properties.values()):
             current_feature = val.split(".")[0]
             current_property = val.split(".")[1]
-            if current_feature not in target_feature_properties:
+            if current_feature not in target_features:
                 continue
-            # We will only check against properties if properties were specified
-            # ex. magnetic_field.x, magnetic_field.y ...
-            if target_feature_properties[current_feature]:
-                target_properties = target_feature_properties[current_feature]
-                if current_property.lower() not in target_properties:
-                    continue
+            if target_properties and current_property not in target_properties:
+                continue
             columns.add(val.split(".")[1].lower())
 
     return columns
@@ -204,6 +195,7 @@ def aggregate(args, agg_label, agg_fn):
     node = args['node']
     feature = args['feature']
     sensors = args.get('sensors')
+    property_ = args.get('property')
 
     start_dt = datetime.now() - timedelta(days=7) \
         if args.get('start_datetime') is None \
@@ -216,12 +208,13 @@ def aggregate(args, agg_label, agg_fn):
     target_sensors = sensors
 
     # Generate a map of the target features and properties
-    target_feature_properties = {feature.name: d['name'] for d in feature.observed_properties}
+    target_features = [feature.name]
+    target_properties = [p['name'] for p in feature.observed_properties]
+    if property_ and property_ in target_properties:
+        target_properties = [property_]
 
     # Determine which columns, if any, can be aggregated from the target node
-    valid_columns = _valid_columns(node,
-                                   target_sensors,
-                                   target_feature_properties)
+    valid_columns = _valid_columns(node, target_sensors, target_features, target_properties)
 
     if not valid_columns:
         raise ValueError("Your query returns no results. You have specified "

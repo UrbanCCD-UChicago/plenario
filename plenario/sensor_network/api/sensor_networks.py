@@ -66,7 +66,7 @@ class Feature(Field):
 
     def _deserialize(self, value, attr, data):
         try:
-            value = value.lower()
+            value = value.lower().split('.', 1)[0]
             query = FeatureMeta.query.filter(FeatureMeta.name == value)
             return query.one()
         except NoResultFound:
@@ -270,10 +270,18 @@ def get_observations(network: str) -> Response:
     validated = validator.load(args)
     if validated.errors:
         return bad_request(validated.errors)
+    
+    if '.' in feature:
+        feature, property_ = feature.split('.', 1)
+        validated.data.update({'property': property_})
 
     redshift_base.metadata.reflect()
     table = redshift_base.metadata.tables[network + "__" + feature]
-    query = observation_query(table, **validated.data)
+
+    try:
+        query = observation_query(table, **validated.data)
+    except KeyError as err:
+        return bad_request(str(err))
 
     data = list()
     for obs in query:
@@ -369,11 +377,14 @@ def get_aggregations(network: str) -> Response:
     if validated.errors:
         return bad_request(validated.errors)
 
+    if '.' in feature:
+        validated.data.update({'property': feature.split('.', 1)[-1]})
+
     try:
         aggregate_fn = aggregate_fn_map[validated.data.get("function")]
         result = aggregate_fn(validated.data)
     except ValueError as err:
-        return bad_request(err)
+        return bad_request(str(err))
     return jsonify(json_response_base(validated, result, args))
 
 
@@ -388,12 +399,17 @@ def observation_query(table, **kwargs):
     start_dt = kwargs.get("start_datetime")
     end_dt = kwargs.get("end_datetime")
     condition = kwargs.get("filter")
+    property_ = kwargs.get('property')
 
     q = redshift_session.query(table)
     q = q.filter(table.c.datetime >= start_dt) if start_dt else q
     q = q.filter(table.c.datetime < end_dt) if end_dt else q
     q = q.filter(sqla_fn.lower(table.c.node_id).in_(nodes)) if nodes else q
     q = q.filter(sqla_fn.lower(table.c.sensor).in_(sensors)) if sensors else q
+    try:
+        q = q.filter(table.c[property_] != None) if property_ else q
+    except KeyError:
+        raise ValueError('Bad property name {}'.format(property_))
     q = q.filter(condition) if condition is not None else q
     q = q.order_by(desc(table.c.datetime))
     q = q.limit(limit) if limit else q
