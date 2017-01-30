@@ -225,6 +225,31 @@ def get_feature_metadata(network: str, feature: str = None) -> Response:
 
 
 @crossdomain(origin="*")
+def check(network: str) -> Response:
+    """Validate query parameters.
+
+    :endpoint: /sensor-networks/<network-name>/check"""
+
+    args = request.args.to_dict()
+    if not args:
+        return bad_request("You didn't provide any arguments.")
+
+    if args.get('nodes'):
+        args['nodes'] = args['nodes'].split(',')
+    if args.get('sensors'):
+        args['sensors'] = args['sensors'].split(',')
+    if args.get('features'):
+        args['features'] = args['features'].split(',')
+
+    validator = Validator()
+    validated = validator.load(args)
+    if validated.errors:
+        return bad_request(validated.errors)
+
+    return jsonify({'message': 'Your query params are good to go.'})
+
+
+@crossdomain(origin="*")
 def get_observations(network: str) -> Response:
     """Return raw sensor network observations for a single feature within
     the specified network.
@@ -463,7 +488,7 @@ def format_observation(obs, table):
         'meta_id': obs.meta_id,
         'datetime': obs.datetime.isoformat().split('+')[0],
         'sensor': obs.sensor,
-        'feature': table.name.split('__')[-1],
+        'feature': table.name.split('__', 1)[-1],
         'results': {}
     }
 
