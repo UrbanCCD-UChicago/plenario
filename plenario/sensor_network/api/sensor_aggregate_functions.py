@@ -205,7 +205,7 @@ def aggregate(args, agg_label, agg_fn):
         if args.get('end_datetime') is None \
         else args['end_datetime']
 
-    target_sensors = sensors
+    target_sensors = [sensor.name for sensor in sensors]
 
     # Generate a map of the target features and properties
     target_features = [feature.name]
