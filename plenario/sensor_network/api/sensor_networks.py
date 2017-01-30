@@ -1,7 +1,7 @@
 import csv
 import io
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from flask import request, Response, stream_with_context, jsonify
 from marshmallow import Schema
 from marshmallow.exceptions import ValidationError
@@ -97,6 +97,11 @@ class Validator(Schema):
     function = String(missing="avg")
     limit = Integer(missing=1000)
     offset = Integer(missing=0, validate=Range(0))
+
+
+class NoLimitValidator(Validator):
+
+    limit = Integer(allow_none=True)
 
 
 @crossdomain(origin="*")
@@ -313,7 +318,7 @@ def get_observation_nearest(network: str) -> Response:
 def get_observations_download(network: str) -> Response:
     """Stream a sensor network's bulk records to a csv file.
 
-    :endpoint: /sensor-networks/<network-name>/download"""
+    :endpoint: /sensor-networks/<network>/download"""
 
     nodes = request.args.get("nodes")
     sensors = request.args.get("sensors")
@@ -327,7 +332,7 @@ def get_observations_download(network: str) -> Response:
         "sensors": sensors.split(",") if sensors else [],
     })
 
-    validator = Validator()
+    validator = NoLimitValidator()
     deserialized = validator.load(kwargs)
     if deserialized.errors:
         return bad_request(deserialized.errors)
@@ -340,6 +345,10 @@ def get_observations_download(network: str) -> Response:
         kwargs["features"] = deserialized.data['network'].features()
 
     deserialized = validator.load(kwargs)
+
+    if not deserialized.data.get('start_datetime'):
+        deserialized.data.update({'start_datetime': datetime.now() - timedelta(days=7)})
+
     stream = get_observation_datadump_csv(**deserialized.data)
 
     network = deserialized.data["network"]
