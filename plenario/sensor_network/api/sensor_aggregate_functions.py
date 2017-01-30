@@ -1,3 +1,5 @@
+import pytz
+
 from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime, timedelta
@@ -18,6 +20,8 @@ def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
 
     start_dt = _zero_out_datetime(start_dt, agg_unit)
     end_dt = _zero_out_datetime(end_dt, agg_unit)
+    start_dt = start_dt.replace(tzinfo=None)
+    end_dt =end_dt.replace(tzinfo=None)
 
     if not aggregates:
         return aggregates
