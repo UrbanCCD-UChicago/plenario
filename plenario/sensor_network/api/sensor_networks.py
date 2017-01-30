@@ -231,8 +231,6 @@ def check(network: str) -> Response:
     :endpoint: /sensor-networks/<network-name>/check"""
 
     args = request.args.to_dict()
-    if not args:
-        return bad_request("You didn't provide any arguments.")
 
     if args.get('nodes'):
         args['nodes'] = args['nodes'].split(',')
