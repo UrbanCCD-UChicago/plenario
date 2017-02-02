@@ -12,4 +12,4 @@ $$ language plv8;
 
 create view sensor__sensors_view as
   select name, invert(observed_properties)
-  from sensor__sensors;
+  from sensor__sensor_metadata;

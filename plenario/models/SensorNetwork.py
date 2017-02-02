@@ -142,7 +142,7 @@ class SensorMeta(Base):
 
         rp = session.execute("""
             select distinct name
-            from sensor__sensor_metadata
+            from sensor__sensors_view
             where invert ?| '{}'
         """.format("{" + ",".join(features) + "}"))
 

@@ -153,17 +153,18 @@ def init_worker_meta():
     create_tables(('plenario_workers', 'plenario_datadump', 'etl_task'))
 
 
-def add_functions():
+def add_function(script_path):
+    args = 'PGPASSWORD=' + DB_PASSWORD
+    args += ' psql '
+    args += ' -h ' + DB_HOST
+    args += ' -U ' + DB_USER
+    args += ' -d ' + DB_NAME
+    args += ' -p ' + str(DB_PORT)
+    args += ' -f ' + script_path
+    subprocess.check_output(args, shell=True)
 
-    def add_function(script_path):
-        args = 'PGPASSWORD=' + DB_PASSWORD
-        args += ' psql '
-        args += ' -h ' + DB_HOST
-        args += ' -U ' + DB_USER
-        args += ' -d ' + DB_NAME
-        args += ' -p ' + str(DB_PORT)
-        args += ' -f ' + script_path
-        subprocess.check_output(args, shell=True)
+
+def add_functions():
 
     add_function("./plenario/dbscripts/audit_trigger.sql")
     add_function("./plenario/dbscripts/point_from_location.sql")

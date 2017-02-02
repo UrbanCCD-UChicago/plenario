@@ -607,7 +607,7 @@ def get_observation_nearest_query(args):
     if not nearest_nodes_rp:
         return "No nodes could be found nearby with your target feature."
 
-    feature = reflect(feature, MetaData(), redshift_engine)
+    feature = reflect(network + '__' + feature, MetaData(), redshift_engine)
 
     result = None
     for row in nearest_nodes_rp:
