@@ -11,7 +11,8 @@ from shapely import wkb
 from sqlalchemy import MetaData, Table, func as sqla_fn, and_, asc, desc
 from sqlalchemy.orm.exc import NoResultFound
 
-from plenario.api.common import cache, crossdomain
+from plenario.api.common import cache, crossdomain, make_fragment_str
+from plenario.api.common import extract_first_geometry_fragment
 from plenario.api.common import make_cache_key
 from plenario.database import windowed_query
 from plenario.utils.helpers import reflect
@@ -76,9 +77,17 @@ class Feature(Field):
         return value.name.lower()
 
 
+class Geom(Field):
+
+    def _deserialize(self, value, attr, data):
+        try:
+            return make_fragment_str(extract_first_geometry_fragment(value))
+        except (ValueError, AttributeError):
+            raise ValidationError("Invalid geom: {}".format(value))
+
+
 class Validator(Schema):
 
-    # geom
     feature = Feature()
     features = List(Feature(allow_none=True))
     network = Network()
@@ -97,6 +106,7 @@ class Validator(Schema):
     function = String(missing="avg")
     limit = Integer(missing=1000)
     offset = Integer(missing=0, validate=Range(0))
+    geom = Geom()
 
 
 class NoLimitValidator(Validator):
@@ -115,7 +125,7 @@ def get_network_map(network: str) -> Response:
     return jsonify(network.tree())
 
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+# @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def get_network_metadata(network: str = None) -> Response:
     """Return metadata for some network. If no network_name is specified, the
@@ -139,7 +149,7 @@ def get_network_metadata(network: str = None) -> Response:
     return jsonify(json_response_base(validated, result, args))
 
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+# @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def get_node_metadata(network: str, node: str = None) -> Response:
     """Return metadata about nodes for some network. If no node_id or
@@ -161,14 +171,21 @@ def get_node_metadata(network: str, node: str = None) -> Response:
 
     if node is None:
         nodes = NodeMeta.all(network.name)
-    elif node not in network.tree():
+    elif node.lower() not in network.tree():
         return bad_request("Invalid node {} for {}".format(node, network))
+
+    geojson = validated.data.get('geom')
+    if geojson:
+        nodes_within_geom = NodeMeta.within_geojson(network, geojson).all()
+        if not nodes_within_geom:
+            return bad_request("No features found within {}!".format(geojson))
+        nodes = nodes_within_geom
 
     result = [format_node_metadata(n) for n in nodes]
     return jsonify(json_response_base(validated, result, args))
 
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+# @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def get_sensor_metadata(network: str, sensor: str = None) -> Response:
     """Return metadata for all sensors within a network. Sensors can also be
@@ -192,14 +209,28 @@ def get_sensor_metadata(network: str, sensor: str = None) -> Response:
         sensors = []
         for node in NodeMeta.all(network.name):
             sensors += node.sensors
-    elif sensor not in network.sensors():
+    elif sensor.lower() not in network.sensors():
         return bad_request("Invalid sensor {} for {}".format(sensor, network))
 
-    result = [format_sensor_metadata(s) for s in sensors]
+    geojson = validated.data.get('geom')
+
+    if geojson:
+
+        nodes_within_geom = NodeMeta.within_geojson(network, geojson).all()
+        if not nodes_within_geom:
+            return bad_request("No sensors found within {}!".format(geojson))
+
+        sensors_within_geom = NodeMeta.sensors_from_nodes(nodes_within_geom)
+        if sensor is None:
+            sensors = sensors_within_geom
+        elif SensorMeta.query.get(sensor) not in sensors_within_geom:
+            return bad_request("No sensors found within {}!".format(geojson))
+
+    result = [format_sensor_metadata(s) for s in set(sensors)]
     return jsonify(json_response_base(validated, result, args))
 
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
+# @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def get_feature_metadata(network: str, feature: str = None) -> Response:
     """Return metadata about features for some network. If no feature is
@@ -222,8 +253,25 @@ def get_feature_metadata(network: str, feature: str = None) -> Response:
         features = []
         for f in network.features():
             features.append(FeatureMeta.query.get(f))
-    elif all(feature not in f for f in network.features()):
+    elif all(feature.lower() not in f for f in network.features()):
         return bad_request("Invalid feature {} for {}".format(feature, network))
+
+    geojson = validated.data.get('geom')
+
+    if geojson:
+
+        nodes_within_geom = NodeMeta.within_geojson(network, geojson).all()
+        if not nodes_within_geom:
+            return bad_request("No features found within {}!".format(geojson))
+
+        feature_set = set()
+        for node in nodes_within_geom:
+            feature_set.update(node.features())
+
+        if feature is None:
+            features = set(FeatureMeta.query.get(f.split('.')[0]) for f in feature_set)
+        elif feature not in feature_set:
+            return bad_request("No features found within {}!".format(geojson))
 
     result = [format_feature_metadata(f) for f in features]
     return jsonify(json_response_base(validated, result, args))

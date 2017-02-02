@@ -1,5 +1,8 @@
+import json
+
 from geoalchemy2 import Geometry
 from sqlalchemy import Table, String, Column, ForeignKey, ForeignKeyConstraint
+from sqlalchemy import and_, func as sqla_fn
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
@@ -95,16 +98,25 @@ class NodeMeta(Base):
         )
 
     @staticmethod
-    def get_nodes_from_sensors(network, sensors):
-        rp = session.execute("""
-            select distinct id
-            from sensor__node_metadata
-            inner join sensor__sensor_to_node
-            on id = node
-            where sensor = any('{0}'::text[])
-            and network = '{1}'
-        """.format("{" + ",".join(sensors) + "}", network))
-        return [row.id for row in rp]
+    def within_geojson(network: NetworkMeta, geojson: str):
+        geom = sqla_fn.ST_GeomFromGeoJSON(geojson)
+        within = NodeMeta.location.ST_Within(geom)
+        query = NodeMeta.query.filter(within)
+        query = query.filter(NodeMeta.sensor_network == network.name)
+        return query
+
+    @staticmethod
+    def sensors_from_nodes(nodes):
+        sensors_list = []
+        for node in nodes:
+            sensors_list += node.sensors
+        return set(sensors_list)
+
+    def features(self) -> set:
+        feature_set = set()
+        for feature in self.tree().values():
+            feature_set.update(feature.keys())
+        return feature_set
 
     def __repr__(self):
         return '<Node "{}">'.format(self.id)
