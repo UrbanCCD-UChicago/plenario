@@ -1,8 +1,17 @@
+import csv
+import sqlalchemy.ext.serializer
+import tarfile
+import tempfile
+
 from celery import Celery
 from datetime import datetime, timedelta
+from dateutil.parser import parse as date_parse
 from raven import Client
+from sqlalchemy.orm import sessionmaker
 
 from plenario.database import session as session, Base, app_engine as engine
+from plenario.database import redshift_Base as redshift_base
+from plenario.database import redshift_session, redshift_engine
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
@@ -160,4 +169,29 @@ def update_weather() -> True:
     if last_month != month:
         w.initialize_month(last_year, last_month)
     w.initialize_month(year, month)
+    return True
+
+
+@worker.task()
+def archive(path: str, table: str, start: str, end: str) -> bool:
+    """Store the results of a query in a tar.gz file."""
+
+    redshift_base.metadata.reflect()
+
+    table = redshift_base.metadata.tables[table]
+    query = redshift_session.query(table)  \
+        .filter(table.c.datetime >= date_parse(start)) \
+        .filter(table.c.datetime < date_parse(end))
+    temp = tempfile.NamedTemporaryFile()
+    writer = csv.writer(temp)
+
+    for row in query.yield_per(1000):
+        writer.writerow(row)
+
+    tar = tarfile.open(path, mode='w:gz')
+
+    tar.add(temp.name)
+    tar.close()
+    temp.close()
+
     return True
