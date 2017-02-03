@@ -173,7 +173,7 @@ def update_weather() -> True:
 
 
 @worker.task()
-def archive(path: str, table: str, start: str, end: str) -> bool:
+def archive(path: str, table: str, start: str, end: str) -> str:
     """Store the results of a query in a tar.gz file."""
 
     redshift_base.metadata.reflect()
@@ -181,17 +181,17 @@ def archive(path: str, table: str, start: str, end: str) -> bool:
     table = redshift_base.metadata.tables[table]
     query = redshift_session.query(table)  \
         .filter(table.c.datetime >= date_parse(start)) \
-        .filter(table.c.datetime < date_parse(end))
-    temp = tempfile.NamedTemporaryFile()
+        .filter(table.c.datetime <= date_parse(end))
+    temp = tempfile.NamedTemporaryFile('wt')
     writer = csv.writer(temp)
 
     for row in query.yield_per(1000):
         writer.writerow(row)
+    temp.file.seek(0)
 
     tar = tarfile.open(path, mode='w:gz')
-
     tar.add(temp.name)
     tar.close()
     temp.close()
 
-    return True
+    return temp.name
