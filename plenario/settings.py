@@ -20,7 +20,7 @@ RS_USER = get('RS_USER', 'postgres')
 RS_PASSWORD = get('RS_PASSWORD', 'password')
 RS_HOST = get('RS_HOST', 'localhost')
 RS_PORT = get('RS_PORT', 5432)
-RS_NAME = get('RS_NAME', 'sensor_obs_test')
+RS_NAME = get('RS_NAME', 'plenario_test')
 
 DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.\
     format(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)

@@ -7,6 +7,7 @@ addons:
     packages:
     - gdal-bin
     - postgresql-9.4-postgis-2.3
+    - postgresql-9.4-plv8
 services:
 - postgresql
 - redis-server
@@ -47,6 +48,8 @@ script:
 - nosetests --nologcapture tests/test_etl/test_point.py -v
 - nosetests --nologcapture tests/submission/ -v
 - nosetests --nologcapture tests/test_sensor_network/test_sensor_networks.py -v
+- nosetests --nologcapture tests/test_sensor_network/test_nearest.py -v
+- nosetests --nologcapture tests/test_tasks/test_archive.py -v
 
 deploy:
 - provider: elasticbeanstalk
