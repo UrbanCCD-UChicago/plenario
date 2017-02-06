@@ -12,9 +12,10 @@ from plenario.settings import DEFAULT_USER
 sensor_meta_table_names = (
     "sensor__network_metadata",
     "sensor__node_metadata",
-    "sensor__features_of_interest",
-    "sensor__sensors",
-    "sensor__sensor_to_node"
+    "sensor__feature_metadata",
+    "sensor__sensor_metadata",
+    "sensor__sensor_to_node",
+    "sensor__feature_to_network"
 )
 
 
@@ -152,17 +153,18 @@ def init_worker_meta():
     create_tables(('plenario_workers', 'plenario_datadump', 'etl_task'))
 
 
-def add_functions():
+def add_function(script_path):
+    args = 'PGPASSWORD=' + DB_PASSWORD
+    args += ' psql '
+    args += ' -h ' + DB_HOST
+    args += ' -U ' + DB_USER
+    args += ' -d ' + DB_NAME
+    args += ' -p ' + str(DB_PORT)
+    args += ' -f ' + script_path
+    subprocess.check_output(args, shell=True)
 
-    def add_function(script_path):
-        args = 'PGPASSWORD=' + DB_PASSWORD
-        args += ' psql '
-        args += ' -h ' + DB_HOST
-        args += ' -U ' + DB_USER
-        args += ' -d ' + DB_NAME
-        args += ' -p ' + str(DB_PORT)
-        args += ' -f ' + script_path
-        subprocess.check_output(args, shell=True)
+
+def add_functions():
 
     add_function("./plenario/dbscripts/audit_trigger.sql")
     add_function("./plenario/dbscripts/point_from_location.sql")

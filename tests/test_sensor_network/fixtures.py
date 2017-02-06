@@ -19,7 +19,7 @@ class Fixtures:
             conn.execute("commit")
             conn.execute(query)
         except ProgrammingError as err:
-            print(err)
+            print(str(err))
         finally:
             conn.close()
 
@@ -46,8 +46,8 @@ class Fixtures:
         self.rs_engine.execute(create_table)
 
     def __init__(self):
-        os.environ["DB_NAME"] = "sensor_meta_test"
-        os.environ["RS_NAME"] = "sensor_obs_test"
+        os.environ["DB_NAME"] = "plenario_test"
+        os.environ["RS_NAME"] = "plenario_test"
 
         self.user = DB_USER
         self.host = DB_HOST
@@ -63,19 +63,17 @@ class Fixtures:
         self.worker_process = None
 
     def setup_databases(self):
-        self._run_with_connection("create database sensor_meta_test")
-        self._run_with_connection("create database sensor_obs_test")
-        self.rs_engine = create_engine(self.base_db_url + "/sensor_obs_test")
-        self.pg_engine = create_engine(self.base_db_url + "/sensor_meta_test")
+        self._run_with_connection("create database plenario_test")
+        self.rs_engine = create_engine(self.base_db_url + "/plenario_test")
+        self.pg_engine = create_engine(self.base_db_url + "/plenario_test")
         self.pg_engine.execute("create extension postgis")
 
     def generate_sensor_network_meta_tables(self):
-        print("Creating sensor network tables for {} ..." .format(self.pg_engine))
+        print("create sensor network tables for {} ..." .format(self.pg_engine))
         Base.metadata.create_all(bind=self.pg_engine)
 
     def drop_databases(self):
-        self._run_with_connection("drop database sensor_meta_test")
-        self._run_with_connection("drop database sensor_obs_test")
+        self._run_with_connection("drop database plenario_test")
 
     def generate_mock_metadata(self):
         session.configure(bind=self.pg_engine)
@@ -133,8 +131,8 @@ class Fixtures:
                 session.rollback()
 
     def generate_mock_observations(self):
-        self._create_foi_table({"name": "vector", "properties": [{"name": "x", "type": "float"}, {"name": "y", "type": "float"}]})
-        self._create_foi_table({"name": "temperature", "properties": [{"name": "temperature", "type": "float"}]})
+        self._create_foi_table({"name": "test_network__vector", "properties": [{"name": "x", "type": "float"}, {"name": "y", "type": "float"}]})
+        self._create_foi_table({"name": "test_network__temperature", "properties": [{"name": "temperature", "type": "float"}]})
         print("Populating records ", end=' ')
 
         date_string = "2016-10-{} {}:{}:{}"
@@ -152,24 +150,18 @@ class Fixtures:
             )
 
             self.rs_engine.execute("""
-                insert into vector (node_id, datetime, meta_id, sensor, x, y)
+                insert into test_network__vector (node_id, datetime, meta_id, sensor, x, y)
                 values ('test_node', '{}', '{}', 'sensor_02', {}, {})
                 """.format(record_date, randint(0, 100), random(), random())
             )
 
             self.rs_engine.execute("""
-                insert into temperature (node_id, datetime, meta_id, sensor, temperature)
+                insert into test_network__temperature (node_id, datetime, meta_id, sensor, temperature)
                 values ('test_node', '{}', '{}', 'sensor_01', {})
                 """.format(record_date, randint(0, 100), random(), random())
             )
 
         print("\n")
-
-    def run_worker(self):
-        self.worker_process = subprocess.Popen(["python", "worker.py"])
-
-    def kill_worker(self):
-        os.kill(self.worker_process.pid, signal.SIGTERM)
 
 
 from plenario.models.SensorNetwork import *

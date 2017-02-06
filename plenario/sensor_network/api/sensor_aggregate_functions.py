@@ -1,15 +1,13 @@
+import pytz
+
 from collections import defaultdict
 from copy import deepcopy
-from datetime import timedelta
-
-from dateutil.parser import parse as date_parse
+from datetime import datetime, timedelta
 from sqlalchemy import and_, func, Table, asc
 from sqlalchemy.sql import select
 
-from plenario.database import redshift_Base as RBase
+from plenario.database import redshift_Base as redshift_base
 from plenario.database import redshift_session as r_session
-from plenario.database import session, redshift_engine as r_engine
-from plenario.models.SensorNetwork import NodeMeta
 
 
 def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
@@ -22,6 +20,8 @@ def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
 
     start_dt = _zero_out_datetime(start_dt, agg_unit)
     end_dt = _zero_out_datetime(end_dt, agg_unit)
+    start_dt = start_dt.replace(tzinfo=None)
+    end_dt =end_dt.replace(tzinfo=None)
 
     if not aggregates:
         return aggregates
@@ -69,7 +69,7 @@ def _format_aggregates(aggregates, agg_label, agg_unit, start_dt, end_dt):
             elif key == "count":
                 aggregate_json["count"] = agg[key]
             elif "count" in key:
-                aggregate_json[key.split("_")[0]]["count"] = agg[key]
+                aggregate_json[key.rsplit("_", 1)[0]]["count"] = agg[key]
             else:
                 aggregate_json[key][agg_label] = agg[key]
 
@@ -139,18 +139,11 @@ def _reflect(table_name, metadata, engine):
     )
 
 
-def _valid_columns(node, target_sensors, target_feature_properties):
+def _valid_columns(node, target_sensors, target_features, target_properties=None):
     """Retrieve the set of valid feature properties to return, given
-    feature and sensor filters.
+    feature and sensor filters."""
 
-    :param node: (str) node id
-    :param target_sensors: (list) containing sensor ids
-    :param target_feature_properties: (dict) map of target FOI properties
-    :returns: (set) column keys to be used in the aggregate query"""
-
-    select_node_meta = session.query(NodeMeta).filter(NodeMeta.id == node)
-    target_node = select_node_meta.first()
-    sensors = target_node.sensors
+    sensors = node.sensors
 
     columns = set()
     for sensor in sensors:
@@ -160,14 +153,10 @@ def _valid_columns(node, target_sensors, target_feature_properties):
         for val in list(sensor.observed_properties.values()):
             current_feature = val.split(".")[0]
             current_property = val.split(".")[1]
-            if current_feature not in target_feature_properties:
+            if current_feature not in target_features:
                 continue
-            # We will only check against properties if properties were specified
-            # ex. magnetic_field.x, magnetic_field.y ...
-            if target_feature_properties[current_feature]:
-                target_properties = target_feature_properties[current_feature]
-                if current_property.lower() not in target_properties:
-                    continue
+            if target_properties and current_property not in target_properties:
+                continue
             columns.add(val.split(".")[1].lower())
 
     return columns
@@ -205,31 +194,31 @@ def aggregate(args, agg_label, agg_fn):
     :param agg_fn: (function) aggregate function that is being applied
     :returns: (list) of dictionary objects that can be dumped to JSON"""
 
-    expected = ("node", "feature", "start_datetime",
-                "end_datetime", "sensors", "agg")
-    node, feature, start_dt, end_dt, sensors, agg_unit = (args.data.get(k)
-                                                          for k in expected)
+    network = args['network']
+    agg_unit = args['agg']
+    node = args['node']
+    feature = args['feature']
+    sensors = args.get('sensors')
+    property_ = args.get('property')
 
-    # Format the datetime parameters
-    start_dt = date_parse(start_dt).replace(tzinfo=None)
-    end_dt = date_parse(end_dt).replace(tzinfo=None)
+    start_dt = datetime.now() - timedelta(days=7) \
+        if args.get('start_datetime') is None \
+        else args['start_datetime']
 
-    target_features = feature
-    target_sensors = sensors
+    end_dt = datetime.now() \
+        if args.get('end_datetime') is None \
+        else args['end_datetime']
+
+    target_sensors = [sensor.name for sensor in sensors]
 
     # Generate a map of the target features and properties
-    target_feature_properties = dict()
-    for feature in target_features:
-        try:
-            feature, f_property = feature.split(".")
-            target_feature_properties.setdefault(feature, []).append(f_property)
-        except ValueError:
-            target_feature_properties[feature] = None
+    target_features = [feature.name]
+    target_properties = [p['name'] for p in feature.observed_properties]
+    if property_ and property_ in target_properties:
+        target_properties = [property_]
 
     # Determine which columns, if any, can be aggregated from the target node
-    valid_columns = _valid_columns(node,
-                                   target_sensors,
-                                   target_feature_properties)
+    valid_columns = _valid_columns(node, target_sensors, target_features, target_properties)
 
     if not valid_columns:
         raise ValueError("Your query returns no results. You have specified "
@@ -237,8 +226,8 @@ def aggregate(args, agg_label, agg_fn):
                          "filtering on a sensor which doesn't have the feature "
                          "you are aggregating for)")
 
-    # Reflect the target feature of interest table
-    obs_table = _reflect(feature.split(".")[0], RBase.metadata, r_engine)
+    redshift_base.metadata.reflect()
+    obs_table = redshift_base.metadata.tables[network.name + "__" + feature.name]
 
     # Generate the necessary select statements and datetime delimiters
     selects = _generate_aggregate_selects(obs_table,

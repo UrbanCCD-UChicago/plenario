@@ -1,10 +1,8 @@
-import sys
-
 from collections import defaultdict
 from flask import Blueprint, make_response, request
 from json import dumps, loads
 from redis import Redis
-from sqlalchemy import func, Table
+from sqlalchemy import func
 from traceback import format_exc
 
 from plenario.database import redshift_session as rshift_session
@@ -13,24 +11,10 @@ from plenario.database import Base as psql_base, app_engine as psql_engine
 from plenario.database import redshift_Base as rshift_base
 from plenario.database import redshift_engine as rshift_engine
 from plenario.settings import REDIS_HOST
+from plenario.utils.helpers import reflect
 
 blueprint = Blueprint("apiary", __name__)
 redis = Redis(REDIS_HOST)
-
-
-def reflect(table_name, metadata, engine):
-    """A helper method for reflecting tables into SQLAlchemy ORM objects.
-
-    :param table_name: (string) target table
-    :param metadata: (MetaData) SQLAlchemy container for database features
-    :param engine: (Engine) SQLAlchemy object for executing db statements"""
-
-    return Table(
-        table_name,
-        metadata,
-        autoload=True,
-        autoload_with=engine
-    )
 
 
 def map_unknown_to_foi(unknown, sensor_properties):
