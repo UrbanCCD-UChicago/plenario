@@ -178,5 +178,43 @@ class FeatureMeta(Base):
             FeatureMeta.name == feature)
         return [feature + "." + prop["name"] for prop in query.first().observed_properties]
 
+    # def mirror(self):
+    #     """Create feature tables in redshift for all the networks associated
+    #     with this feature."""
+    #
+    #     for network in self.networks:
+    #         self._mirror(network.name)
+    #
+    # def _mirror(self, network_name: str):
+    #     """Create a feature table in redshift for the specified network."""
+    #
+    #     columns = []
+    #     for feature in self.observed_properties:
+    #         column_name = feature['name']
+    #         column_type = database_types[feature['type'].upper()]
+    #         columns.append(Column(column_name, column_type))
+    #
+    #     redshift_table = Table(
+    #         '{}__{}'.format(network_name, self.name),
+    #         redshift_base.metadata,
+    #         Column('node_id', String),
+    #         Column('datetime', DateTime),
+    #         Column('meta_id', Float),
+    #         Column('sensor', String),
+    #         *columns
+    #     )
+    #
+    #     redshift_table.create()
+
     def __repr__(self):
         return '<Feature "{}">'.format(self.name)
+
+
+# database_types = {
+#     'FLOAT': DOUBLE_PRECISION,
+#     'DOUBLE': DOUBLE_PRECISION,
+#     'STRING': String,
+#     'BOOL': Boolean,
+#     'INT': BigInteger,
+#     'INTEGER': BigInteger
+# }
