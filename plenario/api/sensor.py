@@ -1,12 +1,15 @@
 import json
 import shapely.geometry
 import shapely.wkb
+import sqlalchemy as sa
 
-from flask import request, make_response
+from flask import request, make_response, jsonify
 from sqlalchemy import Table, func
+from sqlalchemy.exc import SQLAlchemyError
 
 from plenario.api.common import cache, CACHE_TIMEOUT, make_cache_key
 from plenario.api.common import crossdomain, date_json_handler, RESPONSE_LIMIT
+from plenario.api.response import make_error
 from plenario.utils.helpers import get_size_in_degrees
 from plenario.database import session, app_engine as engine, Base
 
@@ -210,6 +213,8 @@ def wban_list_if_valid(wban_list_str):
 
 @crossdomain(origin="*")
 def weather_fill():
+    from plenario.tasks import update_weather
+
     args = request.args.copy()
     year = year_if_valid(args.get('year'))
     if not year:
@@ -221,27 +226,14 @@ def weather_fill():
 
     wbans = wban_list_if_valid(args.get('wbans'))
     if not wbans:
-        return make_error("WBAN list misformatted or no WBANS provided are available. Check /weather-stations", 400)
+        return make_error("WBAN list misformatted or no WBANS provided are "
+                          "available. Check /weather-stations", 400)
 
-    data = {
-        "month": month,
-        "year": year,
-        "wbans": wbans,
-        "job": True  # WHE: Not sure if this is necessary
-    }
-
-    ValidatorProxy = namedtuple("ValidatorProxy", ["data"])
-    validator_result = ValidatorProxy(data)
-    return make_job_response("weather_fill", validator_result)
-
-
-def weather_fill_impl(args):
-    wbans = args.data['wbans']
-    month = args.data['month']
-    year = args.data['year']
-    etl = WeatherETL()
-    etl.initialize_month(year, month, weather_stations_list=wbans)
-    return {'weatherResult': 'The ETL process completed without an exception.'}
+    task_id = update_weather.delay(month=month, year=year, wbans=wbans).id
+    return jsonify({
+        'message': 'Successfully queued weather update.',
+        'task_id': task_id
+    })
 
 
 '''
