@@ -155,7 +155,7 @@ def clean_metar() -> True:
 
 
 @worker.task()
-def update_weather() -> True:
+def update_weather(month=None, year=None, wbans=None) -> True:
     """Run a weather update."""
 
     # This should do the current month AND the previous month, just in case.
@@ -163,12 +163,15 @@ def update_weather() -> True:
     last_month = last_month_dt.month
     last_year = last_month_dt.year
 
-    month, year = datetime.now().month, datetime.now().year
-    print("[plenario] {}".format(last_month))
+    if not month:
+        month = datetime.now().month
+    if not year:
+        year = datetime.now().year
+
     w = WeatherETL()
     if last_month != month:
-        w.initialize_month(last_year, last_month)
-    w.initialize_month(year, month)
+        w.initialize_month(last_year, last_month, weather_stations_list=wbans)
+    w.initialize_month(year, month, weather_stations_list=wbans)
     return True
 
 
