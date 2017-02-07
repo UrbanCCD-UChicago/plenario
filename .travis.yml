@@ -48,6 +48,7 @@ script:
 - nosetests --nologcapture tests/test_etl/test_point.py -v
 - nosetests --nologcapture tests/submission/ -v
 - nosetests --nologcapture tests/test_sensor_network/test_sensor_networks.py -v
+- nosetests --nologcapture tests/test_models/test_feature_meta.py -v
 - nosetests --nologcapture tests/test_sensor_network/test_nearest.py -v
 - nosetests --nologcapture tests/test_tasks/test_archive.py -v
 

@@ -26,31 +26,6 @@ def create_foi_table(foi_name, properties):
     redshift_engine.execute(text(op))
 
 
-def add_column(network_name, column_name, column_type):
-    op = text('ALTER TABLE {} '
-              'ADD COLUMN {} {} '
-              'DEFAULT NULL'.format(network_name, column_name, column_type))
-    redshift_engine.execute(op)
-
-
-def insert_observation(foi_name, nodeid, datetime, sensor,
-                       values, procedures):
-    """Inserts sensor readings
-
-          :param values: list of observed property values in order
-          :param procedures: integer procedure identifier """
-
-    op = ('INSERT INTO {} '
-          'VALUES ({}, {}, {}'
-          .format(foi_name.lower(), repr(nodeid), repr(datetime), repr(sensor)))
-    for val in values:
-        op = (op + ', {}'.format(val))
-    op = (op + ', {});'.format(str(procedures)))
-    print(op)
-    op = text(op)
-    redshift_engine.execute(op)
-
-
 def table_exists(table_name):
     """Make an inexpensive query to the database. It the table does not exist,
     the query will cause a ProgrammingError.

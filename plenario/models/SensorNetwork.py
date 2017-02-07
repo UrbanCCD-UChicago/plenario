@@ -190,16 +190,18 @@ class FeatureMeta(Base):
         for feature in self.observed_properties:
             column_name = feature['name']
             column_type = database_types[feature['type'].upper()]
-            columns.append(Column(column_name, column_type))
+            columns.append(Column(column_name, column_type, default=None))
 
         redshift_table = Table(
             '{}__{}'.format(network_name, self.name),
             redshift_base.metadata,
-            Column('node_id', String),
-            Column('datetime', DateTime),
-            Column('meta_id', Float),
-            Column('sensor', String),
-            *columns
+            Column('node_id', String, primary_key=True),
+            Column('datetime', DateTime, primary_key=True),
+            Column('meta_id', Float, nullable=False),
+            Column('sensor', String, nullable=False),
+            *columns,
+            redshift_distkey='datetime',
+            redshift_sortkey='datetime'
         )
 
         redshift_table.create()
