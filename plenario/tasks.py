@@ -1,20 +1,20 @@
+import boto3
 import csv
-import sqlalchemy.ext.serializer
+import os
 import tarfile
-import tempfile
 
 from celery import Celery
 from datetime import datetime, timedelta
-from dateutil.parser import parse as date_parse
 from raven import Client
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Table
 
 from plenario.database import session as session, Base, app_engine as engine
 from plenario.database import redshift_Base as redshift_base
-from plenario.database import redshift_session, redshift_engine
+from plenario.database import redshift_session
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
+from plenario.models.SensorNetwork import NodeMeta
 from plenario.settings import PLENARIO_SENTRY_URL, CELERY_RESULT_BACKEND
 from plenario.settings import CELERY_BROKER_URL
 from plenario.utils.helpers import reflect
@@ -135,7 +135,7 @@ def frequency_update(frequency) -> bool:
 
 
 @worker.task()
-def update_metar() -> True:
+def update_metar() -> bool:
     """Run a METAR update."""
 
     w = WeatherETL()
@@ -144,7 +144,7 @@ def update_metar() -> True:
 
 
 @worker.task()
-def clean_metar() -> True:
+def clean_metar() -> bool:
     """Given the latest datetime available in hourly observations table,
     delete all metar records older than that datetime. Records which exist
     in the hourly table are the quality-controlled versions of records that
@@ -155,7 +155,7 @@ def clean_metar() -> True:
 
 
 @worker.task()
-def update_weather(month=None, year=None, wbans=None) -> True:
+def update_weather(month=None, year=None, wbans=None) -> bool:
     """Run a weather update."""
 
     # This should do the current month AND the previous month, just in case.
@@ -175,26 +175,97 @@ def update_weather(month=None, year=None, wbans=None) -> True:
     return True
 
 
+def start_and_end_of_the_month(dt: datetime):
+    """Get first of month and first of next month for a given datetime."""
+
+    start = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if start.month == 12:
+        end = start.replace(year=start.year + 1, month=1, day=1, hour=0,
+                            minute=0, second=0, microsecond=0)
+    else:
+        end = start.replace(month=start.month + 1)
+    return start, end
+
+
 @worker.task()
-def archive(path: str, table: str, start: str, end: str) -> str:
-    """Store the results of a query in a tar.gz file."""
+def archive() -> bool:
 
-    redshift_base.metadata.reflect()
+    # Get table objects for all known feature tables in redshift database
+    tables = dict(redshift_base.metadata.tables)
+    del tables['array_of_things_chicago__unknown_feature']
 
-    table = redshift_base.metadata.tables[table]
+    # Get the start and end datetime bounds for this month
+    start, end = start_and_end_of_the_month(datetime.now() - timedelta(days=10))
+
+    # Break each feature of interest table up into csv files grouped by node
+    csv_file_groups = []
+    for table in tables.values():
+        # Save the list of generated file names
+        csv_file_groups.append(csvify(table, start, end))
+
+    # Get the node ids for the current network
+    network = 'array_of_things_chicago'
+    nodes = NodeMeta.index(network)
+
+    # Reserve list for each node that will contain a nodes relevant file names
+    tar_groups = {}
+    for node in nodes:
+        tar_groups[node] = []
+
+    # Sort the file names into groups by node
+    for file_group in csv_file_groups:
+        for file_name in file_group:
+            node = file_name.split('--')[0]
+            tar_groups[node].append(file_name)
+
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket('plenario-test')
+
+    # Tar and upload each group of files for a single node
+    for node, tar_group in tar_groups.items():
+        tar = tarfile.open('{}.tar.gz'.format(node), mode='w:gz')
+        for file_name in tar_group:
+            print(file_name)
+            tar.add(file_name)
+            os.remove(file_name)
+        tar.close()
+
+        file = open('{}.tar.gz'.format(node), 'rb')
+        bucket.put_object(
+            Key='{}/{}.tar.gz'.format(start.date(), node),
+            Body=file)
+        file.close()
+        os.remove('{}.tar.gz'.format(node))
+
+    return True
+
+
+def csvify(table: Table, start: datetime, end: datetime) -> list:
+    """Take a feature of interest table and split it into a bunch of csv files
+    that are grouped by node. Return the names of all the files it made."""
+
+    files = {}
+    writers = {}
+    file_names = []
+
     query = redshift_session.query(table)  \
-        .filter(table.c.datetime >= date_parse(start)) \
-        .filter(table.c.datetime <= date_parse(end))
-    temp = tempfile.NamedTemporaryFile('wt')
-    writer = csv.writer(temp)
+        .filter(table.c.datetime >= start) \
+        .filter(table.c.datetime < end)    \
+        .yield_per(1000)
 
-    for row in query.yield_per(1000):
-        writer.writerow(row)
-    temp.file.seek(0)
+    for row in query:
+        node = row.node_id
+        if node not in files:
+            file_name = '{}--{}--{}--{}.csv'.format(
+                node, table.name, start.date(), end.date())
+            file_names.append(file_name)
+            files[node] = open(file_name, 'w')
+            writers[node] = csv.writer(files[node])
+            writers[node].writerow(row.keys())
+        writers[node].writerow(row)
 
-    tar = tarfile.open(path, mode='w:gz')
-    tar.add(temp.name)
-    tar.close()
-    temp.close()
+    for file in files.values():
+        file.seek(0)
+        file.close()
 
-    return temp.name
+    return file_names
