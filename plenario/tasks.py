@@ -189,7 +189,9 @@ def start_and_end_of_the_month(dt: datetime):
 
 
 @worker.task()
-def archive() -> bool:
+def archive(dt: datetime) -> bool:
+    """Store the feature data into tar files organized by node and upload
+    those tar files to s3."""
 
     # Get table objects for all known feature tables in redshift database
     redshift_base.metadata.reflect()
@@ -202,7 +204,7 @@ def archive() -> bool:
         pass
 
     # Get the start and end datetime bounds for this month
-    start, end = start_and_end_of_the_month(datetime.now())
+    start, end = start_and_end_of_the_month(dt)
 
     # Break each feature of interest table up into csv files grouped by node
     csv_file_groups = []
