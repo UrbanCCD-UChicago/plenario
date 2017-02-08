@@ -18,3 +18,6 @@ cron:
  - name: "weather"
    url: "/update/weather"
    schedule: "0 4 * * *"
+ - name: "archive"
+   url: "/archive"
+   schedule: "0 0 * * *"
