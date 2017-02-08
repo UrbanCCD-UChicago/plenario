@@ -14,7 +14,6 @@ from plenario.database import redshift_session
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
-from plenario.models.SensorNetwork import NodeMeta
 from plenario.settings import PLENARIO_SENTRY_URL, CELERY_RESULT_BACKEND
 from plenario.settings import CELERY_BROKER_URL
 from plenario.utils.helpers import reflect
@@ -193,8 +192,14 @@ def start_and_end_of_the_month(dt: datetime):
 def archive() -> bool:
 
     # Get table objects for all known feature tables in redshift database
+    redshift_base.metadata.reflect()
     tables = dict(redshift_base.metadata.tables)
-    del tables['array_of_things_chicago__unknown_feature']
+
+    try:
+        del tables['array_of_things_chicago__unknown_feature']
+    except KeyError:
+        # The unknown feature table might not exist in test environments
+        pass
 
     # Get the start and end datetime bounds for this month
     start, end = start_and_end_of_the_month(datetime.now())
@@ -203,46 +208,46 @@ def archive() -> bool:
     csv_file_groups = []
     for table in tables.values():
         # Save the list of generated file names
-        csv_file_groups.append(csvify(table, start, end))
-
-    # Get the node ids for the current network
-    network = 'array_of_things_chicago'
-    nodes = NodeMeta.index(network)
-
-    # Reserve list for each node that will contain a nodes relevant file names
-    tar_groups = {}
-    for node in nodes:
-        tar_groups[node] = []
+        csv_file_groups.append(
+            table_to_csvs(table, start, end))
 
     # Sort the file names into groups by node
+    tar_groups = {}
     for file_group in csv_file_groups:
-        for file_name in file_group:
-            node = file_name.split('--')[0]
-            tar_groups[node].append(file_name)
-
-    s3 = boto3.resource('s3')
-    bucket = s3.Bucket(Config.S3_BUCKET)
+        for file_path in file_group:
+            node = file_path.split('--', 1)[0]
+            tar_groups.setdefault(node, []).append(file_path)
 
     # Tar and upload each group of files for a single node
     for node, tar_group in tar_groups.items():
-        tar = tarfile.open('{}.tar.gz'.format(node), mode='w:gz')
-        for file_name in tar_group:
-            print(file_name)
-            tar.add(file_name)
-            os.remove(file_name)
+
+        tarfile_path = '{}.tar.gz'.format(node)
+
+        tar = tarfile.open(tarfile_path, mode='w:gz')
+        for file_path in tar_group:
+            tar.add(file_path)
+            os.remove(file_path)
         tar.close()
 
-        file = open('{}.tar.gz'.format(node), 'rb')
-        bucket.put_object(
-            Key='{}-{}/{}.tar.gz'.format(start.year, start.month, node),
-            Body=file)
-        file.close()
-        os.remove('{}.tar.gz'.format(node))
+        s3_destination = '{}-{}/{}.tar.gz'.format(start.year, start.month, node)
+        s3_upload(tarfile_path, s3_destination)
+        os.remove(tarfile_path)
 
     return True
 
 
-def csvify(table: Table, start: datetime, end: datetime) -> list:
+def s3_upload(path: str, dest: str):
+    """Upload file found at path to s3."""
+
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket(Config.S3_BUCKET)
+    file = open(path, 'rb')
+
+    bucket.put_object(Key=dest, Body=file)
+    file.close()
+
+
+def table_to_csvs(table: Table, start: datetime, end: datetime) -> list:
     """Take a feature of interest table and split it into a bunch of csv files
     that are grouped by node. Return the names of all the files it made."""
 

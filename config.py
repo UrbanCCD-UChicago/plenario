@@ -3,18 +3,19 @@ import os
 
 class Default:
 
-    POSTGRES_URI = 'postgresql://postgres:password@localhost:5432/plenario_dev'
-    REDSHIFT_URI = 'postgresql://postgres:password@localhost:5432/plenario_dev'
+    BASE_URI = 'postgresql://postgres:password@localhost:5432'
+    POSTGRES_URI = BASE_URI + '/plenario_dev'
+    REDSHIFT_URI = BASE_URI + '/plenario_dev_rs'
 
 
-class DevConfig:
+class DevConfig(Default):
 
     POSTGRES_URI = os.environ.get('DEV_POSTGRES_URI') or Default.POSTGRES_URI
     REDSHIFT_URI = os.environ.get('DEV_REDSHIFT_URI') or Default.REDSHIFT_URI
     S3_BUCKET = os.environ.get('DEV_S3_BUCKET') or 'plenario-dev'
 
 
-class TestConfig:
+class TestConfig(Default):
 
     POSTGRES_URI = os.environ.get('TEST_POSTGRES_URI') or Default.POSTGRES_URI
     REDSHIFT_URI = os.environ.get('TEST_REDSHIFT_URI') or Default.REDSHIFT_URI

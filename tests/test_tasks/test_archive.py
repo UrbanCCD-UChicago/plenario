@@ -3,9 +3,10 @@ import unittest
 from datetime import datetime, timedelta
 from sqlalchemy import MetaData
 from sqlalchemy import Table, Column, String, DateTime, Float
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
-from plenario.database import app_engine as engine
+from plenario.database import redshift_engine as engine
 from plenario.tasks import archive
 
 
@@ -26,7 +27,11 @@ class TestArchive(unittest.TestCase):
     def setUpClass(cls):
 
         cls.session = sessionmaker(bind=engine)()
-        temperature.create(engine)
+
+        try:
+            temperature.create(engine)
+        except ProgrammingError:
+            pass
 
         time = datetime.now()
         time = time.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -46,5 +51,5 @@ class TestArchive(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
 
-        temperature.drop()
+        temperature.drop(bind=engine)
         cls.session.close()
