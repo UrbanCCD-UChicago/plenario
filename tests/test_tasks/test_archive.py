@@ -55,8 +55,7 @@ class TestArchive(unittest.TestCase):
 
     def test_archive(self):
 
-        dt = parse('2017-01')
-        archive(dt)
+        archive('2017-01')
 
         s3 = boto3.client('s3')
         with open('test.tar.gz', 'wb') as file:

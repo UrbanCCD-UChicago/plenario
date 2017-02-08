@@ -5,6 +5,7 @@ import tarfile
 
 from celery import Celery
 from datetime import datetime, timedelta
+from dateutil.parser import parse as date_parse
 from raven import Client
 from sqlalchemy import Table
 
@@ -189,7 +190,7 @@ def start_and_end_of_the_month(dt: datetime):
 
 
 @worker.task()
-def archive(dt: datetime) -> bool:
+def archive(dt: str) -> bool:
     """Store the feature data into tar files organized by node and upload
     those tar files to s3."""
 
@@ -204,7 +205,7 @@ def archive(dt: datetime) -> bool:
         pass
 
     # Get the start and end datetime bounds for this month
-    start, end = start_and_end_of_the_month(dt)
+    start, end = start_and_end_of_the_month(date_parse(dt))
 
     # Break each feature of interest table up into csv files grouped by node
     csv_file_groups = []
