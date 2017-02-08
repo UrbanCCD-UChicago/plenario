@@ -20,6 +20,8 @@ from plenario.settings import CELERY_BROKER_URL
 from plenario.utils.helpers import reflect
 from plenario.utils.weather import WeatherETL
 
+from config import Config
+
 
 client = Client(PLENARIO_SENTRY_URL) if PLENARIO_SENTRY_URL else None
 
@@ -195,7 +197,7 @@ def archive() -> bool:
     del tables['array_of_things_chicago__unknown_feature']
 
     # Get the start and end datetime bounds for this month
-    start, end = start_and_end_of_the_month(datetime.now() - timedelta(days=10))
+    start, end = start_and_end_of_the_month(datetime.now())
 
     # Break each feature of interest table up into csv files grouped by node
     csv_file_groups = []
@@ -219,7 +221,7 @@ def archive() -> bool:
             tar_groups[node].append(file_name)
 
     s3 = boto3.resource('s3')
-    bucket = s3.Bucket('plenario-test')
+    bucket = s3.Bucket(Config.S3_BUCKET)
 
     # Tar and upload each group of files for a single node
     for node, tar_group in tar_groups.items():
@@ -232,7 +234,7 @@ def archive() -> bool:
 
         file = open('{}.tar.gz'.format(node), 'rb')
         bucket.put_object(
-            Key='{}/{}.tar.gz'.format(start.date(), node),
+            Key='{}-{}/{}.tar.gz'.format(start.year, start.month, node),
             Body=file)
         file.close()
         os.remove('{}.tar.gz'.format(node))

@@ -1,4 +1,3 @@
-import os
 from sqlalchemy import create_engine, and_, text, func
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
@@ -6,10 +5,12 @@ from sqlalchemy.exc import InvalidRequestError
 
 from plenario.settings import DATABASE_CONN, REDSHIFT_CONN
 
-if os.environ.get('WORKER'):
-    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=8, max_overflow=8, pool_timeout=60, echo=False)
-else:
+from config import Config
+
+if not Config.POSTGRES_URI:
     app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=4, max_overflow=4, pool_timeout=60, echo=False)
+else:
+    app_engine = create_engine(Config.POSTGRES_URI)
 
 session = scoped_session(sessionmaker(bind=app_engine,
                                       autocommit=False,
@@ -18,7 +19,10 @@ Base = declarative_base(bind=app_engine)
 Base.query = session.query_property()
 
 
-redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=False, pool_size=50, max_overflow=50)
+if not Config.REDSHIFT_URI:
+    redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=False, pool_size=50, max_overflow=50)
+else:
+    redshift_engine = create_engine(Config.REDSHIFT_URI)
 
 redshift_session = scoped_session(
     sessionmaker(
