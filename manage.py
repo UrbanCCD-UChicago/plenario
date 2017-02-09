@@ -101,6 +101,7 @@ def init():
 
     from plenario.database import create_extension
     from plenario.database import app_engine as plenario_engine, Base
+    from plenario.utils.weather import WeatherETL, WeatherStationsETL
 
     for extension in ['plv8', 'postgis']:
         try:
@@ -110,6 +111,10 @@ def init():
 
     print('[plenario] Creating metadata tables')
     Base.metadata.create_all()
+
+    print('[plenario] Creating weather tables')
+    WeatherETL().make_tables()
+    WeatherStationsETL()._make_station_table()
 
     from plenario.database import psql
 
