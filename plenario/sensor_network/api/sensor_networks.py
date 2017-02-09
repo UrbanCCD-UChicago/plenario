@@ -1,8 +1,9 @@
+import boto3
 import csv
 import io
 
 from datetime import datetime, timedelta
-from flask import request, Response, stream_with_context, jsonify
+from flask import request, Response, stream_with_context, jsonify, redirect
 from marshmallow import Schema
 from marshmallow.exceptions import ValidationError
 from marshmallow.fields import Field, List, DateTime, Integer, String
@@ -16,6 +17,8 @@ from plenario.api.common import extract_first_geometry_fragment
 from plenario.api.common import make_cache_key
 from plenario.database import windowed_query
 from plenario.utils.helpers import reflect
+
+from config import Config
 
 # Cache timeout of 5 minutes
 CACHE_TIMEOUT = 60 * 10
@@ -183,6 +186,46 @@ def get_node_metadata(network: str, node: str = None) -> Response:
 
     result = [format_node_metadata(n) for n in nodes]
     return jsonify(json_response_base(validated, result, args))
+
+
+@crossdomain(origin="*")
+def get_node_download(network: str, node: str):
+    """Return an aws presigned-url to download a month of tar'd node data."""
+
+    args = request.args.to_dict()
+    args.update({
+        "network": network,
+        "node": node,
+        "datetime": args.get('datetime')
+    })
+
+    validator = Validator()
+    validated = validator.load(args)
+    if validated.errors:
+        return bad_request(validated.errors)
+
+    dt = validated.data['datetime']
+    year_and_month = '{}-{}'.format(dt.year, dt.month)
+    key = year_and_month + '/' + node + '.tar.gz'
+    return redirect(presigned_url(Config.S3_BUCKET, key, node))
+
+
+def presigned_url(bucket: str, key: str, file_name: str) -> str:
+    """Generate a url that lets a user have download access to an s3 object for
+    a limited amount of time."""
+
+    params = {
+        "Bucket": bucket,
+        "Key": key,
+        "ResponseContentDisposition": "attachment; {}".format(file_name)
+    }
+
+    s3_client = boto3.client('s3')
+    return s3_client.generate_presigned_url(
+        ClientMethod="get_object",
+        Params=params,
+        ExpiresIn=300
+    )
 
 
 # @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
