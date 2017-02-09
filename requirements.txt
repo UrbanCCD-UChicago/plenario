@@ -1,9 +1,10 @@
 alembic==0.8.8
-bcrypt==3.1.0
+bcrypt==3.1.2
 blinker==1.4
 boto==2.42.0
 boto3==1.4.0
 botocore==1.4.58
+celery==4.0.2
 cffi==1.8.3
 click==6.6
 contextlib2==0.5.4
@@ -22,6 +23,7 @@ Flask-Security==1.7.5
 Flask-Script
 Flask-SQLAlchemy==2.1
 Flask-WTF==0.12
+flower==0.9.1
 futures==3.0.5
 GeoAlchemy2==0.3.0
 gunicorn==19.6.0
@@ -54,6 +56,3 @@ sqlalchemy-redshift==0.5.0
 Werkzeug==0.11.10
 WTForms==2.1
 xlrd==1.0.0
-
-celery
-flower
