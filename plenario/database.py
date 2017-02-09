@@ -1,7 +1,10 @@
+import subprocess
+
 from sqlalchemy import create_engine, and_, text, func
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, scoped_session
 
 from plenario.settings import DATABASE_CONN, REDSHIFT_CONN
 
@@ -105,3 +108,29 @@ def fast_count(q):
     return count
 # Redshift connection setup
 
+
+def create_database(bind: Engine, database: str) -> None:
+    """Setup a database (schema) in postgresql."""
+
+    print('[plenario] Create database %s' % database)
+    connection = bind.connect()
+    connection.execute("commit")
+    connection.execute("create database %s" % database)
+    connection.close()
+
+
+def create_extension(bind: Engine, extension: str) -> None:
+    """Setup an extension in postgresql."""
+
+    print('[plenario] Create extension %s' % extension)
+    connection = bind.connect()
+    connection.execute("create extension %s" % extension)
+    connection.close()
+
+
+def psql(path: str) -> None:
+    """Use psql to run a file at some path."""
+
+    print('[plenario] Psql file %s' % path)
+    command = 'psql {} -f {}'.format(Config.POSTGRES_URI, path)
+    subprocess.check_call(command, shell=True)

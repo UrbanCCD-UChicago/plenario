@@ -4,8 +4,13 @@ import os
 class Default:
 
     BASE_URI = 'postgresql://postgres:password@localhost:5432'
+    DB_NAME = 'plenario_test'
     POSTGRES_URI = BASE_URI + '/plenario_dev'
     REDSHIFT_URI = BASE_URI + '/plenario_dev_rs'
+
+    USERNAME = 'plenario'
+    EMAIL = 'plenario@admin.com'
+    PASSWORD = 'changemeplz'
 
 
 class DevConfig(Default):
@@ -36,3 +41,6 @@ configs = {
 }
 
 Config = configs[os.environ.get('CONFIG') or 'dev']
+
+
+Config.CELERY_RESULT_BACKEND = 'db+' + Config.POSTGRES_URI

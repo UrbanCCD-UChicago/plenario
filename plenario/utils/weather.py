@@ -1495,7 +1495,7 @@ class WeatherStationsETL(object):
             ftp = FTP(self.stations_ftp)
             ftp.login()
             stations = StringIO()
-            ftp.retrbinary('RETR %s' % self.stations_file, stations.write)
+            ftp.retrlines('RETR %s' % self.stations_file, stations.write)
             self.station_raw_info = stations
             self.station_raw_info.seek(0)
         except:

@@ -28,7 +28,7 @@ client = Client(PLENARIO_SENTRY_URL) if PLENARIO_SENTRY_URL else None
 worker = Celery(
     "worker",
     broker=CELERY_BROKER_URL,
-    backend=CELERY_RESULT_BACKEND
+    backend=Config.CELERY_RESULT_BACKEND
 )
 
 
