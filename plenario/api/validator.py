@@ -482,7 +482,7 @@ def valid_column_condition(table, column_name, value):
     # Dates are trickier than other types, the check that follows this will
     # not correctly approve string dates because they are usually coerced from
     # int values.
-    if 'date' in column_name:
+    if str(column.type) == 'DATE':
         try:
             parser.parse(value)
             return True
