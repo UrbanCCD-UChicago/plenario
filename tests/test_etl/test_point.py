@@ -8,7 +8,6 @@ from plenario.etl.point import Staging, PlenarioETL
 import os
 import json
 from datetime import date
-from init_db import init_meta
 from plenario.models import MetaTable
 
 pwd = os.path.dirname(os.path.realpath(__file__))

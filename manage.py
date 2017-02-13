@@ -11,9 +11,9 @@ from os import getenv
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from plenario import create_app as server
+from plenario.settings import DATABASE_CONN, REDSHIFT_CONN, DB_NAME
+from plenario.settings import DEFAULT_USER
 from plenario.worker import create_worker as worker
-
-from config import Config
 
 
 # Ignore warnings stating that libraries we depend on use deprecated flask code
@@ -58,16 +58,16 @@ def monitor():
 def pg():
     """Psql into postgres."""
 
-    print("[plenario] Connecting to %s" % Config.POSTGRES_URI)
-    wait(subprocess.Popen(["psql", Config.POSTGRES_URI]))
+    print("[plenario] Connecting to %s" % DATABASE_CONN)
+    wait(subprocess.Popen(["psql", DATABASE_CONN]))
 
 
 @manager.command
 def rs():
     """Psql into redshift."""
 
-    print("[plenario] Connecting to %s" % Config.REDSHIFT_URI)
-    wait(subprocess.Popen(["psql", Config.REDSHIFT_URI]))
+    print("[plenario] Connecting to %s" % REDSHIFT_CONN)
+    wait(subprocess.Popen(["psql", REDSHIFT_CONN]))
 
 
 @manager.command
@@ -92,10 +92,11 @@ def init():
     from plenario.database import create_database
     from sqlalchemy import create_engine
 
-    base_engine = create_engine(Config.BASE_URI)
+    base_uri = DATABASE_CONN.rsplit('/', 1)[0]
+    base_engine = create_engine(base_uri)
 
     try:
-        create_database(base_engine, Config.DB_NAME)
+        create_database(base_engine, DB_NAME)
     except ProgrammingError:
         print('[plenario] It already exists!')
 
@@ -114,7 +115,7 @@ def init():
 
     print('[plenario] Creating weather tables')
     WeatherETL().make_tables()
-    WeatherStationsETL()._make_station_table()
+    WeatherStationsETL().make_station_table()
 
     from plenario.database import psql
 
@@ -129,11 +130,7 @@ def init():
         from plenario.models.User import User
 
         print('[plenario] Create default user')
-        user = User(
-            name=Config.USERNAME,
-            email=Config.EMAIL,
-            password=Config.PASSWORD
-        )
+        user = User(**DEFAULT_USER)
 
         try:
             session.add(user)

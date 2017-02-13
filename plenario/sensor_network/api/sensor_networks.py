@@ -16,9 +16,8 @@ from plenario.api.common import cache, crossdomain, make_fragment_str
 from plenario.api.common import extract_first_geometry_fragment
 from plenario.api.common import make_cache_key
 from plenario.database import windowed_query
+from plenario.settings import S3_BUCKET
 from plenario.utils.helpers import reflect
-
-from config import Config
 
 # Cache timeout of 5 minutes
 CACHE_TIMEOUT = 60 * 10
@@ -207,7 +206,7 @@ def get_node_download(network: str, node: str):
     dt = validated.data['datetime']
     year_and_month = '{}-{}'.format(dt.year, dt.month)
     key = year_and_month + '/' + node + '.tar.gz'
-    return redirect(presigned_url(Config.S3_BUCKET, key, node))
+    return redirect(presigned_url(S3_BUCKET, key, node))
 
 
 def presigned_url(bucket: str, key: str, file_name: str) -> str:
@@ -727,7 +726,7 @@ def sanitize_validated_args():
     pass
 
 
-from plenario.database import redshift_session, redshift_engine, redshift_Base as redshift_base
+from plenario.database import redshift_session, redshift_engine, redshift_base as redshift_base
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.api.validator import sensor_network_validate
 from plenario.sensor_network.api.sensor_validator import NearMeValidator

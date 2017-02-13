@@ -8,12 +8,7 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 
 from plenario.settings import DATABASE_CONN, REDSHIFT_CONN
 
-from config import Config
-
-if not Config.POSTGRES_URI:
-    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=4, max_overflow=4, pool_timeout=60, echo=False)
-else:
-    app_engine = create_engine(Config.POSTGRES_URI)
+app_engine = create_engine(DATABASE_CONN, convert_unicode=True, max_overflow=-1)
 
 session = scoped_session(sessionmaker(bind=app_engine,
                                       autocommit=False,
@@ -22,10 +17,7 @@ Base = declarative_base(bind=app_engine)
 Base.query = session.query_property()
 
 
-if not Config.REDSHIFT_URI:
-    redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=False, pool_size=50, max_overflow=50)
-else:
-    redshift_engine = create_engine(Config.REDSHIFT_URI)
+redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, max_overflow=-1)
 
 redshift_session = scoped_session(
     sessionmaker(
@@ -36,8 +28,8 @@ redshift_session = scoped_session(
     )
 )
 
-redshift_Base = declarative_base(bind=redshift_engine)
-redshift_Base.query = redshift_session.query_property()
+redshift_base = declarative_base(bind=redshift_engine)
+redshift_base.query = redshift_session.query_property()
 
 
 # Efficient query of large datasets (for use in DataDump)
@@ -132,5 +124,5 @@ def psql(path: str) -> None:
     """Use psql to run a file at some path."""
 
     print('[plenario] Psql file %s' % path)
-    command = 'psql {} -f {}'.format(Config.POSTGRES_URI, path)
+    command = 'psql {} -f {}'.format(DATABASE_CONN, path)
     subprocess.check_call(command, shell=True)

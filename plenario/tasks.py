@@ -10,17 +10,14 @@ from raven import Client
 from sqlalchemy import Table
 
 from plenario.database import session as session, Base, app_engine as engine
-from plenario.database import redshift_Base as redshift_base
-from plenario.database import redshift_session
+from plenario.database import redshift_base, redshift_session
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
 from plenario.settings import PLENARIO_SENTRY_URL, CELERY_RESULT_BACKEND
-from plenario.settings import CELERY_BROKER_URL
+from plenario.settings import CELERY_BROKER_URL, S3_BUCKET
 from plenario.utils.helpers import reflect
 from plenario.utils.weather import WeatherETL
-
-from config import Config
 
 
 client = Client(PLENARIO_SENTRY_URL) if PLENARIO_SENTRY_URL else None
@@ -28,7 +25,7 @@ client = Client(PLENARIO_SENTRY_URL) if PLENARIO_SENTRY_URL else None
 worker = Celery(
     "worker",
     broker=CELERY_BROKER_URL,
-    backend=Config.CELERY_RESULT_BACKEND
+    backend=CELERY_RESULT_BACKEND
 )
 
 
@@ -243,7 +240,7 @@ def s3_upload(path: str, dest: str):
     """Upload file found at path to s3."""
 
     s3 = boto3.resource('s3')
-    bucket = s3.Bucket(Config.S3_BUCKET)
+    bucket = s3.Bucket(S3_BUCKET)
     file = open(path, 'rb')
 
     bucket.put_object(Key=dest, Body=file)

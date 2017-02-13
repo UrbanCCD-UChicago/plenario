@@ -4,7 +4,7 @@ from sqlalchemy import func as sqla_fn, Boolean, BigInteger, DateTime, Float
 from sqlalchemy.dialects.postgresql import JSONB, DOUBLE_PRECISION
 from sqlalchemy.orm import relationship
 
-from plenario.database import Base, session, redshift_Base as redshift_base
+from plenario.database import Base, session, redshift_base as redshift_base
 from plenario.utils.model_helpers import knn
 
 

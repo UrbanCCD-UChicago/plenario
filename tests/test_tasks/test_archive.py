@@ -13,9 +13,8 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
 from plenario.database import redshift_engine as engine
+from plenario.settings import S3_BUCKET
 from plenario.tasks import archive
-
-from config import Config
 
 
 metadata = MetaData()
@@ -59,7 +58,7 @@ class TestArchive(unittest.TestCase):
 
         s3 = boto3.client('s3')
         with open('test.tar.gz', 'wb') as file:
-            s3.download_fileobj(Config.S3_BUCKET, '2017-1/0.tar.gz', file)
+            s3.download_fileobj(S3_BUCKET, '2017-1/0.tar.gz', file)
 
         tar = tarfile.open('test.tar.gz')
         tar.extractall()

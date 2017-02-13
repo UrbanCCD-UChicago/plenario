@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import and_, func, Table, asc
 from sqlalchemy.sql import select
 
-from plenario.database import redshift_Base as redshift_base
+from plenario.database import redshift_base as redshift_base
 from plenario.database import redshift_session as r_session
 
 
