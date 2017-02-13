@@ -2,7 +2,7 @@ from collections import defaultdict
 from flask import Blueprint, make_response, request
 from json import dumps, loads
 from redis import Redis
-from sqlalchemy import func
+from sqlalchemy import func, select, desc
 from traceback import format_exc
 
 from plenario.database import redshift_session as rshift_session
@@ -10,6 +10,7 @@ from plenario.database import session as psql_session
 from plenario.database import Base as psql_base, app_engine as psql_engine
 from plenario.database import redshift_base as rshift_base
 from plenario.database import redshift_engine as rshift_engine
+from plenario.models.SensorNetwork import NetworkMeta, SensorMeta
 from plenario.settings import REDIS_HOST
 from plenario.utils.helpers import reflect
 
@@ -116,3 +117,39 @@ def send_message():
         return make_response("Message received successfully!", 200)
     except (KeyError, ValueError):
         return make_response(format_exc(), 500)
+
+
+def index() -> list:
+    """Generate the information necessary for displaying unknown features on the
+    admin index page."""
+
+    # todo: iterate over all networks
+
+    rshift_base.metadata.reflect()
+    unknown_features = rshift_base.metadata.tables['array_of_things_chicago__unknown_feature']
+
+    query = select([unknown_features])               \
+        .order_by(desc(unknown_features.c.datetime)) \
+        .limit(5)
+    rp = query.execute()
+
+    results = []
+    for row in rp:
+
+        sensor = SensorMeta.query.get(row.sensor)
+
+        if sensor is None:
+            expected = "No metadata exists for this sensor!"
+        else:
+            expected = dumps(sensor.observed_properties, indent=2, sort_keys=True)
+
+        result = {
+            'sensor': row.sensor,
+            'datetime': row.datetime,
+            'incoming': dumps(loads(row.data), indent=2, sort_keys=True, default=str),
+            'expected': expected
+        }
+
+        results.append(result)
+
+    return results

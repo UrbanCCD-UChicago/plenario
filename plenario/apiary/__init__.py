@@ -9,7 +9,7 @@ from .admin_view import admin_views
 from plenario.database import session
 from plenario.models.SensorNetwork import FeatureMeta
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, SensorMeta
-from .views import blueprint, redis
+from .views import blueprint, redis, index
 
 
 class ApiaryIndexView(AdminIndexView):
@@ -22,10 +22,10 @@ class ApiaryIndexView(AdminIndexView):
     
     @expose("/")
     def index(self):
-        errors = defaultdict(list)
-        for key in redis.scan_iter(match="AOTMapper_*"):
-            errors[key].append(redis.get(key))
-        return self.render("apiary/index.html", errors=errors)
+        try:
+            return self.render('apiary/index.html', elements=index())
+        except KeyError:
+            return self.render('apiary/index.html', elements=[])
 
 
 admin = Admin(
