@@ -1,3 +1,4 @@
+from datetime import datetime
 from flask import Flask
 
 import plenario.tasks as tasks
@@ -20,6 +21,10 @@ def create_worker():
     @app.route('/update/<frequency>', methods=['POST'])
     def update(frequency):
         return tasks.frequency_update.delay(frequency).id
+
+    @app.route('/archive', methods=['POST'])
+    def archive():
+        return tasks.archive.delay(datetime.now()).id
 
     @app.route('/health', methods=['GET', 'POST'])
     def check_health():

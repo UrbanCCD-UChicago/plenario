@@ -11,7 +11,7 @@ from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
 
-from init_db import init_meta, init_worker_meta
+from manage import init
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 
@@ -68,8 +68,7 @@ class BasePlenarioTest(unittest.TestCase):
         drop_tables(meta_table_names)
 
         # Re-add meta tables
-        init_meta()
-        init_worker_meta()
+        init()
 
         cls.app = create_app().test_client()
 

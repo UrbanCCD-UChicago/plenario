@@ -1,12 +1,10 @@
-import json
-
 from geoalchemy2 import Geometry
 from sqlalchemy import Table, String, Column, ForeignKey, ForeignKeyConstraint
-from sqlalchemy import and_, func as sqla_fn
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import func as sqla_fn, Boolean, BigInteger, DateTime, Float
+from sqlalchemy.dialects.postgresql import JSONB, DOUBLE_PRECISION
 from sqlalchemy.orm import relationship
 
-from plenario.database import Base, session
+from plenario.database import Base, session, redshift_base as redshift_base
 from plenario.utils.model_helpers import knn
 
 
@@ -178,5 +176,45 @@ class FeatureMeta(Base):
             FeatureMeta.name == feature)
         return [feature + "." + prop["name"] for prop in query.first().observed_properties]
 
+    def mirror(self):
+        """Create feature tables in redshift for all the networks associated
+        with this feature."""
+
+        for network in self.networks:
+            self._mirror(network.name)
+
+    def _mirror(self, network_name: str):
+        """Create a feature table in redshift for the specified network."""
+
+        columns = []
+        for feature in self.observed_properties:
+            column_name = feature['name']
+            column_type = database_types[feature['type'].upper()]
+            columns.append(Column(column_name, column_type, default=None))
+
+        redshift_table = Table(
+            '{}__{}'.format(network_name, self.name),
+            redshift_base.metadata,
+            Column('node_id', String, primary_key=True),
+            Column('datetime', DateTime, primary_key=True),
+            Column('meta_id', Float, nullable=False),
+            Column('sensor', String, nullable=False),
+            *columns,
+            redshift_distkey='datetime',
+            redshift_sortkey='datetime'
+        )
+
+        redshift_table.create()
+
     def __repr__(self):
         return '<Feature "{}">'.format(self.name)
+
+
+database_types = {
+    'FLOAT': DOUBLE_PRECISION,
+    'DOUBLE': DOUBLE_PRECISION,
+    'STRING': String,
+    'BOOL': Boolean,
+    'INT': BigInteger,
+    'INTEGER': BigInteger
+}

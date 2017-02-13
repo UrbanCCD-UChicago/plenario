@@ -1,6 +1,3 @@
-create extension plv8;
-
-
 create or replace function invert(j jsonb) returns jsonb as $$
 
     var result = {};

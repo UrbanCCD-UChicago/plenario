@@ -21,7 +21,7 @@ class User(Base):
         return self._password
 
     def _set_password(self, value):
-        self._password = bcrypt.generate_password_hash(value)
+        self._password = bcrypt.generate_password_hash(value).decode('utf-8')
 
     password = property(_get_password, _set_password)
     password = synonym('_password', descriptor=password)

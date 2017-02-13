@@ -6,7 +6,7 @@ from flask import make_response, Blueprint
 from .common import cache, make_cache_key
 from plenario.sensor_network.api.sensor_networks import get_network_metadata, get_node_metadata, \
     get_observations, get_feature_metadata, get_sensor_metadata, get_aggregations, get_observations_download, \
-    get_observation_nearest, get_network_map, check
+    get_observation_nearest, get_network_map, check, get_node_download
 from plenario.sensor_network.api.ifttt import get_ifttt_observations, get_ifttt_meta, ifttt_status, ifttt_test_setup
 from .point import timeseries, detail, meta, dataset_fields, grid, detail_aggregate, datadump_view, get_job_view
 from .sensor import weather_stations, weather, weather_fill
@@ -49,6 +49,7 @@ api.add_url_rule(prefix + '/sensor-networks/<network>/check', 'check', check)
 
 api.add_url_rule(prefix + '/sensor-networks/<network>/nodes', 'network_nodes', get_node_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network>/nodes/<node>', 'single_node', get_node_metadata)
+api.add_url_rule(prefix + '/sensor-networks/<network>/nodes/<node>/download', 'node_download', get_node_download)
 
 api.add_url_rule(prefix + '/sensor-networks/<network>/features', 'features', get_feature_metadata)
 api.add_url_rule(prefix + '/sensor-networks/<network>/features/<feature>', 'features', get_feature_metadata)

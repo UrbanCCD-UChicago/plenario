@@ -1,15 +1,14 @@
-import os
+import subprocess
+
 from sqlalchemy import create_engine, and_, text, func
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, scoped_session
 
 from plenario.settings import DATABASE_CONN, REDSHIFT_CONN
 
-if os.environ.get('WORKER'):
-    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=8, max_overflow=8, pool_timeout=60, echo=False)
-else:
-    app_engine = create_engine(DATABASE_CONN, convert_unicode=True, pool_size=4, max_overflow=4, pool_timeout=60, echo=False)
+app_engine = create_engine(DATABASE_CONN, convert_unicode=True, max_overflow=-1)
 
 session = scoped_session(sessionmaker(bind=app_engine,
                                       autocommit=False,
@@ -18,7 +17,7 @@ Base = declarative_base(bind=app_engine)
 Base.query = session.query_property()
 
 
-redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, echo=False, pool_size=50, max_overflow=50)
+redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, max_overflow=-1)
 
 redshift_session = scoped_session(
     sessionmaker(
@@ -29,8 +28,8 @@ redshift_session = scoped_session(
     )
 )
 
-redshift_Base = declarative_base(bind=redshift_engine)
-redshift_Base.query = redshift_session.query_property()
+redshift_base = declarative_base(bind=redshift_engine)
+redshift_base.query = redshift_session.query_property()
 
 
 # Efficient query of large datasets (for use in DataDump)
@@ -101,3 +100,29 @@ def fast_count(q):
     return count
 # Redshift connection setup
 
+
+def create_database(bind: Engine, database: str) -> None:
+    """Setup a database (schema) in postgresql."""
+
+    print('[plenario] Create database %s' % database)
+    connection = bind.connect()
+    connection.execute("commit")
+    connection.execute("create database %s" % database)
+    connection.close()
+
+
+def create_extension(bind: Engine, extension: str) -> None:
+    """Setup an extension in postgresql."""
+
+    print('[plenario] Create extension %s' % extension)
+    connection = bind.connect()
+    connection.execute("create extension %s" % extension)
+    connection.close()
+
+
+def psql(path: str) -> None:
+    """Use psql to run a file at some path."""
+
+    print('[plenario] Psql file %s' % path)
+    command = 'psql {} -f {}'.format(DATABASE_CONN, path)
+    subprocess.check_call(command, shell=True)

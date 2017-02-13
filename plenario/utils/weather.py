@@ -1474,7 +1474,7 @@ class WeatherStationsETL(object):
     def initialize(self):
         self._extract()
         self._transform()
-        self._make_station_table()
+        self.make_station_table()
         try:
             self._load()
         except:
@@ -1485,7 +1485,7 @@ class WeatherStationsETL(object):
         self._extract()
         self._transform()
         # Doing this just so self.station_table is defined
-        self._make_station_table()
+        self.make_station_table()
         self._update_stations()
 
     def _extract(self):
@@ -1495,7 +1495,7 @@ class WeatherStationsETL(object):
             ftp = FTP(self.stations_ftp)
             ftp.login()
             stations = StringIO()
-            ftp.retrbinary('RETR %s' % self.stations_file, stations.write)
+            ftp.retrlines('RETR %s' % self.stations_file, stations.write)
             self.station_raw_info = stations
             self.station_raw_info.seek(0)
         except:
@@ -1538,7 +1538,7 @@ class WeatherStationsETL(object):
         writer.writerows(all_rows)
         self.clean_station_info.seek(0)
 
-    def _make_station_table(self):
+    def make_station_table(self):
         self.station_table = Table('weather_stations', Base.metadata,
                 Column('wban_code', String(5), primary_key=True),
                 Column('station_name', String(100), nullable=False),
