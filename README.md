@@ -56,7 +56,7 @@ pip install -r requirements.txt
 If you aren't already running [PostgreSQL](http://www.postgresql.org/), 
 we recommend installing version 9.3 or later. 
 
-Make sure your the host of your database has the [PostGIS](http://postgis.net/) 
+Make sure the host of your database has the [PostGIS](http://postgis.net/) 
 extension and the [plv8](http://pgxn.org/dist/plv8/) extension installed.
 
 The following command creates a postgres database, imports the 
