@@ -9,6 +9,7 @@ import os
 import json
 from datetime import date
 from plenario.models import MetaTable
+from manage import init
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 fixtures_path = os.path.join(pwd, '../fixtures')
@@ -35,7 +36,8 @@ class StagingTableTests(TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        init_meta()
+
+        init()
 
         cls.dog_path = os.path.join(fixtures_path, 'dog_park_permits.csv')
         cls.radio_path = os.path.join(fixtures_path, 'community_radio_events.csv')

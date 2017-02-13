@@ -114,8 +114,8 @@ def init():
     Base.metadata.create_all()
 
     print('[plenario] Creating weather tables')
-    WeatherETL().make_tables()
     WeatherStationsETL().make_station_table()
+    WeatherETL().make_tables()
 
     from plenario.database import psql
 

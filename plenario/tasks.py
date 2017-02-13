@@ -207,6 +207,11 @@ def archive(dt: str) -> bool:
     # Break each feature of interest table up into csv files grouped by node
     csv_file_groups = []
     for table in tables.values():
+        try:
+            table.c.node_id
+        except AttributeError:
+            # Skip tables which are not feature of interest tables
+            continue
         # Save the list of generated file names
         csv_file_groups.append(
             table_to_csvs(table, start, end))
