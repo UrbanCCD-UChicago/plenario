@@ -40,7 +40,7 @@ Open http://localhost:5000/ on your host browser
 
 ## Running locally
 
-* Get the Plenario source:
+Get the Plenario source:
 
 ``` bash
 git clone git@github.com:UrbanCCD-UChicago/plenario.git
@@ -53,21 +53,20 @@ cd plenario
 pip install -r requirements.txt
 ```
 
-Create a PostgreSQL database for Plenario. (If you aren't already running
-[PostgreSQL](http://www.postgresql.org/), we recommend installing version 9.3 or
-later.) The following command creates the default database, `plenario_test`.
-This corresponds with the `DB_NAME` setting in your `plenario/settings.py` file
-and can be modified.
+If you aren't already running [PostgreSQL](http://www.postgresql.org/), 
+we recommend installing version 9.3 or later. 
+
+Make sure your the host of your database has the [PostGIS](http://postgis.net/) 
+extension and the [plv8](http://pgxn.org/dist/plv8/) extension installed.
+
+The following command creates a postgres database, imports the 
+plv8 and postgis extensions, and creates all the necessary tables for
+plenario to work. The database name corresponds with the `DB_NAME` 
+setting in your `plenario/settings.py` file and can be modified. It will 
+be set to `plenario_test` by default.
 
 ```
-createdb plenario_test
-```
-
-Make sure your local database has the [PostGIS](http://postgis.net/) extension:
-
-```
-psql plenario_test
-plenario_test=# CREATE EXTENSION postgis;
+./manage.py init
 ```
 
 You'll need the ogr2ogr utility - part of the gdal package. We use it to import and export shape datasets.
@@ -83,19 +82,18 @@ Ubuntu/Debian
 sudo apt-get install gdal-bin
 ```
 
-Next, create your own `settings.py`:
+The default settings should work given a typical postgres setup, however
+should you find that the init method fails to run - the first place to
+check would be the `settings.py` file.
 
-
-```
-cp plenario/settings.py.example plenario/settings.py
-```
-
-You will want to change, at the minimum, the following `settings.py` fields:
+You will likely want to change, at minimum, the following `settings.py` 
+fields:
 
 * `DATABASE_CONN`: edit this field to reflect your PostgreSQL
   username, server hostname, port, and database name.
 
-* `DEFAULT_USER`: change the username, email and password on the administrator account you will use on Plenario locally.
+* `DEFAULT_USER`: change the username, email and password on the 
+administrator account you will use on Plenario locally.
 
 Before running the server, [Redis](http://redis.io/) needs to be running.
 
@@ -105,15 +103,19 @@ Before running the server, [Redis](http://redis.io/) needs to be running.
 redis-server &
 ```
 
-Initialize the plenario database by running `python init_db.py`.
+Start up a worker:
+
+```
+./manage.py worker
+```
 
 Finally, run the server:
 
 ```
-python runserver.py
+./manage.py runserver
 ```
 
-Once the server is running, navigate to http://localhost:5001/ . From
+Once the server is running, navigate to http://localhost:5000/ . From
 the homepage, click 'Login' to log in with the username and password
 from `settings.py`. Once logged in, go to 'Add a dataset' under the
 'Admin' menu to add your own datasets.
@@ -133,6 +135,7 @@ Thanks to the maintainers of these open source projects we depend on.
 * [GDAL](http://www.gdal.org/) - geospatial data mungeing
 * [Redis](http://redis.io/) - key-value cache
 * [Gunicorn](http://gunicorn.org/) - WSGI server
+* [Celery](http://www.celeryproject.org/) - Task Queue
 
 ### Production Support
 
