@@ -129,7 +129,7 @@ class Staging(object):
         table.create(bind=engine)
 
         # Fill in the columns we expect from the CSV.
-        names = [c.name for c in self.cols]
+        names = ['"' + c.name + '"' for c in self.cols]
         copy_st = "COPY {t_name} ({cols}) FROM STDIN " \
                   "WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')".\
             format(t_name=self.name, cols=', '.join(names))
