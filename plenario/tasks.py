@@ -294,9 +294,6 @@ def map_unknown_to_foi(unknown, sensor_properties):
     :param unknown: (object) a row returned from a SQLAlchemy query
     :param sensor_properties: (dict) holds mappings from node key to FOI"""
 
-    # TODO: Make sure to handle errors, in case the resolved issue doesn't
-    # TODO: actually fix what made this these observations misfits.
-
     foi_insert_vals = defaultdict(list)
 
     for key, value in list(loads(unknown.data).items()):
@@ -305,8 +302,8 @@ def map_unknown_to_foi(unknown, sensor_properties):
         foi_insert_vals[foi].append((prop, value))
 
     for foi, insert_vals in list(foi_insert_vals.items()):
-        insert = "insert into {} (node_id, datetime, meta_id, sensor, {}) values ({})"
-        columns = ", ".join(val[0] for val in insert_vals)
+        insert = "insert into array_of_things_chicago__{} (node_id, datetime, meta_id, sensor, {}) values ({})"
+        columns = ", ".join('"' + val[0] + '"' for val in insert_vals)
 
         values = "'{}', '{}', '{}', '{}', ".format(
             unknown.node_id,
@@ -317,7 +314,7 @@ def map_unknown_to_foi(unknown, sensor_properties):
 
         redshift_engine.execute(insert.format(foi, columns, values))
 
-        delete = "delete from unknown_feature where node_id = '{}' and datetime = '{}' and meta_id = '{}' and sensor = '{}'"
+        delete = "delete from array_of_things_chicago__unknown_feature where node_id = '{}' and datetime = '{}' and meta_id = '{}' and sensor = '{}'"
         delete = delete.format(unknown.node_id, unknown.datetime, unknown.meta_id, unknown.sensor)
 
         redshift_engine.execute(delete)
@@ -333,8 +330,9 @@ def unknown_features_resolve(target_sensor) -> int:
 
     print("Resolving: {}".format(target_sensor))
 
+    # todo: unhardcode the network
     sensors = reflect("sensor__sensor_metadata", Base.metadata, engine)
-    unknowns = reflect("unknown_feature", redshift_session.metadata, redshift_engine)
+    unknowns = reflect("array_of_things_chicago__unknown_feature", redshift_base.metadata, redshift_engine)
 
     # Grab the set of keys that are used to assert if an unknown is correct
     c_obs_props = sensors.c.observed_properties
