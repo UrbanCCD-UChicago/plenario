@@ -35,7 +35,7 @@ manager = Manager(application)
 def runserver():
     """Start up plenario server."""
 
-    application.run(host="0.0.0.0", port=5000)
+    application.run(host="0.0.0.0", port=5000, debug=os.environ.get('DEBUG'))
 
 
 @manager.command

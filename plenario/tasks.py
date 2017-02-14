@@ -1,3 +1,6 @@
+from collections import defaultdict
+from json import loads
+
 import boto3
 import csv
 import os
@@ -7,10 +10,10 @@ from celery import Celery
 from datetime import datetime, timedelta
 from dateutil.parser import parse as date_parse
 from raven import Client
-from sqlalchemy import Table
+from sqlalchemy import Table, func
 
 from plenario.database import session as session, Base, app_engine as engine
-from plenario.database import redshift_base, redshift_session
+from plenario.database import redshift_base, redshift_session, redshift_engine
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
@@ -281,3 +284,89 @@ def table_to_csvs(table: Table, start: datetime, end: datetime) -> list:
         file.close()
 
     return file_names
+
+
+def map_unknown_to_foi(unknown, sensor_properties):
+    """Given a valid unknown feature row, distribute the data stored within
+    to the corresponding feature of interest tables by using the mapping
+    defined by a sensor's observed properties.
+
+    :param unknown: (object) a row returned from a SQLAlchemy query
+    :param sensor_properties: (dict) holds mappings from node key to FOI"""
+
+    # TODO: Make sure to handle errors, in case the resolved issue doesn't
+    # TODO: actually fix what made this these observations misfits.
+
+    foi_insert_vals = defaultdict(list)
+
+    for key, value in list(loads(unknown.data).items()):
+        foi = sensor_properties[key].split(".")[0]
+        prop = sensor_properties[key].split(".")[1]
+        foi_insert_vals[foi].append((prop, value))
+
+    for foi, insert_vals in list(foi_insert_vals.items()):
+        insert = "insert into {} (node_id, datetime, meta_id, sensor, {}) values ({})"
+        columns = ", ".join(val[0] for val in insert_vals)
+
+        values = "'{}', '{}', '{}', '{}', ".format(
+            unknown.node_id,
+            unknown.datetime,
+            unknown.meta_id,
+            unknown.sensor
+        ) + ", ".join(repr(val[1]) for val in insert_vals)
+
+        redshift_engine.execute(insert.format(foi, columns, values))
+
+        delete = "delete from unknown_feature where node_id = '{}' and datetime = '{}' and meta_id = '{}' and sensor = '{}'"
+        delete = delete.format(unknown.node_id, unknown.datetime, unknown.meta_id, unknown.sensor)
+
+        redshift_engine.execute(delete)
+
+
+@worker.task()
+def unknown_features_resolve(target_sensor) -> int:
+    """When the issues for a sensor with an unknown error have been resolved,
+    attempt to recover sensor readings that were originally suspended in the
+    unknowns table and insert them into the correct feature of interest table.
+
+    :param target_sensor: (str) resolved sensor"""
+
+    print("Resolving: {}".format(target_sensor))
+
+    sensors = reflect("sensor__sensors", Base.metadata, engine)
+    unknowns = reflect("unknown_feature", redshift_session.metadata, redshift_engine)
+
+    # Grab the set of keys that are used to assert if an unknown is correct
+    c_obs_props = sensors.c.observed_properties
+    q = session.query(c_obs_props).filter(sensors.c.name == target_sensor)
+    sensor_properties = q.first()[0]
+
+    print("Most up to date map: {}".format(sensor_properties))
+
+    # Grab all the candidate unknown observations
+    c_sensor = unknowns.c.sensor
+    target_unknowns = redshift_session \
+        .query(unknowns) \
+        .filter(c_sensor == target_sensor)
+
+    unresolved_count = redshift_session \
+        .query(func.count(unknowns.c.datetime)) \
+        .filter(c_sensor == target_sensor) \
+        .scalar()
+
+    print("Attempting to resolve {} rows".format(unresolved_count))
+
+    resolved = 0
+    for unknown in target_unknowns:
+
+        unknown_data = loads(unknown.data)
+        unknown_properties = list(unknown_data.keys())
+        known_properties = list(sensor_properties.keys())
+
+        if not all(key in known_properties for key in unknown_properties):
+            continue
+
+        map_unknown_to_foi(unknown, sensor_properties)
+        resolved += 1
+
+    return resolved
