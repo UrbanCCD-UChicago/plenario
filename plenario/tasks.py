@@ -333,7 +333,7 @@ def unknown_features_resolve(target_sensor) -> int:
 
     print("Resolving: {}".format(target_sensor))
 
-    sensors = reflect("sensor__sensors", Base.metadata, engine)
+    sensors = reflect("sensor__sensor_metadata", Base.metadata, engine)
     unknowns = reflect("unknown_feature", redshift_session.metadata, redshift_engine)
 
     # Grab the set of keys that are used to assert if an unknown is correct
