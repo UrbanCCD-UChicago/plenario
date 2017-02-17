@@ -529,7 +529,8 @@ def _meta(args):
     # Columns to select as-is
     cols_to_return = ['human_name', 'dataset_name', 'source_url', 'view_url',
                       'date_added', 'last_update', 'update_freq', 'attribution',
-                      'description', 'obs_from', 'obs_to', 'column_names']
+                      'description', 'obs_from', 'obs_to', 'column_names',
+                      'observed_date', 'latitude', 'longitude', 'location']
     col_objects = [getattr(MetaTable, col) for col in cols_to_return]
 
     # Columns that need pre-processing
