@@ -2,7 +2,7 @@ alembic==0.8.8
 bcrypt==3.1.2
 blinker==1.4
 boto==2.42.0
-boto3==1.4.0
+boto3==1.4.4
 botocore==1.4.58
 celery==4.0.2
 cffi==1.8.3
