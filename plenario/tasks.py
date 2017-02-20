@@ -14,6 +14,7 @@ from sqlalchemy import Table, func
 
 from plenario.database import session as session, Base, app_engine as engine
 from plenario.database import redshift_base, redshift_session, redshift_engine
+from plenario.database import redshift_session_context
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
@@ -355,7 +356,7 @@ def unknown_features_resolve(target_sensor) -> int:
     print("Attempting to resolve {} rows".format(unresolved_count))
 
     resolved = 0
-    for unknown in target_unknowns:
+    for unknown in target_unknowns.yield_per(1000):
 
         unknown_data = loads(unknown.data)
         unknown_properties = list(unknown_data.keys())
@@ -368,3 +369,16 @@ def unknown_features_resolve(target_sensor) -> int:
         resolved += 1
 
     return resolved
+
+
+def resolve():
+
+    with redshift_session_context() as session:
+        rp = session.execute('select distinct sensor from array_of_things_chicago__unknown_feature')
+        for row in rp:
+            try:
+                resolved_count = unknown_features_resolve(row.sensor)
+                print('Resolved: ' + str(resolved_count))
+            except TypeError as err:
+                print(err)
+                print('There is no metadata for sensor: {}'.format(row.sensor))
