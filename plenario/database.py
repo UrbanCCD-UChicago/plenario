@@ -1,5 +1,6 @@
 import subprocess
 
+from contextlib import contextmanager
 from sqlalchemy import create_engine, and_, text, func
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import InvalidRequestError
@@ -126,3 +127,22 @@ def psql(path: str) -> None:
     print('[plenario] Psql file %s' % path)
     command = 'psql {} -f {}'.format(DATABASE_CONN, path)
     subprocess.check_call(command, shell=True)
+
+
+@contextmanager
+def redshift_session_context():
+    """A helper method for keeping the state of an connection with the database
+    separate from the work being done, and ensuring that the session is always
+    cleaned up after use."""
+
+    transactional_session = redshift_session()
+    try:
+        yield transactional_session
+        transactional_session.commit()
+    except InvalidRequestError:
+        pass
+    except:
+        transactional_session.rollback()
+        raise
+    finally:
+        transactional_session.close()
