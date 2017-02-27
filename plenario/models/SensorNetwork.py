@@ -145,6 +145,11 @@ class SensorMeta(Base):
         """.format("{" + ",".join(features) + "}"))
 
         return [row.name for row in rp]
+    
+    def features(self) -> set:
+        """Return the features that this sensor reports on."""
+
+        return {e.split('.')[0] for e in self.tree()}
 
     def __repr__(self):
         return '<Sensor "{}">'.format(self.name)
@@ -159,6 +164,11 @@ class FeatureMeta(Base):
     name = Column(String, primary_key=True)
     networks = relationship('NetworkMeta', secondary='sensor__feature_to_network')
     observed_properties = Column(JSONB)
+
+    def types(self):
+        """Return a dictionary with the properties mapped to their types."""
+
+        return {e['name']: e['type'] for e in self.observed_properties}
 
     @staticmethod
     def index(network_name=None):
