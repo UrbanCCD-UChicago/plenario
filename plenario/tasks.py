@@ -320,7 +320,6 @@ def map_unknown_to_foi(unknown, sensor_properties):
         redshift_engine.execute(delete)
 
 
-@worker.task()
 def unknown_features_resolve(target_sensor) -> int:
     """When the issues for a sensor with an unknown error have been resolved,
     attempt to recover sensor readings that were originally suspended in the
@@ -368,3 +367,17 @@ def unknown_features_resolve(target_sensor) -> int:
         resolved += 1
 
     return resolved
+
+
+@worker.task()
+def resolve():
+
+    with redshift_session_context() as session:
+        rp = session.execute('select distinct sensor from unknown_feature')
+        for row in rp:
+            try:
+                resolved_count = unknown_features_resolve(row.sensor)
+                print('Resolved: ' + str(resolved_count))
+            except TypeError as err:
+                print(err)
+                print('There is no metadata for sensor: {}'.format(row.sensor))
