@@ -410,9 +410,9 @@ def get_observations_download(network: str) -> Response:
 
     :endpoint: /sensor-networks/<network>/download"""
 
-    nodes = request.args.get("nodes")
-    sensors = request.args.get("sensors")
-    features = request.args.get("features")
+    nodes = request.args.get("node") or request.args.get("nodes")
+    sensors = request.args.get("sensor") or request.args.get("sensors")
+    features = request.args.get("feature") or request.args.get("features")
 
     kwargs = request.args.to_dict()
     kwargs.update({
@@ -427,10 +427,6 @@ def get_observations_download(network: str) -> Response:
     if deserialized.errors:
         return bad_request(deserialized.errors)
 
-    if not kwargs["nodes"]:
-        kwargs["nodes"] = [n.id for n in deserialized.data['network'].nodes]
-    if not kwargs["sensors"]:
-        kwargs["sensors"] = deserialized.data['network'].sensors()
     if not kwargs["features"]:
         kwargs["features"] = deserialized.data['network'].features()
 
@@ -676,8 +672,7 @@ def get_observation_nearest_query(args):
 
 
 def get_observation_datadump_csv(**kwargs):
-    """Query and store large amounts of raw sensor network observations for
-    download."""
+    """Query and yield chunks of sensor network observations for streaming."""
 
     class ValidatorResultProxy(object):
         pass
@@ -686,8 +681,7 @@ def get_observation_datadump_csv(**kwargs):
 
     queries_and_tables = get_observation_queries(vr_proxy)
 
-    rownum = 0
-    chunksize = 10
+    chunksize = 100
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
@@ -695,11 +689,12 @@ def get_observation_datadump_csv(**kwargs):
     for query, table in queries_and_tables:
 
         writer.writerow([c.name for c in table.c])
+        rownum = 1
 
         # Chunk sizes of 25000 seem to be the sweet spot. The windowed_query
         # doesn't take that long to calculate the query bounds, and the results
         # are large enough that download speed is decent
-        for row in windowed_query(query, table.c.datetime, 25000):
+        for row in query.yield_per(1000):
 
             rownum += 1
             writer.writerow([getattr(row, c) for c in row.keys()])
