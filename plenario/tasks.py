@@ -14,6 +14,7 @@ from sqlalchemy import Table, func
 
 from plenario.database import session as session, Base, app_engine as engine
 from plenario.database import redshift_base, redshift_session, redshift_engine
+from plenario.database import redshift_session_context
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
@@ -302,7 +303,7 @@ def map_unknown_to_foi(unknown, sensor_properties):
         foi_insert_vals[foi].append((prop, value))
 
     for foi, insert_vals in list(foi_insert_vals.items()):
-        insert = "insert into array_of_things_chicago__{} (node_id, datetime, meta_id, sensor, {}) values ({})"
+        insert = "insert into {}__{} (node_id, datetime, meta_id, sensor, {}) values ({})"
         columns = ", ".join('"' + val[0] + '"' for val in insert_vals)
 
         values = "'{}', '{}', '{}', '{}', ".format(
@@ -312,10 +313,10 @@ def map_unknown_to_foi(unknown, sensor_properties):
             unknown.sensor
         ) + ", ".join(repr(val[1]) for val in insert_vals)
 
-        redshift_engine.execute(insert.format(foi, columns, values))
+        redshift_engine.execute(insert.format(unknown.network, foi, columns, values))
 
-        delete = "delete from array_of_things_chicago__unknown_feature where node_id = '{}' and datetime = '{}' and meta_id = '{}' and sensor = '{}'"
-        delete = delete.format(unknown.node_id, unknown.datetime, unknown.meta_id, unknown.sensor)
+        delete = "delete from unknown_feature where network = '{}' and node_id = '{}' and datetime = '{}' and meta_id = '{}' and sensor = '{}'"
+        delete = delete.format(unknown.network, unknown.node_id, unknown.datetime, unknown.meta_id, unknown.sensor)
 
         redshift_engine.execute(delete)
 
@@ -331,7 +332,7 @@ def unknown_features_resolve(target_sensor) -> int:
 
     # todo: unhardcode the network
     sensors = reflect("sensor__sensor_metadata", Base.metadata, engine)
-    unknowns = reflect("array_of_things_chicago__unknown_feature", redshift_base.metadata, redshift_engine)
+    unknowns = reflect("unknown_feature", redshift_base.metadata, redshift_engine)
 
     # Grab the set of keys that are used to assert if an unknown is correct
     c_obs_props = sensors.c.observed_properties
@@ -374,7 +375,8 @@ def resolve():
 
     with redshift_session_context() as session:
         rp = session.execute('select distinct sensor from unknown_feature')
-        for row in rp:
+        for row in rp.fetchall():
+            print(row)
             try:
                 resolved_count = unknown_features_resolve(row.sensor)
                 print('Resolved: ' + str(resolved_count))
