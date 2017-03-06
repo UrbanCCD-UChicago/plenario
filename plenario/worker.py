@@ -25,6 +25,10 @@ def create_worker():
     @app.route('/archive', methods=['POST'])
     def archive():
         return tasks.archive.delay(datetime.now()).id
+    
+    @app.route('/resolve', methods=['POST'])
+    def resolve():
+        return tasks.resolve.delay().id
 
     @app.route('/health', methods=['GET', 'POST'])
     def check_health():
