@@ -298,9 +298,9 @@ def resolve():
         rp = session.execute('select distinct sensor from unknown_feature')
         for row in rp:
             try:
-                resolved_count = resolve_sensor(row.sensor)
+                resolve_sensor(row.sensor)
             except AttributeError as err:
-                print(err)
+                print('{} {}'.format(row.sensor, err))
 
 
 @worker.task()
@@ -322,14 +322,14 @@ def resolve_sensor(sensor: str):
             # can't be extracted from the data column. If the value is not null,
             # then attempt to cast it to the correct type. 
             selection = "case when json_extract_path_text(data, '{0}') = '' then null "
-            selection += "else json_extract_path_text(data, '{0}')::{1} end as {0}"
+            selection += "else json_extract_path_text(data, '{0}')::{1} end as \"{0}\""
             selection = selection.format(property_, type_)
             selections.append(selection)
 
             condition = "json_extract_path_text(data, '{}') != ''".format(property_)
             conditions.append(condition)
 
-            values.append(property_)
+            values.append('"{}"'.format(property_))
         
         # This allows us to select only rows where at least one of the properties
         # found in the sensor metadata can be extracted from the raw data string
