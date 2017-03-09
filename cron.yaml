@@ -23,4 +23,4 @@ cron:
    schedule: "0 0 * * *"
  - name: "resolve"
    url: "/resolve"
-   schedule: "*/10 * * * *"
+   schedule: "*/5 * * * *"
