@@ -317,9 +317,12 @@ def resolve_sensor(sensor: str):
         conditions = []
         values = ['node_id, datetime, meta_id, sensor']
 
-        for informal, formal in sensor.observed_properties.items():
-            formal = formal.split('.')[-1]
-            type_ = feature.types()[formal]
+        for formal, type_ in feature.types().items():
+            try:
+                informal = sensor.tree()[feature.name + '.' + formal]
+            except KeyError:
+                continue
+
             # Using 'case when' allows us to resolve to null values if a feature
             # can't be extracted from the data column. If the value is not null,
             # then attempt to cast it to the correct type. 
