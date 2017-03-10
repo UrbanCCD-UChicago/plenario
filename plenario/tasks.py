@@ -317,19 +317,21 @@ def resolve_sensor(sensor: str):
         conditions = []
         values = ['node_id, datetime, meta_id, sensor']
 
-        for property_, type_ in feature.types().items():
+        for informal, formal in sensor.observed_properties.items():
+            formal = formal.split('.')[-1]
+            type_ = feature.types()[formal]
             # Using 'case when' allows us to resolve to null values if a feature
             # can't be extracted from the data column. If the value is not null,
             # then attempt to cast it to the correct type. 
             selection = "case when json_extract_path_text(data, '{0}') = '' then null "
-            selection += "else json_extract_path_text(data, '{0}')::{1} end as \"{0}\""
-            selection = selection.format(property_, type_)
+            selection += "else json_extract_path_text(data, '{0}')::{1} end as \"{2}\""
+            selection = selection.format(informal, type_, formal)
             selections.append(selection)
 
-            condition = "json_extract_path_text(data, '{}') != ''".format(property_)
+            condition = "json_extract_path_text(data, '{}') != ''".format(informal)
             conditions.append(condition)
 
-            values.append('"{}"'.format(property_))
+            values.append('"{}"'.format(formal))
         
         # This allows us to select only rows where at least one of the properties
         # found in the sensor metadata can be extracted from the raw data string
