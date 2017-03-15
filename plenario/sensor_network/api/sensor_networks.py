@@ -7,7 +7,7 @@ from dateutil.parser import parse as parse_date
 from flask import request, Response, stream_with_context, jsonify, redirect
 from marshmallow import Schema
 from marshmallow.exceptions import ValidationError
-from marshmallow.fields import Field, List, DateTime, Integer, String
+from marshmallow.fields import Field, List, DateTime, Integer, String, Float
 from marshmallow.validate import Range
 from shapely import wkb
 from sqlalchemy import MetaData, Table, func as sqla_fn, and_, asc, desc
@@ -110,6 +110,13 @@ class Validator(Schema):
     limit = Integer(missing=1000)
     offset = Integer(missing=0, validate=Range(0))
     geom = Geom()
+
+
+class NearestValidator(Validator):
+
+    feature = Feature(required=True)
+    lat = Float(required=True)
+    lng = Float(required=True)
 
 
 class NoLimitValidator(Validator):
@@ -396,15 +403,16 @@ def get_observation_nearest(network: str) -> Response:
     :endpoint: /sensor-networks/<network-name>/nearest
                ?lng=<lng>&lat=<lat>&feature=<feature>"""
 
-    args = dict(request.args.to_dict(), **{"network": network})
+    args = request.args.to_dict()
+    args.update({"network": network})
 
-    fields = ('datetime', 'network', 'feature', 'lat', 'lng')
-    validated_args = sensor_network_validate(NearMeValidator(only=fields), args)
-    if validated_args.errors:
-        return bad_request(validated_args.errors)
+    validator = NearestValidator(only=('lat', 'lng', 'feature', 'network', 'datetime'))
+    validated = validator.load(args)
+    if validated.errors:
+        return bad_request(validated.errors)
 
-    result = get_observation_nearest_query(validated_args)
-    return jsonify(json_response_base(validated_args, [result], validated_args.data))
+    result = get_observation_nearest_query(validated)
+    return jsonify(json_response_base(validated, [result], args))
 
 
 @crossdomain(origin="*")
@@ -635,19 +643,18 @@ def get_observation_nearest_query(args):
 
     lng = args.data["lng"]
     lat = args.data["lat"]
-    feature = args.data["feature"].split(".")[0]
-    properties = args.data["feature"]
+    feature = args.data["feature"]
     network = args.data["network"]
-    point_dt = parse_date(args.data["datetime"])
+    point_dt = args.data["datetime"] if args.data.get('datetime') else datetime.now()
 
     nearest_nodes_rp = NodeMeta.nearest_neighbor_to(
-        lng, lat, network=network, features=[properties]
+        lng, lat, network=network.name, features=[feature.name]
     )
 
     if not nearest_nodes_rp:
         return "No nodes could be found nearby with your target feature."
 
-    feature = reflect(network + '__' + feature, MetaData(), redshift_engine)
+    feature = reflect(network + '__' + feature.name, MetaData(), redshift_engine)
 
     result = None
     for row in nearest_nodes_rp:
