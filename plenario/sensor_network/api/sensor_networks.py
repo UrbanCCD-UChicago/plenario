@@ -458,8 +458,8 @@ def get_aggregations(network: str) -> Response:
     :endpoint: /sensor-networks/<network-name>/aggregate"""
 
     node = request.args.get("node")
-    sensors = request.args.get("sensors")
     feature = request.args.get("feature")
+    sensors = request.args.get("sensor") or request.args.get("sensors")
 
     args = request.args.to_dict()
     args.update({

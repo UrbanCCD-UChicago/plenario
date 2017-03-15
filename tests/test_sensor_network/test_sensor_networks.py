@@ -85,7 +85,7 @@ class TestSensorNetworks(unittest.TestCase):
 
     def test_sensor_metadata_returns_correct_number_of_results(self):
         _, data = self.get_result("/v1/api/sensor-networks/test_network/sensors")
-        self.assertEqual(data["meta"]["total"], 2)
+        self.assertEqual(data["meta"]["total"], 3)
 
     def test_feature_metadata_returns_correct_number_of_results(self):
         _, data = self.get_result("/v1/api/sensor-networks/test_network/features")
@@ -162,7 +162,7 @@ class TestSensorNetworks(unittest.TestCase):
         url = "/v1/api/sensor-networks/test_network/sensors?geom={}"
         url = url.format(geom)
         response, result = self.get_result(url)
-        self.assertEqual(result["meta"]["total"], 2)
+        self.assertEqual(result["meta"]["total"], 3)
 
     def test_geom_filter_for_feature_metadata(self):
         # Geom box in the middle of the lake, should return no results
@@ -203,6 +203,20 @@ class TestSensorNetworks(unittest.TestCase):
     def test_aggregate_endpoint_returns_correct_observation_count(self):
         url = "/v1/api/sensor-networks/test_network/aggregate?node=test_node"
         url += "&function=avg&feature=vector.x"
+        url += "&start_datetime=2016-10-01&end_datetime=2016-10-03"
+        response, result = self.get_result(url)
+        total_count = 0
+        for bucket in result["data"]:
+            for item in bucket.values():
+                try:
+                    total_count += item["count"]
+                except TypeError:
+                    pass
+        self.assertEqual(total_count, 200)
+
+    def test_aggregate_endpoint_returns_correct_observation_count_with_sensor_filter(self):
+        url = "/v1/api/sensor-networks/test_network/aggregate?node=test_node"
+        url += "&function=avg&feature=temperature&sensors=sensor_03"
         url += "&start_datetime=2016-10-01&end_datetime=2016-10-03"
         response, result = self.get_result(url)
         total_count = 0
