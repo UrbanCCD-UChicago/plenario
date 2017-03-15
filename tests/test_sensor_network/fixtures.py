@@ -78,16 +78,6 @@ class Fixtures:
     def generate_mock_metadata(self):
         session.configure(bind=self.pg_engine)
 
-        feature_01 = FeatureMeta(
-            name="temperature",
-            observed_properties=[{"type": "float", "name": "temperature"}]
-        )
-
-        feature_02 = FeatureMeta(
-            name="vector",
-            observed_properties=[{"type": "float", "name": "x"}, {"type": "float", "name": "y"}]
-        )
-
         sensor_01 = SensorMeta(
             name="sensor_01",
             observed_properties={"howhot": "temperature.temperature"}
@@ -124,6 +114,18 @@ class Fixtures:
 
         network_02 = NetworkMeta(
             name="test_network_other",
+        )
+
+        feature_01 = FeatureMeta(
+            name="temperature",
+            observed_properties=[{"type": "float", "name": "temperature"}],
+            networks=[network]
+        )
+
+        feature_02 = FeatureMeta(
+            name="vector",
+            observed_properties=[{"type": "float", "name": "x"}, {"type": "float", "name": "y"}],
+            networks=[network]
         )
 
         for obj in [feature_01, feature_02, network, network_02, node, node_2]:

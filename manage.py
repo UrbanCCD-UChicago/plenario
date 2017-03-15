@@ -104,11 +104,10 @@ def init():
     from plenario.database import app_engine as plenario_engine, Base
     from plenario.utils.weather import WeatherETL, WeatherStationsETL
 
-    for extension in ['plv8', 'postgis']:
-        try:
-            create_extension(plenario_engine, extension)
-        except ProgrammingError:
-            print('[plenario] It already exists!')
+    try:
+        create_extension(plenario_engine, 'postgis')
+    except ProgrammingError:
+        print('[plenario] It already exists!')
 
     print('[plenario] Creating metadata tables')
     Base.metadata.create_all()
@@ -122,7 +121,6 @@ def init():
     # Set up custom functions, triggers and views in postgres
     psql("./plenario/dbscripts/audit_trigger.sql")
     psql("./plenario/dbscripts/point_from_location.sql")
-    psql("./plenario/dbscripts/sensors_trigger.sql")
 
     # Set up the default user if we are running in anything but production
     if os.environ.get('CONFIG') != 'prod':
