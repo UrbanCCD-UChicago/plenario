@@ -57,7 +57,7 @@ If you aren't already running [PostgreSQL](http://www.postgresql.org/),
 we recommend installing version 9.3 or later. 
 
 Make sure the host of your database has the [PostGIS](http://postgis.net/) 
-extension and the [plv8](http://pgxn.org/dist/plv8/) extension installed.
+extension installed.
 
 The following command creates a postgres database, imports the 
 plv8 and postgis extensions, and creates all the necessary tables for

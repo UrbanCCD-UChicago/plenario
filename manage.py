@@ -122,7 +122,6 @@ def init():
     # Set up custom functions, triggers and views in postgres
     psql("./plenario/dbscripts/audit_trigger.sql")
     psql("./plenario/dbscripts/point_from_location.sql")
-    psql("./plenario/dbscripts/sensors_trigger.sql")
 
     # Set up the default user if we are running in anything but production
     if os.environ.get('CONFIG') != 'prod':
