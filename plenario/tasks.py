@@ -10,13 +10,15 @@ from celery import Celery
 from datetime import datetime, timedelta
 from dateutil.parser import parse as date_parse
 from raven import Client
-from sqlalchemy import Table, func
+from sqlalchemy import Table, func, cast, DateTime, alias, types, select, and_, case
 
 from plenario.database import session as session, Base, app_engine as engine
 from plenario.database import redshift_base, redshift_session, redshift_engine
+from plenario.database import redshift_session_context
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
+from plenario.models.SensorNetwork import SensorMeta, FeatureMeta
 from plenario.settings import PLENARIO_SENTRY_URL, CELERY_RESULT_BACKEND
 from plenario.settings import CELERY_BROKER_URL, S3_BUCKET
 from plenario.utils.helpers import reflect
@@ -199,6 +201,7 @@ def archive(dt: str) -> bool:
     tables = dict(redshift_base.metadata.tables)
 
     try:
+        del tables['unknown_feature']
         del tables['array_of_things_chicago__unknown_feature']
     except KeyError:
         # The unknown feature table might not exist in test environments
@@ -286,85 +289,76 @@ def table_to_csvs(table: Table, start: datetime, end: datetime) -> list:
     return file_names
 
 
-def map_unknown_to_foi(unknown, sensor_properties):
-    """Given a valid unknown feature row, distribute the data stored within
-    to the corresponding feature of interest tables by using the mapping
-    defined by a sensor's observed properties.
+@worker.task()
+def resolve():
+    """Run resolve sensor for every distinct sensor available in the unknown
+    feature table in redshift."""
 
-    :param unknown: (object) a row returned from a SQLAlchemy query
-    :param sensor_properties: (dict) holds mappings from node key to FOI"""
-
-    foi_insert_vals = defaultdict(list)
-
-    for key, value in list(loads(unknown.data).items()):
-        foi = sensor_properties[key].split(".")[0]
-        prop = sensor_properties[key].split(".")[1]
-        foi_insert_vals[foi].append((prop, value))
-
-    for foi, insert_vals in list(foi_insert_vals.items()):
-        insert = "insert into array_of_things_chicago__{} (node_id, datetime, meta_id, sensor, {}) values ({})"
-        columns = ", ".join('"' + val[0] + '"' for val in insert_vals)
-
-        values = "'{}', '{}', '{}', '{}', ".format(
-            unknown.node_id,
-            unknown.datetime,
-            unknown.meta_id,
-            unknown.sensor
-        ) + ", ".join(repr(val[1]) for val in insert_vals)
-
-        redshift_engine.execute(insert.format(foi, columns, values))
-
-        delete = "delete from array_of_things_chicago__unknown_feature where node_id = '{}' and datetime = '{}' and meta_id = '{}' and sensor = '{}'"
-        delete = delete.format(unknown.node_id, unknown.datetime, unknown.meta_id, unknown.sensor)
-
-        redshift_engine.execute(delete)
+    with redshift_session_context() as session:
+        rp = session.execute('select distinct sensor from unknown_feature')
+        for row in rp:
+            try:
+                resolve_sensor(row.sensor)
+            except AttributeError as err:
+                print('{} {}'.format(row.sensor, err))
 
 
 @worker.task()
-def unknown_features_resolve(target_sensor) -> int:
-    """When the issues for a sensor with an unknown error have been resolved,
-    attempt to recover sensor readings that were originally suspended in the
-    unknowns table and insert them into the correct feature of interest table.
+def resolve_sensor(sensor: str):
+    """Move values from the staging observation table to the mapped tables. It
+    fails on sensors for which the metadata does not exist. If the mapping is
+    incorrect the rows will not be moved over at all."""
 
-    :param target_sensor: (str) resolved sensor"""
+    sensor = SensorMeta.query.get(sensor)
 
-    print("Resolving: {}".format(target_sensor))
+    for i, feature in enumerate(sensor.features()):
+        feature = FeatureMeta.query.get(feature)
+        selections = []
+        conditions = []
+        values = ['node_id, datetime, meta_id, sensor']
 
-    # todo: unhardcode the network
-    sensors = reflect("sensor__sensor_metadata", Base.metadata, engine)
-    unknowns = reflect("array_of_things_chicago__unknown_feature", redshift_base.metadata, redshift_engine)
+        for formal, type_ in feature.types().items():
+            try:
+                informal = sensor.tree()[feature.name + '.' + formal]
+            except KeyError:
+                continue
 
-    # Grab the set of keys that are used to assert if an unknown is correct
-    c_obs_props = sensors.c.observed_properties
-    q = session.query(c_obs_props).filter(sensors.c.name == target_sensor)
-    sensor_properties = q.first()[0]
+            # Using 'case when' allows us to resolve to null values if a feature
+            # can't be extracted from the data column. If the value is not null,
+            # then attempt to cast it to the correct type. 
+            selection = "case when json_extract_path_text(data, '{0}') = '' then null "
+            selection += "else json_extract_path_text(data, '{0}')::{1} end as \"{2}\""
+            selection = selection.format(informal, type_, formal)
+            selections.append(selection)
 
-    print("Most up to date map: {}".format(sensor_properties))
+            condition = "json_extract_path_text(data, '{}') != ''".format(informal)
+            conditions.append(condition)
 
-    # Grab all the candidate unknown observations
-    c_sensor = unknowns.c.sensor
-    target_unknowns = redshift_session \
-        .query(unknowns) \
-        .filter(c_sensor == target_sensor)
+            values.append('"{}"'.format(formal))
+        
+        # This allows us to select only rows where at least one of the properties
+        # found in the sensor metadata can be extracted from the raw data string
+        # in the unknown feature table.
+        conditions = "(" + str.join(" or ", conditions) + ")"
+        selections = str.join(", ", selections)
+        # Necessary so that the ordering of the selected columns doesn't matter
+        values = str.join(", ", values)
 
-    unresolved_count = redshift_session \
-        .query(func.count(unknowns.c.datetime)) \
-        .filter(c_sensor == target_sensor) \
-        .scalar()
+        select = 'select node_id, "datetime"::datetime, '
+        select += 'meta_id, sensor, {} from unknown_feature'.format(selections)
 
-    print("Attempting to resolve {} rows".format(unresolved_count))
+        delete = 'delete from unknown_feature'
 
-    resolved = 0
-    for unknown in target_unknowns:
+        for network in feature.networks:
+            target_table = "{}__{}".format(network.name, feature.name)
+            insert = 'insert into {} ({}) '.format(target_table, values)
 
-        unknown_data = loads(unknown.data)
-        unknown_properties = list(unknown_data.keys())
-        known_properties = list(sensor_properties.keys())
+            where = "where network = '{}' and sensor = '{}' and {}"
+            where = where.format(network.name, sensor.name, conditions)
 
-        if not all(key in known_properties for key in unknown_properties):
-            continue
+            redshift_session.execute('{} {} {}'.format(insert, select, where))
 
-        map_unknown_to_foi(unknown, sensor_properties)
-        resolved += 1
-
-    return resolved
+            # In cases where the sensor reports on two features (ex. bmp180) we
+            # can't delete until we've mapped to every feature table.
+            if i + 1 == len(sensor.features()):
+                redshift_session.execute('{} {}'.format(delete, where))

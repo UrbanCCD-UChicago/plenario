@@ -235,12 +235,20 @@ def aggregate(args, agg_label, agg_fn):
                                           agg_fn,
                                           agg_unit)
 
-    # Execute the query and return the formatted results
+    # Generate the base query
     query = select(selects).where(and_(
         obs_table.c.datetime >= start_dt,
         obs_table.c.datetime < end_dt
-    )).group_by("time_bucket").order_by(asc("time_bucket"))
+    ))
 
+    # If sensors are specified, filter on them
+    if target_sensors:
+        query = query.where(obs_table.c.sensor.in_(target_sensors))
+    
+    # Format the query
+    query = query.group_by("time_bucket").order_by(asc("time_bucket"))
+
+    # Execute and format the result
     results = r_session.execute(query).fetchall()
     return _format_aggregates(results, agg_label, agg_unit, start_dt, end_dt)
 

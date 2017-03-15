@@ -98,10 +98,15 @@ class Fixtures:
             observed_properties={"vec_x": "vector.x", "vex_y": "vector.y"}
         )
 
+        sensor_03 = SensorMeta(
+            name="sensor_03",
+            observed_properties={"temperature": "temperature.temperature"}
+        )
+
         node = NodeMeta(
             id="test_node",
             sensor_network="test_network",
-            sensors=[sensor_01, sensor_02],
+            sensors=[sensor_01, sensor_02, sensor_03],
             location="0101000020E6100000A4A7C821E2E755C07C48F8DEDFF04440",
         )
 
@@ -153,6 +158,12 @@ class Fixtures:
                 insert into test_network__vector (node_id, datetime, meta_id, sensor, x, y)
                 values ('test_node', '{}', '{}', 'sensor_02', {}, {})
                 """.format(record_date, randint(0, 100), random(), random())
+            )
+
+            self.rs_engine.execute("""
+                insert into test_network__temperature (node_id, datetime, meta_id, sensor, temperature)
+                values ('test_node', '{}', '{}', 'sensor_03', {})
+                """.format(record_date, randint(0, 100), random())
             )
 
             self.rs_engine.execute("""

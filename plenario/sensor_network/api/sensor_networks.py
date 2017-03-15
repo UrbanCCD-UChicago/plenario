@@ -325,14 +325,16 @@ def check(network: str) -> Response:
 
     :endpoint: /sensor-networks/<network-name>/check"""
 
-    args = request.args.to_dict()
+    nodes = request.args.get("node") or request.args.get("nodes")
+    sensors = request.args.get("sensor") or request.args.get("sensors")
+    features = request.args.get("feature") or request.args.get("features")
 
-    if args.get('nodes'):
-        args['nodes'] = args['nodes'].split(',')
-    if args.get('sensors'):
-        args['sensors'] = args['sensors'].split(',')
-    if args.get('features'):
-        args['features'] = args['features'].split(',')
+    args = {
+        "network": network,
+        "features": features.split(",") if features else [],
+        "nodes": nodes.split(",") if nodes else [],
+        "sensors": sensors.split(",") if sensors else [],
+    }
 
     validator = Validator()
     validated = validator.load(args)
@@ -456,8 +458,8 @@ def get_aggregations(network: str) -> Response:
     :endpoint: /sensor-networks/<network-name>/aggregate"""
 
     node = request.args.get("node")
-    sensors = request.args.get("sensors")
     feature = request.args.get("feature")
+    sensors = request.args.get("sensor") or request.args.get("sensors")
 
     args = request.args.to_dict()
     args.update({

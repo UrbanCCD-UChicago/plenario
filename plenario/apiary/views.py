@@ -9,7 +9,7 @@ from plenario.auth import login_required
 from plenario.database import redshift_base as rshift_base
 from plenario.models.SensorNetwork import SensorMeta
 from plenario.settings import REDIS_HOST
-from plenario.tasks import unknown_features_resolve
+# from plenario.tasks import unknown_features_resolve
 
 blueprint = Blueprint("apiary", __name__)
 redis = Redis(REDIS_HOST)
@@ -31,14 +31,14 @@ def send_message():
         return make_response(format_exc(), 500)
 
 
-@blueprint.route("/apiary/resolve/<sensor>")
-@login_required
-def resolve(sensor: str):
-    task_id = unknown_features_resolve.delay(sensor).id
-    message = 'Successfully queued resolve task for  {} (TASK ID: {})'
-    message = message.format(sensor, task_id)
-    flash(message)
-    return redirect(request.referrer)
+# @blueprint.route("/apiary/resolve/<sensor>")
+# @login_required
+# def resolve(sensor: str):
+#     task_id = unknown_features_resolve.delay(sensor).id
+#     message = 'Successfully queued resolve task for  {} (TASK ID: {})'
+#     message = message.format(sensor, task_id)
+#     flash(message)
+#     return redirect(request.referrer)
 
 
 def index() -> list:
