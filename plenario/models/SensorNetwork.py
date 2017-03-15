@@ -86,7 +86,11 @@ class NodeMeta(Base):
 
     @staticmethod
     def nearest_neighbor_to(lng, lat, network, features):
-        sensors = SensorMeta.get_sensors_from_features(features)
+        sensors = set()
+        for feature in features:
+            feature = FeatureMeta.query.get(feature)
+            sensors = sensors | feature.sensors()
+
         return knn(
             lng=lng,
             lat=lat,
@@ -130,22 +134,6 @@ class SensorMeta(Base):
     observed_properties = Column(JSONB)
     info = Column(JSONB)
 
-    @staticmethod
-    def get_sensors_from_features(features):
-        full_features = []
-        for feature in features:
-            if len(feature.split(".")) == 1:
-                full_features += FeatureMeta.properties_of(feature)
-        features = set(features + full_features)
-
-        rp = session.execute("""
-            select distinct name
-            from sensor__sensors_view
-            where invert ?| '{}'
-        """.format("{" + ",".join(features) + "}"))
-
-        return [row.name for row in rp]
-    
     def features(self) -> set:
         """Return the features that this sensor reports on."""
 
@@ -169,6 +157,19 @@ class FeatureMeta(Base):
         """Return a dictionary with the properties mapped to their types."""
 
         return {e['name']: e['type'] for e in self.observed_properties}
+    
+    def sensors(self) -> set:
+        """Return the set of sensors that report on this feature."""
+
+        results = set()
+        for network in self.networks:
+            for node in network.tree().values():
+                for sensor, properties in node.items():
+                    if self.name in {p.split('.')[0] for p in properties}:
+                        results.add(sensor)
+
+        return results
+
 
     @staticmethod
     def index(network_name=None):

@@ -3,6 +3,7 @@ import csv
 import io
 
 from datetime import datetime, timedelta
+from dateutil.parser import parse as parse_date
 from flask import request, Response, stream_with_context, jsonify, redirect
 from marshmallow import Schema
 from marshmallow.exceptions import ValidationError
@@ -403,7 +404,7 @@ def get_observation_nearest(network: str) -> Response:
         return bad_request(validated_args.errors)
 
     result = get_observation_nearest_query(validated_args)
-    return jsonify(validated_args, [result], 200)
+    return jsonify(json_response_base(validated_args, [result], validated_args.data))
 
 
 @crossdomain(origin="*")
@@ -439,11 +440,10 @@ def get_observations_download(network: str) -> Response:
 
     stream = get_observation_datadump_csv(**deserialized.data)
 
-    network = deserialized.data["network"]
-    fmt = "csv"
-    content_disposition = 'attachment; filename={}.{}'.format(network, fmt)
+    filename = datetime.now().isoformat() + '-' + deserialized.data["network"].name + '.csv'
+    content_disposition = 'attachment; filename={}'.format(filename)
 
-    attachment = Response(stream_with_context(stream), mimetype="text/%s" % fmt)
+    attachment = Response(stream_with_context(stream), mimetype="text/csv")
     attachment.headers["Content-Disposition"] = content_disposition
     return attachment
 
@@ -638,7 +638,7 @@ def get_observation_nearest_query(args):
     feature = args.data["feature"].split(".")[0]
     properties = args.data["feature"]
     network = args.data["network"]
-    point_dt = args.data["datetime"]
+    point_dt = parse_date(args.data["datetime"])
 
     nearest_nodes_rp = NodeMeta.nearest_neighbor_to(
         lng, lat, network=network, features=[properties]
