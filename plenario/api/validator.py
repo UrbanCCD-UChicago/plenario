@@ -110,7 +110,7 @@ class DatasetRequiredValidator(Validator):
     """Some endpoints, like /detail-aggregate, should not be allowed to receive
     requests that do not specify a 'dataset_name' in the query string."""
 
-    dataset_name = fields.Str(default=None, validate=validate_dataset, dump_to='dataset', required=True)
+    dataset_name = fields.Str(validate=validate_dataset, dump_to='dataset', required=True)
 
 
 class NoGeoJSONValidator(Validator):

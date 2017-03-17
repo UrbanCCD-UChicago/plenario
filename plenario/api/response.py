@@ -9,7 +9,7 @@ from plenario.models import ShapeMetadata
 from plenario.utils.ogr2ogr import OgrExport
 
 from datetime import datetime
-from flask import make_response, request
+from flask import make_response, request, jsonify
 from itertools import groupby
 from operator import itemgetter
 from functools import reduce
@@ -37,6 +37,19 @@ def make_raw_error(msg):
         'objects': [],
     }
     return resp
+
+
+def error(message: object, status: int):
+    response = jsonify({
+        'meta': {
+            'status': 'error',
+            'message': message,
+            'query': request.args
+        }
+    })
+
+    response.status_code = status
+    return response
 
 
 def bad_request(msg):
