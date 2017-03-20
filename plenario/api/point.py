@@ -327,7 +327,7 @@ def datadump_json(**kwargs):
 
     dataset = kwargs["dataset"]
     columns = [c.name for c in dataset.c]
-    query = detail_query(vr_proxy).order_by(dataset.c.point_date.desc())
+    query = detail_query(vr_proxy)
 
     buffer = ""
     chunksize = 1000
@@ -372,7 +372,7 @@ def datadump_csv(**kwargs):
     vr_proxy.data = kwargs
 
     dataset = kwargs["dataset"]
-    query = detail_query(vr_proxy).order_by(dataset.c.point_date.desc())
+    query = detail_query(vr_proxy)
 
     rownum = 0
     chunksize = 1000

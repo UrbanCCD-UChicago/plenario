@@ -21,6 +21,3 @@ cron:
  - name: "archive"
    url: "/archive"
    schedule: "0 0 * * *"
- - name: "resolve"
-   url: "/resolve"
-   schedule: "*/5 * * * *"
