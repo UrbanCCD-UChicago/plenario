@@ -6,15 +6,9 @@
         {% for element in elements %}
             <li class="list-group-item">
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-12">
+                        <h4>{{ element.network }}</h4>
                         <h4>{{ element.datetime }}</h4>
-                    </div>
-                    <div class="col-md-6">
-                        <h4>
-                            <a href="apiary/resolve/{{ element.sensor }}" type="button" class="btn btn-primary pull-right">
-                                Resolve {{ element.sensor }}
-                            </a>
-                        </h4>
                     </div>
                 </div>
                 <div class="row">

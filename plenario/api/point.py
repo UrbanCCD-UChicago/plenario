@@ -98,8 +98,12 @@ def datadump_view():
     fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
               'obs_date__le', 'offset', 'date__time_of_day_ge',
               'date__time_of_day_le', 'limit', 'job', 'data_type')
+
     validator = DatasetRequiredValidator(only=fields)
     validator_result = validate(validator, request.args.to_dict())
+
+    if validator_result.errors:
+        return api_response.error(validator_result.errors, 400)
 
     stream = datadump(**validator_result.data)
 
@@ -327,13 +331,10 @@ def datadump_json(**kwargs):
 
     buffer = ""
     chunksize = 1000
-    rowcount = fast_count(query)
-    rownum = 0
 
     yield '{"type": "FeatureCollection", "features": ['
 
-    for row in windowed_query(query, dataset.c.point_date, chunksize):
-        rownum += 1
+    for i, row in enumerate(query.yield_per(chunksize)):
         wkb = row.geom
 
         try:
@@ -349,17 +350,15 @@ def datadump_json(**kwargs):
         del geojson["properties"]["geom"]
         del geojson["properties"]["hash"]
 
-        if rownum != rowcount:
-            buffer += json.dumps(geojson, default=unknown_object_json_handler)
-            buffer += ","
-        else:
-            buffer += json.dumps(geojson, default=unknown_object_json_handler)
+        buffer += json.dumps(geojson, default=unknown_object_json_handler)
+        buffer += ","
 
-        if rownum % chunksize == 0:
+        if i % chunksize == 0:
             yield buffer
             buffer = ""
 
-    yield buffer + "]}"
+    # Remove the trailing comma and close the json
+    yield buffer.rsplit(',', 1)[0] + "]}"
 
 
 def datadump_csv(**kwargs):
@@ -383,7 +382,7 @@ def datadump_csv(**kwargs):
     writer = csv.writer(buffer)
     writer.writerow([c.name for c in dataset.c if c not in hide])
 
-    for row in windowed_query(query, dataset.c.point_date, chunksize):
+    for row in query.yield_per(chunksize):
         rownum += 1
         writer.writerow([getattr(row, c) for c in row.keys() if c not in hide])
 
