@@ -267,7 +267,7 @@ class TestSensorNetworks(unittest.TestCase):
         response = self.app.get(url)
 
         expected_number_of_objects = 900
-        received_number_of_objects = len(json.loads(response.get_data())['objects'])
+        received_number_of_objects = len(json.loads(response.get_data().decode('utf-8'))['objects'])
         self.assertEqual(expected_number_of_objects, received_number_of_objects)
 
     def test_sensor_network_download_csv_with_feature_filter(self):
@@ -293,7 +293,7 @@ class TestSensorNetworks(unittest.TestCase):
         response = self.app.get(url)
 
         expected_number_of_objects = 300
-        received_number_of_objects = len(json.loads(response.get_data())['objects'])
+        received_number_of_objects = len(json.loads(response.get_data().decode('utf-8'))['objects'])
         self.assertEqual(expected_number_of_objects, received_number_of_objects)
 
     def test_sensor_network_download_csv_with_feature_and_sensor_filter(self):
