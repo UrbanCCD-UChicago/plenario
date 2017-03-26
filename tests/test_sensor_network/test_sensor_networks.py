@@ -251,5 +251,64 @@ class TestSensorNetworks(unittest.TestCase):
         response, result = self.get_result(url)
         self.assertEqual(result["meta"]["total"], 1)
 
+    def test_sensor_network_download_csv(self):
+        url = "/v1/api/sensor-networks/test_network/download?start_datetime=2016-10-01T00:00:00"
+        response = self.app.get(url)
+
+        # 900 rows and 2 headers (because there's two features: temperature and vector)
+        expected_number_of_rows = 902
+        received_rows = response.get_data().split(b'\r\n')
+        received_rows_without_blank_lines = [e for e in received_rows if e]
+        received_number_of_rows = len(received_rows_without_blank_lines)
+        self.assertEqual(expected_number_of_rows, received_number_of_rows)
+
+    def test_sensor_network_download_json(self):
+        url = "/v1/api/sensor-networks/test_network/download?start_datetime=2016-10-01T00:00:00&data_type=json"
+        response = self.app.get(url)
+
+        expected_number_of_objects = 900
+        received_number_of_objects = len(json.loads(response.get_data().decode('utf-8'))['objects'])
+        self.assertEqual(expected_number_of_objects, received_number_of_objects)
+
+    def test_sensor_network_download_csv_with_feature_filter(self):
+        url = "/v1/api/sensor-networks/test_network/download?" \
+              "start_datetime=2016-10-01T00:00:00&"            \
+              "feature=temperature"
+
+        response = self.app.get(url)
+
+        # 600 rows and 1 header (temperature)
+        expected_number_of_rows = 601
+        received_rows = response.get_data().split(b'\r\n')
+        received_rows_without_blank_lines = [e for e in received_rows if e]
+        received_number_of_rows = len(received_rows_without_blank_lines)
+        self.assertEqual(expected_number_of_rows, received_number_of_rows)
+
+    def test_sensor_network_download_json_with_feature_filter(self):
+        url = "/v1/api/sensor-networks/test_network/download?" \
+              "start_datetime=2016-10-01T00:00:00&"            \
+              "data_type=json&"                                \
+              "feature=vector"
+
+        response = self.app.get(url)
+
+        expected_number_of_objects = 300
+        received_number_of_objects = len(json.loads(response.get_data().decode('utf-8'))['objects'])
+        self.assertEqual(expected_number_of_objects, received_number_of_objects)
+
+    def test_sensor_network_download_csv_with_feature_and_sensor_filter(self):
+        url = "/v1/api/sensor-networks/test_network/download?" \
+              "start_datetime=2016-10-01T00:00:00&"            \
+              "feature=temperature&"                           \
+              "sensor=sensor_01"
+
+        response = self.app.get(url)
+
+        # 300 rows and 1 header (temperature)
+        expected_number_of_rows = 301
+        received_rows = response.get_data().split(b'\r\n')
+        received_rows_without_blank_lines = [e for e in received_rows if e]
+        received_number_of_rows = len(received_rows_without_blank_lines)
+        self.assertEqual(expected_number_of_rows, received_number_of_rows)
 
 from plenario import create_app
