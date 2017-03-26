@@ -1,4 +1,5 @@
 import boto3
+import json
 import csv
 import io
 
@@ -15,7 +16,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from plenario.api.common import cache, crossdomain, make_fragment_str
 from plenario.api.common import extract_first_geometry_fragment
-from plenario.api.common import make_cache_key
+from plenario.api.common import make_cache_key, unknown_object_json_handler
 from plenario.database import windowed_query
 from plenario.settings import S3_BUCKET
 from plenario.utils.helpers import reflect
@@ -121,6 +122,7 @@ class NearestValidator(Validator):
 
 class NoLimitValidator(Validator):
 
+    data_type = String(allow_none=True)
     limit = Integer(allow_none=True)
 
 
@@ -446,12 +448,16 @@ def get_observations_download(network: str) -> Response:
     if not deserialized.data.get('start_datetime'):
         deserialized.data.update({'start_datetime': datetime.now() - timedelta(days=7)})
 
-    stream = get_observation_datadump_csv(**deserialized.data)
+    if deserialized.data.get('data_type') == 'json':
+        stream = get_observation_datadump_json(**deserialized.data)
+        filename = datetime.now().isoformat() + '-' + deserialized.data["network"].name + '.json'
+        attachment = Response(stream_with_context(stream), mimetype="text/json")
+    else:
+        stream = get_observation_datadump_csv(**deserialized.data)
+        filename = datetime.now().isoformat() + '-' + deserialized.data["network"].name + '.csv'
+        attachment = Response(stream_with_context(stream), mimetype="text/csv")
 
-    filename = datetime.now().isoformat() + '-' + deserialized.data["network"].name + '.csv'
     content_disposition = 'attachment; filename={}'.format(filename)
-
-    attachment = Response(stream_with_context(stream), mimetype="text/csv")
     attachment.headers["Content-Disposition"] = content_disposition
     return attachment
 
@@ -718,6 +724,35 @@ def get_observation_datadump_csv(**kwargs):
 
     yield buffer.getvalue()
     buffer.close()
+
+
+def get_observation_datadump_json(**kwargs):
+    """Query and yield chunks of sensor network observations for streaming."""
+
+    class ValidatorResultProxy(object):
+        pass
+    vr_proxy = ValidatorResultProxy()
+    vr_proxy.data = kwargs
+
+    queries_and_tables = get_observation_queries(vr_proxy)
+
+    chunksize = 1000
+    buffer = '{"objects": ['
+
+    for query, table in queries_and_tables:
+        columns = [c.name for c in table.c]
+
+        for i, row in enumerate(query.yield_per(1000)):
+            row = dict(zip(columns, row))
+            buffer += json.dumps(row, default=unknown_object_json_handler)
+            buffer += ","
+
+            if i % chunksize == 0:
+                yield buffer
+                buffer = ""
+
+    # Remove the trailing comma and close the json
+    yield buffer.rsplit(',', 1)[0] + ']}'
 
 
 def get_raw_metadata():
