@@ -17,7 +17,6 @@ from sqlalchemy.orm.exc import NoResultFound
 from plenario.api.common import cache, crossdomain, make_fragment_str
 from plenario.api.common import extract_first_geometry_fragment
 from plenario.api.common import make_cache_key, unknown_object_json_handler
-from plenario.database import windowed_query
 from plenario.settings import S3_BUCKET
 from plenario.utils.helpers import reflect
 
