@@ -20,7 +20,7 @@ from plenario.api.validator import DatasetRequiredValidator
 from plenario.api.validator import NoGeoJSONDatasetRequiredValidator
 from plenario.api.validator import NoDefaultDatesValidator, NoGeoJSONValidator
 from plenario.api.validator import validate, has_tree_filters
-from plenario.database import fast_count, windowed_query, session
+from plenario.database import session
 from plenario.models import MetaTable
 
 from . import response as api_response
