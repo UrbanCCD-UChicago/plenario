@@ -1,3 +1,4 @@
+import time
 import itertools
 import re
 import requests
@@ -18,6 +19,7 @@ from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
 from plenario.database import session, Base, app_engine as engine
+from plenario.model.meta.schema import infer
 from plenario.models import MetaTable, User, ShapeMetadata
 from plenario.settings import FLOWER_URL
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
@@ -415,17 +417,20 @@ class GenericSuggestion(object):
         self.columns = (None if is_shapefile else self._infer_columns())
 
     def _infer_columns(self):
-        r = requests.get(self.file_url, stream=True)
-        inp = StringIO()
 
-        head = itertools.islice(r.iter_lines(), 1000)
+        stream = requests.get(self.file_url, stream=True)
+        head = itertools.islice(stream.iter_lines(), 1000)
+        buffer = StringIO()
+
         for line in head:
-            inp.write(line.decode("utf-8") + '\n')
-        inp.seek(0)
-        column_info = infer_csv_columns(inp)
+            buffer.write(line.decode("utf-8") + '\n')
 
-        return [ColumnMeta(name, type_.__visit_name__.lower(), '')
-                for name, type_, _ in column_info]
+        buffer.seek(0)
+        columns = infer(buffer)
+        buffer.close()
+        stream.close()
+
+        return [ColumnMeta(c.name, str(c.type).lower(), '') for c in columns]
 
 
 class SocrataSuggestion(object):
@@ -455,6 +460,7 @@ class SocrataSuggestion(object):
         self.columns = (None if is_shapefile else self._derive_columns())
 
     def _derive_columns(self):
+        print('[plenario] SocrataSuggestion._derive_columns()')
         return [ColumnMeta(c['name'],
                            c['dataTypeName'],
                            c.get('description', None))
