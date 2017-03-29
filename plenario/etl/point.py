@@ -10,7 +10,7 @@ from sqlalchemy.exc import NoSuchTableError
 from plenario.database import app_engine as engine, session, Base
 from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError, delete_absent_hashes
 from plenario.model.meta.schema import infer
-from plenario.utils.helpers import iter_column
+# from plenario.utils.helpers import iter_column
 
 
 class PlenarioETL(object):
@@ -206,20 +206,20 @@ class Staging(object):
 
         return cols
 
-    @staticmethod
-    def _from_inference(f):
-        """
-        Generate columns by scanning source CSV and inferring column types.
-        """
-        reader = csv.reader(f)
-        # Always create columns with slugified names
-        header = list(map(slugify, next(reader)))
-
-        cols = []
-        for col_idx, col_name in enumerate(header):
-            col_type, nullable = iter_column(col_idx, f)
-            cols.append(_make_col(col_name, col_type, nullable))
-        return cols
+    # @staticmethod
+    # def _from_inference(f):
+    #     """
+    #     Generate columns by scanning source CSV and inferring column types.
+    #     """
+    #     reader = csv.reader(f)
+    #     # Always create columns with slugified names
+    #     header = list(map(slugify, next(reader)))
+    #
+    #     cols = []
+    #     for col_idx, col_name in enumerate(header):
+    #         col_type, nullable = iter_column(col_idx, f)
+    #         cols.append(_make_col(col_name, col_type, nullable))
+    #     return cols
 
 
 def _null_malformed_geoms(existing):

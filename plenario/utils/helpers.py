@@ -8,7 +8,7 @@ from sqlalchemy import Table
 
 from plenario.settings import MAIL_USERNAME, ADMIN_EMAILS
 from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME
-from plenario.utils.typeinference import normalize_column_type
+# from plenario.utils.typeinference import normalize_column_type
 
 
 def get_size_in_degrees(meters, latitude):
@@ -27,48 +27,48 @@ def get_size_in_degrees(meters, latitude):
 ColumnInfo = namedtuple('ColumnInfo', 'name type_ has_nulls')
 
 
-def infer_csv_columns(inp):
-    """
+# def infer_csv_columns(inp):
+#     """
+#
+#     :param inp: File handle to a CSV dataset
+#                 that we can throw into a UnicodeCSVReader
+#     :return: List of `ColumnInfo`s
+#     """
+#     reader = csv.reader(inp)
+#     header = next(reader)
+#     inp.seek(0)
+#     iter_output = [iter_column(col_idx, inp)
+#                    for col_idx in range(len(header))]
+#
+#     return [ColumnInfo(name, type_, has_nulls)
+#             for name, (type_, has_nulls) in zip(header, iter_output)]
 
-    :param inp: File handle to a CSV dataset
-                that we can throw into a UnicodeCSVReader
-    :return: List of `ColumnInfo`s
-    """
-    reader = csv.reader(inp)
-    header = next(reader)
-    inp.seek(0)
-    iter_output = [iter_column(col_idx, inp)
-                   for col_idx in range(len(header))]
 
-    return [ColumnInfo(name, type_, has_nulls)
-            for name, (type_, has_nulls) in zip(header, iter_output)]
-
-
-def iter_column(idx, f):
-    """
-
-    :param idx: index of column
-    :param f: gzip file object of CSV dataset
-    :return: col_type, null_values
-             where col_type is inferred type from typeinference.py
-             and null_values is whether null values were found and normalized.
-    """
-    f.seek(0)
-    reader = csv.reader(f)
-
-    # Discard the header
-    next(reader)
-
-    col = []
-    for row in reader:
-        if row:
-            try:
-                col.append(row[idx])
-            except IndexError:
-                # Bad data. Maybe we can fill with nulls?
-                pass
-    col_type, null_values = normalize_column_type(col)
-    return col_type, null_values
+# def iter_column(idx, f):
+#     """
+#
+#     :param idx: index of column
+#     :param f: gzip file object of CSV dataset
+#     :return: col_type, null_values
+#              where col_type is inferred type from typeinference.py
+#              and null_values is whether null values were found and normalized.
+#     """
+#     f.seek(0)
+#     reader = csv.reader(f)
+#
+#     # Discard the header
+#     next(reader)
+#
+#     col = []
+#     for row in reader:
+#         if row:
+#             try:
+#                 col.append(row[idx])
+#             except IndexError:
+#                 # Bad data. Maybe we can fill with nulls?
+#                 pass
+#     col_type, null_values = normalize_column_type(col)
+#     return col_type, null_values
 
 
 def slugify(text: str, delimiter: str = "_") -> str:

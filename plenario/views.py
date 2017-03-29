@@ -22,7 +22,7 @@ from plenario.database import session, Base, app_engine as engine
 from plenario.model.meta.schema import infer
 from plenario.models import MetaTable, User, ShapeMetadata
 from plenario.settings import FLOWER_URL
-from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
+from plenario.utils.helpers import send_mail, slugify
 
 views = Blueprint('views', __name__)
 
