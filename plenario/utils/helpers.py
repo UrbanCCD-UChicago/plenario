@@ -1,14 +1,15 @@
 import csv
-import string
-from csvkit.unicsv import UnicodeCSVReader
-from plenario.utils.typeinference import normalize_column_type
-import boto3
-from plenario.settings import MAIL_USERNAME, ADMIN_EMAILS, \
-    AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME
 import math
 from collections import namedtuple
-from sqlalchemy import Table
+
+import boto3
 from slugify import slugify as _slugify
+from sqlalchemy import Table
+
+from plenario.settings import MAIL_USERNAME, ADMIN_EMAILS
+from plenario.settings import AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME
+from plenario.utils.typeinference import normalize_column_type
+
 
 def get_size_in_degrees(meters, latitude):
     earth_circumference = 40041000.0  # meters, average circumference

@@ -1,5 +1,9 @@
+import pandas
 import tempfile
 import requests
+
+from slugify import slugify
+
 from plenario.database import app_engine as engine
 
 

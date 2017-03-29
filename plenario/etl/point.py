@@ -1,15 +1,15 @@
-# import json
-
-# from csvkit.unicsv import UnicodeCSVReader
 import csv
+
 from geoalchemy2 import Geometry
+from slugify import slugify
 from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
 from sqlalchemy import select, func
 from sqlalchemy.exc import NoSuchTableError
 
 from plenario.database import app_engine as engine, session
 from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError, delete_absent_hashes
-from plenario.utils.helpers import iter_column, slugify
+from plenario.model.meta.schema import infer
+from plenario.utils.helpers import iter_column
 
 
 class PlenarioETL(object):
@@ -89,9 +89,14 @@ class Staging(object):
 
             text_handle = open(helper.handle.name, "rt")
 
+            # other_cols = self._from_inference_2(text_handle)
+            # self.cols = self._from_inference(text_handle)
+
             if not self.cols:
                 # We couldn't get the column metadata from an existing table
-                self.cols = self._from_inference(text_handle)
+                self.cols = infer(text_handle)
+                # self.cols = self._from_inference(text_handle)
+                # other_cols = self._from_inference_2(text_handle)
 
             # Grab the handle to build a table from the CSV
             try:
