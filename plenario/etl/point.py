@@ -1,12 +1,13 @@
 import csv
 
 from geoalchemy2 import Geometry
+from psycopg2 import DataError
 from slugify import slugify
-from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
+from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String, Integer, Float
 from sqlalchemy import select, func
 from sqlalchemy.exc import NoSuchTableError
 
-from plenario.database import app_engine as engine, session
+from plenario.database import app_engine as engine, session, Base
 from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError, delete_absent_hashes
 from plenario.model.meta.schema import infer
 from plenario.utils.helpers import iter_column
@@ -128,10 +129,9 @@ class Staging(object):
         # Persist an empty table eagerly
         # so that we can access it when we drop down to a raw connection.
 
+
         # Be paranoid and remove the table if one by this name already exists.
-        table = Table(self.name, MetaData(), *self.cols, extend_existing=True)
-        self._drop()
-        table.create(bind=engine)
+        table = self._remake_table()
 
         # Fill in the columns we expect from the CSV.
         names = ['"' + c.name + '"' for c in self.cols]
@@ -141,18 +141,52 @@ class Staging(object):
 
         # In order to issue a COPY, we need to drop down to the psycopg2 DBAPI.
         conn = engine.raw_connection()
-        try:
-            with conn.cursor() as cursor:
+        with conn.cursor() as cursor:
+            try:
                 f.seek(0)
                 cursor.copy_expert(copy_st, f)
                 conn.commit()
                 return table
-        except Exception as e:
-            # When the bulk copy fails on _any_ row,
-            # roll back the entire operation.
-            raise PlenarioETLError(e)
-        finally:
-            conn.close()
+
+            except DataError as e:
+                error_parts = str(e).split(' ')
+                column_type = error_parts[5].strip(':')
+                column_name = error_parts[13].strip(':')
+                column_value = error_parts[14].strip('\n').strip('"')
+
+                self.cols = [c for c in self.cols if c.name != column_name]
+
+                if column_type == 'timestamp':
+                    try:
+                        int(column_value)
+                        self.cols.append(Column(column_name, Integer))
+                    except ValueError:
+                        self.cols.append(Column(column_name, String))
+                else:
+                    self.cols.append(Column(column_name, String))
+
+
+                table = self._remake_table()
+
+                f.seek(0)
+                conn.rollback()
+                cursor.copy_expert(copy_st, f)
+                conn.commit()
+                return table
+
+            except Exception as e:
+                raise PlenarioETLError(e)
+
+            finally:
+                conn.close()
+
+    def _remake_table(self):
+
+        table = Table(self.name, Base.metadata, *self.cols, extend_existing=True)
+        table.drop(checkfirst=True)
+        table.create(checkfirst=True)
+        # self._drop()
+        return table
 
     '''Utility methods to generate columns
     into which we can dump the CSV data.'''
