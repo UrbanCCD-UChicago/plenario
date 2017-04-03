@@ -6,13 +6,13 @@ from sqlalchemy import Table, select, Integer, func
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.types import NullType
 
-from plenario.database import session, Base
+from plenario.database import postgres_session, postgres_base
 from plenario.utils.helpers import slugify
 
 bcrypt = Bcrypt()
 
 
-class ShapeMetadata(Base):
+class ShapeMetadata(postgres_base):
     __tablename__ = 'meta_shape'
     dataset_name = Column(String, primary_key=True)
     human_name = Column(String, nullable=False)
@@ -45,7 +45,7 @@ class ShapeMetadata(Base):
 
     @classmethod
     def get_by_dataset_name(cls, name):
-        shape_metatable = session.query(cls).filter(cls.dataset_name == name).first()
+        shape_metatable = postgres_session.query(cls).filter(cls.dataset_name == name).first()
         return shape_metatable
 
     @classmethod
@@ -61,7 +61,7 @@ class ShapeMetadata(Base):
             WHERE meta.approved_status = TRUE;
         '''
 
-        return list(session.execute(shape_query))
+        return list(postgres_session.execute(shape_query))
 
     @classmethod
     def index(cls, geom=None):
@@ -77,7 +77,7 @@ class ShapeMetadata(Base):
         attr_names = as_is_attr_names + ['bbox']
         attrs = as_is_attrs + [bbox]
 
-        result = session.query(*attrs).filter(cls.is_ingested)
+        result = postgres_session.query(*attrs).filter(cls.is_ingested)
         listing = [dict(list(zip(attr_names, row))) for row in result]
 
         for dataset in listing:
@@ -97,7 +97,7 @@ class ShapeMetadata(Base):
             try:
                 # Reflect up the shape table
                 table = Table(name,
-                              Base.metadata,
+                              postgres_base.metadata,
                               autoload=True,
                               extend_existing=True)
             except NoSuchTableError:
@@ -123,7 +123,7 @@ class ShapeMetadata(Base):
 
     @classmethod
     def tablenames(cls):
-        return [x.dataset_name for x in session.query(ShapeMetadata.dataset_name).all()]
+        return [x.dataset_name for x in postgres_session.query(ShapeMetadata.dataset_name).all()]
 
     @staticmethod
     def add_intersections_to_index(listing, geom):
@@ -139,7 +139,7 @@ class ShapeMetadata(Base):
             WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
             '''.format(dataset_name=name, geojson_fragment=geom)
 
-            num_intersections = session.execute(num_intersections_query) \
+            num_intersections = postgres_session.execute(num_intersections_query) \
                 .first().num_geoms
             row['num_shapes'] = num_intersections
 
@@ -156,12 +156,12 @@ class ShapeMetadata(Base):
             WHERE meta.dataset_name='{}';
         '''.format(table_name)
 
-        metadata = session.execute(query).first()
+        metadata = postgres_session.execute(query).first()
         return metadata
 
     @classmethod
     def get_by_human_name(cls, human_name):
-        return session.query(cls).get(cls.make_table_name(human_name))
+        return postgres_session.query(cls).get(cls.make_table_name(human_name))
 
     @classmethod
     def make_table_name(cls, human_name):
@@ -183,7 +183,7 @@ class ShapeMetadata(Base):
             date_added=datetime.now().date(),
             # The rest
             **kwargs)
-        session.add(new_shape_dataset)
+        postgres_session.add(new_shape_dataset)
         return new_shape_dataset
 
     @property
@@ -191,15 +191,15 @@ class ShapeMetadata(Base):
         try:
             return self._shape_table
         except AttributeError:
-            self._shape_table = Table(self.dataset_name, Base.metadata,
+            self._shape_table = Table(self.dataset_name, postgres_base.metadata,
                                       autoload=True, extend_existing=True)
             return self._shape_table
 
     def remove_table(self):
         if self.is_ingested:
             drop = "DROP TABLE {};".format(self.dataset_name)
-            session.execute(drop)
-        session.delete(self)
+            postgres_session.execute(drop)
+        postgres_session.delete(self)
 
     def update_after_ingest(self):
         self.is_ingested = True
@@ -209,7 +209,7 @@ class ShapeMetadata(Base):
     def _make_bbox(self):
         bbox_query = 'SELECT ST_Envelope(ST_Union(geom)) FROM {};'. \
             format(self.dataset_name)
-        box = session.execute(bbox_query).first().st_envelope
+        box = postgres_session.execute(bbox_query).first().st_envelope
         return box
 
     def _get_num_shapes(self):
@@ -218,4 +218,4 @@ class ShapeMetadata(Base):
         count_query = select([func.count(table.c.geom)])
         # Should return only one row.
         # And we want the 0th and only attribute of that row (the count).
-        return session.execute(count_query).fetchone()[0]
+        return postgres_session.execute(count_query).fetchone()[0]

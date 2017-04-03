@@ -1,6 +1,6 @@
 import tempfile
 import requests
-from plenario.database import app_engine as engine
+from plenario.database import postgres_engine as engine
 
 
 class PlenarioETLError(Exception):

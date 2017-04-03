@@ -70,13 +70,13 @@ class Fixtures:
 
     def generate_sensor_network_meta_tables(self):
         print("create sensor network tables for {} ..." .format(self.pg_engine))
-        Base.metadata.create_all(bind=self.pg_engine)
+        postgres_base.metadata.create_all(bind=self.pg_engine)
 
     def drop_databases(self):
         self._run_with_connection("drop database plenario_test")
 
     def generate_mock_metadata(self):
-        session.configure(bind=self.pg_engine)
+        postgres_session.configure(bind=self.pg_engine)
 
         sensor_01 = SensorMeta(
             name="sensor_01",
@@ -130,12 +130,12 @@ class Fixtures:
 
         for obj in [feature_01, feature_02, network, network_02, node, node_2]:
             try:
-                print("INSERT {} with {}".format(obj, session.get_bind()))
-                session.add(obj)
-                session.commit()
+                print("INSERT {} with {}".format(obj, postgres_session.get_bind()))
+                postgres_session.add(obj)
+                postgres_session.commit()
             except IntegrityError as err:
                 print(str(err) + "\n")
-                session.rollback()
+                postgres_session.rollback()
 
     def generate_mock_observations(self):
         self._create_foi_table({"name": "test_network__vector", "properties": [{"name": "x", "type": "float"}, {"name": "y", "type": "float"}]})

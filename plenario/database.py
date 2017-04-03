@@ -8,26 +8,14 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 
 from plenario.settings import DATABASE_CONN, REDSHIFT_CONN
 
-app_engine = create_engine(DATABASE_CONN, convert_unicode=True, max_overflow=-1)
 
-session = scoped_session(sessionmaker(bind=app_engine,
-                                      autocommit=False,
-                                      autoflush=False, expire_on_commit=False))
-Base = declarative_base(bind=app_engine)
-Base.query = session.query_property()
+postgres_engine = create_engine(DATABASE_CONN)
+postgres_session = scoped_session(sessionmaker(bind=postgres_engine))
+postgres_base = declarative_base(bind=postgres_engine)
+postgres_base.query = postgres_session.query_property()
 
-
-redshift_engine = create_engine(REDSHIFT_CONN, convert_unicode=True, max_overflow=-1)
-
-redshift_session = scoped_session(
-    sessionmaker(
-        bind=redshift_engine,
-        autocommit=True,
-        autoflush=True,
-        expire_on_commit=True
-    )
-)
-
+redshift_engine = create_engine(REDSHIFT_CONN)
+redshift_session = scoped_session(sessionmaker(bind=redshift_engine))
 redshift_base = declarative_base(bind=redshift_engine)
 redshift_base.query = redshift_session.query_property()
 
@@ -65,7 +53,7 @@ def postgres_session_context():
     separate from the work being done, and ensuring that the session is always
     cleaned up after use."""
 
-    transactional_session = session()
+    transactional_session = postgres_session()
     try:
         yield transactional_session
         transactional_session.commit()

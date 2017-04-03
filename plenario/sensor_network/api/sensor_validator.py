@@ -6,7 +6,7 @@ from marshmallow.validate import Range, ValidationError
 from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
-from plenario.database import session
+from plenario.database import postgres_session
 from plenario.models.SensorNetwork import NodeMeta, NetworkMeta, FeatureMeta, SensorMeta
 from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
 
@@ -153,6 +153,6 @@ def convert(request_args):
             # Failed transactions, which we do expect, can cause
             # a DatabaseError with Postgres. Failing to rollback
             # prevents further queries from being carried out.
-            session.rollback()
+            postgres_session.rollback()
 
 

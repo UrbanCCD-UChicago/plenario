@@ -6,7 +6,7 @@ from tests.fixtures.point_meta import flu_path, landmarks_path
 from tests.fixtures.point_meta import crime_meta, crime_path
 
 from plenario import create_app
-from plenario.database import session
+from plenario.database import postgres_session
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
@@ -21,8 +21,8 @@ FIXTURE_PATH = pwd
 
 def ingest_point_fixture(fixture_meta, fname):
     md = MetaTable(**fixture_meta)
-    session.add(md)
-    session.commit()
+    postgres_session.add(md)
+    postgres_session.commit()
     path = os.path.join(fixtures_path, fname)
     point_etl = PlenarioETL(md, source_path=path)
     point_etl.add()
@@ -31,8 +31,8 @@ def ingest_point_fixture(fixture_meta, fname):
 def drop_tables(table_names):
     drop_template = 'DROP TABLE IF EXISTS {};'
     command = ''.join([drop_template.format(table_name) for table_name in table_names])
-    session.execute(command)
-    session.commit()
+    postgres_session.execute(command)
+    postgres_session.commit()
 
 
 class ShapeFixture(object):
@@ -77,7 +77,7 @@ class BasePlenarioTest(unittest.TestCase):
         fixtures = [f for k, f in shape_fixtures.items() if k != 'changed_neighborhoods']
         fixture_table_names = [f.table_name for f in fixtures]
         drop_tables(fixture_table_names)
-        session.commit()
+        postgres_session.commit()
 
         for fixture in fixtures:
             cls.ingest_fixture(fixture)
@@ -87,7 +87,7 @@ class BasePlenarioTest(unittest.TestCase):
                                            source_url=None,
                                            update_freq='yearly',
                                            approved_status=False).dataset_name
-        session.commit()
+        postgres_session.commit()
 
     @classmethod
     def ingest_points(cls):
@@ -95,7 +95,7 @@ class BasePlenarioTest(unittest.TestCase):
         ingest_point_fixture(flu_shot_meta, flu_path)
         ingest_point_fixture(landmarks_meta, landmarks_path)
         ingest_point_fixture(crime_meta, crime_path)
-        session.commit()
+        postgres_session.commit()
 
     @staticmethod
     def ingest_fixture(fixture):
@@ -104,11 +104,11 @@ class BasePlenarioTest(unittest.TestCase):
                                        source_url=None,
                                        update_freq=fixture.update_freq,
                                        approved_status=False)
-        session.commit()
+        postgres_session.commit()
         # Bypass the celery task and call on a ShapeETL directly
         ShapeETL(meta=shape_meta, source_path=fixture.path).add()
         return shape_meta
 
     @classmethod
     def tearDownClass(cls):
-        session.close()
+        postgres_session.close()

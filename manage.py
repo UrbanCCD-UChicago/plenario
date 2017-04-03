@@ -101,7 +101,7 @@ def init():
         print('[plenario] It already exists!')
 
     from plenario.database import create_extension
-    from plenario.database import app_engine as plenario_engine, Base
+    from plenario.database import postgres_engine as plenario_engine, postgres_base
     from plenario.utils.weather import WeatherETL, WeatherStationsETL
 
     try:
@@ -110,7 +110,7 @@ def init():
         print('[plenario] It already exists!')
 
     print('[plenario] Creating metadata tables')
-    Base.metadata.create_all()
+    postgres_base.metadata.create_all()
 
     print('[plenario] Creating weather tables')
     WeatherStationsETL().make_station_table()
@@ -124,18 +124,18 @@ def init():
 
     # Set up the default user if we are running in anything but production
     if os.environ.get('CONFIG') != 'prod':
-        from plenario.database import session
+        from plenario.database import postgres_session
         from plenario.models.User import User
 
         print('[plenario] Create default user')
         user = User(**DEFAULT_USER)
 
         try:
-            session.add(user)
-            session.commit()
+            postgres_session.add(user)
+            postgres_session.commit()
         except IntegrityError:
             print('[plenario] Already exists!')
-            session.rollback()
+            postgres_session.rollback()
 
     from plenario.tasks import health
 

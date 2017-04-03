@@ -2,13 +2,13 @@ import pickle
 
 from flask import jsonify
 
-from plenario.database import Base, app_engine as engine
+from plenario.database import postgres_base, postgres_engine as engine
 from plenario.utils.helpers import reflect
 
 
 def get_job(ticket: str):
 
-    celery_taskmeta = reflect("celery_taskmeta", Base.metadata, engine)
+    celery_taskmeta = reflect("celery_taskmeta", postgres_base.metadata, engine)
     query = celery_taskmeta.select().where(celery_taskmeta.c.task_id == ticket)
     job_meta = dict(query.execute().first().items())
     job_meta["result"] = pickle.loads(job_meta["result"])

@@ -125,6 +125,12 @@ class NoLimitValidator(Validator):
     limit = Integer(allow_none=True)
 
 
+class AggregateValidator(Validator):
+
+    node = Node(required=True)
+    feature = Feature(required=True)
+
+
 @crossdomain(origin="*")
 def get_network_map(network: str) -> Response:
     """Map of network and the relationships of the elements it contains."""
@@ -482,7 +488,7 @@ def get_aggregations(network: str) -> Response:
         "sensors": sensors.split(",") if sensors else [],
     })
 
-    validator = Validator()
+    validator = AggregateValidator()
     validated = validator.load(args)
     if validated.errors:
         return bad_request(validated.errors)

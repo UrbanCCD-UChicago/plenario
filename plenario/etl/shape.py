@@ -2,7 +2,7 @@
 
 import zipfile
 
-from plenario.database import session, app_engine as engine
+from plenario.database import postgres_session, postgres_engine as engine
 from plenario.etl.common import ETLFile, PlenarioETLError, add_unique_hash,\
     delete_absent_hashes
 from plenario.utils.shapefile import import_shapefile, ShapefileError
@@ -36,7 +36,7 @@ class ShapeETL:
         try:
             new.ingest()
             self.meta.update_after_ingest()
-            session.commit()
+            postgres_session.commit()
         except:
             # In case ingestion failed partway through,
             # be sure to leave no trace.

@@ -25,7 +25,7 @@ def create_app():
     # plenario.views does now. So we'll put them here like
     # API and not import them until they're really needed.
     from plenario.apiary import apiary, apiary_bp
-    from plenario.database import session as db_session
+    from plenario.database import postgres_session as db_session
     from plenario.models import bcrypt
     from plenario.auth import auth, login_manager
     from plenario.views import views
@@ -105,7 +105,7 @@ def create_app():
     return app
 
 
-from plenario.database import session as db_session
+from plenario.database import postgres_session as db_session
 # from plenario.auth import auth, login_manager
 from plenario.models import bcrypt
 from plenario.views import views

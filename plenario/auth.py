@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, request, url_for, \
     session as flask_session, flash
 from flask_login import LoginManager, login_user, logout_user, login_required
-from plenario.database import session as db_session
+from plenario.database import postgres_session as db_session
 from plenario.models import User
 from flask_wtf import Form
 from flask_wtf import CsrfProtect

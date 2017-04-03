@@ -10,7 +10,7 @@ from raven import Client
 from sqlalchemy import Table
 
 from plenario.database import redshift_base, redshift_session
-from plenario.database import session as session, Base, app_engine as engine
+from plenario.database import postgres_session as session, postgres_base, postgres_engine as engine
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
@@ -31,11 +31,11 @@ worker = Celery(
 def get_meta(name: str):
     """Return meta record given a point table name or a shape table name."""
 
-    query = session.query(MetaTable).filter(MetaTable.dataset_name == name)
+    query = postgres_session.query(MetaTable).filter(MetaTable.dataset_name == name)
     result = query.first()
 
     if result is None:
-        result = session.query(ShapeMetadata).filter(
+        result = postgres_session.query(ShapeMetadata).filter(
             ShapeMetadata.dataset_name == name
         ).first()
 
@@ -74,9 +74,9 @@ def update_dataset(name: str) -> bool:
 def delete_dataset(name: str) -> bool:
     """Delete the table and meta information for an approved point dataset."""
 
-    metatable = reflect("meta_master", Base.metadata, engine)
+    metatable = reflect("meta_master", postgres_base.metadata, engine)
     metatable.delete().where(metatable.c.dataset_name == name).execute()
-    reflect(name, Base.metadata, engine).drop()
+    reflect(name, postgres_base.metadata, engine).drop()
     return True
 
 
@@ -102,9 +102,9 @@ def update_shape(name: str) -> bool:
 def delete_shape(name) -> bool:
     """Delete the table and meta information for an approved shapeset."""
 
-    metashape = reflect("meta_shape", Base.metadata, engine)
+    metashape = reflect("meta_shape", postgres_base.metadata, engine)
     metashape.delete().where(metashape.c.dataset_name == name).execute()
-    reflect(name, Base.metadata, engine).drop()
+    reflect(name, postgres_base.metadata, engine).drop()
     return True
 
 
@@ -113,7 +113,7 @@ def frequency_update(frequency) -> bool:
     """Queue an update task for all the tables whose corresponding meta info
     is part of this frequency group."""
 
-    point_metas = session.query(MetaTable) \
+    point_metas = postgres_session.query(MetaTable) \
         .filter(MetaTable.update_freq == frequency) \
         .filter(MetaTable.date_added != None) \
         .all()
@@ -121,7 +121,7 @@ def frequency_update(frequency) -> bool:
     for point in point_metas:
         update_dataset.delay(point.dataset_name)
 
-    shape_metas = session.query(ShapeMetadata) \
+    shape_metas = postgres_session.query(ShapeMetadata) \
         .filter(ShapeMetadata.update_freq == frequency) \
         .filter(ShapeMetadata.is_ingested == True) \
         .all()

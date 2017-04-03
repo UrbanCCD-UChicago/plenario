@@ -14,13 +14,13 @@ from sqlalchemy import Table, select, Integer
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.exc import ProgrammingError
 
-from plenario.database import Base, session
+from plenario.database import postgres_base, postgres_session
 from plenario.utils.helpers import get_size_in_degrees, slugify
 
 bcrypt = Bcrypt()
 
 
-class MetaTable(Base):
+class MetaTable(postgres_base):
     __tablename__ = 'meta_master'
     # limited to 50 chars elsewhere
     dataset_name = Column(String(100), nullable=False)
@@ -150,7 +150,7 @@ class MetaTable(Base):
         try:
             return self._point_table
         except AttributeError:
-            self._point_table = Table(self.dataset_name, Base.metadata,
+            self._point_table = Table(self.dataset_name, postgres_base.metadata,
                                       autoload=True, extend_existing=True)
             return self._point_table
 
@@ -180,7 +180,7 @@ class MetaTable(Base):
         attrs = as_is_attrs + [bbox]
 
         # Make the DB call
-        result = session.query(*attrs). \
+        result = postgres_session.query(*attrs). \
             filter(cls.dataset_name.in_(dataset_names))
         meta_list = [dict(list(zip(attr_names, row))) for row in result]
 
@@ -220,7 +220,7 @@ class MetaTable(Base):
         panel_query = sa.union(*selects) \
             .order_by('dataset_name') \
             .order_by('time_bucket')
-        panel_vals = session.execute(panel_query)
+        panel_vals = postgres_session.execute(panel_query)
 
         panel = []
         for dataset_name, ts in groupby(panel_vals, lambda row: row.dataset_name):
@@ -250,7 +250,7 @@ class MetaTable(Base):
     @classmethod
     def index(cls):
         try:
-            q = session.query(cls.dataset_name)
+            q = postgres_session.query(cls.dataset_name)
             q = q.filter(cls.approved_status == True)
             names = [result.dataset_name for result in q.all()]
         except ProgrammingError:
@@ -268,7 +268,7 @@ class MetaTable(Base):
                        interesects with the given bounds.
         """
         # Filter out datsets that don't intersect the time boundary
-        q = session.query(cls.dataset_name) \
+        q = postgres_session.query(cls.dataset_name) \
             .filter(cls.dataset_name.in_(dataset_names), cls.date_added != None,
                     cls.obs_from < end,
                     cls.obs_to > start)
@@ -282,12 +282,12 @@ class MetaTable(Base):
 
     @classmethod
     def get_by_dataset_name(cls, name):
-        foo = session.query(cls).filter(cls.dataset_name == name).first()
+        foo = postgres_session.query(cls).filter(cls.dataset_name == name).first()
         return foo
 
     def get_bbox_center(self):
         sel = select([func.ST_AsGeoJSON(func.ST_centroid(self.bbox))])
-        result = session.execute(sel)
+        result = postgres_session.execute(sel)
         # returns [lon, lat]
         return json.loads(result.first()[0])['coordinates']
 
@@ -322,9 +322,9 @@ class MetaTable(Base):
 
         # Generate a count for each resolution by resolution square
         t = self.point_table
-        q = session.query(func.count(t.c.hash),
-                          func.ST_SnapToGrid(t.c.geom, size_x, size_y)
-                          .label('squares')) \
+        q = postgres_session.query(func.count(t.c.hash),
+                                   func.ST_SnapToGrid(t.c.geom, size_x, size_y)
+                                   .label('squares')) \
             .filter(*conditions) \
             .group_by('squares')
 
@@ -335,7 +335,7 @@ class MetaTable(Base):
         if geom:
             q = q.filter(t.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geom)))
 
-        return session.execute(q), size_x, size_y
+        return postgres_session.execute(q), size_x, size_y
 
     # Return select statement to execute or union
     def timeseries(self, agg_unit, start, end, geom=None, column_filters=None):
@@ -394,7 +394,7 @@ class MetaTable(Base):
 
     def timeseries_one(self, agg_unit, start, end, geom=None, column_filters=None):
         ts_select = self.timeseries(agg_unit, start, end, geom, column_filters)
-        rows = session.execute(ts_select.order_by('time_bucket'))
+        rows = postgres_session.execute(ts_select.order_by('time_bucket'))
 
         header = [['count', 'datetime']]
         # Discard the name attribute.
@@ -420,4 +420,4 @@ class MetaTable(Base):
             WHERE m.approved_status = 'true'
         '''
 
-        return list(session.execute(query))
+        return list(postgres_session.execute(query))

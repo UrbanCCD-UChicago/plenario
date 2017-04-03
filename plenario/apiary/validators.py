@@ -2,7 +2,7 @@ from collections import defaultdict
 
 from wtforms import ValidationError
 
-from plenario.database import session
+from plenario.database import postgres_session
 from plenario.models.SensorNetwork import FeatureMeta
 from plenario.models.SensorNetwork import NetworkMeta
 
@@ -12,7 +12,7 @@ def validate_sensor_properties(observed_properties):
         raise ValidationError("No observed properties were provided!")
 
     features = defaultdict(list)
-    for feature in session.query(FeatureMeta).all():
+    for feature in postgres_session.query(FeatureMeta).all():
         for property_dict in feature.observed_properties:
             features[feature.name].append(property_dict["name"])
 
@@ -34,7 +34,7 @@ def assert_json_enclosed_in_brackets(json_list):
 
 
 def validate_node(network):
-    if network not in [net.name for net in session.query(NetworkMeta).all()]:
+    if network not in [net.name for net in postgres_session.query(NetworkMeta).all()]:
         raise ValidationError("Invalid network name!")
 
 

@@ -7,7 +7,7 @@ from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
 from sqlalchemy import select, func
 from sqlalchemy.exc import NoSuchTableError
 
-from plenario.database import app_engine as engine, session
+from plenario.database import postgres_engine as engine, postgres_session
 from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError, delete_absent_hashes
 from plenario.utils.helpers import iter_column, slugify
 
@@ -111,7 +111,7 @@ class Staging(object):
         """
         Drop the staging table if it's been created.
         """
-        session.close()
+        postgres_session.close()
         self._drop()
 
     def _make_table(self, f):
@@ -392,12 +392,12 @@ def update_meta(metatable, table):
     try:
         metatable.update_date_added()
 
-        metatable.obs_from, metatable.obs_to = session.query(
+        metatable.obs_from, metatable.obs_to = postgres_session.query(
             func.min(table.c.point_date),
             func.max(table.c.point_date)
         ).first()
 
-        metatable.bbox = session.query(
+        metatable.bbox = postgres_session.query(
             func.ST_SetSRID(
                 func.ST_Envelope(func.ST_Union(table.c.geom)),
                 4326
@@ -409,9 +409,9 @@ def update_meta(metatable, table):
             if c.name not in {'geom', 'point_date', 'hash'}
         }
 
-        session.add(metatable)
-        session.commit()
+        postgres_session.add(metatable)
+        postgres_session.commit()
 
     except:
-        session.rollback()
+        postgres_session.rollback()
         raise
