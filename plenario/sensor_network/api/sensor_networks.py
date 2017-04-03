@@ -773,6 +773,5 @@ def sanitize_validated_args():
 from plenario.database import redshift_session, redshift_engine, redshift_base as redshift_base
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.api.validator import sensor_network_validate
-from plenario.sensor_network.api.sensor_validator import NearMeValidator
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, FeatureMeta, SensorMeta
 from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
