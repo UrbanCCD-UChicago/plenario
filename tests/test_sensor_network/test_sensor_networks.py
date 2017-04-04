@@ -262,6 +262,17 @@ class TestSensorNetworks(unittest.TestCase):
         received_number_of_rows = len(received_rows_without_blank_lines)
         self.assertEqual(expected_number_of_rows, received_number_of_rows)
 
+    def test_sensor_network_download_with_node_and_feature_args(self):
+        url = "/v1/api/sensor-networks/test_network/download?nodes=test_node&" \
+              "features=vector&start_datetime=2016-10-01&end_datetime=2016-10-02"
+        response = self.app.get(url)
+
+        expected_number_of_rows = 101
+        received_rows = response.get_data().split(b'\r\n')
+        received_rows_without_blank_lines = [e for e in received_rows if e]
+        received_number_of_rows = len(received_rows_without_blank_lines)
+        self.assertEqual(expected_number_of_rows, received_number_of_rows)
+
     def test_sensor_network_download_json(self):
         url = "/v1/api/sensor-networks/test_network/download?start_datetime=2016-10-01T00:00:00&data_type=json"
         response = self.app.get(url)
