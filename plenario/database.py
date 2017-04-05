@@ -14,7 +14,7 @@ postgres_session = scoped_session(sessionmaker(bind=postgres_engine))
 postgres_base = declarative_base(bind=postgres_engine)
 postgres_base.query = postgres_session.query_property()
 
-redshift_engine = create_engine(REDSHIFT_CONN)
+redshift_engine = create_engine(REDSHIFT_CONN, max_overflow=-1)
 redshift_session = scoped_session(sessionmaker(bind=redshift_engine, autocommit=True))
 redshift_base = declarative_base(bind=redshift_engine)
 redshift_base.query = redshift_session.query_property()
