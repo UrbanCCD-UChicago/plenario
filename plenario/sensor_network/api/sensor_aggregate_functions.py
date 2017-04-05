@@ -238,7 +238,8 @@ def aggregate(args, agg_label, agg_fn):
     # Generate the base query
     query = select(selects).where(and_(
         obs_table.c.datetime >= start_dt,
-        obs_table.c.datetime < end_dt
+        obs_table.c.datetime < end_dt,
+        obs_table.c.node_id == node.id
     ))
 
     # If sensors are specified, filter on them

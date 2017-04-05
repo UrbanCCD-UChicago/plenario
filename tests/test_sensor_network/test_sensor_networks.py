@@ -228,6 +228,21 @@ class TestSensorNetworks(unittest.TestCase):
                     pass
         self.assertEqual(total_count, 200)
 
+    def test_aggregate_endpoint_returns_correct_observation_count_with_node_filter(self):
+        url = "/v1/api/sensor-networks/test_network/aggregate?node=node_2"
+        url += "&function=avg&feature=temperature&sensors=sensor_01"
+        url += "&start_datetime=2016-10-01 00:00:00" \
+               "&end_datetime=2016-10-02 00:00:00"
+        response, result = self.get_result(url)
+        total_count = 0
+        for bucket in result["data"]:
+            for item in bucket.values():
+                try:
+                    total_count += item["count"]
+                except TypeError:
+                    pass
+        self.assertEqual(total_count, 100)
+
     def test_query_endpoint_returns_correct_observation_count_total(self):
         url = "/v1/api/sensor-networks/test_network/query?nodes=test_node"
         url += "&feature=vector&start_datetime=2016-01-01"
@@ -252,7 +267,9 @@ class TestSensorNetworks(unittest.TestCase):
         self.assertEqual(result["meta"]["total"], 1)
 
     def test_sensor_network_download_csv(self):
-        url = "/v1/api/sensor-networks/test_network/download?start_datetime=2016-10-01T00:00:00"
+        url = "/v1/api/sensor-networks/test_network/download" \
+              "?start_datetime=2016-10-01T00:00:00" \
+              "&node=test_node"
         response = self.app.get(url)
 
         # 900 rows and 2 headers (because there's two features: temperature and vector)
@@ -274,7 +291,10 @@ class TestSensorNetworks(unittest.TestCase):
         self.assertEqual(expected_number_of_rows, received_number_of_rows)
 
     def test_sensor_network_download_json(self):
-        url = "/v1/api/sensor-networks/test_network/download?start_datetime=2016-10-01T00:00:00&data_type=json"
+        url = "/v1/api/sensor-networks/test_network/download?" \
+              "start_datetime=2016-10-01T00:00:00" \
+              "&data_type=json" \
+              "&nodes=test_node"
         response = self.app.get(url)
 
         expected_number_of_objects = 900
@@ -284,7 +304,8 @@ class TestSensorNetworks(unittest.TestCase):
     def test_sensor_network_download_csv_with_feature_filter(self):
         url = "/v1/api/sensor-networks/test_network/download?" \
               "start_datetime=2016-10-01T00:00:00&"            \
-              "feature=temperature"
+              "feature=temperature" \
+              "&nodes=test_node"
 
         response = self.app.get(url)
 
@@ -299,7 +320,8 @@ class TestSensorNetworks(unittest.TestCase):
         url = "/v1/api/sensor-networks/test_network/download?" \
               "start_datetime=2016-10-01T00:00:00&"            \
               "data_type=json&"                                \
-              "feature=vector"
+              "feature=vector&" \
+              "nodes=test_node"
 
         response = self.app.get(url)
 
@@ -311,7 +333,8 @@ class TestSensorNetworks(unittest.TestCase):
         url = "/v1/api/sensor-networks/test_network/download?" \
               "start_datetime=2016-10-01T00:00:00&"            \
               "feature=temperature&"                           \
-              "sensor=sensor_01"
+              "sensor=sensor_01&" \
+              "node=test_node"
 
         response = self.app.get(url)
 

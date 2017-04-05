@@ -171,6 +171,12 @@ class Fixtures:
             self.rs_engine.execute("""
                 insert into test_network__temperature (node_id, datetime, meta_id, sensor, temperature)
                 values ('test_node', '{}', '{}', 'sensor_01', {})
+                """.format(record_date, randint(0, 100), random())
+            )
+
+            self.rs_engine.execute("""
+                insert into test_network__temperature (node_id, datetime, meta_id, sensor, temperature)
+                values ('node_2', '{}', '{}', 'sensor_01', {})
                 """.format(record_date, randint(0, 100), random(), random())
             )
 
