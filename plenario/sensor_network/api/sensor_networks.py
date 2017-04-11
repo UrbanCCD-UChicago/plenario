@@ -1,24 +1,30 @@
-import boto3
-import json
 import csv
 import io
-
+import json
 from datetime import datetime, timedelta
-from dateutil.parser import parse as parse_date
+
+import boto3
 from flask import request, Response, stream_with_context, jsonify, redirect
 from marshmallow import Schema
 from marshmallow.exceptions import ValidationError
 from marshmallow.fields import Field, List, DateTime, Integer, String, Float
 from marshmallow.validate import Range
 from shapely import wkb
-from sqlalchemy import MetaData, Table, func as sqla_fn, and_, asc, desc
+from sqlalchemy import MetaData, func as sqla_fn, and_, asc, desc
 from sqlalchemy.orm.exc import NoResultFound
 
 from plenario.api.common import cache, crossdomain, make_fragment_str
 from plenario.api.common import extract_first_geometry_fragment
 from plenario.api.common import make_cache_key, unknown_object_json_handler
+from plenario.api.condition_builder import parse_tree
+from plenario.api.validator import valid_tree
+from plenario.database import redshift_session, redshift_engine, redshift_base
 from plenario.settings import S3_BUCKET
 from plenario.utils.helpers import reflect
+
+
+# todo: find a better place for me
+redshift_base.metadata.reflect()
 
 # Cache timeout of 5 minutes
 CACHE_TIMEOUT = 60 * 10
@@ -89,6 +95,21 @@ class Geom(Field):
             raise ValidationError("Invalid geom: {}".format(value))
 
 
+class ConditionTree(Field):
+
+    def _deserialize(self, value, attr, data):
+        feature = request.args['feature']
+        network = request.view_args['network']
+
+        try:
+            parsed_json = json.loads(value)
+            table = redshift_base.metadata.tables[network + '__' + feature]
+            valid_tree(table, parsed_json)
+            return parse_tree(table, parsed_json)
+        except (KeyError) as err:
+            raise ValidationError(str(err))
+
+
 class Validator(Schema):
 
     feature = Feature()
@@ -105,7 +126,7 @@ class Validator(Schema):
     end_datetime = DateTime()
 
     agg = String(missing="hour")
-    filter = String(allow_none=True, missing=None, default=None)
+    filter = ConditionTree(allow_none=True, missing=None, default=None)
     function = String(missing="avg")
     limit = Integer(missing=1000)
     offset = Integer(missing=0, validate=Range(0))
@@ -382,12 +403,11 @@ def get_observations(network: str) -> Response:
     validated = validator.load(args)
     if validated.errors:
         return bad_request(validated.errors)
-    
+
     if '.' in feature:
         feature, property_ = feature.split('.', 1)
         validated.data.update({'property': property_})
 
-    redshift_base.metadata.reflect()
     table = redshift_base.metadata.tables[network + "__" + feature]
 
     try:
@@ -515,7 +535,7 @@ def observation_query(table, **kwargs):
     start_dt = kwargs.get("start_datetime")
     end_dt = kwargs.get("end_datetime")
     condition = kwargs.get("filter")
-    property_ = kwargs.get('property')
+    property_ = kwargs.get("property")
 
     q = redshift_session.query(table)
     q = q.filter(table.c.datetime >= start_dt) if start_dt else q
@@ -770,8 +790,7 @@ def sanitize_validated_args():
     pass
 
 
-from plenario.database import redshift_session, redshift_engine, redshift_base as redshift_base
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
-from plenario.api.validator import sensor_network_validate
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, FeatureMeta, SensorMeta
 from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
+
