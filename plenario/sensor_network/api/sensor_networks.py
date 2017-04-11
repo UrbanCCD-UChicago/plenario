@@ -23,9 +23,6 @@ from plenario.settings import S3_BUCKET
 from plenario.utils.helpers import reflect
 
 
-# todo: find a better place for me
-redshift_base.metadata.reflect()
-
 # Cache timeout of 5 minutes
 CACHE_TIMEOUT = 60 * 10
 
@@ -408,6 +405,7 @@ def get_observations(network: str) -> Response:
         feature, property_ = feature.split('.', 1)
         validated.data.update({'property': property_})
 
+    redshift_base.metadata.reflect()
     table = redshift_base.metadata.tables[network + "__" + feature]
 
     try:
