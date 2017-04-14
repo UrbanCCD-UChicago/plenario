@@ -7,6 +7,7 @@ import warnings
 
 from flask.exthook import ExtDeprecationWarning
 from flask_script import Manager
+from kombu.exceptions import OperationalError
 from os import getenv
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
@@ -140,7 +141,32 @@ def init():
     from plenario.tasks import health
 
     # This will get celery to set up its meta tables
-    health.delay()
+    try:
+        health.delay()
+    except OperationalError:
+        print('[plenario] Redis is not running!')
+
+
+@manager.command
+def uninstall():
+    """Drop the plenario databases."""
+
+    from sqlalchemy import create_engine
+    from plenario.database import drop_database
+
+    base_uri = DATABASE_CONN.rsplit('/', 1)[0]
+    base_engine = create_engine(base_uri)
+    try:
+        drop_database(base_engine, 'plenario_test')
+    except ProgrammingError:
+        pass
+
+    base_uri = REDSHIFT_CONN.rsplit('/', 1)[0]
+    base_engine = create_engine(base_uri)
+    try:
+        drop_database(base_engine, 'plenario_test')
+    except ProgrammingError:
+        pass
 
 
 def wait(process):

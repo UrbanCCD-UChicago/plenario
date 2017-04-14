@@ -30,6 +30,16 @@ def create_database(bind: Engine, database: str) -> None:
     connection.close()
 
 
+def drop_database(bind: Engine, database: str) -> None:
+    """Drop a database (schema) in postgresql."""
+
+    print('[plenario] Drop database %s' % database)
+    connection = bind.connect()
+    connection.execute("commit")
+    connection.execute("drop database %s" % database)
+    connection.close()
+
+
 def create_extension(bind: Engine, extension: str) -> None:
     """Setup an extension in postgresql."""
 

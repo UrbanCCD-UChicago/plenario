@@ -791,4 +791,3 @@ def sanitize_validated_args():
 from plenario.sensor_network.api.sensor_response import json_response_base, bad_request
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, FeatureMeta, SensorMeta
 from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
-
