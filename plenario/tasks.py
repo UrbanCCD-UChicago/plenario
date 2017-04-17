@@ -1,4 +1,5 @@
 import csv
+import logging
 import os
 import tarfile
 from datetime import datetime, timedelta
@@ -10,7 +11,7 @@ from raven import Client
 from sqlalchemy import Table
 
 from plenario.database import redshift_base, redshift_session
-from plenario.database import postgres_session as session, postgres_base, postgres_engine as engine
+from plenario.database import postgres_session, postgres_base, postgres_engine as engine
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
@@ -26,6 +27,8 @@ worker = Celery(
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND
 )
+
+logger = logging.getLogger(__name__)
 
 
 def get_meta(name: str):
@@ -186,23 +189,27 @@ def start_and_end_of_the_month(dt: datetime):
 
 
 @worker.task()
-def archive(dt: str) -> bool:
+def archive(datetime_string: str) -> bool:
     """Store the feature data into tar files organized by node and upload
     those tar files to s3."""
 
+    logger.debug('reflecting tables')
     # Get table objects for all known feature tables in redshift database
     redshift_base.metadata.reflect()
     tables = dict(redshift_base.metadata.tables)
+    logger.debug('reflected redshift tables')
 
     try:
         del tables['unknown_feature']
         del tables['array_of_things_chicago__unknown_feature']
+        logger.debug('deleted unknown feature keys')
     except KeyError:
         # The unknown feature table might not exist in test environments
         pass
 
     # Get the start and end datetime bounds for this month
-    start, end = start_and_end_of_the_month(date_parse(dt))
+    start, end = start_and_end_of_the_month(date_parse(datetime_string))
+    logger.debug('get the start and end dates for the given month')
 
     # Break each feature of interest table up into csv files grouped by node
     csv_file_groups = []
@@ -215,28 +222,32 @@ def archive(dt: str) -> bool:
         # Save the list of generated file names
         csv_file_groups.append(
             table_to_csvs(table, start, end))
+        logger.debug('generated csv files for {}'.format(table))
 
     # Sort the file names into groups by node
     tar_groups = {}
     for file_group in csv_file_groups:
         for file_path in file_group:
-            node = file_path.split('--', 1)[0]
-            tar_groups.setdefault(node, []).append(file_path)
+            node_path = file_path.split('.', 1)[0]
+            tar_groups.setdefault(node_path, []).append(file_path)
+    logger.debug("tar'd all the csvs together by node")
 
     # Tar and upload each group of files for a single node
-    for node, tar_group in tar_groups.items():
+    for node_path, tar_group in tar_groups.items():
 
-        tarfile_path = '{}.tar.gz'.format(node)
+        tarfile_path = '/tmp/{}.tar.gz'.format(node_path)
 
         tar = tarfile.open(tarfile_path, mode='w:gz')
         for file_path in tar_group:
-            tar.add(file_path)
-            os.remove(file_path)
+            tar.add('/tmp/' + file_path)
+            os.remove('/tmp/' + file_path)
         tar.close()
+        logger.debug("generated {}".format(tarfile_path))
 
-        s3_destination = '{}-{}/{}.tar.gz'.format(start.year, start.month, node)
+        s3_destination = '{}-{}/{}.tar.gz'.format(start.year, start.month, node_path)
         s3_upload(tarfile_path, s3_destination)
         os.remove(tarfile_path)
+        logger.debug("uploaded {}".format(tarfile_path))
 
     return True
 
@@ -268,10 +279,11 @@ def table_to_csvs(table: Table, start: datetime, end: datetime) -> list:
     for row in query:
         node = row.node_id
         if node not in files:
-            file_name = '{}--{}--{}--{}.csv'.format(
-                node, table.name, start.date(), end.date())
-            file_names.append(file_name)
-            files[node] = open(file_name, 'w')
+            file = '{}.{}.{}.{}.csv'
+            file = file.format(node, table.name, start.date(), end.date())
+
+            file_names.append(file)
+            files[node] = open('/tmp/' + file, 'w')
             writers[node] = csv.writer(files[node])
             writers[node].writerow(row.keys())
         writers[node].writerow(row)

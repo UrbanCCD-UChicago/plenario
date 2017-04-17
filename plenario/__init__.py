@@ -1,5 +1,9 @@
+import yaml
+
 from flask import Flask, render_template, redirect, url_for, request
 from flask_cors import CORS
+from logging import getLogger
+from logging.config import dictConfig
 from raven.contrib.flask import Sentry
 
 from plenario.settings import DATABASE_CONN
@@ -13,6 +17,12 @@ if PLENARIO_SENTRY_URL:
 # object since the models themselves need to import db.
 from plenario.models.SensorNetwork import FeatureMeta, SensorMeta
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta
+
+
+# Set up the logger using parameters found in the 'log.yaml' file
+config = yaml.load(open('log.yaml'))
+dictConfig(config)
+logger = getLogger(__name__)
 
 
 def create_app():
@@ -102,6 +112,7 @@ def create_app():
             # Is there even a description attribute?
             return False
 
+    logger.info('set up the application')
     return app
 
 
