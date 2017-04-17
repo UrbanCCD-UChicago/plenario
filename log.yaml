@@ -7,12 +7,12 @@ handlers:
     class: logging.StreamHandler
     formatter: default
     stream: ext://sys.stdout
-  file:
-    class: logging.handlers.RotatingFileHandler
-    formatter: default
-    filename: plenario.log
-    maxBytes: 1024
+#   file:
+#     class: logging.handlers.RotatingFileHandler
+#     formatter: default
+#     filename: /var/tmp/plenario.log
+#     maxBytes: 1024
 root:
   level: DEBUG
-  handlers: [console, file]
+  handlers: [console]
 version: 1
