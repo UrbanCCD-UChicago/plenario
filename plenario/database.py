@@ -1,5 +1,6 @@
 import subprocess
 from contextlib import contextmanager
+from logging import getLogger
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine.base import Engine
@@ -8,6 +9,8 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 
 from plenario.settings import DATABASE_CONN, REDSHIFT_CONN
 
+
+logger = getLogger(__name__)
 
 postgres_engine = create_engine(DATABASE_CONN)
 postgres_session = scoped_session(sessionmaker(bind=postgres_engine))
@@ -63,15 +66,18 @@ def postgres_session_context():
     separate from the work being done, and ensuring that the session is always
     cleaned up after use."""
 
+    logger.info('Begin.')
     transactional_session = postgres_session()
     try:
         yield transactional_session
         transactional_session.commit()
     except:
         transactional_session.rollback()
+        logger.error('Postgres transaction failed.', exc_info=True)
         raise
     finally:
         transactional_session.close()
+    logger.info('End.')
 
 
 @contextmanager
@@ -80,12 +86,15 @@ def redshift_session_context():
     separate from the work being done, and ensuring that the session is always
     cleaned up after use."""
 
+    logger.info('Begin.')
     transactional_session = redshift_session()
     try:
         yield transactional_session
         transactional_session.commit()
     except:
         transactional_session.rollback()
+        logger.error('Redshift transaction failed.', exc_info=True)
         raise
     finally:
         transactional_session.close()
+    logger.info('End.')
