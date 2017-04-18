@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 def get_meta(name: str):
     """Return meta record given a point table name or a shape table name."""
 
+    logger.info('Begin. (name: "{}")'.format(name))
     query = postgres_session.query(MetaTable).filter(MetaTable.dataset_name == name)
     result = query.first()
 
@@ -45,6 +46,7 @@ def get_meta(name: str):
     if result is None:
         raise ValueError("dataset '%s' not found in metadata records" % name)
 
+    logger.info('End.')
     return result
 
 
@@ -59,8 +61,10 @@ def health() -> bool:
 def add_dataset(name: str) -> bool:
     """Ingest the row information for an approved point dataset."""
 
+    logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
     PlenarioETL(meta).add()
+    logger.info('End.')
     return True
 
 
@@ -68,8 +72,10 @@ def add_dataset(name: str) -> bool:
 def update_dataset(name: str) -> bool:
     """Update the row information for an approved point dataset."""
 
+    logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
     PlenarioETL(meta).update()
+    logger.info('End.')
     return True
 
 
@@ -77,9 +83,11 @@ def update_dataset(name: str) -> bool:
 def delete_dataset(name: str) -> bool:
     """Delete the table and meta information for an approved point dataset."""
 
+    logger.info('Begin. (name: "{}")'.format(name))
     metatable = reflect("meta_master", postgres_base.metadata, engine)
     metatable.delete().where(metatable.c.dataset_name == name).execute()
     reflect(name, postgres_base.metadata, engine).drop()
+    logger.info('End.')
     return True
 
 
@@ -87,8 +95,11 @@ def delete_dataset(name: str) -> bool:
 def add_shape(name: str) -> bool:
     """Ingest the row information for an approved shapeset."""
 
+    logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
+    logger.debug('Add the shape table.')
     ShapeETL(meta).add()
+    logger.info('End.')
     return True
 
 
@@ -96,8 +107,11 @@ def add_shape(name: str) -> bool:
 def update_shape(name: str) -> bool:
     """Update the row information for an approved shapeset."""
 
+    logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
+    logger.debug('Update the shape table.')
     ShapeETL(meta).update()
+    logger.info('End.')
     return True
 
 
@@ -105,9 +119,14 @@ def update_shape(name: str) -> bool:
 def delete_shape(name) -> bool:
     """Delete the table and meta information for an approved shapeset."""
 
+    logger.info('Begin. (name: "{}")'.format(name))
+    logger.debug('Reflect the shape metadata table.')
     metashape = reflect("meta_shape", postgres_base.metadata, engine)
+    logger.debug('Delete the shape meta record.')
     metashape.delete().where(metashape.c.dataset_name == name).execute()
+    logger.debug('Reflect and drop the corresponding shape table.')
     reflect(name, postgres_base.metadata, engine).drop()
+    logger.info('End.')
     return True
 
 
@@ -116,22 +135,27 @@ def frequency_update(frequency) -> bool:
     """Queue an update task for all the tables whose corresponding meta info
     is part of this frequency group."""
 
+    logger.info('Begin. (frequency: "{}")'.format(frequency))
+    logger.debug('Query for all point dataset meta records.')
     point_metas = postgres_session.query(MetaTable) \
         .filter(MetaTable.update_freq == frequency) \
         .filter(MetaTable.date_added != None) \
         .all()
 
+    logger.debug('Queue an update task for each point dataset.')
     for point in point_metas:
         update_dataset.delay(point.dataset_name)
 
+    logger.debug('Query for all shape dataset meta records.')
     shape_metas = postgres_session.query(ShapeMetadata) \
         .filter(ShapeMetadata.update_freq == frequency) \
         .filter(ShapeMetadata.is_ingested == True) \
         .all()
-    
+
+    logger.debug('Queue an update task for each shape dataset.')
     for shape_meta in shape_metas:
         update_shape.delay(shape_meta.dataset_name)
-
+    logger.info('End.')
     return True
 
 
@@ -139,8 +163,11 @@ def frequency_update(frequency) -> bool:
 def update_metar() -> bool:
     """Run a METAR update."""
 
+    logger.info('Begin.')
     w = WeatherETL()
+    logger.debug('Call metar initialization method.')
     w.metar_initialize_current()
+    logger.info('End.')
     return True
 
 
@@ -151,7 +178,9 @@ def clean_metar() -> bool:
     in the hourly table are the quality-controlled versions of records that
     existed in the metar table."""
 
+    logger.info('Begin.')
     WeatherETL().clear_metars()
+    logger.info('End.')
     return True
 
 

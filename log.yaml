@@ -1,7 +1,7 @@
 formatters:
   default:
     datefmt: '%Y-%m-%d %H:%M:%S'
-    format: '%(asctime)s %(levelname)s %(name)s.%(funcName)s: %(message)s'
+    format: '%(asctime)s - %(levelname)s - %(name)s.%(funcName)s - %(message)s'
 handlers:
   console:
     class: logging.StreamHandler
