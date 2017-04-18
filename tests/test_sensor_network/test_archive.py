@@ -22,7 +22,7 @@ class TestArchive(BaseTest):
         tar = tarfile.open('test.tar.gz')
         tar.extractall()
 
-        with open('0--temperature--2017-01-01--2017-02-01.csv') as file:
+        with open('0.temperature.2017-01-01.2017-02-01.csv') as file:
             count = 0
             reader = csv.reader(file)
             for line in reader:
@@ -33,4 +33,4 @@ class TestArchive(BaseTest):
         tar.close()
 
         os.remove('test.tar.gz')
-        os.remove('0--temperature--2017-01-01--2017-02-01.csv')
+        os.remove('0.temperature.2017-01-01.2017-02-01.csv')
