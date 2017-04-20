@@ -9,7 +9,7 @@ from sqlalchemy import select, func
 from sqlalchemy.exc import NoSuchTableError
 
 from plenario.database import postgres_base, postgres_engine
-from plenario.database import postgres_session_context
+from plenario.database import postgres_session
 from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError, delete_absent_hashes
 from plenario.utils.helpers import iter_column, slugify
 
@@ -412,24 +412,24 @@ def update_meta(metatable, table):
     :returns: None
     """
 
-    with postgres_session_context() as session:
-        metatable.update_date_added()
+    metatable.update_date_added()
 
-        metatable.obs_from, metatable.obs_to = session.query(
-            func.min(table.c.point_date),
-            func.max(table.c.point_date)
-        ).first()
+    metatable.obs_from, metatable.obs_to = postgres_session.query(
+        func.min(table.c.point_date),
+        func.max(table.c.point_date)
+    ).first()
 
-        metatable.bbox = session.query(
-            func.ST_SetSRID(
-                func.ST_Envelope(func.ST_Union(table.c.geom)),
-                4326
-            )
-        ).first()[0]
+    metatable.bbox = postgres_session.query(
+        func.ST_SetSRID(
+            func.ST_Envelope(func.ST_Union(table.c.geom)),
+            4326
+        )
+    ).first()[0]
 
-        metatable.column_names = {
-            c.name: str(c.type) for c in metatable.column_info()
-            if c.name not in {'geom', 'point_date', 'hash'}
-        }
+    metatable.column_names = {
+        c.name: str(c.type) for c in metatable.column_info()
+        if c.name not in {'geom', 'point_date', 'hash'}
+    }
 
-        session.add(metatable)
+    postgres_session.add(metatable)
+    postgres_session.commit()

@@ -141,14 +141,16 @@ class StagingTableTests(TestCase):
         # For the entry in MetaTable without a table, create a staging table.
         # We'll need to read from a fixture csv.
         with Staging(self.unloaded_meta, source_path=self.radio_path) as s_table:
-            all_rows = postgres_session.execute(s_table.table.select()).fetchall()
+            with postgres_engine.begin() as connection:
+                all_rows = connection.execute(s_table.table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
 
     def test_staging_existing_table(self):
         # With a fixture CSV whose columns match the existing dataset,
         # create a staging table.
         with Staging(self.existing_meta, source_path=self.dog_path) as s_table:
-            all_rows = postgres_session.execute(s_table.table.select()).fetchall()
+            with postgres_engine.begin() as connection:
+                all_rows = connection.execute(s_table.table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
 
     def test_insert_data(self):
