@@ -80,7 +80,7 @@ def fixtures():
         for f in features:
             f.mirror()
 
-        for i in range(1, 31):
+        for i in range(1, 32):
             dt = parse("2017-01-{}".format(i))
             session.execute(observation('aot0', 'temperature', ['temperature'], 'node0', dt, 'tmp0', ['0']))
             session.execute(observation('aot0', 'temperature', ['temperature'], 'node1', dt, 'tmp0', ['20']))
@@ -93,4 +93,3 @@ class BaseTest(TestCase):
         uninstall()
         init()
         fixtures()
-

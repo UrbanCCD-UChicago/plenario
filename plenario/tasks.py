@@ -249,8 +249,7 @@ def archive(datetime_string: str) -> bool:
             # Skip tables which are not feature of interest tables
             continue
         # Save the list of generated file names
-        csv_file_groups.append(
-            table_to_csvs(table, start, end))
+        csv_file_groups.append(table_to_csvs(table, start, end))
         logger.debug('generated csv files for {}'.format(table))
 
     # Sort the file names into groups by node
@@ -268,7 +267,7 @@ def archive(datetime_string: str) -> bool:
 
         tar = tarfile.open(tarfile_path, mode='w:gz')
         for file_path in tar_group:
-            tar.add('/tmp/' + file_path)
+            tar.add('/tmp/' + file_path, file_path)
             os.remove('/tmp/' + file_path)
         tar.close()
         logger.debug("generated {}".format(tarfile_path))
@@ -309,7 +308,8 @@ def table_to_csvs(table: Table, start: datetime, end: datetime) -> list:
         node = row.node_id
         if node not in files:
             file = '{}.{}.{}.{}.csv'
-            file = file.format(node, table.name, start.date(), end.date())
+            feature = table.name.split('__')[1]
+            file = file.format(node, feature, start.date(), end.date())
 
             file_names.append(file)
             files[node] = open('/tmp/' + file, 'w')

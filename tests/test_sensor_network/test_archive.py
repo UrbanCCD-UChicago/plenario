@@ -17,12 +17,12 @@ class TestArchive(BaseTest):
 
         s3 = boto3.client('s3')
         with open('test.tar.gz', 'wb') as file:
-            s3.download_fileobj(S3_BUCKET, '2017-1/0.tar.gz', file)
+            s3.download_fileobj(S3_BUCKET, '2017-1/node0.tar.gz', file)
 
         tar = tarfile.open('test.tar.gz')
         tar.extractall()
 
-        with open('0.temperature.2017-01-01.2017-02-01.csv') as file:
+        with open('node0.temperature.2017-01-01.2017-02-01.csv') as file:
             count = 0
             reader = csv.reader(file)
             for line in reader:
@@ -33,4 +33,4 @@ class TestArchive(BaseTest):
         tar.close()
 
         os.remove('test.tar.gz')
-        os.remove('0.temperature.2017-01-01.2017-02-01.csv')
+        os.remove('node0.temperature.2017-01-01.2017-02-01.csv')
