@@ -6,7 +6,7 @@ from flask_admin.menu import url_for
 from flask_login import current_user
 
 from .admin_view import admin_views
-from plenario.database import session
+from plenario.database import postgres_session
 from plenario.models.SensorNetwork import FeatureMeta
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta, SensorMeta
 from .views import blueprint, redis, index
@@ -35,10 +35,10 @@ admin = Admin(
     url="/apiary",
 )
 
-admin.add_view(admin_views["FOI"](FeatureMeta, session))
-admin.add_view(admin_views["Sensor"](SensorMeta, session))
-admin.add_view(admin_views["Network"](NetworkMeta, session))
-admin.add_view(admin_views["Node"](NodeMeta, session))
+admin.add_view(admin_views["FOI"](FeatureMeta, postgres_session))
+admin.add_view(admin_views["Sensor"](SensorMeta, postgres_session))
+admin.add_view(admin_views["Network"](NetworkMeta, postgres_session))
+admin.add_view(admin_views["Node"](NodeMeta, postgres_session))
 
 apiary = admin  
 apiary_bp = blueprint

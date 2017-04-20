@@ -2,14 +2,18 @@
 
 # from csvkit.unicsv import UnicodeCSVReader
 import csv
+from logging import getLogger
 from geoalchemy2 import Geometry
 from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
 from sqlalchemy import select, func
 from sqlalchemy.exc import NoSuchTableError
 
-from plenario.database import app_engine as engine, session
+from plenario.database import postgres_base, postgres_engine
+from plenario.database import postgres_session
 from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError, delete_absent_hashes
 from plenario.utils.helpers import iter_column, slugify
+
+logger = getLogger(__name__)
 
 
 class PlenarioETL(object):
@@ -19,26 +23,34 @@ class PlenarioETL(object):
         :param source_path: If provided, get source CSV from local filesystem
                             instead of URL in metadata.
         """
+
+        logger.info('Begin.')
+        logger.info('metadata: {}'.format(metadata))
+        logger.info('source_path: {}'.format(source_path))
         self.metadata = metadata
         # Grab a record of the names we'll need to work with this dataset
         # instead of passing around the unwieldy metadata object to ETL objects.
         # Type of namedtuple('Dataset', 'name date lat lon loc')
         self.dataset = self.metadata.meta_tuple()
         self.staging_table = Staging(self.metadata, source_path=source_path)
+        logger.info('End.')
 
     def add(self):
         """
         Create point table for the first time.
         """
+        logger.info('Begin.')
         with self.staging_table as s_table:
             new_table = Creation(s_table.table, self.dataset).table
         update_meta(self.metadata, new_table)
+        logger.info('End.')
         return new_table
 
     def update(self):
         """
         Insert new records into existing point table.
         """
+        logger.info('Begin.')
         existing_table = self.metadata.point_table
         with self.staging_table as s_table:
             staging = s_table.table
@@ -46,6 +58,7 @@ class PlenarioETL(object):
             with Update(staging, self.dataset, existing_table) as new_records:
                 new_records.insert()
         update_meta(self.metadata, existing_table)
+        logger.info('End.')
 
 
 class Staging(object):
@@ -62,6 +75,9 @@ class Staging(object):
                             if None, look for data at a remote URL instead
         """
         # Just the info about column names we usually need
+        logger.info('Begin.')
+        logger.info('meta: {}'.format(meta))
+        logger.info('source_path: {}'.format(source_path))
         self.dataset = meta.meta_tuple()
         self.name = 's_' + self.dataset.name
 
@@ -82,11 +98,10 @@ class Staging(object):
             raise PlenarioETLError(e)
 
     def __enter__(self):
-        """
-        Create the staging table. Will be named s_[dataset_name]
-        """
-        with self.file_helper as helper:
+        """Create the staging table. Will be named s_[dataset_name]"""
 
+        logger.info('Begin.')
+        with self.file_helper as helper:
             text_handle = open(helper.handle.name, "rt")
 
             if not self.cols:
@@ -97,21 +112,25 @@ class Staging(object):
             try:
                 self.table = self._make_table(text_handle)
                 add_unique_hash(self.table.name)
-                self.table = Table(self.name, MetaData(),
-                                   autoload_with=engine, extend_existing=True)
+                self.table = Table(
+                    self.name,
+                    postgres_base.metadata,
+                    autoload_with=postgres_engine,
+                    extend_existing=True
+                )
                 return self
             except Exception as e:
                 raise PlenarioETLError(e)
+        logger.info('End.')
 
     def _drop(self):
-        engine.execute("DROP TABLE IF EXISTS {};"
-                       .format('s_' + self.dataset.name))
+        postgres_engine.execute("DROP TABLE IF EXISTS {};"
+                                .format('s_' + self.dataset.name))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
         Drop the staging table if it's been created.
         """
-        session.close()
         self._drop()
 
     def _make_table(self, f):
@@ -126,7 +145,7 @@ class Staging(object):
         # Be paranoid and remove the table if one by this name already exists.
         table = Table(self.name, MetaData(), *self.cols, extend_existing=True)
         self._drop()
-        table.create(bind=engine)
+        table.create(bind=postgres_engine)
 
         # Fill in the columns we expect from the CSV.
         names = ['"' + c.name + '"' for c in self.cols]
@@ -135,7 +154,7 @@ class Staging(object):
             format(t_name=self.name, cols=', '.join(names))
 
         # In order to issue a COPY, we need to drop down to the psycopg2 DBAPI.
-        conn = engine.raw_connection()
+        conn = postgres_engine.raw_connection()
         try:
             with conn.cursor() as cursor:
                 f.seek(0)
@@ -157,6 +176,8 @@ class Staging(object):
         """
         Generate columns from the existing table.
         """
+
+        logger.info('Begin.')
         ingested_cols = column_info
         # Don't include the geom and point_date columns.
         # They're derived from the source data
@@ -165,21 +186,23 @@ class Staging(object):
         # Make copies that don't refer to the existing table.
         cols = [_copy_col(c) for c in original_cols]
 
+        logger.info('End.')
         return cols
 
     @staticmethod
     def _from_inference(f):
-        """
-        Generate columns by scanning source CSV and inferring column types.
-        """
+        """Generate columns by scanning CSV and inferring column types."""
+
+        logger.info('Begin.')
         reader = csv.reader(f)
-        # Always create columns with slugified names
         header = list(map(slugify, next(reader)))
 
         cols = []
         for col_idx, col_name in enumerate(header):
             col_type, nullable = iter_column(col_idx, f)
             cols.append(_make_col(col_name, col_type, nullable))
+
+        logger.info('End.')
         return cols
 
 
@@ -188,7 +211,7 @@ def _null_malformed_geoms(existing):
     # (off the coast of Africa).
     upd = existing.update().values(geom=None).\
         where(existing.c.geom == select([func.ST_SetSRID(func.ST_MakePoint(0, 0), 4326)]))
-    engine.execute(upd)
+    postgres_engine.execute(upd)
 
 
 def _make_col(name, type, nullable):
@@ -218,7 +241,7 @@ class Creation(object):
             try:
                 new.insert()
             except Exception as e:
-                self.table.drop(bind=engine, checkfirst=True)
+                self.table.drop(bind=postgres_engine, checkfirst=True)
                 raise e
 
     def _init_table(self):
@@ -240,11 +263,11 @@ class Creation(object):
                           *(original_cols + derived_cols))
 
         try:
-            new_table.create(engine)
+            new_table.create(postgres_engine)
             # Trigger is broken
             #self._add_trigger()
         except:
-            new_table.drop(bind=engine, checkfirst=True)
+            new_table.drop(bind=postgres_engine, checkfirst=True)
             raise
         else:
             return new_table
@@ -254,7 +277,7 @@ class Creation(object):
                          ON "{table}"
                          FOR EACH ROW EXECUTE PROCEDURE audit.if_modified()""".\
                       format(table=self.dataset.name)
-        engine.execute(add_trigger)
+        postgres_engine.execute(add_trigger)
 
 
 class Update(object):
@@ -310,7 +333,7 @@ class Update(object):
         # Drop the table first out of healthy paranoia
         self._drop()
         try:
-            self.table.create(bind=engine)
+            self.table.create(bind=postgres_engine)
         except Exception as e:
             raise PlenarioETLError(repr(e) +
                                    '\nCould not create table n_' + d.name)
@@ -318,7 +341,7 @@ class Update(object):
         ins = self.table.insert().from_select(cols_to_insert, sel)
         # Populate it with records from our select statement.
         try:
-            engine.execute(ins)
+            postgres_engine.execute(ins)
         except Exception as e:
             raise PlenarioETLError(repr(e) + '\n' + str(sel))
         else:
@@ -339,7 +362,7 @@ class Update(object):
         ins = self.existing.insert().from_select(sel_cols, sel)
 
         try:
-            engine.execute(ins)
+            postgres_engine.execute(ins)
         except Exception as e:
             raise PlenarioETLError(repr(e) +
                                    '\n Failed on statement: ' + str(ins))
@@ -350,7 +373,7 @@ class Update(object):
                         '\n Failed to null out geoms with (0,0) geocoding')
 
     def _drop(self):
-        engine.execute("DROP TABLE IF EXISTS {};".format(self.name))
+        postgres_engine.execute("DROP TABLE IF EXISTS {};".format(self.name))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._drop()
@@ -389,29 +412,24 @@ def update_meta(metatable, table):
     :returns: None
     """
 
-    try:
-        metatable.update_date_added()
+    metatable.update_date_added()
 
-        metatable.obs_from, metatable.obs_to = session.query(
-            func.min(table.c.point_date),
-            func.max(table.c.point_date)
-        ).first()
+    metatable.obs_from, metatable.obs_to = postgres_session.query(
+        func.min(table.c.point_date),
+        func.max(table.c.point_date)
+    ).first()
 
-        metatable.bbox = session.query(
-            func.ST_SetSRID(
-                func.ST_Envelope(func.ST_Union(table.c.geom)),
-                4326
-            )
-        ).first()[0]
+    metatable.bbox = postgres_session.query(
+        func.ST_SetSRID(
+            func.ST_Envelope(func.ST_Union(table.c.geom)),
+            4326
+        )
+    ).first()[0]
 
-        metatable.column_names = {
-            c.name: str(c.type) for c in metatable.column_info()
-            if c.name not in {'geom', 'point_date', 'hash'}
-        }
+    metatable.column_names = {
+        c.name: str(c.type) for c in metatable.column_info()
+        if c.name not in {'geom', 'point_date', 'hash'}
+    }
 
-        session.add(metatable)
-        session.commit()
-
-    except:
-        session.rollback()
-        raise
+    postgres_session.add(metatable)
+    postgres_session.commit()

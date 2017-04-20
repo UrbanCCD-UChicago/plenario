@@ -3,7 +3,7 @@ import unittest
 from sqlalchemy.exc import ProgrammingError, IntegrityError, InvalidRequestError
 
 from plenario.database import redshift_engine
-from plenario.database import session as postgres_session
+from plenario.database import postgres_session as postgres_session
 from plenario.models.SensorNetwork import NetworkMeta, FeatureMeta
 
 

@@ -1,6 +1,10 @@
-import tempfile
 import requests
-from plenario.database import app_engine as engine
+import tempfile
+
+from logging import getLogger
+from plenario.database import postgres_engine
+
+logger = getLogger(__name__)
 
 
 class PlenarioETLError(Exception):
@@ -19,6 +23,11 @@ class ETLFile(object):
     Implements context manager interface with __enter__ and __exit__.
     """
     def __init__(self, source_path=None, source_url=None, interpret_as='text'):
+
+        logger.info('Begin.')
+        logger.info('source_path: {}'.format(source_path))
+        logger.info('source_url: {}'.format(source_url))
+        logger.info('interpret_as: {}'.format(interpret_as))
         if source_path and source_url:
             raise RuntimeError('ETLFile takes exactly one of source_path and source_url. Both were given.')
 
@@ -30,15 +39,19 @@ class ETLFile(object):
         self.source_url = source_url
         self.is_local = bool(source_path)
         self._handle = None
+        logger.info('End')
 
     def __enter__(self):
         """
         Assigns an open file object to self.file_handle
         """
+        logger.info('Begin.')
         if self.is_local:
+            logger.debug('self.is_local: True')
             file_type = 'rb' if self.interpret_as == 'bytes' else 'r'
             self.handle = open(self.source_path, file_type)
         else:
+            logger.debug('self.is_local: False')
             self._download_temp_file(self.source_url)
 
         # Return the whole ETLFile so that the `with foo as bar:` syntax looks right.
@@ -70,6 +83,7 @@ class ETLFile(object):
         :raises: IOError
         """
 
+        logger.info('Begin. (url: {})'.format(url))
         # The file might be big, so stream it in chunks.
         # I'd like to enforce a timeout, but some big datasets
         # take more than a minute to start streaming.
@@ -86,6 +100,7 @@ class ETLFile(object):
             if chunk:
                 self._handle.write(chunk)
                 self._handle.flush()
+        logger.info('End.')
 
 
 def add_unique_hash(table_name):
@@ -94,6 +109,8 @@ def add_unique_hash(table_name):
     and removes duplicate rows from a table.
     :param table_name: Name of table to add hash to.
     """
+
+    logger.info('Begin (table_name: {})'.format(table_name))
     add_hash = '''
     DROP TABLE IF EXISTS temp;
     CREATE TABLE temp AS
@@ -106,13 +123,18 @@ def add_unique_hash(table_name):
     '''.format(table_name=table_name)
 
     try:
-        engine.execute(add_hash)
+        postgres_engine.execute(add_hash)
     except Exception as e:
         raise PlenarioETLError(repr(e) +
                                '\n Failed to deduplicate with ' + add_hash)
+    logger.info('End.')
 
 
 def delete_absent_hashes(staging_name, existing_name):
+
+    logger.info('Begin.')
+    logger.info('staging_name: {}'.format(staging_name))
+    logger.info('existing_name: {}'.format(existing_name))
     del_ = """DELETE FROM "{existing}"
                   WHERE hash IN
                      (SELECT hash FROM "{existing}"
@@ -121,6 +143,7 @@ def delete_absent_hashes(staging_name, existing_name):
             format(existing=existing_name, staging=staging_name)
 
     try:
-        engine.execute(del_)
+        postgres_engine.execute(del_)
     except Exception as e:
         raise PlenarioETLError(repr(e) + '\n Failed to execute' + del_)
+    logger.info('End.')

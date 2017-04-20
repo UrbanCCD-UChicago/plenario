@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
-from plenario.database import session, Base, app_engine as engine
+from plenario.database import postgres_session, postgres_base, postgres_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata
 from plenario.settings import FLOWER_URL
 from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
@@ -78,12 +78,12 @@ def approve_shape_view(dataset_name):
 
 def approve_shape(dataset_name):
 
-    meta = session.query(ShapeMetadata).get(dataset_name)
+    meta = postgres_session.query(ShapeMetadata).get(dataset_name)
     ticket = worker.add_shape.delay(dataset_name).id
 
     meta.approved_status = True
     meta.celery_task_id = ticket
-    session.commit()
+    postgres_session.commit()
 
     send_approval_email(
         meta.human_name,
@@ -101,12 +101,12 @@ def approve_dataset_view(source_url_hash):
 
 def approve_dataset(source_url_hash):
 
-    meta = session.query(MetaTable).get(source_url_hash)
+    meta = postgres_session.query(MetaTable).get(source_url_hash)
     ticket = worker.add_dataset.delay(meta.dataset_name).id
 
     meta.approved_status = True
     meta.result_ids = [ticket]
-    session.commit()
+    postgres_session.commit()
 
     send_approval_email(
         meta.human_name,
@@ -144,7 +144,7 @@ http://plenar.io""" % (contributor_name, dataset_name)
 @views.route('/admin/add', methods=['GET', 'POST'])
 @login_required
 def admin_add_dataset():
-    user = session.query(User).get(flask_session['user_id'])
+    user = postgres_session.query(User).get(flask_session['user_id'])
     context = {'is_admin': True,
                'contributor_name': user.name,
                'contributor_organization': 'Plenario Admin',
@@ -223,11 +223,11 @@ def submit(context):
             if is_shapefile:
                 ticket = worker.add_shape.delay(meta.dataset_name).id
                 meta.celery_task_id = ticket
-                session.commit()
+                postgres_session.commit()
             else:
                 ticket = worker.add_dataset.delay(meta.dataset_name).id
                 meta.result_ids = [ticket]
-                session.commit()
+                postgres_session.commit()
         else:
             return send_submission_email(
                 meta.human_name,
@@ -284,7 +284,7 @@ def form_columns(form):
 
 def csv_already_submitted(url):
     digest = md5(bytes(url, encoding="utf-8")).hexdigest()
-    return session.query(MetaTable).get(digest) is not None
+    return postgres_session.query(MetaTable).get(digest) is not None
 
 
 def shape_already_submitted(name):
@@ -326,8 +326,8 @@ def point_meta_from_submit_form(form, is_approved):
         column_names=columns
     )
 
-    session.add(metatable)
-    session.commit()
+    postgres_session.add(metatable)
+    postgres_session.commit()
     return metatable
 
 
@@ -343,7 +343,7 @@ def shape_meta_from_submit_form(form, is_approved):
         contributor_organization=form.get('contributor_organization'),
         contributor_email=form['contributor_email'],
         approved_status=is_approved)
-    session.commit()
+    postgres_session.commit()
     return md
 
 
@@ -611,7 +611,7 @@ class EditShapeForm(Form):
 @login_required
 def edit_shape(dataset_name):
     form = EditShapeForm()
-    meta = session.query(ShapeMetadata).get(dataset_name)
+    meta = postgres_session.query(ShapeMetadata).get(dataset_name)
 
     if form.validate_on_submit():
         upd = {
@@ -620,10 +620,10 @@ def edit_shape(dataset_name):
             'attribution': form.attribution.data,
             'update_freq': form.update_freq.data,
         }
-        session.query(ShapeMetadata) \
+        postgres_session.query(ShapeMetadata) \
             .filter(ShapeMetadata.dataset_name == meta.dataset_name) \
             .update(upd)
-        session.commit()
+        postgres_session.commit()
 
         if not meta.approved_status:
             approve_shape(dataset_name)
@@ -647,10 +647,10 @@ def edit_shape(dataset_name):
 @views.route('/update-shape/<dataset_name>')
 def update_shape_view(dataset_name):
 
-    meta = session.query(ShapeMetadata).get(dataset_name)
+    meta = postgres_session.query(ShapeMetadata).get(dataset_name)
     ticket = worker.update_shape.delay(dataset_name).id
     meta.celery_task_id = ticket
-    session.commit()
+    postgres_session.commit()
     return redirect(url_for('views.view_datasets'))
 
 
@@ -699,14 +699,14 @@ class EditDatasetForm(Form):
 @login_required
 def edit_dataset(source_url_hash):
     form = EditDatasetForm()
-    meta = session.query(MetaTable).get(source_url_hash)
+    meta = postgres_session.query(MetaTable).get(source_url_hash)
     fieldnames = meta.column_names
     num_rows = 0
 
     if meta.approved_status:
         try:
             table_name = meta.dataset_name
-            table = Table(table_name, Base.metadata,
+            table = Table(table_name, postgres_base.metadata,
                           autoload=True, autoload_with=engine)
 
             # Would prefer to just get the names from the metadata
@@ -714,7 +714,7 @@ def edit_dataset(source_url_hash):
             fieldnames = list(table.columns.keys())
             pk_name = [p.name for p in table.primary_key][0]
             pk = table.c[pk_name]
-            num_rows = session.query(pk).count()
+            num_rows = postgres_session.query(pk).count()
 
         except NoSuchTableError:
             # dataset has been approved, but perhaps still processing.
@@ -731,10 +731,10 @@ def edit_dataset(source_url_hash):
             'location': form.location.data,
             'observed_date': form.observed_date.data,
         }
-        session.query(MetaTable) \
+        postgres_session.query(MetaTable) \
             .filter(MetaTable.source_url_hash == meta.source_url_hash) \
             .update(upd)
-        session.commit()
+        postgres_session.commit()
 
         if not meta.approved_status:
             approve_dataset(source_url_hash)
@@ -757,7 +757,7 @@ def edit_dataset(source_url_hash):
 @login_required
 def delete_dataset_view(source_url_hash):
 
-    meta = session.query(MetaTable).get(source_url_hash)
+    meta = postgres_session.query(MetaTable).get(source_url_hash)
     worker.delete_dataset.delay(meta.dataset_name)
     return redirect(url_for('views.view_datasets'))
 
@@ -765,12 +765,12 @@ def delete_dataset_view(source_url_hash):
 @views.route('/update-dataset/<source_url_hash>')
 def update_dataset_view(source_url_hash):
 
-    meta = session.query(MetaTable).get(source_url_hash)
+    meta = postgres_session.query(MetaTable).get(source_url_hash)
     ticket = worker.update_dataset.delay(meta.dataset_name).id
 
     meta.result_ids = [ticket]
-    session.add(meta)
-    session.commit()
+    postgres_session.add(meta)
+    postgres_session.commit()
 
     return redirect(url_for('views.view_datasets'))
 
@@ -803,5 +803,5 @@ def fetch_pending_tables(model):
     :param model: (class) ORM Class corresponding to a meta table
     :returns: (list) contains all records for which is_approved is false"""
 
-    query = session.query(model).filter(model.approved_status != True)
+    query = postgres_session.query(model).filter(model.approved_status != True)
     return query.all()

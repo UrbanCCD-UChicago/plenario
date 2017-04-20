@@ -1,0 +1,18 @@
+formatters:
+  default:
+    datefmt: '%Y-%m-%d %H:%M:%S'
+    format: '%(asctime)s - %(levelname)s - %(name)s.%(funcName)s:%(lineno)s - %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: default
+    stream: ext://sys.stdout
+#   file:
+#     class: logging.handlers.RotatingFileHandler
+#     formatter: default
+#     filename: /var/tmp/plenario.log
+#     maxBytes: 1024
+root:
+  level: DEBUG
+  handlers: [console]
+version: 1

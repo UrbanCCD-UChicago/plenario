@@ -11,7 +11,7 @@ from plenario.api.common import cache, CACHE_TIMEOUT, make_cache_key
 from plenario.api.common import crossdomain, date_json_handler, RESPONSE_LIMIT
 from plenario.api.response import make_error
 from plenario.utils.helpers import get_size_in_degrees
-from plenario.database import session, app_engine as engine, Base
+from plenario.database import postgres_session, postgres_engine as engine, postgres_base
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -21,7 +21,7 @@ def weather_stations():
 
     stations_table = Table(
         'weather_stations',
-        Base.metadata,
+        postgres_base.metadata,
         autoload=True,
         autoload_with=engine,
         extend_existing=True
@@ -33,7 +33,7 @@ def weather_stations():
     if valid_query:
 
         resp['meta']['status'] = 'ok'
-        base_query = session.query(stations_table)
+        base_query = postgres_session.query(stations_table)
 
         for clause in query_clauses:
             print(("weather_stations(): filtering on clause", clause))
@@ -64,7 +64,7 @@ def weather(table):
 
     weather_table = Table(
         'dat_weather_observations_{}'.format(table),
-        Base.metadata,
+        postgres_base.metadata,
         autoload=True,
         autoload_with=engine,
         extend_existing=True
@@ -72,7 +72,7 @@ def weather(table):
 
     stations_table = Table(
         'weather_stations',
-        Base.metadata,
+        postgres_base.metadata,
         autoload=True,
         autoload_with=engine,
         extend_existing=True
@@ -83,7 +83,7 @@ def weather(table):
 
     if valid_query:
         resp['meta']['status'] = 'ok'
-        base_query = session.query(weather_table, stations_table)
+        base_query = postgres_session.query(weather_table, stations_table)
         base_query = base_query.join(
             stations_table,
             weather_table.c.wban_code == stations_table.c.wban_code
@@ -184,12 +184,12 @@ def wban_is_valid(wban):
         return False
 
     try:
-        stations_table = Table('weather_stations', Base.metadata,
+        stations_table = Table('weather_stations', postgres_base.metadata,
                                autoload=True, autoload_with=engine, extend_existing=True)
         q = sa.select([stations_table.c["wban_code"]]).where(stations_table.c["wban_code"] == wban)
-        result = session.execute(q)
+        result = postgres_session.execute(q)
     except SQLAlchemyError:
-        session.rollback()
+        postgres_session.rollback()
         return False
 
     matched_wban = result.first()

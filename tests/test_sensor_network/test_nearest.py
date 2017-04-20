@@ -5,7 +5,7 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
 from plenario import create_app
-from plenario.database import Base, psql
+from plenario.database import postgres_base, psql
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta
 from plenario.models.SensorNetwork import SensorMeta, FeatureMeta
 
@@ -37,7 +37,7 @@ class TestNearest(unittest.TestCase):
         cls.connection = cls.engine.connect()
         cls.connection.execute('create extension postgis')
 
-        Base.metadata.create_all(bind=cls.engine)
+        postgres_base.metadata.create_all(bind=cls.engine)
         init()
 
         temperature = FeatureMeta(name="temperature", observed_properties=[{"type": "float", "name": "temperature"}])

@@ -1,5 +1,5 @@
 from unittest import TestCase
-from plenario.database import session, app_engine
+from plenario.database import postgres_session, postgres_engine
 import sqlalchemy as sa
 from sqlalchemy import Table, Column, Integer, Date, Float, String, TIMESTAMP, MetaData, Text
 from sqlalchemy.exc import NoSuchTableError
@@ -18,14 +18,14 @@ fixtures_path = os.path.join(pwd, '../fixtures')
 def drop_if_exists(table_name):
     try:
         t = Table(table_name, MetaData(), extend_existing=True)
-        t.drop(app_engine, checkfirst=True)
+        t.drop(postgres_engine, checkfirst=True)
     except NoSuchTableError:
         pass
 
 
 def drop_meta(table_name):
     del_ = "DELETE FROM meta_master WHERE dataset_name = '{}';".format(table_name)
-    app_engine.execute(del_)
+    postgres_engine.execute(del_)
 
 
 class StagingTableTests(TestCase):
@@ -47,7 +47,7 @@ class StagingTableTests(TestCase):
         cls.expected_dog_col_names = ['lat', 'lon', 'hooded_figure_id', 'date']
 
     def setUp(self):
-        session.rollback()
+        postgres_session.rollback()
         # Ensure we have metadata loaded into the database
         # to mimic the behavior of metadata ingestion preceding file ingestion.
         drop_meta('dog_park_permits')
@@ -75,8 +75,8 @@ class StagingTableTests(TestCase):
                                    observed_date='Date',
                                    location='Location',
                                    approved_status=False)
-        session.add_all([self.existing_meta, self.opera_meta, self.unloaded_meta])
-        session.commit()
+        postgres_session.add_all([self.existing_meta, self.opera_meta, self.unloaded_meta])
+        postgres_session.commit()
 
         # Also, let's have one table pre-loaded...
         self.existing_table = sa.Table('dog_park_permits', MetaData(),
@@ -88,7 +88,7 @@ class StagingTableTests(TestCase):
                                        Column('hash', String(32), primary_key=True),
                                       Column('geom', Geometry('POINT', srid=4326), nullable=True))
         drop_if_exists(self.existing_table.name)
-        self.existing_table.create(bind=app_engine)
+        self.existing_table.create(bind=postgres_engine)
 
         # ... with some pre-existing data
         ins = self.existing_table.insert().values(hooded_figure_id=1,
@@ -97,10 +97,10 @@ class StagingTableTests(TestCase):
                                                   lat=41.7915865543,
                                                   geom=None,
                                                   hash='addde9be7f59e95fc08e54e29b2a947f')
-        app_engine.execute(ins)
+        postgres_engine.execute(ins)
 
     def tearDown(self):
-        session.close()
+        postgres_session.close()
 
     '''
     Do the names of created columns match what we expect?
@@ -141,14 +141,16 @@ class StagingTableTests(TestCase):
         # For the entry in MetaTable without a table, create a staging table.
         # We'll need to read from a fixture csv.
         with Staging(self.unloaded_meta, source_path=self.radio_path) as s_table:
-            all_rows = session.execute(s_table.table.select()).fetchall()
+            with postgres_engine.begin() as connection:
+                all_rows = connection.execute(s_table.table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
 
     def test_staging_existing_table(self):
         # With a fixture CSV whose columns match the existing dataset,
         # create a staging table.
         with Staging(self.existing_meta, source_path=self.dog_path) as s_table:
-            all_rows = session.execute(s_table.table.select()).fetchall()
+            with postgres_engine.begin() as connection:
+                all_rows = connection.execute(s_table.table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
 
     def test_insert_data(self):
@@ -156,7 +158,7 @@ class StagingTableTests(TestCase):
         etl.update()
 
         existing = self.existing_table
-        all_rows = session.execute(existing.select()).fetchall()
+        all_rows = postgres_session.execute(existing.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
 
     def test_update_no_change(self):
@@ -176,7 +178,7 @@ class StagingTableTests(TestCase):
         etl = PlenarioETL(self.existing_meta, source_path=deleted_path)
         etl.update()
 
-        all_rows = session.execute(self.existing_table.select()).fetchall()
+        all_rows = postgres_session.execute(self.existing_table.select()).fetchall()
         self.assertEqual(len(all_rows), 4)
 
     def test_update_with_change(self):
@@ -190,7 +192,7 @@ class StagingTableTests(TestCase):
         etl.update()
 
         sel = sa.select([table.c.date]).where(table.c.event_name == 'baz')
-        changed_date = app_engine.execute(sel).fetchone()[0]
+        changed_date = postgres_engine.execute(sel).fetchone()[0]
         self.assertEqual(changed_date, date(1993, 11, 10))
 
     def test_new_table(self):
@@ -199,10 +201,10 @@ class StagingTableTests(TestCase):
         etl = PlenarioETL(self.unloaded_meta, source_path=self.radio_path)
         new_table = etl.add()
 
-        all_rows = session.execute(new_table.select()).fetchall()
+        all_rows = postgres_session.execute(new_table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
-        session.close()
-        new_table.drop(app_engine, checkfirst=True)
+        postgres_session.close()
+        new_table.drop(postgres_engine, checkfirst=True)
 
         # Did we add a bbox?
         bbox = MetaTable.get_by_dataset_name('community_radio_events').bbox
@@ -214,14 +216,14 @@ class StagingTableTests(TestCase):
         etl = PlenarioETL(self.unloaded_meta, source_path=self.radio_path)
         new_table = etl.add()
 
-        columns = session.query(MetaTable.column_names)
+        columns = postgres_session.query(MetaTable.column_names)
         columns = columns.filter(MetaTable.dataset_name == self.unloaded_meta.dataset_name)
         columns = columns.first()[0]
 
         self.assertEqual(len(columns), 4)
 
-        session.close()
-        new_table.drop(app_engine, checkfirst=True)
+        postgres_session.close()
+        new_table.drop(postgres_engine, checkfirst=True)
 
     def test_location_col_add(self):
         drop_if_exists(self.opera_meta.dataset_name)
@@ -229,10 +231,10 @@ class StagingTableTests(TestCase):
         etl = PlenarioETL(self.opera_meta, source_path=self.opera_path)
         new_table = etl.add()
 
-        all_rows = session.execute(new_table.select()).fetchall()
+        all_rows = postgres_session.execute(new_table.select()).fetchall()
         self.assertEqual(len(all_rows), 5)
-        session.close()
-        new_table.drop(app_engine, checkfirst=True)
+        postgres_session.close()
+        new_table.drop(postgres_engine, checkfirst=True)
 
         # Did we add a bbox?
         bbox = MetaTable.get_by_dataset_name('public_opera_performances').bbox
@@ -248,11 +250,11 @@ class StagingTableTests(TestCase):
                                     Column('geom', Geometry('POINT', srid=4326), nullable=True),
                                     Column('point_date', TIMESTAMP, nullable=False))
         drop_if_exists(self.existing_table.name)
-        self.opera_table.create(bind=app_engine)
+        self.opera_table.create(bind=postgres_engine)
 
         ins = self.opera_table.insert().values(event_name='quux',
                                                date=None,
                                                point_date=date(2015, 1, 2),
                                                location='(-87.6495076896,41.7915865543)',
                                                geom=None)
-        app_engine.execute(ins)
+        postgres_engine.execute(ins)

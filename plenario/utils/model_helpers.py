@@ -3,7 +3,7 @@ interactions with the models."""
 
 import json
 from sqlalchemy.exc import ProgrammingError
-from plenario.database import app_engine as engine
+from plenario.database import postgres_engine as engine
 from plenario.models import MetaTable as Meta, ShapeMetadata as SMeta
 
 

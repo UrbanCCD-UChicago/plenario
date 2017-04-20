@@ -7,6 +7,7 @@ import warnings
 
 from flask.exthook import ExtDeprecationWarning
 from flask_script import Manager
+from kombu.exceptions import OperationalError
 from os import getenv
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
@@ -101,7 +102,7 @@ def init():
         print('[plenario] It already exists!')
 
     from plenario.database import create_extension
-    from plenario.database import app_engine as plenario_engine, Base
+    from plenario.database import postgres_engine as plenario_engine, postgres_base
     from plenario.utils.weather import WeatherETL, WeatherStationsETL
 
     try:
@@ -110,7 +111,7 @@ def init():
         print('[plenario] It already exists!')
 
     print('[plenario] Creating metadata tables')
-    Base.metadata.create_all()
+    postgres_base.metadata.create_all()
 
     print('[plenario] Creating weather tables')
     WeatherStationsETL().make_station_table()
@@ -124,23 +125,48 @@ def init():
 
     # Set up the default user if we are running in anything but production
     if os.environ.get('CONFIG') != 'prod':
-        from plenario.database import session
+        from plenario.database import postgres_session
         from plenario.models.User import User
 
         print('[plenario] Create default user')
         user = User(**DEFAULT_USER)
 
         try:
-            session.add(user)
-            session.commit()
+            postgres_session.add(user)
+            postgres_session.commit()
         except IntegrityError:
             print('[plenario] Already exists!')
-            session.rollback()
+            postgres_session.rollback()
 
     from plenario.tasks import health
 
     # This will get celery to set up its meta tables
-    health.delay()
+    try:
+        health.delay()
+    except OperationalError:
+        print('[plenario] Redis is not running!')
+
+
+@manager.command
+def uninstall():
+    """Drop the plenario databases."""
+
+    from sqlalchemy import create_engine
+    from plenario.database import drop_database
+
+    base_uri = DATABASE_CONN.rsplit('/', 1)[0]
+    base_engine = create_engine(base_uri)
+    try:
+        drop_database(base_engine, 'plenario_test')
+    except ProgrammingError:
+        pass
+
+    base_uri = REDSHIFT_CONN.rsplit('/', 1)[0]
+    base_engine = create_engine(base_uri)
+    try:
+        drop_database(base_engine, 'plenario_test')
+    except ProgrammingError:
+        pass
 
 
 def wait(process):

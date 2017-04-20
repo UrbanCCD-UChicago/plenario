@@ -20,7 +20,7 @@ from plenario.api.validator import DatasetRequiredValidator
 from plenario.api.validator import NoGeoJSONDatasetRequiredValidator
 from plenario.api.validator import NoDefaultDatesValidator, NoGeoJSONValidator
 from plenario.api.validator import validate, has_tree_filters
-from plenario.database import fast_count, windowed_query, session
+from plenario.database import postgres_session
 from plenario.models import MetaTable
 
 from . import response as api_response
@@ -301,7 +301,7 @@ def _detail(args):
             columns += [c.name for c in shapeset.columns]
         return [OrderedDict(list(zip(columns, row))) for row in q.all()]
     except Exception as e:
-        session.rollback()
+        postgres_session.rollback()
         msg = "Failed to fetch records."
         return api_response.make_raw_error("{}: {}".format(msg, e))
 
@@ -419,7 +419,7 @@ def detail_query(args, aggregate=False):
         return api_response.bad_request("Too many table filters provided.")
 
     # Query the point dataset.
-    q = session.query(dataset)
+    q = postgres_session.query(dataset)
 
     # If the user specified a geom, filter results to those within its shape.
     if geom:
@@ -537,7 +537,7 @@ def _meta(args):
     cols_to_return.append('bbox')
 
     # Only return datasets that have been successfully ingested
-    q = session.query(*col_objects).filter(MetaTable.date_added.isnot(None))
+    q = postgres_session.query(*col_objects).filter(MetaTable.date_added.isnot(None))
 
     # Filter over datasets if user provides full date range or geom
     should_filter = geom or (start_date and end_date)

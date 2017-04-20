@@ -4,7 +4,7 @@ import urllib.request, urllib.parse, urllib.error
 import zipfile
 from io import BytesIO
 
-from plenario.database import session, app_engine as engine
+from plenario.database import postgres_session, postgres_engine as engine
 from plenario.models import ShapeMetadata
 from plenario.etl.shape import ShapeETL
 from plenario.utils.shapefile import Shapefile
@@ -26,7 +26,7 @@ class ShapeTests(BasePlenarioTest):
         # Try to ingest slightly changed shape
         fixture = shape_fixtures['changed_neighborhoods']
         # Add the fixture to the registry first
-        shape_meta = session.query(ShapeMetadata).get('chicago_neighborhoods')
+        shape_meta = postgres_session.query(ShapeMetadata).get('chicago_neighborhoods')
         # Do a ShapeETL update
         ShapeETL(meta=shape_meta, source_path=fixture.path).update()
         t = shape_meta.shape_table
@@ -40,23 +40,23 @@ class ShapeTests(BasePlenarioTest):
         # The city fixture should already be ingested
         with self.assertRaises(Exception):
             ShapeTests.ingest_fixture(shape_fixtures['city'])
-        session.rollback()
+        postgres_session.rollback()
 
     def test_delete_shape(self):
         # Can we remove a shape that's fully ingested?
-        city_meta = session.query(ShapeMetadata).get(shape_fixtures['city'].table_name)
+        city_meta = postgres_session.query(ShapeMetadata).get(shape_fixtures['city'].table_name)
         self.assertIsNotNone(city_meta)
         city_meta.remove_table()
-        session.commit()
-        city_meta = session.query(ShapeMetadata).get(shape_fixtures['city'].table_name)
+        postgres_session.commit()
+        city_meta = postgres_session.query(ShapeMetadata).get(shape_fixtures['city'].table_name)
         self.assertIsNone(city_meta)
 
         # Can we remove a shape that's only in the metadata?
-        dummy_meta = session.query(ShapeMetadata).get(self.dummy_name)
+        dummy_meta = postgres_session.query(ShapeMetadata).get(self.dummy_name)
         self.assertIsNotNone(dummy_meta)
         dummy_meta.remove_table()
-        session.commit()
-        dummy_meta = session.query(ShapeMetadata).get(self.dummy_name)
+        postgres_session.commit()
+        dummy_meta = postgres_session.query(ShapeMetadata).get(self.dummy_name)
         self.assertIsNone(dummy_meta)
 
         # Add them back to return to original test state
@@ -66,7 +66,7 @@ class ShapeTests(BasePlenarioTest):
                           update_freq='yearly',
                           approved_status=False)
 
-        session.commit()
+        postgres_session.commit()
 
     '''/shapes'''
 

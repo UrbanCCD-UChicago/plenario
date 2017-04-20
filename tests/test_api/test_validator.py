@@ -4,7 +4,7 @@ import unittest
 from sqlalchemy.exc import ProgrammingError
 
 from plenario import create_app
-from plenario.database import app_engine
+from plenario.database import postgres_engine
 from plenario.etl.point import PlenarioETL
 from plenario.models import MetaTable
 from tests.test_api.test_point import get_loop_rect
@@ -230,7 +230,7 @@ class TestValidator(unittest.TestCase):
     def tearDownClass(cls):
 
         try:
-            app_engine.execute("drop table roadworks")
-            app_engine.execute("delete from meta_master where dataset_name = 'roadworks'")
+            postgres_engine.execute("drop table roadworks")
+            postgres_engine.execute("delete from meta_master where dataset_name = 'roadworks'")
         except ProgrammingError:
             pass

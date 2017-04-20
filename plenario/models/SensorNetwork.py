@@ -4,13 +4,13 @@ from sqlalchemy import func as sqla_fn, Boolean, BigInteger, DateTime, Float
 from sqlalchemy.dialects.postgresql import JSONB, DOUBLE_PRECISION
 from sqlalchemy.orm import relationship
 
-from plenario.database import Base, session, redshift_base as redshift_base
+from plenario.database import postgres_base, postgres_session, redshift_base as redshift_base
 from plenario.utils.model_helpers import knn
 
 
 sensor_to_node = Table(
     'sensor__sensor_to_node',
-    Base.metadata,
+    postgres_base.metadata,
     Column('sensor', String, ForeignKey('sensor__sensor_metadata.name')),
     Column('network', String),
     Column('node', String),
@@ -22,13 +22,13 @@ sensor_to_node = Table(
 
 feature_to_network = Table(
     'sensor__feature_to_network',
-    Base.metadata,
+    postgres_base.metadata,
     Column('feature', String, ForeignKey('sensor__feature_metadata.name')),
     Column('network', String, ForeignKey('sensor__network_metadata.name'))
 )
 
 
-class NetworkMeta(Base):
+class NetworkMeta(postgres_base):
     __tablename__ = 'sensor__network_metadata'
 
     name = Column(String, primary_key=True)
@@ -37,7 +37,7 @@ class NetworkMeta(Base):
 
     @staticmethod
     def index():
-        networks = session.query(NetworkMeta)
+        networks = postgres_session.query(NetworkMeta)
         return [network.name.lower() for network in networks]
 
     def __repr__(self):
@@ -64,7 +64,7 @@ class NetworkMeta(Base):
         return set([k.split(".")[0] for k in keys])
 
 
-class NodeMeta(Base):
+class NodeMeta(postgres_base):
     __tablename__ = 'sensor__node_metadata'
 
     id = Column(String, primary_key=True)
@@ -127,7 +127,7 @@ class NodeMeta(Base):
         return {s.name: s.tree() for s in self.sensors}
 
 
-class SensorMeta(Base):
+class SensorMeta(postgres_base):
     __tablename__ = 'sensor__sensor_metadata'
 
     name = Column(String, primary_key=True)
@@ -146,7 +146,7 @@ class SensorMeta(Base):
         return {v: k for k, v in self.observed_properties.items()}
 
 
-class FeatureMeta(Base):
+class FeatureMeta(postgres_base):
     __tablename__ = 'sensor__feature_metadata'
 
     name = Column(String, primary_key=True)
@@ -174,7 +174,7 @@ class FeatureMeta(Base):
     @staticmethod
     def index(network_name=None):
         features = []
-        for node in session.query(NodeMeta).all():
+        for node in postgres_session.query(NodeMeta).all():
             if network_name is None or node.sensor_network.lower() == network_name.lower():
                 for sensor in node.sensors:
                     for prop in sensor.observed_properties.values():
@@ -183,7 +183,7 @@ class FeatureMeta(Base):
 
     @staticmethod
     def properties_of(feature):
-        query = session.query(FeatureMeta.observed_properties).filter(
+        query = postgres_session.query(FeatureMeta.observed_properties).filter(
             FeatureMeta.name == feature)
         return [feature + "." + prop["name"] for prop in query.first().observed_properties]
 

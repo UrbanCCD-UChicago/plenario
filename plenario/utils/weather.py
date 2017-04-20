@@ -15,8 +15,8 @@ from dateutil import relativedelta
 import operator
 
 import calendar
-from plenario.database import session as session, app_engine as engine, \
-    Base
+from plenario.database import postgres_session as session, postgres_engine as engine, \
+    postgres_base
 from plenario.settings import DATA_DIR
 import sqlalchemy
 from sqlalchemy import Table, Column, String, Date, DateTime, Integer, Float, \
@@ -266,7 +266,7 @@ class WeatherETL(object):
 
         
     def _update(self, span=None):
-        new_table = Table('new_weather_observations_%s' % span, Base.metadata,
+        new_table = Table('new_weather_observations_%s' % span, postgres_base.metadata,
                           Column('wban_code', String(5)), keep_existing=True)
         dat_table = getattr(self, '%s_table' % span)
         src_table = getattr(self, 'src_%s_table' % span)
@@ -316,7 +316,7 @@ class WeatherETL(object):
     def _update_metar(self):
         #print "_update_metar()"
         
-        new_table = Table('new_weather_observations_metar', Base.metadata,
+        new_table = Table('new_weather_observations_metar', postgres_base.metadata,
                           Column('wban_code', String(5)), keep_existing=True)  # intersection of src and dat -- only new records
         dat_table = getattr(self, 'metar_table') # where we are eventually storing things
         src_table = getattr(self, 'src_metar_table') # raw incoming data
@@ -1169,99 +1169,99 @@ class WeatherETL(object):
         self.metar_table.create(engine, checkfirst=True)
         
     def _get_daily_table(self, name='dat'):
-        return Table('%s_weather_observations_daily' % name, Base.metadata,
-                            Column('wban_code', String(5), nullable=False),
-                            Column('date', Date, nullable=False),
-                            Column('temp_max', Float, index=True),
-                            Column('temp_min', Float, index=True),
-                            Column('temp_avg', Float, index=True),
-                            Column('departure_from_normal', Float),
-                            Column('dewpoint_avg', Float),
-                            Column('wetbulb_avg', Float),
-                            #Column('weather_types', ARRAY(String(16))), # column 'CodeSum',
-                            Column('weather_types', ARRAY(String)), # column 'CodeSum',
+        return Table('%s_weather_observations_daily' % name, postgres_base.metadata,
+                     Column('wban_code', String(5), nullable=False),
+                     Column('date', Date, nullable=False),
+                     Column('temp_max', Float, index=True),
+                     Column('temp_min', Float, index=True),
+                     Column('temp_avg', Float, index=True),
+                     Column('departure_from_normal', Float),
+                     Column('dewpoint_avg', Float),
+                     Column('wetbulb_avg', Float),
+                     #Column('weather_types', ARRAY(String(16))), # column 'CodeSum',
+                            Column('weather_types', ARRAY(String)),  # column 'CodeSum',
                             Column("snowice_depth", Float),
-                            Column("snowice_waterequiv", Float),
-                            # XX: Not sure about meaning of 'Cool' and 'Heat' columns in daily table,
+                     Column("snowice_waterequiv", Float),
+                     # XX: Not sure about meaning of 'Cool' and 'Heat' columns in daily table,
                             #     based on documentation.
                             Column('snowfall', Float),
-                            Column('precip_total', Float, index=True),
-                            Column('station_pressure', Float),
-                            Column('sealevel_pressure', Float),
-                            Column('resultant_windspeed', Float),
-                            Column('resultant_winddirection', String(3)), # appears to be 00 (000) to 36 (360)
-                            Column('resultant_winddirection_cardinal', String(3)), # e.g. NNE, NNW
+                     Column('precip_total', Float, index=True),
+                     Column('station_pressure', Float),
+                     Column('sealevel_pressure', Float),
+                     Column('resultant_windspeed', Float),
+                     Column('resultant_winddirection', String(3)),  # appears to be 00 (000) to 36 (360)
+                            Column('resultant_winddirection_cardinal', String(3)),  # e.g. NNE, NNW
                             Column('avg_windspeed', Float),
-                            Column('max5_windspeed', Float),
-                            Column('max5_winddirection', String(3)), # 000 through 360, M for missing
-                            Column('max5_direction_cardinal', String(3)), # e.g. NNE, NNW
-                            Column('max2_windspeed', Float), 
-                            Column('max2_winddirection', String(3)), # 000 through 360, M for missing
-                            Column('max2_direction_cardinal', String(3)), # e.g. NNE, NNW
+                     Column('max5_windspeed', Float),
+                     Column('max5_winddirection', String(3)),  # 000 through 360, M for missing
+                            Column('max5_direction_cardinal', String(3)),  # e.g. NNE, NNW
+                            Column('max2_windspeed', Float),
+                     Column('max2_winddirection', String(3)),  # 000 through 360, M for missing
+                            Column('max2_direction_cardinal', String(3)),  # e.g. NNE, NNW
                             Column('longitude', Float),
-                            Column('latitude', Float),
-                            keep_existing=True) 
+                     Column('latitude', Float),
+                     keep_existing=True)
 
     def _get_hourly_table(self, name='dat'):
-        return Table('%s_weather_observations_hourly' % name, Base.metadata,
-                Column('wban_code', String(5), nullable=False),
-                Column('datetime', DateTime, nullable=False),
-                # AO1: without precipitation discriminator, AO2: with precipitation discriminator
+        return Table('%s_weather_observations_hourly' % name, postgres_base.metadata,
+                     Column('wban_code', String(5), nullable=False),
+                     Column('datetime', DateTime, nullable=False),
+                     # AO1: without precipitation discriminator, AO2: with precipitation discriminator
                 Column('old_station_type', String(5)),
-                Column('station_type', Integer),
-                Column('sky_condition', String),
-                Column('sky_condition_top', String), # top-level sky condition, e.g.
+                     Column('station_type', Integer),
+                     Column('sky_condition', String),
+                     Column('sky_condition_top', String),  # top-level sky condition, e.g.
                                                         # if 'FEW018 BKN029 OVC100'
                                                         # we have overcast at 10,000 feet (100 * 100).
                                                         # BKN017TCU means broken clouds at 1700 feet w/ towering cumulonimbus
                                                         # BKN017CB means broken clouds at 1700 feet w/ cumulonimbus
-                Column('visibility', Float), #  in Statute Miles
+                Column('visibility', Float),  #  in Statute Miles
                 # XX in R: unique(unlist(strsplit(unlist(as.character(unique(x$WeatherType))), ' ')))
                 #Column('weather_types', ARRAY(String(16))),
                 Column('weather_types', ARRAY(String)),
-                Column('drybulb_fahrenheit', Float, index=True), # These can be NULL bc of missing data
-                Column('wetbulb_fahrenheit', Float), # These can be NULL bc of missing data
-                Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
+                     Column('drybulb_fahrenheit', Float, index=True),  # These can be NULL bc of missing data
+                Column('wetbulb_fahrenheit', Float),  # These can be NULL bc of missing data
+                Column('dewpoint_fahrenheit', Float),  # These can be NULL bc of missing data
                 Column('relative_humidity', Integer),
-                Column('wind_speed', Integer),
-                Column('wind_direction', String(3)), # 000 to 360
-                Column('wind_direction_cardinal', String(3)), # e.g. NNE, NNW
+                     Column('wind_speed', Integer),
+                     Column('wind_direction', String(3)),  # 000 to 360
+                Column('wind_direction_cardinal', String(3)),  # e.g. NNE, NNW
                 Column('station_pressure', Float),
-                Column('sealevel_pressure', Float),
-                Column('report_type', String), # Either 'AA' or 'SP'
+                     Column('sealevel_pressure', Float),
+                     Column('report_type', String),  # Either 'AA' or 'SP'
                 Column('hourly_precip', Float, index=True),
-                Column('longitude', Float),
-                Column('latitude', Float),
-                keep_existing=True)
+                     Column('longitude', Float),
+                     Column('latitude', Float),
+                     keep_existing=True)
 
     def _get_metar_table(self, name='dat'):
-        return Table('%s_weather_observations_metar' % name, Base.metadata,
-                Column('wban_code', String(5), nullable=False),
-                Column('call_sign', String(5), nullable=False),  
-                Column('datetime', DateTime, nullable=False),
-                Column('sky_condition', String),
-                Column('sky_condition_top', String), # top-level sky condition, e.g.
+        return Table('%s_weather_observations_metar' % name, postgres_base.metadata,
+                     Column('wban_code', String(5), nullable=False),
+                     Column('call_sign', String(5), nullable=False),
+                     Column('datetime', DateTime, nullable=False),
+                     Column('sky_condition', String),
+                     Column('sky_condition_top', String),  # top-level sky condition, e.g.
                                                         # if 'FEW018 BKN029 OVC100'
                                                         # we have overcast at 10,000 feet (100 * 100).
                                                         # BKN017TCU means broken clouds at 1700 feet w/ towering cumulonimbus
                                                         # BKN017CB means broken clouds at 1700 feet w/ cumulonimbus
-                Column('visibility', Float), #  in Statute Miles
+                Column('visibility', Float),  #  in Statute Miles
                 Column('weather_types', ARRAY(String)),
-                Column('temp_fahrenheit', Float, index=True), # These can be NULL bc of missing data
-                Column('dewpoint_fahrenheit', Float),# These can be NULL bc of missing data
+                     Column('temp_fahrenheit', Float, index=True),  # These can be NULL bc of missing data
+                Column('dewpoint_fahrenheit', Float),  # These can be NULL bc of missing data
                 Column('wind_speed', Integer),
-                Column('wind_direction', String(3)), # 000 to 360
-                Column('wind_direction_cardinal', String(3)), # e.g. NNE, NNW
+                     Column('wind_direction', String(3)),  # 000 to 360
+                Column('wind_direction_cardinal', String(3)),  # e.g. NNE, NNW
                 Column('wind_gust', Integer),
-                Column('station_pressure', Float),
-                Column('sealevel_pressure', Float),
-                Column('precip_1hr', Float, index=True),
-                Column('precip_3hr', Float, index=True),
-                Column('precip_6hr', Float, index=True),
-                Column('precip_24hr', Float, index=True),
-                Column('longitude', Float),
-                Column('latitude', Float),
-                keep_existing=True)
+                     Column('station_pressure', Float),
+                     Column('sealevel_pressure', Float),
+                     Column('precip_1hr', Float, index=True),
+                     Column('precip_3hr', Float, index=True),
+                     Column('precip_6hr', Float, index=True),
+                     Column('precip_24hr', Float, index=True),
+                     Column('longitude', Float),
+                     Column('latitude', Float),
+                     keep_existing=True)
 
     
     def _extract_last_fname(self):
@@ -1422,7 +1422,7 @@ class WeatherETL(object):
         return date(year, month, day)
 
     def _get_distinct_weather_stations_by_month(self,year, month, daily_or_hourly='daily'):
-        table = Table('dat_weather_observations_%s' % daily_or_hourly, Base.metadata, autoload=True, autoload_with=engine)
+        table = Table('dat_weather_observations_%s' % daily_or_hourly, postgres_base.metadata, autoload=True, autoload_with=engine)
         column = None
         if (daily_or_hourly == 'daily'):
             column = table.c.date
@@ -1432,8 +1432,8 @@ class WeatherETL(object):
         dt = datetime(year, month,0o1)
         dt_nextmonth = dt + relativedelta.relativedelta(months=1)
         
-        q = session.query(distinct(table.c.wban_code)).filter(and_(column >= dt,
-                                                                   column < dt_nextmonth))
+        q = postgres_session.query(distinct(table.c.wban_code)).filter(and_(column >= dt,
+                                                                            column < dt_nextmonth))
         
         station_list = list(map(operator.itemgetter(0), q.all()))
         return station_list
@@ -1539,16 +1539,16 @@ class WeatherStationsETL(object):
         self.clean_station_info.seek(0)
 
     def make_station_table(self):
-        self.station_table = Table('weather_stations', Base.metadata,
-                Column('wban_code', String(5), primary_key=True),
-                Column('station_name', String(100), nullable=False),
-                Column('country', String(2)),
-                Column('state', String(2)),
-                Column('call_sign', String(5)),
-                Column('location', Geometry('POINT', srid=4326)),
-                Column('elevation', Float),
-                Column('begin', Date),
-                Column('end', Date))
+        self.station_table = Table('weather_stations', postgres_base.metadata,
+                                   Column('wban_code', String(5), primary_key=True),
+                                   Column('station_name', String(100), nullable=False),
+                                   Column('country', String(2)),
+                                   Column('state', String(2)),
+                                   Column('call_sign', String(5)),
+                                   Column('location', Geometry('POINT', srid=4326)),
+                                   Column('elevation', Float),
+                                   Column('begin', Date),
+                                   Column('end', Date))
         self.station_table.create(engine, checkfirst=True)
 
     def _load(self):
@@ -1564,7 +1564,7 @@ class WeatherStationsETL(object):
         reader = csv.DictReader(self.clean_station_info)
         conn = engine.connect()
         for row in reader:
-            station = session.query(self.station_table).filter(self.station_table.c.wban_code == row['wban_code']).all()
+            station = postgres_session.query(self.station_table).filter(self.station_table.c.wban_code == row['wban_code']).all()
             if not station:
                 ins = self.station_table.insert().values(**row)
                 conn.execute(ins)

@@ -1,4 +1,5 @@
 import csv
+import logging
 import os
 import tarfile
 from datetime import datetime, timedelta
@@ -10,7 +11,7 @@ from raven import Client
 from sqlalchemy import Table
 
 from plenario.database import redshift_base, redshift_session
-from plenario.database import session as session, Base, app_engine as engine
+from plenario.database import postgres_session, postgres_base, postgres_engine as engine
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
@@ -27,21 +28,25 @@ worker = Celery(
     backend=CELERY_RESULT_BACKEND
 )
 
+logger = logging.getLogger(__name__)
+
 
 def get_meta(name: str):
     """Return meta record given a point table name or a shape table name."""
 
-    query = session.query(MetaTable).filter(MetaTable.dataset_name == name)
+    logger.info('Begin. (name: "{}")'.format(name))
+    query = postgres_session.query(MetaTable).filter(MetaTable.dataset_name == name)
     result = query.first()
 
     if result is None:
-        result = session.query(ShapeMetadata).filter(
+        result = postgres_session.query(ShapeMetadata).filter(
             ShapeMetadata.dataset_name == name
         ).first()
 
     if result is None:
         raise ValueError("dataset '%s' not found in metadata records" % name)
 
+    logger.info('End.')
     return result
 
 
@@ -56,8 +61,10 @@ def health() -> bool:
 def add_dataset(name: str) -> bool:
     """Ingest the row information for an approved point dataset."""
 
+    logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
     PlenarioETL(meta).add()
+    logger.info('End.')
     return True
 
 
@@ -65,8 +72,10 @@ def add_dataset(name: str) -> bool:
 def update_dataset(name: str) -> bool:
     """Update the row information for an approved point dataset."""
 
+    logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
     PlenarioETL(meta).update()
+    logger.info('End.')
     return True
 
 
@@ -74,9 +83,11 @@ def update_dataset(name: str) -> bool:
 def delete_dataset(name: str) -> bool:
     """Delete the table and meta information for an approved point dataset."""
 
-    metatable = reflect("meta_master", Base.metadata, engine)
+    logger.info('Begin. (name: "{}")'.format(name))
+    metatable = reflect("meta_master", postgres_base.metadata, engine)
     metatable.delete().where(metatable.c.dataset_name == name).execute()
-    reflect(name, Base.metadata, engine).drop()
+    reflect(name, postgres_base.metadata, engine).drop()
+    logger.info('End.')
     return True
 
 
@@ -84,8 +95,11 @@ def delete_dataset(name: str) -> bool:
 def add_shape(name: str) -> bool:
     """Ingest the row information for an approved shapeset."""
 
+    logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
+    logger.debug('Add the shape table.')
     ShapeETL(meta).add()
+    logger.info('End.')
     return True
 
 
@@ -93,8 +107,11 @@ def add_shape(name: str) -> bool:
 def update_shape(name: str) -> bool:
     """Update the row information for an approved shapeset."""
 
+    logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
+    logger.debug('Update the shape table.')
     ShapeETL(meta).update()
+    logger.info('End.')
     return True
 
 
@@ -102,9 +119,14 @@ def update_shape(name: str) -> bool:
 def delete_shape(name) -> bool:
     """Delete the table and meta information for an approved shapeset."""
 
-    metashape = reflect("meta_shape", Base.metadata, engine)
+    logger.info('Begin. (name: "{}")'.format(name))
+    logger.debug('Reflect the shape metadata table.')
+    metashape = reflect("meta_shape", postgres_base.metadata, engine)
+    logger.debug('Delete the shape meta record.')
     metashape.delete().where(metashape.c.dataset_name == name).execute()
-    reflect(name, Base.metadata, engine).drop()
+    logger.debug('Reflect and drop the corresponding shape table.')
+    reflect(name, postgres_base.metadata, engine).drop()
+    logger.info('End.')
     return True
 
 
@@ -113,22 +135,27 @@ def frequency_update(frequency) -> bool:
     """Queue an update task for all the tables whose corresponding meta info
     is part of this frequency group."""
 
-    point_metas = session.query(MetaTable) \
+    logger.info('Begin. (frequency: "{}")'.format(frequency))
+    logger.debug('Query for all point dataset meta records.')
+    point_metas = postgres_session.query(MetaTable) \
         .filter(MetaTable.update_freq == frequency) \
         .filter(MetaTable.date_added != None) \
         .all()
 
+    logger.debug('Queue an update task for each point dataset.')
     for point in point_metas:
         update_dataset.delay(point.dataset_name)
 
-    shape_metas = session.query(ShapeMetadata) \
+    logger.debug('Query for all shape dataset meta records.')
+    shape_metas = postgres_session.query(ShapeMetadata) \
         .filter(ShapeMetadata.update_freq == frequency) \
         .filter(ShapeMetadata.is_ingested == True) \
         .all()
-    
+
+    logger.debug('Queue an update task for each shape dataset.')
     for shape_meta in shape_metas:
         update_shape.delay(shape_meta.dataset_name)
-
+    logger.info('End.')
     return True
 
 
@@ -136,8 +163,11 @@ def frequency_update(frequency) -> bool:
 def update_metar() -> bool:
     """Run a METAR update."""
 
+    logger.info('Begin.')
     w = WeatherETL()
+    logger.debug('Call metar initialization method.')
     w.metar_initialize_current()
+    logger.info('End.')
     return True
 
 
@@ -148,7 +178,9 @@ def clean_metar() -> bool:
     in the hourly table are the quality-controlled versions of records that
     existed in the metar table."""
 
+    logger.info('Begin.')
     WeatherETL().clear_metars()
+    logger.info('End.')
     return True
 
 
@@ -186,23 +218,27 @@ def start_and_end_of_the_month(dt: datetime):
 
 
 @worker.task()
-def archive(dt: str) -> bool:
+def archive(datetime_string: str) -> bool:
     """Store the feature data into tar files organized by node and upload
     those tar files to s3."""
 
+    logger.debug('reflecting tables')
     # Get table objects for all known feature tables in redshift database
     redshift_base.metadata.reflect()
     tables = dict(redshift_base.metadata.tables)
+    logger.debug('reflected redshift tables')
 
     try:
         del tables['unknown_feature']
         del tables['array_of_things_chicago__unknown_feature']
+        logger.debug('deleted unknown feature keys')
     except KeyError:
         # The unknown feature table might not exist in test environments
         pass
 
     # Get the start and end datetime bounds for this month
-    start, end = start_and_end_of_the_month(date_parse(dt))
+    start, end = start_and_end_of_the_month(date_parse(datetime_string))
+    logger.debug('get the start and end dates for the given month')
 
     # Break each feature of interest table up into csv files grouped by node
     csv_file_groups = []
@@ -213,30 +249,33 @@ def archive(dt: str) -> bool:
             # Skip tables which are not feature of interest tables
             continue
         # Save the list of generated file names
-        csv_file_groups.append(
-            table_to_csvs(table, start, end))
+        csv_file_groups.append(table_to_csvs(table, start, end))
+        logger.debug('generated csv files for {}'.format(table))
 
     # Sort the file names into groups by node
     tar_groups = {}
     for file_group in csv_file_groups:
         for file_path in file_group:
-            node = file_path.split('--', 1)[0]
-            tar_groups.setdefault(node, []).append(file_path)
+            node_path = file_path.split('.', 1)[0]
+            tar_groups.setdefault(node_path, []).append(file_path)
+    logger.debug("tar'd all the csvs together by node")
 
     # Tar and upload each group of files for a single node
-    for node, tar_group in tar_groups.items():
+    for node_path, tar_group in tar_groups.items():
 
-        tarfile_path = '{}.tar.gz'.format(node)
+        tarfile_path = '/tmp/{}.tar.gz'.format(node_path)
 
         tar = tarfile.open(tarfile_path, mode='w:gz')
         for file_path in tar_group:
-            tar.add(file_path)
-            os.remove(file_path)
+            tar.add('/tmp/' + file_path, file_path)
+            os.remove('/tmp/' + file_path)
         tar.close()
+        logger.debug("generated {}".format(tarfile_path))
 
-        s3_destination = '{}-{}/{}.tar.gz'.format(start.year, start.month, node)
+        s3_destination = '{}-{}/{}.tar.gz'.format(start.year, start.month, node_path)
         s3_upload(tarfile_path, s3_destination)
         os.remove(tarfile_path)
+        logger.debug("uploaded {}".format(tarfile_path))
 
     return True
 
@@ -268,10 +307,12 @@ def table_to_csvs(table: Table, start: datetime, end: datetime) -> list:
     for row in query:
         node = row.node_id
         if node not in files:
-            file_name = '{}--{}--{}--{}.csv'.format(
-                node, table.name, start.date(), end.date())
-            file_names.append(file_name)
-            files[node] = open(file_name, 'w')
+            file = '{}.{}.{}.{}.csv'
+            feature = table.name.split('__')[1]
+            file = file.format(node, feature, start.date(), end.date())
+
+            file_names.append(file)
+            files[node] = open('/tmp/' + file, 'w')
             writers[node] = csv.writer(files[node])
             writers[node].writerow(row.keys())
         writers[node].writerow(row)
