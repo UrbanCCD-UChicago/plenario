@@ -20,12 +20,14 @@ def make_error(msg, status_code):
         'meta': {
             'status': 'error',
             'message': msg,
+            'query': request.args
         },
         'objects': [],
     }
 
-    resp['meta']['query'] = request.args
-    return make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
+    response = jsonify(resp)
+    response.status_code = status_code
+    return response
 
 
 def make_raw_error(msg):
