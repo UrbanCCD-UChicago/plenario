@@ -560,9 +560,9 @@ def format_network_metadata(network):
 
     network_response = {
         'name': network.name,
-        'features': list(network.features()),
-        'nodes': [n for n in network.tree()],
-        'sensors': network.sensors(),
+        'features': sorted(list(network.features())),
+        'nodes': sorted([n for n in network.tree()]),
+        'sensors': sorted(list(network.sensors())),
         'info': network.info
     }
 

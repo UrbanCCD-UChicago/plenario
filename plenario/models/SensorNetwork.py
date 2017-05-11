@@ -46,13 +46,13 @@ class NetworkMeta(postgres_base):
     def tree(self):
         return {n.id: n.tree() for n in self.nodes}
 
-    def sensors(self):
+    def sensors(self) -> set:
 
         keys = []
         for sensor in self.tree().values():
             keys += sensor
 
-        return keys
+        return set(keys)
 
     def features(self):
 
@@ -157,7 +157,7 @@ class FeatureMeta(postgres_base):
         """Return a dictionary with the properties mapped to their types."""
 
         return {e['name']: e['type'] for e in self.observed_properties}
-    
+
     def sensors(self) -> set:
         """Return the set of sensors that report on this feature."""
 
