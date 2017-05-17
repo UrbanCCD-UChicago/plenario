@@ -1,10 +1,13 @@
+import json
+
 from geoalchemy2 import Geometry
 from sqlalchemy import Table, String, Column, ForeignKey, ForeignKeyConstraint
 from sqlalchemy import func as sqla_fn, Boolean, BigInteger, DateTime, Float
 from sqlalchemy.dialects.postgresql import JSONB, DOUBLE_PRECISION
 from sqlalchemy.orm import relationship
 
-from plenario.database import postgres_base, postgres_session, redshift_base as redshift_base
+from plenario.database import postgres_engine
+from plenario.database import postgres_base, postgres_session, redshift_base
 
 
 sensor_to_node = Table(
@@ -81,7 +84,7 @@ def knn(lng, lat, k, network, sensors):
         sensors="{" + ",".join(sensors) + "}"
     )
 
-    return engine.execute(query).fetchall()
+    return postgres_engine.execute(query).fetchall()
 
 
 class NetworkMeta(postgres_base):
