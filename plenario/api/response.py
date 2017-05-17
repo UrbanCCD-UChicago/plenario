@@ -329,7 +329,7 @@ def export_dataset_to_response(shapeset, data_type, query=None):
         # Make the downloaded filename look nice
         shapemeta = ShapeMetadata.get_by_dataset_name(shapeset.name)
         resp.headers['Content-Type'] = _shape_format_to_content_header(export_format)
-        resp.headers['Content-Disposition'] = 'attachment; filename={}.{}'.format(shapemeta.human_name, extension)
+        resp.headers['Content-Disposition'] = 'attachment; filename="{}.{}"'.format(shapemeta.human_name, extension)
         return resp
 
     except Exception as e:
