@@ -25,7 +25,7 @@ dictConfig(config)
 logger = getLogger(__name__)
 
 
-def create_app():
+def create_app(configuration: str = 'plenario.settings'):
     # API depends on the tables in the database to exist.
     # Don't import until we really need it to create the app
     # Since otherwise it may be called before init_db.py runs.
@@ -42,7 +42,7 @@ def create_app():
     from plenario.utils.helpers import slugify as slug
 
     app = Flask(__name__)
-    app.config.from_object('plenario.settings')
+    app.config.from_object(configuration)
     app.url_map.strict_slashes = False
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"

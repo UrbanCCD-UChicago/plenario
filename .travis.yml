@@ -45,6 +45,7 @@ script:
 - nosetests --nologcapture tests/test_models/test_feature_meta.py -v
 - nosetests --nologcapture tests/test_sensor_network/test_nearest.py -v
 - nosetests --nologcapture tests/test_sensor_network/test_archive.py -v
+- nosetests --nologcapture tests/test_application_factory -v
 
 deploy:
 - provider: elasticbeanstalk
