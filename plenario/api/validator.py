@@ -17,12 +17,16 @@ from plenario.models import ShapeMetadata, MetaTable
 from plenario.models.SensorNetwork import NodeMeta, NetworkMeta, FeatureMeta, SensorMeta
 from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
 from plenario.utils.helpers import reflect
-from plenario.utils.model_helpers import table_exists
 
 
 def validate_dataset(dataset_name):
-    if not table_exists(dataset_name):
+    if not MetaTable.get_by_dataset_name(dataset_name):
         raise ValidationError("Invalid table name: {}.".format(dataset_name))
+
+
+def validate_shapeset(name):
+    if not ShapeMetadata.query.get(name):
+        raise ValidationError("Invalid shape name: {}.".format(name))
 
 
 def validate_many_datasets(list_of_datasets):
@@ -91,7 +95,7 @@ class Validator(Schema):
     agg = fields.Str(default='week', validate=OneOf(valid_aggs))
     buffer = fields.Integer(default=100, validate=Range(0))
     dataset_name = fields.Str(default=None, validate=validate_dataset, dump_to='dataset')
-    shape = fields.Str(default=None, validate=validate_dataset, dump_to='shapeset')
+    shape = fields.Str(default=None, validate=validate_shapeset, dump_to='shapeset')
     dataset_name__in = fields.List(fields.Str(), validate=validate_many_datasets)
     date__time_of_day_ge = fields.Integer(default=0, validate=Range(0, 23))
     date__time_of_day_le = fields.Integer(default=23, validate=Range(0, 23))

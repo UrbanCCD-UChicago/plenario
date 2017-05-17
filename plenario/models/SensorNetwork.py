@@ -5,7 +5,6 @@ from sqlalchemy.dialects.postgresql import JSONB, DOUBLE_PRECISION
 from sqlalchemy.orm import relationship
 
 from plenario.database import postgres_base, postgres_session, redshift_base as redshift_base
-from plenario.utils.model_helpers import knn
 
 
 sensor_to_node = Table(
@@ -26,6 +25,63 @@ feature_to_network = Table(
     Column('feature', String, ForeignKey('sensor__feature_metadata.name')),
     Column('network', String, ForeignKey('sensor__network_metadata.name'))
 )
+
+
+def knn(lng, lat, k, network, sensors):
+    """Execute a spatial query to select k nearest neighbors given some point.
+
+    :param lng: (float) longitude
+    :param lat: (float) latitude
+    :param k: (int) number of results to return
+    :returns: (list) of nearest k neighbors"""
+
+    # Convert lng-lat to geojson point
+    point = "'" + json.dumps({
+        "type": "Point",
+        "coordinates": [lng, lat]
+    }) + "'"
+
+    # How many to limit the initial bounding box query to
+    k_10 = k * 10
+
+    # Based off snippet provided on pg 253 of PostGIS In Action (2nd Edition)
+    query = """
+    WITH bbox_results AS (
+      SELECT
+        node,
+        location,
+        array_agg(sensor) AS sensors,
+        (SELECT ST_SetSRID(ST_GeomFromGeoJSON({geojson}), 4326)) AS ref_geom
+      FROM
+        sensor__node_metadata JOIN sensor__sensor_to_node
+        ON id=node
+      WHERE
+          sensor_network = '{network}'
+      GROUP BY
+        node,
+        location
+      ORDER BY
+        location <#> (SELECT ST_SetSRID(ST_GeomFromGeoJSON ({geojson}), 4326))
+      LIMIT {k_10}
+    )
+
+    SELECT
+      node,
+      RANK() OVER(ORDER BY ST_Distance(location, ref_geom)) AS act_r
+    FROM bbox_results
+    WHERE
+      sensors && '{sensors}'::VARCHAR[]
+    ORDER BY act_r
+    LIMIT {k};
+    """.format(
+        geojson=point,
+        network=network,
+        k=k,
+        k_10=k_10,
+        sensors="{" + ",".join(sensors) + "}"
+    )
+
+    return engine.execute(query).fetchall()
 
 
 class NetworkMeta(postgres_base):
@@ -157,7 +213,7 @@ class FeatureMeta(postgres_base):
         """Return a dictionary with the properties mapped to their types."""
 
         return {e['name']: e['type'] for e in self.observed_properties}
-    
+
     def sensors(self) -> set:
         """Return the set of sensors that report on this feature."""
 
