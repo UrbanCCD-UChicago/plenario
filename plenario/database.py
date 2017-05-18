@@ -7,17 +7,17 @@ from sqlalchemy.engine.base import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-from plenario.settings import DATABASE_CONN, REDSHIFT_CONN
+from plenario.settings import Config
 
 
 logger = getLogger(__name__)
 
-postgres_engine = create_engine(DATABASE_CONN)
+postgres_engine = create_engine(Config.DATABASE_CONN)
 postgres_session = scoped_session(sessionmaker(bind=postgres_engine))
 postgres_base = declarative_base(bind=postgres_engine)
 postgres_base.query = postgres_session.query_property()
 
-redshift_engine = create_engine(REDSHIFT_CONN, max_overflow=-1)
+redshift_engine = create_engine(Config.REDSHIFT_CONN, max_overflow=-1)
 redshift_session = scoped_session(sessionmaker(bind=redshift_engine, autocommit=True))
 redshift_base = declarative_base(bind=redshift_engine)
 redshift_base.query = redshift_session.query_property()
