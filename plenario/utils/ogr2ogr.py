@@ -1,4 +1,5 @@
 from plenario.settings import DB_PORT, DB_PASSWORD, DB_USER, DB_NAME, DB_HOST
+from plenario.settings import Config
 import subprocess
 import zipfile
 import os
@@ -10,7 +11,7 @@ postgres_connection_arg = 'PG:host={} user={} port={} dbname={} password={}'.for
                                   DB_HOST,
                                   DB_USER,
                                   DB_PORT,
-                                  DB_NAME,
+                                  Config.DB_NAME,
                                   DB_PASSWORD)
 
 
@@ -60,9 +61,9 @@ class OgrExport(object):
         self._call_ogr2ogr(self.export_path)
 
     def _call_ogr2ogr(self, export_path):
-        
+
         if self.query:
-            query_flags = ['-sql', self.query] 
+            query_flags = ['-sql', self.query]
         else:
             query_flags = []
 
@@ -125,7 +126,8 @@ def import_shapefile_to_table(component_path, table_name):
             postgres_connection_arg,
             component_path + '.shp',            # Point to .shp so that ogr2ogr knows it's importing a Shapefile.
             '-nln', table_name,                 # (n)ew (l)ayer (n)ame. Set the name of the new table.
-            '-lco', 'GEOMETRY_NAME=geom']       # Always name the geometry column 'geom'
+            '-lco', 'GEOMETRY_NAME=geom',       # Always name the geometry column 'geom'
+            '-overwrite']                       # Overwrite existing layer (table)
     try:
         subprocess.check_call(args)
     except subprocess.CalledProcessError as e:

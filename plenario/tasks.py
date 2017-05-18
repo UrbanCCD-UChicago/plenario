@@ -50,6 +50,12 @@ def get_meta(name: str):
     return result
 
 
+def get_shape(name: str):
+    """Return the meta record for a given shape table."""
+
+    return ShapeMetadata.query.get(name)
+
+
 @worker.task()
 def health() -> bool:
     """Shows that the worker is still recieving messages."""
@@ -95,12 +101,9 @@ def delete_dataset(name: str) -> bool:
 def add_shape(name: str) -> bool:
     """Ingest the row information for an approved shapeset."""
 
-    logger.info('Begin. (name: "{}")'.format(name))
-    meta = get_meta(name)
-    logger.debug('Add the shape table.')
+    meta = get_shape(name)
     ShapeETL(meta).add()
-    logger.info('End.')
-    return True
+    return reflect(name, postgres_base.metadata, engine)
 
 
 @worker.task()
