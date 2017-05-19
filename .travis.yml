@@ -20,7 +20,7 @@ env:
   - secure: bnBfgN5eIAsCVdo+tMhjO88GRfUAEIkD0HFcOMEezP1YQv1bIFU71l5v4aT348RD2kuu6kihWApIqsEe0HjW8u0umPV6aLHuEuUrKGyxwk1x81bhP0KpgQgx+/Qbai4Q6gk+U4TWk713Ezu0j0GJH8jxixvyXgrJjfA/1yvHCdg=
   - secure: JEJJxzJum3iMx9IAvR3ZCHq/pL3pO+01d+Xvmgk+cr6tDkE93600O0l9QrV79i0YW5cvBbgV/j3YE++2Ly7Lz0TPOxo+Gz4ZphyoTZr3JZL6UN2HdF/v57DQj2Eq/m2CD0LhxPGv8a2qlRaY6BuOXfLq5t7DppL4PtSceB2qYko=
 before_install:
-- pip install -r requirements.txt
+  - pip install -r requirements.txt
 install:
 - sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
 - python manage.py init
@@ -33,7 +33,7 @@ script:
 # do with test fixure setup and tear down
 ###
 # Furthermore, don't run the jobs test first.
-# Points (etc?) does some kind of setup that 
+# Points (etc?) does some kind of setup that
 # is useful to jobs (it fails otherwise)
 ###
 - nosetests --nologcapture tests/test_api/test_point.py -v
