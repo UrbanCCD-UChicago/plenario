@@ -14,13 +14,13 @@ DB_USER = get('DB_USER', 'postgres')
 DB_PASSWORD = get('DB_PASSWORD', 'password')
 DB_HOST = get('DB_HOST', 'localhost')
 DB_PORT = get('DB_PORT', 5432)
-DB_NAME = get('DB_NAME', 'plenario_test')
+DB_NAME = get('DB_NAME', 'plenario')
 
 RS_USER = get('RS_USER', 'postgres')
 RS_PASSWORD = get('RS_PASSWORD', 'password')
 RS_HOST = get('RS_HOST', 'localhost')
 RS_PORT = get('RS_PORT', 5432)
-RS_NAME = get('RS_NAME', 'plenario_test')
+RS_NAME = get('RS_NAME', 'plenario')
 
 DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.\
     format(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
@@ -86,13 +86,13 @@ class BaseConfig:
     DB_PASSWORD = get('DB_PASSWORD', 'password')
     DB_HOST = get('DB_HOST', 'localhost')
     DB_PORT = get('DB_PORT', 5432)
-    DB_NAME = get('DB_NAME', 'plenario_test')
+    DB_NAME = get('DB_NAME', 'plenario')
 
     RS_USER = get('RS_USER', 'postgres')
     RS_PASSWORD = get('RS_PASSWORD', 'password')
     RS_HOST = get('RS_HOST', 'localhost')
     RS_PORT = get('RS_PORT', 5432)
-    RS_NAME = get('RS_NAME', 'plenario_test')
+    RS_NAME = get('RS_NAME', 'plenario')
 
     DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.\
         format(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
@@ -148,6 +148,7 @@ class DevConfig(BaseConfig):
 
     DEBUG = True
     DB_NAME = BaseConfig.DB_NAME + '_dev'
+    RS_NAME = BaseConfig.RS_NAME + '_dev'
     DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.format(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
 
 
@@ -155,13 +156,14 @@ class TestConfig(BaseConfig):
 
     TESTING = True
     DB_NAME = BaseConfig.DB_NAME + '_test'
+    RS_NAME = BaseConfig.RS_NAME + '_test'
     DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.format(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
-
+    REDSHIFT_CONN = 'postgresql://{}:{}@{}:{}/{}'.format(RS_USER, RS_PASSWORD, RS_HOST, RS_PORT, RS_NAME)
 
 class ProdConfig(BaseConfig):
 
-    TESTING = True
     DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.format(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
+    REDSHIFT_CONN = 'postgresql://{}:{}@{}:{}/{}'.format(RS_USER, RS_PASSWORD, RS_HOST, RS_PORT, RS_NAME)
 
 
 Config = {

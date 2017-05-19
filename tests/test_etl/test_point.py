@@ -9,7 +9,9 @@ import os
 import json
 from datetime import date
 from plenario.models import MetaTable
+
 from manage import init
+from tests.fixtures.base_test import BasePlenarioTest
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 fixtures_path = os.path.join(pwd, '../fixtures')
@@ -28,7 +30,7 @@ def drop_meta(table_name):
     postgres_engine.execute(del_)
 
 
-class StagingTableTests(TestCase):
+class StagingTableTests(BasePlenarioTest):
     """
     Given a dataset is present in MetaTable,
     can we grab a current csv of the underlying data from wherever it lives
@@ -36,8 +38,7 @@ class StagingTableTests(TestCase):
     """
     @classmethod
     def setUpClass(cls):
-
-        init()
+        super(StagingTableTests, cls).setUpClass()
 
         cls.dog_path = os.path.join(fixtures_path, 'dog_park_permits.csv')
         cls.radio_path = os.path.join(fixtures_path, 'community_radio_events.csv')

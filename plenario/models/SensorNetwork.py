@@ -6,7 +6,7 @@ from sqlalchemy import func as sqla_fn, Boolean, BigInteger, DateTime, Float
 from sqlalchemy.dialects.postgresql import JSONB, DOUBLE_PRECISION
 from sqlalchemy.orm import relationship
 
-from plenario.database import postgres_engine
+from plenario.database import postgres_engine, redshift_engine
 from plenario.database import postgres_base, postgres_session, redshift_base
 
 
@@ -274,7 +274,7 @@ class FeatureMeta(postgres_base):
             redshift_sortkey='datetime'
         )
 
-        redshift_table.create()
+        redshift_table.create(bind=redshift_engine)
 
     def __repr__(self):
         return '<Feature "{}">'.format(self.name)

@@ -41,7 +41,7 @@ class WeatherError(Exception):
         self.message = message
 
 class WeatherETL(object):
-    """ 
+    """
     Download, transform and insert weather data into plenario
     """
 
@@ -58,7 +58,7 @@ class WeatherETL(object):
     # - _extract(fname)
     #
     #
-    
+
     weather_type_dict = {'+FC': 'TORNADO/WATERSPOUT',
                      'FC': 'FUNNEL CLOUD',
                      'TS': 'THUNDERSTORM',
@@ -112,7 +112,7 @@ class WeatherETL(object):
         self.wban2callsign_map = self.build_wban2callsign_map()
 
     def build_wban2callsign_map(self):
-        #stations_table = Table('weather_stations', Base.metadata, 
+        #stations_table = Table('weather_stations', Base.metadata,
         #                       autoload=True, autoload_with=engine, extend_existing=True)
         # ask stations_table for all rows where wban_code and call_sign are defined
         sql = "SELECT wban_code, call_sign FROM weather_stations WHERE call_sign IS NOT NULL"
@@ -122,7 +122,7 @@ class WeatherETL(object):
         d = dict(wban_callsigns)
         return d
 
-        
+
     # WeatherETL.initialize_last(): for debugging purposes, only initialize the most recent month of weather data.
     def initialize_last(self, start_line=0, end_line=None):
         self.make_tables()
@@ -155,7 +155,7 @@ class WeatherETL(object):
         self.metar_make_tables()
         # we want to pass this to some _metar_do_etl() function
         self._metar_do_etl(weather_stations_list, banned_weather_stations_list)
-            
+
 
 
     ######################################################################
@@ -169,15 +169,15 @@ class WeatherETL(object):
 
         if (self.debug):
             self.debug_outfile.write("Extracting: %s\n" % fname)
-        
+
         if (not no_daily):
-            t_daily = self._transform_daily(raw_daily, file_type, 
+            t_daily = self._transform_daily(raw_daily, file_type,
                                             weather_stations_list=weather_stations_list,
                                             banned_weather_stations_list=banned_weather_stations_list,
                                             start_line=start_line, end_line=end_line)
         if (not no_hourly):
-            t_hourly = self._transform_hourly(raw_hourly, file_type, 
-                                              weather_stations_list=weather_stations_list, 
+            t_hourly = self._transform_hourly(raw_hourly, file_type,
+                                              weather_stations_list=weather_stations_list,
                                               banned_weather_stations_list=banned_weather_stations_list,
                                               start_line=start_line, end_line=end_line)
         if (not no_daily):
@@ -200,8 +200,8 @@ class WeatherETL(object):
             metar_codes = getCurrentWeather(wban_codes =weather_stations_list, wban2callsigns = self.wban2callsign_map)
         else:
             metar_codes = getAllCurrentWeather()
-            
-        
+
+
         t_metars = self._transform_metars(metar_codes,
                                           weather_stations_list,
                                           banned_weather_stations_list)
@@ -229,7 +229,7 @@ class WeatherETL(object):
                 continue
 
     def _add_location(self, span=None):
-        """ 
+        """
         Add latitude and longitude from weather station into observations table
         """
         start_day, end_day = calendar.monthrange(self.current_year, self.current_month)
@@ -240,11 +240,11 @@ class WeatherETL(object):
         if span == 'hourly' or span == 'metar':
             date_col = 'datetime'
         upd = text("""
-            UPDATE %s SET 
+            UPDATE %s SET
                 longitude = subq.longitude,
                 latitude = subq.latitude
             FROM (
-                SELECT 
+                SELECT
                     wban_code,
                     st_x(location) as longitude,
                     st_y(location) as latitude
@@ -255,7 +255,7 @@ class WeatherETL(object):
                AND %s.%s >= :range_start
                AND %s.longitude IS NULL
                AND %s.latitude IS NULL
-        """ % (table_name, table_name, 
+        """ % (table_name, table_name,
                table_name, date_col,
                table_name, date_col,
                table_name, table_name)
@@ -264,7 +264,7 @@ class WeatherETL(object):
         conn.execute(upd, range_start=range_start, range_end=range_end)
 
 
-        
+
     def _update(self, span=None):
         new_table = Table('new_weather_observations_%s' % span, postgres_base.metadata,
                           Column('wban_code', String(5)), keep_existing=True)
@@ -286,7 +286,7 @@ class WeatherETL(object):
         new_table.drop(engine, checkfirst=True)
         new_table.create(engine)
         ins = new_table.insert()\
-                .from_select(from_sel_cols, 
+                .from_select(from_sel_cols,
                     select([src_table.c.wban_code, src_date_col])\
                         .select_from(src_table.join(dat_table,
                             and_(src_table.c.wban_code == dat_table.c.wban_code,
@@ -303,7 +303,7 @@ class WeatherETL(object):
             new = False
         if new:
             ins = dat_table.insert()\
-                    .from_select([c for c in dat_table.columns if c.name != 'id'], 
+                    .from_select([c for c in dat_table.columns if c.name != 'id'],
                         select([c for c in src_table.columns])\
                             .select_from(src_table.join(new_table,
                                 and_(src_table.c.wban_code == new_table.c.wban_code,
@@ -315,7 +315,7 @@ class WeatherETL(object):
 
     def _update_metar(self):
         #print "_update_metar()"
-        
+
         new_table = Table('new_weather_observations_metar', postgres_base.metadata,
                           Column('wban_code', String(5)), keep_existing=True)  # intersection of src and dat -- only new records
         dat_table = getattr(self, 'metar_table') # where we are eventually storing things
@@ -324,7 +324,7 @@ class WeatherETL(object):
         #print "we have new_table: '%s'" % new_table
         #print "we have dat_table: '%s'" % dat_table
         #print "we have src_table: '%s'" % src_table
-        
+
         from_sel_cols = ['wban_code', 'datetime']
         src_date_col = src_table.c.datetime
         dat_date_col = dat_table.c.datetime
@@ -341,15 +341,15 @@ class WeatherETL(object):
         #ins = """
         #INSERT INTO new_weather_observations_metar (wban_code, date)
         #SELECT src_weather_observations_metar.wban_code, src_weather_observations_metar.datetime
-        #FROM src_weather_observations_metar 
-        #LEFT OUTER JOIN dat_weather_observations_metar 
-        #ON src_weather_observations_metar.wban_code = dat_weather_observations_metar.wban_code 
+        #FROM src_weather_observations_metar
+        #LEFT OUTER JOIN dat_weather_observations_metar
+        #ON src_weather_observations_metar.wban_code = dat_weather_observations_metar.wban_code
         #AND src_weather_observations_metar.datetime = dat_weather_observations_metar.datetime
         #WHERE dat_weather_observations_metar.id IS NULL'
         #"""
 
         ins = new_table.insert()\
-                .from_select(from_sel_cols, 
+                .from_select(from_sel_cols,
                     select([src_table.c.wban_code, src_date_col])\
                         .select_from(src_table.join(dat_table,
                             and_(src_table.c.wban_code == dat_table.c.wban_code,
@@ -361,7 +361,7 @@ class WeatherETL(object):
 
         #print "_update_metar(): sql is'%s'" % ins
         conn = engine.contextual_connect()
-        
+
         try:
             conn.execute(ins)
             new = True
@@ -380,9 +380,9 @@ class WeatherETL(object):
             #INSERT INTO dat_weather_observations_metar (wban_code, call_sign, datetime, sky_condition, sky_condition_top, visibility
             #SELECT ...
             #"""
-            
+
             ins = dat_table.insert()\
-                    .from_select([c for c in dat_table.columns if c.name != 'id'], 
+                    .from_select([c for c in dat_table.columns if c.name != 'id'],
                         select([c for c in src_table.columns])\
                             .select_from(src_table.join(new_table,
                                 and_(src_table.c.wban_code == new_table.c.wban_code,
@@ -391,14 +391,14 @@ class WeatherETL(object):
                     )
             conn.execute(ins)
 
-            
+
     def make_tables(self):
         self._make_daily_table()
         self._make_hourly_table()
 
     def metar_make_tables(self):
         self._make_metar_table()
-            
+
     ########################################
     ########################################
     # Extract (from filename / URL to some raw StringIO()
@@ -435,11 +435,11 @@ class WeatherETL(object):
         yearmonth_str = fname_yearmonth[-6:]
         year_str = yearmonth_str[0:4]
         month_str = yearmonth_str[4:6]
-        
+
         fpath = os.path.join(self.data_dir, fname)
         raw_weather_hourly = StringIO()
         raw_weather_daily = StringIO()
-        
+
         now_month, now_year = str(datetime.now().month), str(datetime.now().year)
         if '%s%s' % (now_year.zfill(2), now_month.zfill(2)) == yearmonth_str:
             self._download_write(fname)
@@ -452,7 +452,7 @@ class WeatherETL(object):
                 for tarinfo in tar:
                     if tarinfo.name.endswith('hourly.txt') and (yearmonth_str in tarinfo.name):
                         raw_weather_hourly.write(tar.extractfile(tarinfo).read())
-                    elif tarinfo.name.endswith('daily.txt') and (yearmonth_str in tarinfo.name): 
+                    elif tarinfo.name.endswith('daily.txt') and (yearmonth_str in tarinfo.name):
                         # need this 2nd caveat above to handle ridiculous stuff like 200408.tar.gz containing 200512daily.txt for no reason
                         raw_weather_daily.write(tar.extractfile(tarinfo).read())
         else:
@@ -486,7 +486,7 @@ class WeatherETL(object):
                            "dewpoint_avg", "wetbulb_avg","weather_types",
                            "snowice_depth", "snowice_waterequiv",
                            "snowfall","precip_total", "station_pressure",
-                           "sealevel_pressure", 
+                           "sealevel_pressure",
                            "resultant_windspeed", "resultant_winddirection", "resultant_winddirection_cardinal",
                            "avg_windspeed",
                            "max5_windspeed", "max5_winddirection","max5_winddirection_cardinal",
@@ -503,32 +503,32 @@ class WeatherETL(object):
                     break
                 raw_row.strip()
                 row = raw_row.split(',')
-                
+
                 self.current_row = row
                 if (row_count % 100 == 0):
                     if (self.debug == True):
                         self.debug_outfile.write("\rdaily parsing: row_count=%06d" % row_count)
                         self.debug_outfile.flush()
-             
+
                 if (start_line > row_count):
                     row_count +=1
                     continue
                 if ((end_line is not None) and (row_count > end_line)):
                     break
-             
+
                 row_count += 1
-             
+
                 if (len(row) == 0):
                     continue
 
                 row_vals = getattr(self, '_parse_%s_row_daily' % file_type)(row, header, self.out_header)
-             
+
                 row_dict = dict(list(zip(self.out_header, row_vals)))
                 if (weather_stations_list is not None):
                     # Only include observations from the specified list of wban_code values
                     if (row_dict['wban_code'] not in weather_stations_list):
                         continue
-             
+
                 writer.writerow(row_vals)
             except UnicodeDecodeError:
                 if (self.debug == True):
@@ -540,7 +540,7 @@ class WeatherETL(object):
                 # We may not get this error anymore (ironically) after rolling our own CSV parser
                 #   as opposed to UnicodeCSVReeder
                 pass
-                
+
                 continue
             except StopIteration:
                 break
@@ -567,7 +567,7 @@ class WeatherETL(object):
         sealevel_pressure=self.floatOrNA(row[header.index('SeaLevel')])
         resultant_windspeed = self.floatOrNA(row[header.index('ResultSpeed')])
         resultant_winddirection, resultant_winddirection_cardinal=self.getWind(resultant_windspeed, row[header.index('ResultDir')])
-        avg_windspeed=self.floatOrNA(row[header.index('AvgSpeed')])            
+        avg_windspeed=self.floatOrNA(row[header.index('AvgSpeed')])
         max5_windspeed=self.floatOrNA(row[header.index('Max5Speed')])
         max5_winddirection, max5_winddirection_cardinal=self.getWind(max5_windspeed, row[header.index('Max5Dir')])
         max2_windspeed=self.floatOrNA(row[header.index('Max2Speed')])
@@ -578,14 +578,14 @@ class WeatherETL(object):
                 dewpoint_avg, wetbulb_avg,weather_types_list,
                 snowice_depth, snowice_waterequiv,
                 snowfall,precip_total, station_pressure,
-                sealevel_pressure, 
+                sealevel_pressure,
                 resultant_windspeed, resultant_winddirection, resultant_winddirection_cardinal,
                 avg_windspeed,
                 max5_windspeed, max5_winddirection,max5_winddirection_cardinal,
                 max2_windspeed, max2_winddirection, max2_winddirection_cardinal]
 
         assert(len(out_header) == len(vals))
-        
+
         return vals
 
     def _parse_tarfile_row_daily(self, row, header, out_header):
@@ -606,7 +606,7 @@ class WeatherETL(object):
         sealevel_pressure=self.floatOrNA(row[header.index('Pressure Avg Sea Level')])
         resultant_windspeed = self.floatOrNA(row[header.index('Wind Speed')])
         resultant_winddirection, resultant_winddirection_cardinal=self.getWind(resultant_windspeed, row[header.index('Wind Direction')])
-        avg_windspeed=self.floatOrNA(row[header.index('Wind Avg Speed')])            
+        avg_windspeed=self.floatOrNA(row[header.index('Wind Avg Speed')])
         max5_windspeed=self.floatOrNA(row[header.index('Max 5 sec speed')])
         max5_winddirection, max5_winddirection_cardinal=self.getWind(max5_windspeed, row[header.index('Max 5 sec Dir')])
         max2_windspeed=self.floatOrNA(row[header.index('Max 2 min speed')])
@@ -617,14 +617,14 @@ class WeatherETL(object):
                dewpoint_avg, wetbulb_avg,weather_types_list,
                snowice_depth, snowice_waterequiv,
                snowfall,precip_total, station_pressure,
-               sealevel_pressure, 
+               sealevel_pressure,
                resultant_windspeed, resultant_winddirection, resultant_winddirection_cardinal,
                avg_windspeed,
                max5_windspeed, max5_winddirection,max5_winddirection_cardinal,
                max2_windspeed, max2_winddirection, max2_winddirection_cardinal]
 
         assert(len(out_header) == len(vals))
-        
+
         return vals
 
 
@@ -660,36 +660,36 @@ class WeatherETL(object):
                     if (self.debug==True):
                         self.debug_outfile.write( "\rparsing: row_count=%06d" % row_count)
                         self.debug_outfile.flush()
-             
+
                 if (start_line > row_count):
                     row_count +=1
                     continue
                 if ((end_line is not None) and (row_count > end_line)):
                     break
-             
+
                 row_count += 1
-             
+
                 if (len(row) == 0):
                     continue
-             
+
                 # this calls either self._parse_zipfile_row_hourly
                 # or self._parse_tarfile_row_hourly
                 row_vals = getattr(self, '_parse_%s_row_hourly' % file_type)(row, header, self.out_header)
                 if (not row_vals):
                     continue
-             
+
                 row_dict = dict(list(zip(self.out_header, row_vals)))
                 if (weather_stations_list is not None):
                     # Only include observations from the specified list of wban_code values
                     if (row_dict['wban_code'] not in weather_stations_list):
                         continue
-                    
+
                 if (banned_weather_stations_list is not None):
                     if (row_dict['wban_code'] in banned_weather_stations_list):
                         continue
-                
-                
-             
+
+
+
                 writer.writerow(row_vals)
             except FieldSizeLimitError:
                 continue
@@ -703,7 +703,7 @@ class WeatherETL(object):
         # 2) SP - METAR SPECIAL REPORT
         # Special reports seem to occur at the same time (and have
         # largely the same content) as hourly reports, but under certain
-        # adverse conditions (e.g. low visibility). 
+        # adverse conditions (e.g. low visibility).
         # As such, I believe it is sufficient to just use the 'AA' reports and keep
         # our composite primary key of (wban_code, datetime).
         report_type = row[header.index('RecordType')]
@@ -716,7 +716,7 @@ class WeatherETL(object):
         if (time):
             time_int =  self.integerOrNA(time)
             time_str = '%04d' % time_int
-        
+
         weather_date = datetime.strptime('%s %s' % (date, time_str), '%Y%m%d %H%M')
         station_type = row[header.index('StationType')]
         old_station_type = None
@@ -741,13 +741,13 @@ class WeatherETL(object):
         station_pressure = self.floatOrNA(row[header.index('StationPressure')])
         sealevel_pressure = self.floatOrNA(row[header.index('SeaLevelPressure')])
         hourly_precip = self.getPrecip(row[header.index('HourlyPrecip')])
-            
+
         vals= [wban_code,
-               weather_date, 
+               weather_date,
                old_station_type,
                station_type,
                sky_condition, sky_condition_top,
-               visibility, 
+               visibility,
                weather_types_list,
                drybulb_F,
                wetbulb_F,
@@ -774,7 +774,7 @@ class WeatherETL(object):
         time = row[header.index('Time')] # e.g. '601' 6:01am
         # pad this into a four digit number:
         time_str = None
-        if (time): 
+        if (time):
             time_int = self.integerOrNA(time)
             if not time_int:
                 time_str = None
@@ -790,11 +790,11 @@ class WeatherETL(object):
         station_type = None
         sky_condition = row[header.index('Sky Conditions')].strip()
         sky_condition_top = sky_condition.split(' ')[-1]
-        
+
         visibility = self._parse_old_visibility(row[header.index('Visibility')])
 
         weather_types_list = self._parse_weather_types(row[header.index('Weather Type')])
-        
+
         drybulb_F = self.floatOrNA(row[header.index('Dry Bulb Temp')])
         wetbulb_F = self.floatOrNA(row[header.index('Wet Bulb Temp')])
         dewpoint_F = self.floatOrNA(row[header.index('Dew Point Temp')])
@@ -804,12 +804,12 @@ class WeatherETL(object):
         station_pressure = self.floatOrNA(row[header.index('Station Pressure')])
         sealevel_pressure = self.floatOrNA(row[header.index('Sea Level Pressure')])
         hourly_precip = self.getPrecip(row[header.index('Precip. Total')])
-        
+
         vals= [wban_code,
-               weather_date, 
+               weather_date,
                old_station_type,station_type,
                sky_condition, sky_condition_top,
-               visibility, 
+               visibility,
                weather_types_list,
                drybulb_F,
                wetbulb_F,
@@ -889,17 +889,17 @@ class WeatherETL(object):
             m = getMetar(row)
         except ParserError:
             return []
-        
+
         vals = getMetarVals(m)
         #print "_parse_row_metar(): header=", header
         #print "_parse_row_metar(): vals=",vals
-        assert(len(header) == len(vals))        
+        assert(len(header) == len(vals))
         return vals
 
 
-    
-    
-    
+
+
+
     # Help parse a 'present weather' string like 'FZFG' (freezing fog) or 'BLSN' (blowing snow) or '-RA' (light rain)
     # When we are doing precip slurp as many as possible
     def _do_weather_parse(self, pw, mapping, multiple=False, local_debug=False):
@@ -916,7 +916,7 @@ class WeatherETL(object):
             else:
                 continue
 
-        if (len(pw) == 0): 
+        if (len(pw) == 0):
             return ('', 'NULL')
 
         # 2nd parse for descriptors
@@ -943,7 +943,7 @@ class WeatherETL(object):
 
         vicinities = [('VC','Vicinity')]
         (l, vicinity) = self._do_weather_parse(l, vicinities)
-        
+
         descriptors = [('MI','Shallow'),
                        ('PR','Partial'),
                        ('BC','Patches'),
@@ -952,9 +952,9 @@ class WeatherETL(object):
                        ('SH','Shower(s)'),
                        ('TS','Thunderstorm'),
                        ('FZ','Freezing')]
-            
+
         (l, desc)= self._do_weather_parse(l, descriptors)
-        
+
         # 3rd parse for phenomena
         precip_phenoms= [('DZ','Drizzle'),
                          ('RA','Rain'),
@@ -983,7 +983,7 @@ class WeatherETL(object):
                          ('SS','Sandstorm'),
                          ('DS','Duststorm'),
                          ('GL','Glaze')]
-                
+
         (l, precips) = self._do_weather_parse(l, precip_phenoms, multiple =True)
         (l, obscuration) = self._do_weather_parse(l, obscuration_phenoms)
         (l, other) = self._do_weather_parse(l, other_phenoms)
@@ -995,10 +995,10 @@ class WeatherETL(object):
                 self.debug_outfile.write(str(self.current_row))
                 self.debug_outfile.write("\ncould not fully parse present weather : '%s' '%s'\n\n" % ( orig_pw, l))
         wt_list = [intensity, vicinity, desc, precips[0], obscuration, other]
-    
+
         ret_wt_lists = []
         ret_wt_lists.append(wt_list)
-        
+
         #if (len(precips) > 1):
         #    print "first precip: ", wt_list
         for p in precips[1:]:
@@ -1007,9 +1007,9 @@ class WeatherETL(object):
                 wt_list = ['NULL', 'NULL', 'NULL', p, 'NULL', 'NULL']
                 #print "extra precip (precip):", wt_list
                 ret_wt_lists.append(wt_list)
-        
+
         return ret_wt_lists
-        
+
 
 
     # Parse a list of 'present weather' strings and convert to multidimensional postgres array.
@@ -1036,7 +1036,7 @@ class WeatherETL(object):
 
     def _parse_old_visibility(self, visibility_str):
         visibility_str = visibility_str.strip()
-        
+
         visibility_str = re.sub('SM', '', visibility_str)
         # has_slash = re.match('\/'), visibility_str)
         # XX This is not worth it, too many weird, undocumented special cases on this particular column
@@ -1049,12 +1049,12 @@ class WeatherETL(object):
 
     def getWBAN(self,wban):
         return wban
-    
+
     def getTemp(self, temp):
         if temp[-1] == '*':
             temp = temp[:-1]
         return self.floatOrNA(temp)
-        
+
     def getWind(self, wind_speed, wind_direction):
         wind_cardinal = None
         wind_direction = wind_direction.strip()
@@ -1073,8 +1073,8 @@ class WeatherETL(object):
                 wind_direction = wind_direction_int
             except ValueError as e:
                 if (self.debug==True):
-                    if (self.current_row): 
-                        self.debug_outfile.write("\n")                        
+                    if (self.current_row):
+                        self.debug_outfile.write("\n")
                         zipped_row = list(zip(self.out_header,self.current_row))
                         for column in zipped_row:
                             self.debug_outfile.write(str(column) + "\n")
@@ -1088,7 +1088,7 @@ class WeatherETL(object):
             wind_cardinal = None
         return wind_direction, wind_cardinal
 
-        
+
     def getPrecip(self, precip_str):
         precip_total = None
         precip_total = precip_str.strip()
@@ -1096,7 +1096,7 @@ class WeatherETL(object):
             precip_total = .005 # 'Trace' precipitation = .005 inch or less
         precip_total = self.floatOrNA(precip_total)
         return precip_total
-                        
+
     def floatOrNA(self, val):
         val_str = str(val).strip()
         if (val_str == 'M'):
@@ -1114,7 +1114,7 @@ class WeatherETL(object):
                 fval = float(val_str)
             except ValueError as e:
                 if (self.debug==True):
-                    if (self.current_row): 
+                    if (self.current_row):
                         self.debug_outfile.write("\n")
                         zipped_row = list(zip(self.out_header,self.current_row))
                         for column in zipped_row:
@@ -1139,11 +1139,11 @@ class WeatherETL(object):
         if (val_str.strip() == ''):  # WindSpeed line
             return None
         else:
-            try: 
+            try:
                 ival = int(val)
             except ValueError as e:
                 if (self.debug==True):
-                    if (self.current_row): 
+                    if (self.current_row):
                         self.debug_outfile.write("\n")
                         zipped_row = list(zip(self.out_header,self.current_row))
                         for column in zipped_row:
@@ -1167,7 +1167,7 @@ class WeatherETL(object):
         self.metar_table = self._get_metar_table()
         self.metar_table.append_column(Column('id', BigInteger, primary_key=True))
         self.metar_table.create(engine, checkfirst=True)
-        
+
     def _get_daily_table(self, name='dat'):
         return Table('%s_weather_observations_daily' % name, postgres_base.metadata,
                      Column('wban_code', String(5), nullable=False),
@@ -1263,18 +1263,18 @@ class WeatherETL(object):
                      Column('latitude', Float),
                      keep_existing=True)
 
-    
+
     def _extract_last_fname(self):
         # XX: tar files are all old and not recent.
-        #tar_last = 
+        #tar_last =
         #tar_last = datetime(2007, 5, 1, 0, 0)
-        #tar_filename = '%s.tar.gz' % tar_last.strftime('%Y%m') 
+        #tar_filename = '%s.tar.gz' % tar_last.strftime('%Y%m')
         #print 'tar_filename'
 
         zip_last = datetime.now()
         self.current_year = zip_last.year
         self.current_month = zip_last.month
-        zip_filename = 'QCLCD%s.zip' % zip_last.strftime('%Y%m') 
+        zip_filename = 'QCLCD%s.zip' % zip_last.strftime('%Y%m')
         return zip_filename
 
     def _extract_fname(self, year_num, month_num):
@@ -1301,7 +1301,7 @@ class WeatherETL(object):
 
     def _load_hourly(self, transformed_input):
         if (self.debug==True):
-            transformed_input.seek(0) 
+            transformed_input.seek(0)
             f = open(os.path.join(self.data_dir, 'weather_etl_dump_hourly.txt'), 'w')
             f.write(transformed_input.getvalue())
             f.close()
@@ -1322,7 +1322,7 @@ class WeatherETL(object):
             ins_st += "FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
         conn = engine.raw_connection()
         cursor = conn.cursor()
-        if (self.debug==True): 
+        if (self.debug==True):
             self.debug_outfile.write("\nCalling: '%s'\n" % ins_st)
             self.debug_outfile.flush()
         cursor.copy_expert(ins_st, transformed_input)
@@ -1333,9 +1333,9 @@ class WeatherETL(object):
             self.debug_outfile.flush()
 
 
-    def _load_daily(self, transformed_input): 
+    def _load_daily(self, transformed_input):
         if (self.debug==True):
-            transformed_input.seek(0) 
+            transformed_input.seek(0)
             f = open(os.path.join(self.data_dir, 'weather_etl_dump_daily.txt'), 'w')
             f.write(transformed_input.getvalue())
             f.close()
@@ -1356,7 +1356,7 @@ class WeatherETL(object):
             ins_st += "FROM STDIN WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',')"
         conn = engine.raw_connection()
         cursor = conn.cursor()
-        if (self.debug==True): 
+        if (self.debug==True):
             self.debug_outfile.write("\nCalling: '%s'\n" % ins_st)
             self.debug_outfile.flush()
         cursor.copy_expert(ins_st, transformed_input)
@@ -1381,8 +1381,8 @@ class WeatherETL(object):
             print("got ProgrammingError on src metar table create")
             return None
 
-        
-            
+
+
         ins_st = "COPY src_weather_observations_metar ("
         for idx, name in enumerate(names):
             if idx < len(names) - 1:
@@ -1395,7 +1395,7 @@ class WeatherETL(object):
         #print "transformed_input is", transformed_input.getvalue()
         conn = engine.raw_connection()
         cursor = conn.cursor()
-        if (self.debug==True): 
+        if (self.debug==True):
             self.debug_outfile.write("\nCalling: '%s'\n" % ins_st)
             self.debug_outfile.flush()
         cursor.copy_expert(ins_st, transformed_input)
@@ -1404,16 +1404,16 @@ class WeatherETL(object):
         if (self.debug == True):
             self.debug_outfile.write("committed: '%s'" % ins_st)
             self.debug_outfile.flush()
-        
+
         pass
 
-            
+
     def _date_span(self, start, end):
         delta = timedelta(days=30)
         while (start.year, start.month) != (end.year, end.month):
             yield start
             start = self._add_month(start)
-    
+
     def _add_month(self, sourcedate):
         month = sourcedate.month
         year = sourcedate.year + month / 12
@@ -1428,13 +1428,13 @@ class WeatherETL(object):
             column = table.c.date
         elif (daily_or_hourly == 'hourly'):
             column = table.c.datetime
-        
+
         dt = datetime(year, month,0o1)
         dt_nextmonth = dt + relativedelta.relativedelta(months=1)
-        
+
         q = postgres_session.query(distinct(table.c.wban_code)).filter(and_(column >= dt,
                                                                             column < dt_nextmonth))
-        
+
         station_list = list(map(operator.itemgetter(0), q.all()))
         return station_list
 
@@ -1539,6 +1539,8 @@ class WeatherStationsETL(object):
         self.clean_station_info.seek(0)
 
     def make_station_table(self):
+        print("Create the weather_stations table with %s" % engine)
+        
         self.station_table = Table('weather_stations', postgres_base.metadata,
                                    Column('wban_code', String(5), primary_key=True),
                                    Column('station_name', String(100), nullable=False),

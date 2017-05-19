@@ -9,20 +9,22 @@ from plenario.etl.point import PlenarioETL
 from plenario.models import MetaTable
 from tests.test_api.test_point import get_loop_rect
 from tests.fixtures.post_data import roadworks_post_data
+from tests.fixtures.base_test import BasePlenarioTest
 
 
-class TestValidator(unittest.TestCase):
+class TestValidator(BasePlenarioTest):
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestValidator, cls).setUpClass()
+        super(TestValidator, cls).ingest_points()
+        super(TestValidator, cls).ingest_shapes()
 
     def get_json_response_data(self, endpoint):
         """A little util that does work I found myself repeating alot."""
 
         response = self.test_client.get('/v1/api/' + endpoint)
         return json.loads(response.data.decode('utf-8'))
-
-    @classmethod
-    def setUpClass(cls):
-        cls.app = create_app()
-        cls.test_client = cls.app.test_client()
 
     def test_validator_bad_dataset_name(self):
         endpoint = 'detail'
@@ -225,12 +227,3 @@ class TestValidator(unittest.TestCase):
             .format(bad_geom, '2015-1-1', '2016-1-1')
         r = self.get_json_response_data(query)
         self.assertEqual(len(r['meta']['message']), 1)
-
-    @classmethod
-    def tearDownClass(cls):
-
-        try:
-            postgres_engine.execute("drop table roadworks")
-            postgres_engine.execute("delete from meta_master where dataset_name = 'roadworks'")
-        except ProgrammingError:
-            pass

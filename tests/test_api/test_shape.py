@@ -20,6 +20,10 @@ class ShapeTests(BasePlenarioTest):
         cls.ingest_shapes()
         cls.ingest_points()
 
+    @classmethod
+    def tearDownClass(cls):
+        super(ShapeTests, cls).tearDownClass()
+
     ''' /etl '''
 
     def test_update(self):
@@ -257,7 +261,7 @@ class ShapeTests(BasePlenarioTest):
         data = json.loads(bytes.decode(response.data))
         neighborhoods = data['features']
         self.assertEqual(len(neighborhoods), 6)
-        
+
         for neighborhood in neighborhoods:
             self.assertGreaterEqual(neighborhood['properties']['count'], 1)
             #print neighborhood['properties']['sec_neigh'], neighborhood['properties']['count']
@@ -271,7 +275,7 @@ class ShapeTests(BasePlenarioTest):
         response = self.app.get(url)
         data = json.loads(bytes.decode(response.data))
         neighborhoods = data['features']
-        self.assertGreaterEqual(20, len(neighborhoods)) 
+        self.assertGreaterEqual(20, len(neighborhoods))
           #check that total number of neighborhoods does not exceed number within this bounding box (The Loop)
 
         for neighborhood in neighborhoods:
@@ -285,7 +289,7 @@ class ShapeTests(BasePlenarioTest):
         escaped_query_rect = urllib.parse.quote(query_rect)
         unfiltered_url = '/v1/api/shapes/chicago_neighborhoods/'#?location_geom__within=' + escaped_query_rect
         filtered_url = '/v1/api/shapes/chicago_neighborhoods/?location_geom__within=' + escaped_query_rect
-        
+
         unfiltered_response = self.app.get(unfiltered_url)
         unfiltered_data = json.loads(bytes.decode(unfiltered_response.data))
         unfiltered_neighborhoods = unfiltered_data['features']

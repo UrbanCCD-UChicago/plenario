@@ -1,15 +1,19 @@
 import os
 import unittest
 
+from sqlalchemy import create_engine
+
 from tests.fixtures.point_meta import flu_shot_meta, landmarks_meta
 from tests.fixtures.point_meta import flu_path, landmarks_path
 from tests.fixtures.point_meta import crime_meta, crime_path
 
 from plenario import create_app
-from plenario.database import postgres_session
+from plenario.database import postgres_session, postgres_engine
+from plenario.database import create_database, create_extension, drop_database
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
+from plenario.settings import Config, DATABASE_CONN
 
 from manage import init
 
@@ -58,19 +62,27 @@ shape_fixtures = {
 
 
 class BasePlenarioTest(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls, shutdown=False):
+
+        cls.base_engine = create_engine(DATABASE_CONN)
+        # create_database(cls.base_engine, Config.DB_NAME)
+        cls.engine = create_engine(Config.DATABASE_CONN)
+        # create_extension(cls.engine, 'postgis')
+
         # Remove tables that we're about to recreate.
         # This doesn't happen in teardown because I find it helpful
         # to inspect them in the DB after running the tests.
 
-        meta_table_names = ['meta_master', 'meta_shape', 'etl_task']
-        drop_tables(meta_table_names)
+        # meta_table_names = ['meta_master', 'meta_shape', 'etl_task']
+        # drop_tables(meta_table_names)
 
         # Re-add meta tables
         init()
 
-        cls.app = create_app().test_client()
+        cls.app = create_app('plenario.settings.Config').test_client()
+        cls.test_client = cls.app
 
     @classmethod
     def ingest_shapes(cls):
@@ -105,10 +117,14 @@ class BasePlenarioTest(unittest.TestCase):
                                        update_freq=fixture.update_freq,
                                        approved_status=False)
         postgres_session.commit()
+        print(postgres_session.bind)
         # Bypass the celery task and call on a ShapeETL directly
         ShapeETL(meta=shape_meta, source_path=fixture.path).add()
         return shape_meta
 
     @classmethod
     def tearDownClass(cls):
+        cls.engine.dispose()
         postgres_session.close()
+        postgres_engine.dispose()
+        drop_database(cls.base_engine, Config.DB_NAME)

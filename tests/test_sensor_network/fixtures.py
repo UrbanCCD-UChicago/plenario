@@ -7,21 +7,10 @@ from random import randint, random
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
-from plenario.settings import DB_USER, DB_PASSWORD, DB_HOST, DB_NAME, DB_PORT
+from plenario.database import postgres_engine, redshift_engine
 
 
 class Fixtures:
-
-    def _run_with_connection(self, query):
-        conn = self.engine.connect()
-        try:
-            print(query)
-            conn.execute("commit")
-            conn.execute(query)
-        except ProgrammingError as err:
-            print(str(err))
-        finally:
-            conn.close()
 
     def _create_foi_table(self, table_schema):
         """A postgres friendly version of the redshift method that shares
@@ -46,34 +35,13 @@ class Fixtures:
         self.rs_engine.execute(create_table)
 
     def __init__(self):
-        os.environ["DB_NAME"] = "plenario_test"
-        os.environ["RS_NAME"] = "plenario_test"
-
-        self.user = DB_USER
-        self.host = DB_HOST
-        self.port = DB_PORT
-        self.password = DB_PASSWORD
-
-        self.base_db_url = "postgresql://{}:{}@{}:{}".format(
-            self.user, self.password, self.host, self.port
-        )
-        self.engine = create_engine(self.base_db_url)
-        self.pg_engine = None
-        self.rs_engine = None
+        self.pg_engine = postgres_engine
+        self.rs_engine = redshift_engine
         self.worker_process = None
-
-    def setup_databases(self):
-        self._run_with_connection("create database plenario_test")
-        self.rs_engine = create_engine(self.base_db_url + "/plenario_test")
-        self.pg_engine = create_engine(self.base_db_url + "/plenario_test")
-        self.pg_engine.execute("create extension postgis")
 
     def generate_sensor_network_meta_tables(self):
         print("create sensor network tables for {} ..." .format(self.pg_engine))
         postgres_base.metadata.create_all(bind=self.pg_engine)
-
-    def drop_databases(self):
-        self._run_with_connection("drop database plenario_test")
 
     def generate_mock_metadata(self):
         postgres_session.configure(bind=self.pg_engine)

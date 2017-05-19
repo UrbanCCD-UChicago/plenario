@@ -2,12 +2,28 @@ import json
 import time
 import unittest
 
+from sqlalchemy import create_engine
+from sqlalchemy.exc import ProgrammingError
+
 from .fixtures import Fixtures
+from plenario.settings import Config
+from plenario.database import redshift_engine, redshift_session, drop_database
+from plenario.database import postgres_engine
+from tests.fixtures.base_test import BasePlenarioTest
+
+from plenario.models.SensorNetwork import sensor_to_node
+
+
+def try_delete_test_database():
+    try:
+        base_uri = Config.DATABASE_CONN.rsplit('/', 1)[0]
+        base_engine = create_engine(base_uri)
+        drop_database(base_engine, Config.DB_NAME)
+    except ProgrammingError:
+        pass
 
 
 class TestSensorNetworks(unittest.TestCase):
-
-    fixtures = Fixtures()
 
     def get_result(self, url):
         response = self.app.get(url)
@@ -15,12 +31,26 @@ class TestSensorNetworks(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.fixtures.drop_databases()
-        cls.fixtures.setup_databases()
-        cls.fixtures.generate_sensor_network_meta_tables()
+        try_delete_test_database()
+        cls.fixtures = Fixtures()
+        BasePlenarioTest.setUpClass()
+        try:
+            cls.fixtures.generate_sensor_network_meta_tables()
+        except ProgrammingError:
+            pass
+        try:
+            sensor_to_node.create(bind=postgres_engine)
+        except ProgrammingError:
+            pass
         cls.fixtures.generate_mock_observations()
         cls.fixtures.generate_mock_metadata()
-        cls.app = create_app().test_client()
+        cls.app = create_app('plenario.settings.Config').test_client()
+
+    @classmethod
+    def tearDownClass(cls):
+        redshift_session.close()
+        redshift_engine.dispose()
+        BasePlenarioTest.tearDownClass()
 
     def test_network_metadata_with_no_args(self):
         response, data = self.get_result("/v1/api/sensor-networks")

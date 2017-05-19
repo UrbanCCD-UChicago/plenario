@@ -9,10 +9,10 @@ from flask.exthook import ExtDeprecationWarning
 from flask_script import Manager
 from kombu.exceptions import OperationalError
 from os import getenv
-from sqlalchemy.exc import IntegrityError, ProgrammingError
+from sqlalchemy.exc import IntegrityError, ProgrammingError, InvalidRequestError
 
 from plenario import create_app as server
-from plenario.settings import DATABASE_CONN, REDSHIFT_CONN, DB_NAME
+from plenario.settings import Config
 from plenario.settings import DEFAULT_USER
 from plenario.worker import create_worker as worker
 
@@ -59,23 +59,25 @@ def monitor():
 def pg():
     """Psql into postgres."""
 
-    print("[plenario] Connecting to %s" % DATABASE_CONN)
-    wait(subprocess.Popen(["psql", DATABASE_CONN]))
+    print("[plenario] Connecting to %s" % Config.DATABASE_CONN)
+    wait(subprocess.Popen(["psql", Config.DATABASE_CONN]))
 
 
 @manager.command
 def rs():
     """Psql into redshift."""
 
-    print("[plenario] Connecting to %s" % REDSHIFT_CONN)
-    wait(subprocess.Popen(["psql", REDSHIFT_CONN]))
+    print("[plenario] Connecting to %s" % Config.REDSHIFT_CONN)
+    wait(subprocess.Popen(["psql", Config.REDSHIFT_CONN]))
 
 
 @manager.command
 def test():
     """Run nosetests."""
 
-    nose_commands = ["nosetests", "-s", "tests", "-vv"]
+    nose_commands = ["env", "PLENARIO_CONFIG=test"]
+    nose_commands += ["nosetests", "-s", "tests", "-v"]
+    nose_commands += ["--with-coverage", "--cover-package=plenario"]
     wait(subprocess.Popen(nose_commands))
 
 
@@ -93,28 +95,34 @@ def init():
     from plenario.database import create_database
     from sqlalchemy import create_engine
 
-    base_uri = DATABASE_CONN.rsplit('/', 1)[0]
+    base_uri = Config.DATABASE_CONN.rsplit('/', 1)[0]
     base_engine = create_engine(base_uri)
 
     try:
-        create_database(base_engine, DB_NAME)
+        create_database(base_engine, Config.DB_NAME)
     except ProgrammingError:
         print('[plenario] It already exists!')
 
     from plenario.database import create_extension
-    from plenario.database import postgres_engine as plenario_engine, postgres_base
+    from plenario.database import postgres_engine, postgres_base
     from plenario.utils.weather import WeatherETL, WeatherStationsETL
 
     try:
-        create_extension(plenario_engine, 'postgis')
+        create_extension(postgres_engine, 'postgis')
     except ProgrammingError:
         print('[plenario] It already exists!')
 
     print('[plenario] Creating metadata tables')
-    postgres_base.metadata.create_all()
+    try:
+        postgres_base.metadata.create_all()
+    except ProgrammingError:
+        print('[plenario] It already exists!')
 
     print('[plenario] Creating weather tables')
-    WeatherStationsETL().make_station_table()
+    try:
+        WeatherStationsETL().make_station_table()
+    except InvalidRequestError:
+        print('[plenario] It already exists!')
     WeatherETL().make_tables()
 
     from plenario.database import psql
@@ -154,14 +162,14 @@ def uninstall():
     from sqlalchemy import create_engine
     from plenario.database import drop_database
 
-    base_uri = DATABASE_CONN.rsplit('/', 1)[0]
+    base_uri = Config.DATABASE_CONN.rsplit('/', 1)[0]
     base_engine = create_engine(base_uri)
     try:
         drop_database(base_engine, 'plenario_test')
     except ProgrammingError:
         pass
 
-    base_uri = REDSHIFT_CONN.rsplit('/', 1)[0]
+    base_uri = Config.REDSHIFT_CONN.rsplit('/', 1)[0]
     base_engine = create_engine(base_uri)
     try:
         drop_database(base_engine, 'plenario_test')

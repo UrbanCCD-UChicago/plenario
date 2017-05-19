@@ -26,7 +26,7 @@ redshift_base.query = redshift_session.query_property()
 def create_database(bind: Engine, database: str) -> None:
     """Setup a database (schema) in postgresql."""
 
-    print('[plenario] Create database %s' % database)
+    print('[plenario] Create database %s with %s' % (database, bind))
     connection = bind.connect()
     connection.execute("commit")
     connection.execute("create database %s" % database)
@@ -36,7 +36,7 @@ def create_database(bind: Engine, database: str) -> None:
 def drop_database(bind: Engine, database: str) -> None:
     """Drop a database (schema) in postgresql."""
 
-    print('[plenario] Drop database %s' % database)
+    print('[plenario] Drop database %s with %s' % (database, bind))
     connection = bind.connect()
     connection.execute("commit")
     connection.execute("drop database %s" % database)
@@ -56,7 +56,7 @@ def psql(path: str) -> None:
     """Use psql to run a file at some path."""
 
     print('[plenario] Psql file %s' % path)
-    command = 'psql {} -f {}'.format(DATABASE_CONN, path)
+    command = 'psql {} -f {}'.format(Config.DATABASE_CONN, path)
     subprocess.check_call(command, shell=True)
 
 
