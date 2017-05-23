@@ -60,9 +60,9 @@ class OgrExport(object):
         self._call_ogr2ogr(self.export_path)
 
     def _call_ogr2ogr(self, export_path):
-        
+
         if self.query:
-            query_flags = ['-sql', self.query] 
+            query_flags = ['-sql', self.query]
         else:
             query_flags = []
 
@@ -126,11 +126,5 @@ def import_shapefile_to_table(component_path, table_name):
             component_path + '.shp',            # Point to .shp so that ogr2ogr knows it's importing a Shapefile.
             '-nln', table_name,                 # (n)ew (l)ayer (n)ame. Set the name of the new table.
             '-lco', 'GEOMETRY_NAME=geom']       # Always name the geometry column 'geom'
-    try:
-        subprocess.check_call(args)
-    except subprocess.CalledProcessError as e:
-        print(('Failed to import dataset to postgres with ogr2ogr.' + str(args)))
-        raise OgrError(e)
-    except OSError as e:
-        print('Could not locate ogr2ogr. Do you have it installed?')
-        raise OgrError(e)
+
+    subprocess.check_output(args)
