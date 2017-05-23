@@ -47,18 +47,7 @@ class PlenarioETL(object):
         return new_table
 
     def update(self):
-        """
-        Insert new records into existing point table.
-        """
-        logger.info('Begin.')
-        existing_table = self.metadata.point_table
-        with self.staging_table as s_table:
-            staging = s_table.table
-            delete_absent_hashes(staging.name, existing_table.name)
-            with Update(staging, self.dataset, existing_table) as new_records:
-                new_records.insert()
-        update_meta(self.metadata, existing_table)
-        logger.info('End.')
+        self.add()
 
 
 class Staging(object):
@@ -262,15 +251,9 @@ class Creation(object):
         new_table = Table(self.dataset.name, MetaData(),
                           *(original_cols + derived_cols))
 
-        try:
-            new_table.create(postgres_engine)
-            # Trigger is broken
-            #self._add_trigger()
-        except:
-            new_table.drop(bind=postgres_engine, checkfirst=True)
-            raise
-        else:
-            return new_table
+        new_table.drop(postgres_engine, checkfirst=True)
+        new_table.create(postgres_engine)
+        return new_table
 
     def _add_trigger(self):
         add_trigger = """CREATE TRIGGER audit_after AFTER DELETE OR UPDATE
