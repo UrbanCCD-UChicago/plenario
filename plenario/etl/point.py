@@ -92,10 +92,7 @@ class Staging(object):
         logger.info('Begin.')
         with self.file_helper as helper:
             text_handle = open(helper.handle.name, "rt")
-
-            if not self.cols:
-                # We couldn't get the column metadata from an existing table
-                self.cols = self._from_inference(text_handle)
+            self.cols = self._from_inference(text_handle)
 
             # Grab the handle to build a table from the CSV
             try:
