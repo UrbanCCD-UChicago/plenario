@@ -95,6 +95,7 @@ class Fixtures:
 
         node = NodeMeta(
             id="test_node",
+            address='Nichols Bridgeway, Chicago, IL 60601, USA',
             sensor_network="test_network",
             sensors=[sensor_01, sensor_02, sensor_03],
             location="0101000020E6100000A4A7C821E2E755C07C48F8DEDFF04440",

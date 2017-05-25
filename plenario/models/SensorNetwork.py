@@ -131,6 +131,7 @@ class NodeMeta(postgres_base):
     location = Column(Geometry(geometry_type='POINT', srid=4326))
     sensors = relationship('SensorMeta', secondary='sensor__sensor_to_node')
     info = Column(JSONB)
+    address = Column(String)
 
     column_editable_list = ("sensors", "info")
 
