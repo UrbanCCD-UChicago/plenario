@@ -579,7 +579,6 @@ def format_node_metadata(node):
     coordinates = wkb.loads(bytes(node.location.data))
     longitude = coordinates.x
     latitude = coordinates.y
-    location = GoogleV3().reverse('{}, {}'.format(latitude, longitude))[0]
 
     node_response = {
         "type": "Feature",
@@ -592,7 +591,7 @@ def format_node_metadata(node):
             "network": node.sensor_network,
             "sensors": [sensor.name for sensor in node.sensors],
             "info": node.info,
-            "address": location.address
+            "address": node.address
         },
     }
 
