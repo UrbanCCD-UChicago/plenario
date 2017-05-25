@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 import boto3
 from flask import request, Response, stream_with_context, jsonify, redirect
+from geopy.geocoders import GoogleV3
 from marshmallow import Schema
 from marshmallow.exceptions import ValidationError
 from marshmallow.fields import Field, List, DateTime, Integer, String, Float
@@ -575,20 +576,23 @@ def format_node_metadata(node):
     :param node: (Row) sensor__node_metadata object
     :returns: (dict) formatted result"""
 
+    coordinates = wkb.loads(bytes(node.location.data))
+    longitude = coordinates.x
+    latitude = coordinates.y
+    location = GoogleV3().reverse('{}, {}'.format(latitude, longitude))[0]
+
     node_response = {
         "type": "Feature",
         'geometry': {
             "type": "Point",
-            "coordinates": [
-                wkb.loads(bytes(node.location.data)).x,
-                wkb.loads(bytes(node.location.data)).y
-            ],
+            "coordinates": [longitude, latitude]
         },
         "properties": {
             "id": node.id,
             "network": node.sensor_network,
             "sensors": [sensor.name for sensor in node.sensors],
             "info": node.info,
+            "address": location.address
         },
     }
 

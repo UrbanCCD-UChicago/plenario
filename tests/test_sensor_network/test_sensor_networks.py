@@ -61,6 +61,12 @@ class TestSensorNetworks(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data["meta"]["total"], 1)
 
+    def test_node_metadata_returns_address_in_properties(self):
+        endpoint = '/v1/api/sensor-networks/test_network/nodes/test_node'
+        _, result = self.get_result(endpoint)
+        address = 'Nichols Bridgeway, Chicago, IL 60601, USA'
+        self.assertEqual(result['data'][0]['properties']['address'], address)
+
     def test_sensor_metadata_returns_with_no_args(self):
         response, _ = self.get_result("/v1/api/sensor-networks/test_network/"
                                       "sensors")
