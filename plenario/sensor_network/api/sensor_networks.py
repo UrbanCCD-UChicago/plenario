@@ -439,7 +439,7 @@ def get_observation_nearest(network: str) -> Response:
         return bad_request(validated.errors)
 
     result = get_observation_nearest_query(validated)
-    return jsonify(json_response_base(validated, [result], args))
+    return jsonify(json_response_base(validated, result, args))
 
 
 @crossdomain(origin="*")
@@ -714,7 +714,8 @@ def get_observation_nearest_query(args):
             )
         )
 
-        result = query.first()
+        # Magic number 3 because IFTTT tests require at least three results
+        result = query.limit(3).all()
 
         if result is not None:
             break
@@ -722,7 +723,7 @@ def get_observation_nearest_query(args):
     if result is None:
         return "Your feature has not been reported on by the nearest 10 " \
                "nodes at the time provided."
-    return format_observation(result, feature)
+    return [format_observation(obs, feature) for obs in result]
 
 
 def get_observation_datadump_csv(**kwargs):
