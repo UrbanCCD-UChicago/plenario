@@ -673,6 +673,11 @@ def get_observation_nearest_query(args):
     :param args: (ValidatorResult) validated query arguments
     """
 
+    # TODO(heyzoos)
+    # [ ] Support filter tree syntax
+    # [ ] Extract the property from a provided feature
+    # [ ] Allow for filtering on the nearest results
+
     lng = args.data["lng"]
     lat = args.data["lat"]
     feature = args.data["feature"]
@@ -686,7 +691,8 @@ def get_observation_nearest_query(args):
     if not nearest_nodes_rp:
         return "No nodes could be found nearby with your target feature."
 
-    feature = reflect(network + '__' + feature.name, MetaData(), redshift_engine)
+    feature_str = '{}__{}'.format(network.name, feature.name)
+    feature = reflect(feature_str, MetaData(), redshift_engine)
 
     result = None
     for row in nearest_nodes_rp:
