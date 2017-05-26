@@ -98,6 +98,7 @@ class ConditionTree(Field):
     def _deserialize(self, value, attr, data):
         feature = request.args['feature']
         network = request.view_args['network']
+        redshift_base.metadata.reflect()
 
         try:
             parsed_json = json.loads(value)
@@ -432,7 +433,7 @@ def get_observation_nearest(network: str) -> Response:
     args = request.args.to_dict()
     args.update({"network": network})
 
-    validator = NearestValidator(only=('lat', 'lng', 'feature', 'network', 'datetime'))
+    validator = NearestValidator(only=('lat', 'lng', 'feature', 'network', 'datetime', 'filter'))
     validated = validator.load(args)
     if validated.errors:
         return bad_request(validated.errors)
@@ -674,15 +675,14 @@ def get_observation_nearest_query(args):
     """
 
     # TODO(heyzoos)
-    # [ ] Support filter tree syntax
-    # [ ] Extract the property from a provided feature
-    # [ ] Allow for filtering on the nearest results
+    # [ ] Test me! Specifically test property filtering.
 
     lng = args.data["lng"]
     lat = args.data["lat"]
     feature = args.data["feature"]
     network = args.data["network"]
     point_dt = args.data["datetime"] if args.data.get('datetime') else datetime.now()
+    conditions = args.data.get('filter')
 
     nearest_nodes_rp = NodeMeta.nearest_neighbor_to(
         lng, lat, network=network.name, features=[feature.name]
@@ -692,22 +692,29 @@ def get_observation_nearest_query(args):
         return "No nodes could be found nearby with your target feature."
 
     feature_str = '{}__{}'.format(network.name, feature.name)
-    feature = reflect(feature_str, MetaData(), redshift_engine)
+    feature = redshift_base.metadata.tables[feature_str]
 
     result = None
     for row in nearest_nodes_rp:
-        result = redshift_session.query(feature).filter(and_(
+        query = redshift_session.query(feature).filter(and_(
             feature.c.node_id == row.node,
             feature.c.datetime <= point_dt + timedelta(hours=12),
             feature.c.datetime >= point_dt - timedelta(hours=12)
-        )).order_by(
+        ))
+
+        if conditions is not None:
+            query = query.filter(conditions)
+
+        query = query.order_by(
             asc(
                 # Ensures that the interval values is always positive,
                 # since the abs() function doesn't work for intervals
                 sqla_fn.greatest(point_dt, feature.c.datetime) -
                 sqla_fn.least(point_dt, feature.c.datetime)
             )
-        ).first()
+        )
+
+        result = query.first()
 
         if result is not None:
             break
