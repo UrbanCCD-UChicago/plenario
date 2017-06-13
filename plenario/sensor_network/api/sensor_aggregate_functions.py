@@ -21,7 +21,7 @@ def _fill_in_blanks(aggregates, agg_unit, start_dt, end_dt):
     start_dt = _zero_out_datetime(start_dt, agg_unit)
     end_dt = _zero_out_datetime(end_dt, agg_unit)
     start_dt = start_dt.replace(tzinfo=None)
-    end_dt =end_dt.replace(tzinfo=None)
+    end_dt = end_dt.replace(tzinfo=None)
 
     if not aggregates:
         return aggregates
@@ -139,6 +139,8 @@ def _reflect(table_name, metadata, engine):
     )
 
 
+# TODO(heyzoos)
+# This could be replaced with a generalized validator for sensor network trees.
 def _valid_columns(node, target_sensors, target_features, target_properties=None):
     """Retrieve the set of valid feature properties to return, given
     feature and sensor filters."""
@@ -245,7 +247,7 @@ def aggregate(args, agg_label, agg_fn):
     # If sensors are specified, filter on them
     if target_sensors:
         query = query.where(obs_table.c.sensor.in_(target_sensors))
-    
+
     # Format the query
     query = query.group_by("time_bucket").order_by(asc("time_bucket"))
 
