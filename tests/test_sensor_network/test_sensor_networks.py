@@ -4,6 +4,8 @@ import unittest
 
 from .fixtures import Fixtures
 
+from plenario import create_app
+
 
 class TestSensorNetworks(unittest.TestCase):
 
@@ -350,5 +352,3 @@ class TestSensorNetworks(unittest.TestCase):
         received_rows_without_blank_lines = [e for e in received_rows if e]
         received_number_of_rows = len(received_rows_without_blank_lines)
         self.assertEqual(expected_number_of_rows, received_number_of_rows)
-
-from plenario import create_app
