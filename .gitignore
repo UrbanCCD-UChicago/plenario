@@ -35,6 +35,7 @@ notebooks/
 
 # Deployment Packages
 *.zip
+!/app/tests/fixtures/*.zip
 
 # Scripts
 _scripts/
