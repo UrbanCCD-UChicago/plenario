@@ -1,59 +1,34 @@
-app:
-  restart: always
-  build: ./app
-  expose:
-    - 5000
-  links:
-    - postgis:postgis
-    - redshift:redshift
-    - redis:redis
-  env_file: docker.env
-  volumes:
-    - ./app:/app
-  command: python /app/manage.py runserver
+version: '2'
+services:
+  flask:
+    restart: always
+    build: .
+    ports:
+      - "5000:5000"
+    env_file: docker.env
+    depends_on:
+      - migrate
+    volumes:
+      - .:/app
+    command: python /app/manage.py runserver
 
-nginx:
-  restart: always
-  build: ./nginx
-  ports:
-    - 5000:80
-  volumes_from:
-    - app
-  links:
-    - app:app
+  migrate:
+    build: .
+    depends_on:
+      - postgis
+      - redshift
+      - redis
+    env_file: docker.env
+    volumes:
+      - .:/app
+    command: python /app/manage.py init
 
-postgis:
-  restart: always
-  build: ./postgis
-  volumes_from:
-    - data_pg
-  expose:
-    - 5432
+  postgis:
+    build: ./deploy/postgis
 
-redshift:
-  restart: always
-  build: ./redshift
-  volumes_from:
-    - data_rs
-  expose:
-    - 5432
+  redshift:
+    build: ./deploy/redshift
 
-redis:
-  restart: always
-  image: redis:latest
-  expose:
-    - 6379
+  redis:
+    image: redis:latest
 
-data_pg:
-  restart: always
-  image: alpine
-  volumes:
-    - /var/lib/postgresql
-  command: "true"
-
-data_rs:
-  restart: always
-  image: alpine
-  volumes:
-    - /var/lib/postgresql
-  command: "true"

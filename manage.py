@@ -90,6 +90,10 @@ def config():
 def init():
     """Initialize the database."""
 
+    # TODO(heyzoos)
+    # Check for dependencies to fail fast and helpfully before running:
+    #   - postgresql-client
+
     from plenario.database import create_database
     from sqlalchemy import create_engine
 
