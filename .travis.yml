@@ -14,12 +14,6 @@ services:
 sudo: required
 dist: trusty
 cache: pip
-env:
-  global:
-  - secure: G1RWlnwPIPSW2XRD7IItotgzTw41IAktyt2VurJwOp3xCIrmeHOtby6ox1x3Ph80Tzp3m3zLENof/sPsgOwRQgUOQ0nScpVGBGsUTAc26LL4SSs+7LGUAohm3EFTHPWU+78ZZMe3njK2fT86XP19FH1CupxgQ1vTpQI1iFChDD0=
-  - secure: bnBfgN5eIAsCVdo+tMhjO88GRfUAEIkD0HFcOMEezP1YQv1bIFU71l5v4aT348RD2kuu6kihWApIqsEe0HjW8u0umPV6aLHuEuUrKGyxwk1x81bhP0KpgQgx+/Qbai4Q6gk+U4TWk713Ezu0j0GJH8jxixvyXgrJjfA/1yvHCdg=
-  - secure: JEJJxzJum3iMx9IAvR3ZCHq/pL3pO+01d+Xvmgk+cr6tDkE93600O0l9QrV79i0YW5cvBbgV/j3YE++2Ly7Lz0TPOxo+Gz4ZphyoTZr3JZL6UN2HdF/v57DQj2Eq/m2CD0LhxPGv8a2qlRaY6BuOXfLq5t7DppL4PtSceB2qYko=
-  - S3_BUCKET=plenario_test
 before_install:
   - pip install -r requirements.txt
 install:
@@ -45,7 +39,6 @@ script:
 - nosetests --nologcapture tests/test_sensor_network/test_sensor_networks.py -v
 - nosetests --nologcapture tests/test_models/test_feature_meta.py -v
 - nosetests --nologcapture tests/test_sensor_network/test_nearest.py -v
-- nosetests --nologcapture tests/test_sensor_network/test_archive.py -v
 
 deploy:
 - provider: elasticbeanstalk
