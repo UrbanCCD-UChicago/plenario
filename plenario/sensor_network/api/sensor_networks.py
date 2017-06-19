@@ -161,6 +161,11 @@ def get_network_map(network: str) -> Response:
         return bad_request("Invalid network name: %s" % network)
     if not network_object:
         return bad_request("Invalid network name: %s" % network)
+
+    # TODO(heyzoos)
+    # Format the returned tree so that beehive internals are not displayed.
+    # Specifically: remove the property 'common names' or replace them with
+    # more helpful information (property data type and unit of measurement).
     return jsonify(network_object.tree())
 
 
