@@ -33,9 +33,9 @@ notebooks/
 .env
 .coveragerc
 
-# Deployment Packages
+# Allow fixtures
 *.zip
-!/app/tests/fixtures/*.zip
+!tests/fixtures/*.zip
 
 # Scripts
 _scripts/
