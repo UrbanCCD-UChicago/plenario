@@ -2,6 +2,7 @@
 
 import os
 import signal
+import sqlalchemy.exc
 import subprocess
 import warnings
 
@@ -10,6 +11,7 @@ from flask_script import Manager
 from kombu.exceptions import OperationalError
 from os import getenv
 from sqlalchemy.exc import IntegrityError, ProgrammingError
+from time import sleep
 
 from plenario import create_app as server
 from plenario.settings import DATABASE_CONN, REDSHIFT_CONN, DB_NAME
@@ -100,10 +102,18 @@ def init():
     base_uri = DATABASE_CONN.rsplit('/', 1)[0]
     base_engine = create_engine(base_uri)
 
-    try:
-        create_database(base_engine, DB_NAME)
-    except ProgrammingError:
-        print('[plenario] It already exists!')
+    connection_attempts = 6
+    interval = 10
+    for connection_attempt in range(0, connection_attempts):
+        try:
+            create_database(base_engine, DB_NAME)
+            break
+        except ProgrammingError:
+            print('[plenario] It already exists!')
+            break
+        except sqlalchemy.exc.OperationalError:
+            print('[plenario] Database has not started yet.')
+            sleep(interval)
 
     from plenario.database import create_extension
     from plenario.database import postgres_engine as plenario_engine, postgres_base
