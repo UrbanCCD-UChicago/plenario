@@ -8,7 +8,7 @@ DATA_DIR = '/tmp'
 
 # Travis CI relies on the default values to build correctly,
 # just keep in mind that if you push changes to the default
-# values, you need to make sure to adjust for these changes 
+# values, you need to make sure to adjust for these changes
 # in the travis.yml
 DB_USER = get('POSTGRES_USER', 'postgres')
 DB_PASSWORD = get('POSTGRES_PASSWORD', 'password')
@@ -67,6 +67,6 @@ MAIL_PASSWORD = get('MAIL_PASSWORD', '')
 MAINTENANCE = False
 
 # Celery
-CELERY_BROKER_URL = get("CELERY_BROKER_URL") or "redis://localhost:6379/0"
+CELERY_BROKER_URL = get("CELERY_BROKER_URL") or "redis://%s:6379/0" % REDIS_HOST
 CELERY_RESULT_BACKEND = get("CELERY_RESULT_BACKEND") or "db+" + DATABASE_CONN
 FLOWER_URL = get("FLOWER_URL") or "http://localhost:5555"

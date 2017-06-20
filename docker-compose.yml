@@ -1,6 +1,6 @@
 version: '2'
 services:
-  flask:
+  server:
     restart: always
     build: .
     ports:
@@ -11,6 +11,16 @@ services:
     volumes:
       - .:/app
     command: python /app/manage.py runserver
+
+  worker:
+    restart: always
+    build: .
+    env_file: docker.env
+    depends_on:
+      - migrate
+    volumes:
+      - .:/app
+    command: python /app/manage.py worker
 
   migrate:
     build: .
@@ -31,4 +41,3 @@ services:
 
   redis:
     image: redis:latest
-
