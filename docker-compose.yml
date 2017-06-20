@@ -22,6 +22,18 @@ services:
       - .:/app
     command: python /app/manage.py worker
 
+  monitor:
+    restart: always
+    build: .
+    env_file: docker.env
+    depends_on:
+      - migrate
+    volumes:
+      - .:/app
+    ports:
+      - "5555:5555"
+    command: python /app/manage.py monitor
+
   migrate:
     build: .
     depends_on:

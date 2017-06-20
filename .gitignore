@@ -44,4 +44,5 @@ _scripts/
 _venv/
 
 # Flower
+flower
 flower.*
