@@ -7,6 +7,7 @@ from random import randint, random
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
+from plenario.database import psql
 from plenario.settings import DB_USER, DB_PASSWORD, DB_HOST, DB_NAME, DB_PORT
 
 
@@ -67,6 +68,8 @@ class Fixtures:
         self.rs_engine = create_engine(self.base_db_url + "/plenario_test")
         self.pg_engine = create_engine(self.base_db_url + "/plenario_test")
         self.pg_engine.execute("create extension postgis")
+        self.pg_engine.execute("create extension plv8")
+        psql('plenario/dbscripts/sensor_tree.sql')
 
     def generate_sensor_network_meta_tables(self):
         print("create sensor network tables for {} ..." .format(self.pg_engine))

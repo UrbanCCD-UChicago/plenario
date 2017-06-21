@@ -156,10 +156,17 @@ def get_network_map(network: str) -> Response:
     """Map of network and the relationships of the elements it contains."""
 
     try:
-        network = NetworkMeta.query.get(network)
+        network_object = NetworkMeta.query.get(network)
     except NoResultFound:
-        bad_request("Invalid network name: %s" % network)
-    return jsonify(network.tree())
+        return bad_request("Invalid network name: %s" % network)
+    if not network_object:
+        return bad_request("Invalid network name: %s" % network)
+
+    # TODO(heyzoos)
+    # Format the returned tree so that beehive internals are not displayed.
+    # Specifically: remove the property 'common names' or replace them with
+    # more helpful information (property data type and unit of measurement).
+    return jsonify(network_object.tree())
 
 
 # @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)

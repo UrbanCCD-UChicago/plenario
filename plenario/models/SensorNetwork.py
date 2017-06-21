@@ -103,7 +103,9 @@ class NetworkMeta(postgres_base):
         return '<Network "{}">'.format(self.name)
 
     def tree(self):
-        return {n.id: n.tree() for n in self.nodes}
+        sensor_tree_fn = sqla_fn.network_tree(self.name)
+        sensor_tree_result_proxy = self.query.session.execute(sensor_tree_fn)
+        return sensor_tree_result_proxy.scalar()
 
     def sensors(self) -> set:
 
@@ -118,7 +120,7 @@ class NetworkMeta(postgres_base):
         keys = []
         for sensor in self.tree().values():
             for feature in sensor.values():
-                keys += feature.keys()
+                keys += feature.values()
 
         return set([k.split(".")[0] for k in keys])
 
@@ -229,7 +231,6 @@ class FeatureMeta(postgres_base):
                         results.add(sensor)
 
         return results
-
 
     @staticmethod
     def index(network_name=None):

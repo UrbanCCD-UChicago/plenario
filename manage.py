@@ -121,6 +121,7 @@ def init():
 
     try:
         create_extension(plenario_engine, 'postgis')
+        create_extension(plenario_engine, 'plv8')
     except ProgrammingError:
         print('[plenario] It already exists!')
 
@@ -134,7 +135,7 @@ def init():
     from plenario.database import psql
 
     # Set up custom functions, triggers and views in postgres
-    psql("./plenario/dbscripts/audit_trigger.sql")
+    psql("./plenario/dbscripts/sensor_tree.sql")
     psql("./plenario/dbscripts/point_from_location.sql")
 
     # Set up the default user if we are running in anything but production
