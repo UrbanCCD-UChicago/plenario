@@ -528,6 +528,13 @@ def get_aggregations(network: str) -> Response:
         result = aggregate_fn(validated.data)
     except ValueError as err:
         return bad_request(str(err))
+
+    # TODO(heyzoos)
+    # Would rather not have to iterate over the results again just to make sure
+    # the datetime format is isoformat as a string.
+    for aggregate in result:
+        aggregate['time_bucket'] = aggregate['time_bucket'].isoformat()
+
     return jsonify(json_response_base(validated, result, args))
 
 
