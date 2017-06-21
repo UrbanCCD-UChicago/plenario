@@ -486,7 +486,7 @@ def valid_column_condition(table, column_name, value):
     # Dates are trickier than other types, the check that follows this will
     # not correctly approve string dates because they are usually coerced from
     # int values.
-    if str(column.type) in {'DATE', 'TIMESTAMP WITHOUT TIME ZONE'}:
+    if str(column.type) == 'DATE' or 'TIMESTAMP' in str(column.type):
         try:
             parser.parse(value)
             return True

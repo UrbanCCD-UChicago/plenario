@@ -1,26 +1,26 @@
 import itertools
 import re
-import requests
-
-import plenario.tasks as worker
-
 from collections import namedtuple
 from hashlib import md5
-from flask import request, redirect, url_for, render_template
+from io import StringIO
+from urllib.parse import urlparse
+
+import requests
 from flask import Blueprint, flash, session as flask_session
+from flask import request, redirect, url_for, render_template
 from flask_login import login_required
 from flask_wtf import Form
-from io import StringIO
 from sqlalchemy import Table
 from sqlalchemy.exc import NoSuchTableError
-from urllib.parse import urlparse
 from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
+import plenario.tasks as worker
 from plenario.database import postgres_session, postgres_base, postgres_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata
+from plenario.models.meta.schema import infer
 from plenario.settings import FLOWER_URL
-from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
+from plenario.utils.helpers import send_mail, slugify
 
 views = Blueprint('views', __name__)
 
@@ -415,17 +415,20 @@ class GenericSuggestion(object):
         self.columns = (None if is_shapefile else self._infer_columns())
 
     def _infer_columns(self):
-        r = requests.get(self.file_url, stream=True)
-        inp = StringIO()
 
-        head = itertools.islice(r.iter_lines(), 1000)
+        stream = requests.get(self.file_url, stream=True)
+        head = itertools.islice(stream.iter_lines(), 1000)
+        buffer = StringIO()
+
         for line in head:
-            inp.write(line.decode("utf-8") + '\n')
-        inp.seek(0)
-        column_info = infer_csv_columns(inp)
+            buffer.write(line.decode("utf-8") + '\n')
 
-        return [ColumnMeta(name, type_.__visit_name__.lower(), '')
-                for name, type_, _ in column_info]
+        buffer.seek(0)
+        columns = infer(buffer)
+        buffer.close()
+        stream.close()
+
+        return [ColumnMeta(c.name, str(c.type).lower(), '') for c in columns]
 
 
 class SocrataSuggestion(object):
@@ -455,6 +458,7 @@ class SocrataSuggestion(object):
         self.columns = (None if is_shapefile else self._derive_columns())
 
     def _derive_columns(self):
+        print('[plenario] SocrataSuggestion._derive_columns()')
         return [ColumnMeta(c['name'],
                            c['dataTypeName'],
                            c.get('description', None))

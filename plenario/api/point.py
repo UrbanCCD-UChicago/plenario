@@ -3,12 +3,12 @@ import csv
 import io
 import json
 import re
+import traceback
+from collections import OrderedDict
+
 import shapely.geometry
 import shapely.wkb
 import sqlalchemy
-import traceback
-
-from collections import OrderedDict
 from dateutil import parser
 from flask import request, Response, jsonify, stream_with_context
 
@@ -17,12 +17,11 @@ from plenario.api.common import make_cache_key, unknown_object_json_handler
 from plenario.api.condition_builder import parse_tree
 from plenario.api.jobs import make_job_response, get_job
 from plenario.api.validator import DatasetRequiredValidator
-from plenario.api.validator import NoGeoJSONDatasetRequiredValidator
 from plenario.api.validator import NoDefaultDatesValidator, NoGeoJSONValidator
+from plenario.api.validator import NoGeoJSONDatasetRequiredValidator
 from plenario.api.validator import validate, has_tree_filters
 from plenario.database import postgres_session
 from plenario.models import MetaTable
-
 from . import response as api_response
 
 

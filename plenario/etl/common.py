@@ -5,6 +5,13 @@ from logging import getLogger
 from plenario.database import postgres_engine
 
 logger = getLogger(__name__)
+import pandas
+import tempfile
+import requests
+
+from slugify import slugify
+
+from plenario.database import app_engine as engine
 
 
 class PlenarioETLError(Exception):

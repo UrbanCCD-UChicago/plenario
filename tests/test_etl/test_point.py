@@ -1,15 +1,17 @@
-from unittest import TestCase
-from plenario.database import postgres_session, postgres_engine
-import sqlalchemy as sa
-from sqlalchemy import Table, Column, Integer, Date, Float, String, TIMESTAMP, MetaData, Text
-from sqlalchemy.exc import NoSuchTableError
-from geoalchemy2 import Geometry
-from plenario.etl.point import Staging, PlenarioETL
-import os
 import json
+import os
 from datetime import date
-from plenario.models import MetaTable
+from unittest import TestCase
+
+import sqlalchemy as sa
+from geoalchemy2 import Geometry
+from sqlalchemy import Table, Column, Integer, Date, Float, String, TIMESTAMP, MetaData
+from sqlalchemy.exc import NoSuchTableError
+
 from manage import init
+from plenario.database import postgres_session, postgres_engine
+from plenario.etl.point import Staging, PlenarioETL
+from plenario.models import MetaTable
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 fixtures_path = os.path.join(pwd, '../fixtures')
@@ -34,9 +36,9 @@ class StagingTableTests(TestCase):
     can we grab a current csv of the underlying data from wherever it lives
     and then make that into a free-standing table?
     """
+
     @classmethod
     def setUpClass(cls):
-
         init()
 
         cls.dog_path = os.path.join(fixtures_path, 'dog_park_permits.csv')
@@ -56,37 +58,37 @@ class StagingTableTests(TestCase):
 
         # Make new MetaTable objects
         self.unloaded_meta = MetaTable(url='nightvale.gov/events.csv',
-                                      human_name='Community Radio Events',
-                                      business_key='Event Name',
-                                      observed_date='Date',
-                                      latitude='lat', longitude='lon',
-                                      approved_status=True)
+                                       human_name='Community Radio Events',
+                                       business_key='Event Name',
+                                       observed_date='Date',
+                                       latitude='lat', longitude='lon',
+                                       approved_status=True)
 
         self.existing_meta = MetaTable(url='nightvale.gov/dogpark.csv',
-                                      human_name='Dog Park Permits',
-                                      business_key='Hooded Figure ID',
-                                      observed_date='Date',
-                                      latitude='lat', longitude='lon',
-                                      approved_status=False)
+                                       human_name='Dog Park Permits',
+                                       business_key='Hooded Figure ID',
+                                       observed_date='Date',
+                                       latitude='lat', longitude='lon',
+                                       approved_status=False)
 
         self.opera_meta = MetaTable(url='nightvale.gov/opera.csv',
-                                   human_name='Public Opera Performances',
-                                   business_key='Event Name',
-                                   observed_date='Date',
-                                   location='Location',
-                                   approved_status=False)
+                                    human_name='Public Opera Performances',
+                                    business_key='Event Name',
+                                    observed_date='Date',
+                                    location='Location',
+                                    approved_status=False)
         postgres_session.add_all([self.existing_meta, self.opera_meta, self.unloaded_meta])
         postgres_session.commit()
 
         # Also, let's have one table pre-loaded...
         self.existing_table = sa.Table('dog_park_permits', MetaData(),
-                                      Column('hooded_figure_id', Integer),
-                                      Column('point_date', TIMESTAMP, nullable=False),
-                                      Column('date', Date, nullable=True),
-                                      Column('lat', Float, nullable=False),
-                                      Column('lon', Float, nullable=False),
+                                       Column('hooded_figure_id', Integer),
+                                       Column('point_date', TIMESTAMP, nullable=False),
+                                       Column('date', Date, nullable=True),
+                                       Column('lat', Float, nullable=False),
+                                       Column('lon', Float, nullable=False),
                                        Column('hash', String(32), primary_key=True),
-                                      Column('geom', Geometry('POINT', srid=4326), nullable=True))
+                                       Column('geom', Geometry('POINT', srid=4326), nullable=True))
         drop_if_exists(self.existing_table.name)
         self.existing_table.create(bind=postgres_engine)
 
@@ -106,6 +108,7 @@ class StagingTableTests(TestCase):
     Do the names of created columns match what we expect?
     Would be nice to check types too, but that was too fragile.
     '''
+
     @staticmethod
     def extract_names(columns):
         return [c.name for c in columns]

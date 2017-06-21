@@ -1,17 +1,15 @@
-# import json
-
-# from csvkit.unicsv import UnicodeCSVReader
 import csv
 from logging import getLogger
 from geoalchemy2 import Geometry
+from slugify import slugify
 from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
-from sqlalchemy import select, func
-from sqlalchemy.exc import NoSuchTableError
+from sqlalchemy import select, func, Integer
+from sqlalchemy.exc import DataError, NoSuchTableError
 
 from plenario.database import postgres_base, postgres_engine
 from plenario.database import postgres_session
-from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError, delete_absent_hashes
-from plenario.utils.helpers import iter_column, slugify
+from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError
+from plenario.models.meta.schema import infer
 
 logger = getLogger(__name__)
 
@@ -92,7 +90,15 @@ class Staging(object):
         logger.info('Begin.')
         with self.file_helper as helper:
             text_handle = open(helper.handle.name, "rt")
-            self.cols = self._from_inference(text_handle)
+
+            # other_cols = self._from_inference_2(text_handle)
+            # self.cols = self._from_inference(text_handle)
+
+            if not self.cols:
+                # We couldn't get the column metadata from an existing table
+                self.cols = infer(text_handle)
+                # self.cols = self._from_inference(text_handle)
+                # other_cols = self._from_inference_2(text_handle)
 
             # Grab the handle to build a table from the CSV
             try:
@@ -128,10 +134,9 @@ class Staging(object):
         # Persist an empty table eagerly
         # so that we can access it when we drop down to a raw connection.
 
+
         # Be paranoid and remove the table if one by this name already exists.
-        table = Table(self.name, MetaData(), *self.cols, extend_existing=True)
-        self._drop()
-        table.create(bind=postgres_engine)
+        table = self._remake_table()
 
         # Fill in the columns we expect from the CSV.
         names = ['"' + c.name + '"' for c in self.cols]
@@ -141,18 +146,52 @@ class Staging(object):
 
         # In order to issue a COPY, we need to drop down to the psycopg2 DBAPI.
         conn = postgres_engine.raw_connection()
-        try:
-            with conn.cursor() as cursor:
+        with conn.cursor() as cursor:
+            try:
                 f.seek(0)
                 cursor.copy_expert(copy_st, f)
                 conn.commit()
                 return table
-        except Exception as e:
-            # When the bulk copy fails on _any_ row,
-            # roll back the entire operation.
-            raise PlenarioETLError(e)
-        finally:
-            conn.close()
+
+            except DataError as e:
+                error_parts = str(e).split(' ')
+                column_type = error_parts[5].strip(':')
+                column_name = error_parts[13].strip(':')
+                column_value = error_parts[14].strip('\n').strip('"')
+
+                self.cols = [c for c in self.cols if c.name != column_name]
+
+                if column_type == 'timestamp':
+                    try:
+                        int(column_value)
+                        self.cols.append(Column(column_name, Integer))
+                    except ValueError:
+                        self.cols.append(Column(column_name, String))
+                else:
+                    self.cols.append(Column(column_name, String))
+
+
+                table = self._remake_table()
+
+                f.seek(0)
+                conn.rollback()
+                cursor.copy_expert(copy_st, f)
+                conn.commit()
+                return table
+
+            except Exception as e:
+                raise PlenarioETLError(e)
+
+            finally:
+                conn.close()
+
+    def _remake_table(self):
+
+        table = Table(self.name, postgres_base.metadata, *self.cols, extend_existing=True)
+        table.drop(checkfirst=True)
+        table.create(checkfirst=True)
+        # self._drop()
+        return table
 
     '''Utility methods to generate columns
     into which we can dump the CSV data.'''
@@ -171,22 +210,6 @@ class Staging(object):
         original_cols = [c for c in ingested_cols if c.name not in ['geom', 'point_date', 'hash']]
         # Make copies that don't refer to the existing table.
         cols = [_copy_col(c) for c in original_cols]
-
-        logger.info('End.')
-        return cols
-
-    @staticmethod
-    def _from_inference(f):
-        """Generate columns by scanning CSV and inferring column types."""
-
-        logger.info('Begin.')
-        reader = csv.reader(f)
-        header = list(map(slugify, next(reader)))
-
-        cols = []
-        for col_idx, col_name in enumerate(header):
-            col_type, nullable = iter_column(col_idx, f)
-            cols.append(_make_col(col_name, col_type, nullable))
 
         logger.info('End.')
         return cols
