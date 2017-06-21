@@ -12,30 +12,29 @@ at the [Computation Institute](http://ci.uchicago.edu)
 of the [University of Chicago](http://uchicago.edu) and [Argonne National Laboratory](http://www.anl.gov).
 It is maintained by UrbanCCD and was prototyped by [DataMade](http://datamade.us).
 
-## Running locally with Vagrant
+## Running locally with Docker
 
-* Install requirements
-  * [Vagrant](https://www.vagrantup.com/)
-  * [Virtualbox](https://www.virtualbox.org/)
-
-
-* Get the Plenario source:
+To maximize development portability, we use Docker and Docker Compose. To build and run the Plenario application using docker, do the following:
 
 ```bash
-git clone git@github.com:UrbanCCD-UChicago/plenario.git
+$ docker-compose build  # will spew out tons of debug logs while building containers
+$ docker-compose up     # will also produce tons of verbose logs
 ```
 
-* Start up Vagrantfile
+Once the server is running, navigate to http://localhost:5000/ . From
+the homepage, click 'Login' to log in with the username and password
+from `settings.py`. Once logged in, go to 'Add a dataset' under the
+'Admin' menu to add your own datasets.
+
+### Developing with Docker
+
+When you make code changes, you must reload the containers:
 
 ```bash
-cd plenario
-vagrant up
-```
-
-* Wait for Vagrant to finish its output and exit with this message
-
-```bash
-Open http://localhost:5000/ on your host browser
+$ ^C                    # kill the running containers with Ctrl-C
+$ docker-compose down   # ensure it's all down and ready to be rebuilt
+$ docker-compose build  # rebuild them to load the changes and install anything new
+$ docker-compose up     # restart the containers
 ```
 
 ## Running locally
@@ -53,16 +52,16 @@ cd plenario
 pip install -r requirements.txt
 ```
 
-If you aren't already running [PostgreSQL](http://www.postgresql.org/), 
-we recommend installing version 9.3 or later. 
+If you aren't already running [PostgreSQL](http://www.postgresql.org/),
+we recommend installing version 9.3 or later.
 
-Make sure the host of your database has the [PostGIS](http://postgis.net/) 
+Make sure the host of your database has the [PostGIS](http://postgis.net/)
 extension installed.
 
-The following command creates a postgres database, imports the 
+The following command creates a postgres database, imports the
 plv8 and postgis extensions, and creates all the necessary tables for
-plenario to work. The database name corresponds with the `DB_NAME` 
-setting in your `plenario/settings.py` file and can be modified. It will 
+plenario to work. The database name corresponds with the `DB_NAME`
+setting in your `plenario/settings.py` file and can be modified. It will
 be set to `plenario_test` by default.
 
 ```
@@ -86,13 +85,13 @@ The default settings should work given a typical postgres setup, however
 should you find that the init method fails to run - the first place to
 check would be the `settings.py` file.
 
-You will likely want to change, at minimum, the following `settings.py` 
+You will likely want to change, at minimum, the following `settings.py`
 fields:
 
 * `DATABASE_CONN`: edit this field to reflect your PostgreSQL
   username, server hostname, port, and database name.
 
-* `DEFAULT_USER`: change the username, email and password on the 
+* `DEFAULT_USER`: change the username, email and password on the
 administrator account you will use on Plenario locally.
 
 Before running the server, [Redis](http://redis.io/) needs to be running.

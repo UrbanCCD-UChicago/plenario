@@ -1,0 +1,55 @@
+version: '2'
+services:
+  server:
+    restart: always
+    build: .
+    ports:
+      - "5000:5000"
+    env_file: docker.env
+    depends_on:
+      - migrate
+    volumes:
+      - .:/app
+    command: python /app/manage.py runserver
+
+  worker:
+    restart: always
+    build: .
+    env_file: docker.env
+    depends_on:
+      - migrate
+    volumes:
+      - .:/app
+    command: python /app/manage.py worker
+
+  monitor:
+    restart: always
+    build: .
+    env_file: docker.env
+    depends_on:
+      - migrate
+    volumes:
+      - .:/app
+    ports:
+      - "5555:5555"
+    command: python /app/manage.py monitor
+
+  migrate:
+    build: .
+    depends_on:
+      - postgis
+      - redshift
+      - redis
+    env_file: docker.env
+    volumes:
+      - .:/app
+    command: python /app/manage.py init
+
+  postgis:
+    build: ./deploy/postgis
+
+  redshift:
+    build: ./deploy/redshift
+
+  redis:
+    image: redis:latest

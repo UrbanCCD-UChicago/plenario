@@ -8,19 +8,19 @@ DATA_DIR = '/tmp'
 
 # Travis CI relies on the default values to build correctly,
 # just keep in mind that if you push changes to the default
-# values, you need to make sure to adjust for these changes 
+# values, you need to make sure to adjust for these changes
 # in the travis.yml
-DB_USER = get('DB_USER', 'postgres')
-DB_PASSWORD = get('DB_PASSWORD', 'password')
-DB_HOST = get('DB_HOST', 'localhost')
-DB_PORT = get('DB_PORT', 5432)
-DB_NAME = get('DB_NAME', 'plenario_test')
+DB_USER = get('POSTGRES_USER', 'postgres')
+DB_PASSWORD = get('POSTGRES_PASSWORD', 'password')
+DB_HOST = get('POSTGRES_HOST', 'localhost')
+DB_PORT = get('POSTGRES_PORT', 5432)
+DB_NAME = get('POSTGRES_DB', 'plenario_test')
 
-RS_USER = get('RS_USER', 'postgres')
-RS_PASSWORD = get('RS_PASSWORD', 'password')
-RS_HOST = get('RS_HOST', 'localhost')
-RS_PORT = get('RS_PORT', 5432)
-RS_NAME = get('RS_NAME', 'plenario_test')
+RS_USER = get('REDSHIFT_USER', 'postgres')
+RS_PASSWORD = get('REDSHIFT_PASSWORD', 'password')
+RS_HOST = get('REDSHIFT_HOST', 'localhost')
+RS_PORT = get('REDSHIFT_PORT', 5432)
+RS_NAME = get('REDSHIFT_NAME', 'plenario_test')
 
 DATABASE_CONN = 'postgresql://{}:{}@{}:{}/{}'.\
     format(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
@@ -67,6 +67,6 @@ MAIL_PASSWORD = get('MAIL_PASSWORD', '')
 MAINTENANCE = False
 
 # Celery
-CELERY_BROKER_URL = get("CELERY_BROKER_URL") or "redis://localhost:6379/0"
+CELERY_BROKER_URL = get("CELERY_BROKER_URL") or "redis://%s:6379/0" % REDIS_HOST
 CELERY_RESULT_BACKEND = get("CELERY_RESULT_BACKEND") or "db+" + DATABASE_CONN
 FLOWER_URL = get("FLOWER_URL") or "http://localhost:5555"
