@@ -11,6 +11,9 @@ from tests import BaseTest
 
 class TestArchive(BaseTest):
 
+    # TODO(heyzoos)
+    # Need a way to test /archive without calling out to AWS S3, as this seems
+    # to fail when builds are running for non-urbanccd forks.
     def test_archive(self):
 
         archive('2017-01')

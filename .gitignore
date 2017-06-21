@@ -33,8 +33,9 @@ notebooks/
 .env
 .coveragerc
 
-# Deployment Packages
+# Allow fixtures
 *.zip
+!tests/fixtures/*.zip
 
 # Scripts
 _scripts/
@@ -43,4 +44,5 @@ _scripts/
 _venv/
 
 # Flower
+flower
 flower.*
