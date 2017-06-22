@@ -12,7 +12,7 @@ from sqlalchemy import Table
 
 from plenario.database import redshift_base, redshift_session
 from plenario.database import postgres_session, postgres_base, postgres_engine as engine
-from plenario.etl.point import PlenarioETL
+from plenario.etl.point import ingest
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
 from plenario.settings import CELERY_BROKER_URL, S3_BUCKET
@@ -61,10 +61,8 @@ def health() -> bool:
 def add_dataset(name: str) -> bool:
     """Ingest the row information for an approved point dataset."""
 
-    logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
-    PlenarioETL(meta).add()
-    logger.info('End.')
+    ingest(meta)
     return True
 
 
@@ -72,10 +70,8 @@ def add_dataset(name: str) -> bool:
 def update_dataset(name: str) -> bool:
     """Update the row information for an approved point dataset."""
 
-    logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
-    PlenarioETL(meta).update()
-    logger.info('End.')
+    ingest(meta)
     return True
 
 

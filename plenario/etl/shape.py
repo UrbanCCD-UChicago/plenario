@@ -2,7 +2,7 @@ import zipfile
 
 from sqlalchemy.exc import ProgrammingError
 from plenario.database import postgres_engine, postgres_session
-from plenario.etl.common import ETLFile, add_unique_hash
+# from plenario.etl.common import ETLFile, add_unique_hash
 from plenario.utils.shapefile import import_shapefile
 
 
@@ -17,11 +17,11 @@ class ShapeETL:
     def add(self):
         staging_name = 'staging_{}'.format(self.table_name)
 
-        with ETLFile(self.source_path, self.source_url, interpret_as='bytes') as file_helper:
-            handle = open(file_helper.handle.name, "rb")
-            with zipfile.ZipFile(handle) as shapefile_zip:
-                import_shapefile(shapefile_zip, staging_name)
-                add_unique_hash(staging_name)
+        # with ETLFile(self.source_path, self.source_url, interpret_as='bytes') as file_helper:
+        #     handle = open(file_helper.handle.name, "rb")
+        #     with zipfile.ZipFile(handle) as shapefile_zip:
+        #         import_shapefile(shapefile_zip, staging_name)
+        #         add_unique_hash(staging_name)
 
         try:
             postgres_engine.execute('drop table {}'.format(self.table_name))
