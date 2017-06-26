@@ -13,22 +13,12 @@ class ETLFile:
 
     def __init__(self, stream):
         self.stream = stream
-        self.transforms = []
-
-    def readline(self):
-        raise NotImplementedError
 
     def close(self):
         self.stream.close()
 
-    def hook(self, fn):
-        self.transforms.append(fn)
-
     def read(self, position):
-        line = self.readline()
-        for transform in self.transforms:
-            line = transform(line)
-        return line
+        raise NotImplementedError
 
 
 class ETLFileLocal(ETLFile):
@@ -36,17 +26,18 @@ class ETLFileLocal(ETLFile):
     def __init__(self, path):
         super(ETLFileLocal, self).__init__(open(path, 'rb'))
 
-    def readline(self):
-        return self.stream.readline()
+    def read(self, position):
+        return self.stream.read(position)
 
 
 class ETLFileRemote(ETLFile):
 
     def __init__(self, url):
-        super(ETLFileRemote, self).__init__(get(url, stream=True).iter_lines())
+        stream = get(url, stream=True).iter_content(chunk_size=8192)
+        super(ETLFileRemote, self).__init__(stream)
 
-    def readline(self):
+    def read(self, position):
         try:
-            return waitfor(lambda: next(self.stream)) + b'\n'
+            return waitfor(lambda: next(self.stream))
         except StopIteration:
             return b''

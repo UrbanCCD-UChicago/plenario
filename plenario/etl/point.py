@@ -1,38 +1,11 @@
-from uuid import uuid4
+from sqlalchemy import Table, MetaData
+from sqlalchemy import func
 
-from geoalchemy2.types import Geometry
-from sqlalchemy import Table, Column
-from sqlalchemy import func, DateTime
-
-from plenario.database import postgres_base
 from plenario.database import postgres_engine
 from plenario.database import postgres_session
 from plenario.etl.etlfile import ETLFileRemote
 from plenario.models.meta.schema import infer
 from plenario.utils.helpers import slugify
-
-
-def point(bytestring):
-    return b'SRID=4326;POINT (' + bytestring + b')'
-
-
-def derive_datetime_and_location(line, dt_i, lat_i=-1, lon_i=-1, loc_i=-1):
-
-    if not line:
-        return line
-
-    values = line.split(b',')
-    datetime = values[dt_i]
-
-    if loc_i >= 0:
-        location = point(values[loc_i].strip())
-    else:
-        latitude = values[lat_i].strip()
-        longitude = values[lon_i].strip()
-        location = point(b' '.join((latitude, longitude)))
-
-    line = b','.join([line.strip(), datetime, location]) + b'\n'
-    return line
 
 
 def update_meta(metatable, table):
@@ -63,58 +36,33 @@ def update_meta(metatable, table):
 def ingest(metadata):
 
     source = metadata.source_url
-    staging_name = str(uuid4())
+    staging_name = 'staging_' + metadata.dataset_name
+    final_name = metadata.dataset_name
 
-    geospatial_columns = [
-        # Column('id', Integer, primary_key=True),
-        Column('datetime', DateTime),
-        Column('location', Geometry(geometry_type='POINT', srid=4326))
-    ]
+    staging_columns = infer(source)
+    staging_column_names = [slugify(c.name) for c in staging_columns]
+    quoted_staging_column_names = ['"%s"' % c for c in staging_column_names]
 
-    columns = infer(source) + geospatial_columns
-    column_names = [slugify(column.name) for column in columns]
-    quoted_column_names = ['"%s"' % column_name for column_name in column_names]
-
-    latitude = metadata.latitude
-    longitude = metadata.longitude
-    location = metadata.location
-
-    datetime_index = column_names.index(metadata.observed_date)
-    latitude_index = column_names.index(latitude) if latitude else -1
-    longitude_index = column_names.index(longitude) if longitude else -1
-    location_index = column_names.index(location) if location else -1
+    staging_table = Table(staging_name, MetaData(), *staging_columns)
+    staging_table.create(bind=postgres_engine)
 
     etlfile = ETLFileRemote(source)
-    etlfile.readline()
-    etlfile.hook(
-        lambda line: derive_datetime_and_location(
-            line=line,
-            dt_i=datetime_index,
-            lat_i=latitude_index,
-            lon_i=longitude_index,
-            loc_i=location_index
-        )
-    )
-
-    table = Table(staging_name, postgres_base.metadata, *columns)
-    table.create()
 
     connection = postgres_engine.raw_connection()
 
+    # TODO(heyzoos)
+    # This is a gross looking block of code. Let's clean this up
+    # when we get the chance.
     with connection.cursor() as cursor:
         try:
-
             copy_statement = 'copy "{table}" ({columns}) from stdin '
             copy_statement += "with (delimiter ',', format csv, header true)"
             copy_statement = copy_statement.format(
                 table=staging_name,
-                columns=','.join(quoted_column_names)
+                columns=','.join(quoted_staging_column_names)
             )
             cursor.copy_expert(copy_statement, etlfile)
             connection.commit()
-
-            index_statement = 'alter table "{}" add column id serial primary key'
-            index_statement = index_statement.format(staging_name)
 
             drop_statement = 'drop table if exists "{}"'.format(metadata.dataset_name)
 
@@ -124,7 +72,27 @@ def ingest(metadata):
                 finished=metadata.dataset_name
             )
 
-            for statement in [index_statement, drop_statement, rename_statement]:
+            alter_statements = [
+                'alter table "%s" add column id serial primary key' % final_name,
+                'alter table "%s" add column geom geometry(point, 4326)' % final_name,
+                'alter table "%s" add column point_date timestamp ' % final_name
+            ]
+
+            update_statement =                       \
+                'update "%s" as t '                  \
+                'set (geom, point_date) = '          \
+                '(point_from_loc(t."%s"), t."%s"::timestamp)'
+
+            update_statement %= (metadata.dataset_name, metadata.location, metadata.observed_date)
+
+            statements = [
+                drop_statement,
+                rename_statement
+            ] + alter_statements + [
+                update_statement
+            ]
+
+            for statement in statements:
                 print(statement)
                 cursor.execute(statement)
                 connection.commit()
@@ -134,3 +102,13 @@ def ingest(metadata):
 
         finally:
             connection.close()
+            etlfile.close()
+
+    final_table = Table(
+        metadata.dataset_name,
+        MetaData(),
+        extend_existing=True,
+        autoload_with=postgres_engine
+    )
+
+    update_meta(metadata, final_table)

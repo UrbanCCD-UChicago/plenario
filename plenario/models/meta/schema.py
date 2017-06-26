@@ -14,7 +14,7 @@ def count_columns(source):
 def get_names_of_datetime_columns(source, number_of_columns):
 
     cols = list(range(0, number_of_columns))
-    datetime_discovery = pandas.read_csv(source, parse_dates=cols, nrows=1000)
+    datetime_discovery = pandas.read_csv(source, parse_dates=cols, nrows=100)
 
     datetime_columns = []
     for k, v in datetime_discovery.dtypes.items():
@@ -26,7 +26,7 @@ def get_names_of_datetime_columns(source, number_of_columns):
 
 def infer_with_datetime_columns(source, datetime_columns):
 
-    df = pandas.read_csv(source, parse_dates=datetime_columns, nrows=1000)
+    df = pandas.read_csv(source, parse_dates=datetime_columns, nrows=100)
 
     columns = []
     for k, v in df.dtypes.items():
