@@ -303,3 +303,54 @@ class ShapeTests(BasePlenarioTest):
             self.assertFalse(feature['properties'].get('hash'))
             self.assertFalse(feature['properties'].get('ogc_fid'))
             self.assertTrue(feature['properties'].get('count'))
+
+    def test_shape_metadata_with_simple_bbox(self):
+        geojson_query = '''
+        {
+          "type": "FeatureCollection",
+          "features": [
+            {
+              "type": "Feature",
+              "properties": {},
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      -87.63999938964844,
+                      41.686758404529186
+                    ],
+                    [
+                      -87.57545471191406,
+                      41.686758404529186
+                    ],
+                    [
+                      -87.57545471191406,
+                      41.70008933705676
+                    ],
+                    [
+                      -87.63999938964844,
+                      41.70008933705676
+                    ],
+                    [
+                      -87.63999938964844,
+                      41.686758404529186
+                    ]
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+        '''
+
+        escaped_geojson_query = urllib.parse.quote(geojson_query)
+
+        url = '/v1/api/shapes?simple_bbox=True&location_geom__within=%s'
+        url %= escaped_geojson_query
+
+        response = self.app.get(url)
+
+        data = json.loads(bytes.decode(response.data))
+
+        self.assertEqual(len(data['objects']), 3)

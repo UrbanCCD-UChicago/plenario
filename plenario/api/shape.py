@@ -3,6 +3,9 @@ import json
 
 from collections import OrderedDict
 from flask import make_response, request
+from marshmallow import Schema
+from marshmallow.exceptions import ValidationError
+from marshmallow.fields import Field
 from sqlalchemy import func
 from sqlalchemy.exc import NoSuchTableError
 
@@ -20,9 +23,8 @@ from plenario.models import ShapeMetadata
 
 @crossdomain(origin="*")
 def get_all_shape_datasets():
-    """
-    Fetches metadata for every shape dataset in meta_shape
-    """
+    """Fetches metadata for every shape dataset in meta_shape."""
+
     try:
         response_skeleton = {
             'meta': {
@@ -33,26 +35,30 @@ def get_all_shape_datasets():
         }
 
         geom = request.args.get('location_geom__within')
+        simple_bbox = request.args.get('simple_bbox')
+
         if geom:
             geom = make_fragment_str(
                 extract_first_geometry_fragment(geom)
             )
 
-        public_listing = ShapeMetadata.index(geom)
+        if simple_bbox:
+            public_listing = ShapeMetadata.simple_index(geom)
+        else:
+            public_listing = ShapeMetadata.index(geom)
         response_skeleton['objects'] = public_listing
         status_code = 200
 
     except Exception as e:
-        print(e)
         response_skeleton = {
             'meta': {
                 'status': 'error',
-                'message': '',
+                'message': str(e),
             }
         }
         status_code = 500
 
-    resp = make_response(json.dumps(response_skeleton), status_code)
+    resp = make_response(json.dumps(response_skeleton, default=str), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 

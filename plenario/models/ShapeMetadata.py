@@ -91,6 +91,35 @@ class ShapeMetadata(postgres_base):
         return listing
 
     @classmethod
+    def simple_index(cls, geom):
+
+        column_names = {
+            'dataset_name',
+            'human_name',
+            'date_added',
+            'attribution',
+            'description',
+            'update_freq',
+            'view_url',
+            'source_url',
+            'num_shapes'
+        }
+
+        columns = [getattr(cls, n) for n in column_names]
+        columns.append(func.ST_AsGeoJson(cls.bbox).label('bbox'))
+
+        query = postgres_session.query(*columns).filter(
+            cls.bbox.ST_Intersects(
+                func.ST_GeomFromGeoJSON(geom)
+            )
+        )
+
+        results = [dict(zip(row.keys(), row)) for row in query]
+
+        return cls._add_fields_to_index(results)
+
+
+    @classmethod
     def _add_fields_to_index(cls, listing):
         for dataset in listing:
             name = dataset['dataset_name']
