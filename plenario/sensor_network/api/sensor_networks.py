@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 import boto3
 from flask import request, Response, stream_with_context, jsonify, redirect
-from geopy.geocoders import GoogleV3
 from marshmallow import Schema
 from marshmallow.exceptions import ValidationError
 from marshmallow.fields import Field, List, DateTime, Integer, String, Float
@@ -22,7 +21,6 @@ from plenario.api.validator import valid_tree
 from plenario.database import redshift_session, redshift_engine, redshift_base
 from plenario.settings import S3_BUCKET
 from plenario.utils.helpers import reflect
-
 
 # Cache timeout of 5 minutes
 CACHE_TIMEOUT = 60 * 10
