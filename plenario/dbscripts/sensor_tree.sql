@@ -1,3 +1,5 @@
+# TODO(heyzoos)
+# BRING BACK SENSOR_TREE
 create or replace function network_tree(network varchar)
   returns json as $$
 

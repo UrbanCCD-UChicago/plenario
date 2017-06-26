@@ -18,7 +18,7 @@ from wtforms.validators import DataRequired
 import plenario.tasks as worker
 from plenario.database import postgres_session, postgres_base, postgres_engine as engine
 from plenario.models import MetaTable, User, ShapeMetadata
-from plenario.models.meta.schema import infer
+from plenario.models.meta.schema import infer_local
 from plenario.settings import FLOWER_URL
 from plenario.utils.helpers import send_mail, slugify
 
@@ -424,7 +424,7 @@ class GenericSuggestion(object):
             buffer.write(line.decode("utf-8") + '\n')
 
         buffer.seek(0)
-        columns = infer(buffer)
+        columns = infer_local(buffer)
         buffer.close()
         stream.close()
 
