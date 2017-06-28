@@ -3,7 +3,7 @@ from sqlalchemy import func
 
 from plenario.database import postgres_engine
 from plenario.database import postgres_session
-from plenario.etl.etlfile import ETLFileRemote
+from plenario.etl.etlfile import ETLFileLocal, ETLFileRemote
 from plenario.models.meta.schema import infer_remote
 from plenario.utils.helpers import slugify
 
@@ -26,14 +26,14 @@ def update_meta(metatable, table):
 
     metatable.column_names = {
         c.name: str(c.type) for c in metatable.column_info()
-        if c.name not in {'geom', 'point_date', 'hash'}
+        if c.name not in {'geom', 'point_date', 'hash', 'id'}
     }
 
     postgres_session.add(metatable)
     postgres_session.commit()
 
 
-def ingest(metadata):
+def ingest_points(metadata, local=False):
 
     latitude = metadata.latitude
     longitude = metadata.longitude
@@ -44,13 +44,21 @@ def ingest(metadata):
     final_name = metadata.dataset_name
 
     staging_columns = infer_remote(source)
+
+    for column in staging_columns:
+        if column.name == 'id':
+            column.name = '%s_id' % final_name
+
     staging_column_names = [slugify(c.name) for c in staging_columns]
     quoted_staging_column_names = ['"%s"' % c for c in staging_column_names]
 
     staging_table = Table(staging_name, MetaData(), *staging_columns)
     staging_table.create(bind=postgres_engine)
 
-    etlfile = ETLFileRemote(source)
+    if local:
+        etlfile = ETLFileLocal(source)
+    else:
+        etlfile = ETLFileRemote(source)
 
     connection = postgres_engine.raw_connection()
 
@@ -106,3 +114,5 @@ def ingest(metadata):
     )
 
     update_meta(metadata, final_table)
+
+    return final_table

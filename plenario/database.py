@@ -52,6 +52,15 @@ def create_extension(bind: Engine, extension: str) -> None:
     connection.close()
 
 
+def drop_extension(bind: Engine, extension: str) -> None:
+    """Remove an extension in postgresql."""
+
+    print('[plenario] Drop extension %s' % extension)
+    connection = bind.connect()
+    connection.execute("drop extension %s cascade" % extension)
+    connection.close()
+
+
 def psql(path: str) -> None:
     """Use psql to run a file at some path."""
 

@@ -282,8 +282,7 @@ class MetaTable(postgres_base):
 
     @classmethod
     def get_by_dataset_name(cls, name):
-        foo = postgres_session.query(cls).filter(cls.dataset_name == name).first()
-        return foo
+        return postgres_session.query(cls).filter(cls.dataset_name == name).first()
 
     def get_bbox_center(self):
         sel = select([func.ST_AsGeoJSON(func.ST_centroid(self.bbox))])

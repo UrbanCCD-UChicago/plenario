@@ -12,7 +12,7 @@ def count_columns(source):
 
 
 def isyear(o):
-    return len(str(o)) >= 4
+    return len(str(o)) <= 4
 
 
 def isnat(o):
