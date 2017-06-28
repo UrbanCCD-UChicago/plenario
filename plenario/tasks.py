@@ -10,10 +10,9 @@ from dateutil.parser import parse as date_parse
 from raven import Client
 from sqlalchemy import Table
 
-from plenario.database import redshift_base, redshift_session
 from plenario.database import postgres_session, postgres_base, postgres_engine as engine
-from plenario.etl.point import ingest_points
-from plenario.etl.shape import ShapeETL
+from plenario.database import redshift_base, redshift_session
+from plenario.etl import ingest_points, ingest_shapes
 from plenario.models import MetaTable, ShapeMetadata
 from plenario.settings import CELERY_BROKER_URL, S3_BUCKET
 from plenario.settings import PLENARIO_SENTRY_URL, CELERY_RESULT_BACKEND
@@ -94,7 +93,7 @@ def add_shape(name: str) -> bool:
     logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
     logger.debug('Add the shape table.')
-    ShapeETL(meta).add()
+    ingest_shapes(meta)
     logger.info('End.')
     return True
 
@@ -103,11 +102,8 @@ def add_shape(name: str) -> bool:
 def update_shape(name: str) -> bool:
     """Update the row information for an approved shapeset."""
 
-    logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
-    logger.debug('Update the shape table.')
-    ShapeETL(meta).update()
-    logger.info('End.')
+    ingest_shapes(meta)
     return True
 
 
@@ -115,14 +111,9 @@ def update_shape(name: str) -> bool:
 def delete_shape(name) -> bool:
     """Delete the table and meta information for an approved shapeset."""
 
-    logger.info('Begin. (name: "{}")'.format(name))
-    logger.debug('Reflect the shape metadata table.')
     metashape = reflect("meta_shape", postgres_base.metadata, engine)
-    logger.debug('Delete the shape meta record.')
     metashape.delete().where(metashape.c.dataset_name == name).execute()
-    logger.debug('Reflect and drop the corresponding shape table.')
     reflect(name, postgres_base.metadata, engine).drop()
-    logger.info('End.')
     return True
 
 
@@ -131,27 +122,21 @@ def frequency_update(frequency) -> bool:
     """Queue an update task for all the tables whose corresponding meta info
     is part of this frequency group."""
 
-    logger.info('Begin. (frequency: "{}")'.format(frequency))
-    logger.debug('Query for all point dataset meta records.')
     point_metas = postgres_session.query(MetaTable) \
         .filter(MetaTable.update_freq == frequency) \
         .filter(MetaTable.date_added != None) \
         .all()
 
-    logger.debug('Queue an update task for each point dataset.')
     for point in point_metas:
         update_dataset.delay(point.dataset_name)
 
-    logger.debug('Query for all shape dataset meta records.')
     shape_metas = postgres_session.query(ShapeMetadata) \
         .filter(ShapeMetadata.update_freq == frequency) \
         .filter(ShapeMetadata.is_ingested == True) \
         .all()
 
-    logger.debug('Queue an update task for each shape dataset.')
     for shape_meta in shape_metas:
         update_shape.delay(shape_meta.dataset_name)
-    logger.info('End.')
     return True
 
 
@@ -159,11 +144,8 @@ def frequency_update(frequency) -> bool:
 def update_metar() -> bool:
     """Run a METAR update."""
 
-    logger.info('Begin.')
     w = WeatherETL()
-    logger.debug('Call metar initialization method.')
     w.metar_initialize_current()
-    logger.info('End.')
     return True
 
 
@@ -174,9 +156,7 @@ def clean_metar() -> bool:
     in the hourly table are the quality-controlled versions of records that
     existed in the metar table."""
 
-    logger.info('Begin.')
     WeatherETL().clear_metars()
-    logger.info('End.')
     return True
 
 

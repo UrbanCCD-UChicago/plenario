@@ -1,11 +1,16 @@
+from tempfile import TemporaryFile
+from zipfile import ZipFile
+
+from requests import get
 from sqlalchemy import Table, MetaData
 from sqlalchemy import func
+from sqlalchemy.exc import ProgrammingError
 
-from plenario.database import postgres_engine
-from plenario.database import postgres_session
-from plenario.etl.etlfile import ETLFileLocal, ETLFileRemote
+from plenario.database import postgres_engine, postgres_session
+from plenario.etlfile import ETLFileLocal, ETLFileRemote
 from plenario.models.meta.schema import infer_remote
 from plenario.utils.helpers import slugify
+from plenario.utils.shapefile import import_shapefile
 
 
 def update_meta(metatable, table):
@@ -116,3 +121,36 @@ def ingest_points(metadata, local=False):
     update_meta(metadata, final_table)
 
     return final_table
+
+
+def ingest_shapes(metashape, local=False):
+
+    source = metashape.source_url
+    staging_name = 'staging_' + metashape.dataset_name
+    final_name = metashape.dataset_name
+
+    shapefile = TemporaryFile()
+
+    if local:
+        shapefile = open(source, 'rb')
+    else:
+        stream = get(source, stream=True).iter_content(8192)
+        for chunk in stream:
+            if chunk:
+                shapefile.write(chunk)
+        stream.close()
+
+    with ZipFile(shapefile) as shapezip:
+        import_shapefile(shapezip, staging_name)
+
+        try:
+            postgres_engine.execute('drop table {}'.format(final_name))
+        except ProgrammingError:
+            pass
+
+        rename_table = 'alter table {} rename to {}'
+        rename_table = rename_table.format(staging_name, final_name)
+        postgres_engine.execute(rename_table)
+
+        metashape.update_after_ingest()
+        postgres_session.commit()

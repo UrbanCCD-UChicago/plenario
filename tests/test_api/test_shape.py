@@ -6,7 +6,7 @@ from io import BytesIO
 
 from plenario.database import postgres_session, postgres_engine as engine
 from plenario.models import ShapeMetadata
-from plenario.etl.shape import ShapeETL
+from plenario.etl import ingest_shapes
 from plenario.utils.shapefile import Shapefile
 from tests.fixtures.base_test import BasePlenarioTest, FIXTURE_PATH, \
     shape_fixtures
@@ -28,7 +28,7 @@ class ShapeTests(BasePlenarioTest):
         # Add the fixture to the registry first
         shape_meta = postgres_session.query(ShapeMetadata).get('chicago_neighborhoods')
         # Do a ShapeETL update
-        ShapeETL(meta=shape_meta, source_path=fixture.path).update()
+        ingest_shapes(meta=shape_meta, local=True)
         t = shape_meta.shape_table
         sel = t.select().where(t.c['sec_neigh'] == 'ENGLEWOOD')
         res = engine.execute(sel).fetchall()

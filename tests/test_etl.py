@@ -6,14 +6,14 @@ from unittest import TestCase
 from sqlalchemy import select, MetaData
 from sqlalchemy.exc import ProgrammingError
 
-from plenario.database import postgres_session, postgres_engine
 from plenario.database import create_extension, drop_extension
-from plenario.etl.point import ingest_points
+from plenario.database import postgres_session, postgres_engine
+from plenario.etl import ingest_points
 from plenario.models import MetaTable
 from plenario.models.meta.schema import infer_local
 
 pwd = os.path.dirname(os.path.realpath(__file__))
-fixtures_path = os.path.join(pwd, '../fixtures')
+fixtures_path = os.path.join(pwd, './fixtures')
 
 
 class BaseTest(TestCase):

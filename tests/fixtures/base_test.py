@@ -1,17 +1,16 @@
 import os
 import unittest
 
-from tests.fixtures.point_meta import flu_shot_meta, landmarks_meta
-from tests.fixtures.point_meta import flu_path, landmarks_path
-from tests.fixtures.point_meta import crime_meta, crime_path
-
-from plenario import create_app
-from plenario.database import postgres_session
-from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
-from plenario.models import MetaTable, ShapeMetadata
 
 from manage import init
+from plenario import create_app
+from plenario.database import postgres_session
+from plenario.etl import PlenarioETL
+from plenario.models import MetaTable, ShapeMetadata
+from tests.fixtures.point_meta import crime_meta, crime_path
+from tests.fixtures.point_meta import flu_path, landmarks_path
+from tests.fixtures.point_meta import flu_shot_meta, landmarks_meta
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 
