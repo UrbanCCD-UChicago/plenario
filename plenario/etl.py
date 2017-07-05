@@ -154,3 +154,12 @@ def ingest_shapes(metashape, local=False):
 
         metashape.update_after_ingest()
         postgres_session.commit()
+
+    final_table = Table(
+        metashape.dataset_name,
+        MetaData(),
+        extend_existing=True,
+        autoload_with=postgres_engine
+    )
+
+    return final_table

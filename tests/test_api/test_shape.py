@@ -4,9 +4,6 @@ import urllib.request, urllib.parse, urllib.error
 import zipfile
 from io import BytesIO
 
-from plenario.database import postgres_session, postgres_engine as engine
-from plenario.models import ShapeMetadata
-from plenario.etl import ingest_shapes
 from plenario.utils.shapefile import Shapefile
 from tests.fixtures.base_test import BasePlenarioTest, FIXTURE_PATH, \
     shape_fixtures

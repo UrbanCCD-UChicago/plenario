@@ -8,15 +8,15 @@ from sqlalchemy.exc import ProgrammingError
 
 from plenario.database import create_extension, drop_extension
 from plenario.database import postgres_session, postgres_engine
-from plenario.etl import ingest_points
-from plenario.models import MetaTable
+from plenario.etl import ingest_points, ingest_shapes
+from plenario.models import MetaTable, ShapeMetadata
 from plenario.models.meta.schema import infer_local
 
 pwd = os.path.dirname(os.path.realpath(__file__))
 fixtures_path = os.path.join(pwd, './fixtures')
 
 
-class BaseTest(TestCase):
+class BaseEventTest(TestCase):
 
     def setUp(self):
         for extension in {'plv8', 'postgis'}:
@@ -38,7 +38,7 @@ class BaseTest(TestCase):
         metadata.drop_all(bind=postgres_engine)
 
 
-class TestColumnInference(BaseTest):
+class TestColumnInference(BaseEventTest):
 
     def test_column_inference(self):
         radio_path = os.path.join(fixtures_path, 'community_radio_events.csv')
@@ -59,9 +59,9 @@ class TestColumnInference(BaseTest):
             self.assertEqual(expected_types[name], str(dtype))
 
 
-class TestPointIngest(BaseTest):
+class TestPointIngest(BaseEventTest):
 
-    def test_insert_data(self):
+    def test_insert_events(self):
         permits = MetaTable(
             url=join(fixtures_path, 'dog_park_permits.csv'),
             human_name='Dog Park Permits',
@@ -162,3 +162,78 @@ class TestPointIngest(BaseTest):
         columns = columns.first()[0]
 
         self.assertEqual(len(columns), 4)
+
+
+class BaseShapeTest(TestCase):
+
+    def setUp(self):
+        for extension in {'plv8', 'postgis'}:
+            try:
+                create_extension(postgres_engine, extension)
+            except ProgrammingError:
+                pass
+
+        ShapeMetadata.__table__.create(bind=postgres_engine, checkfirst=True)
+
+    def tearDown(self):
+        postgres_session.close()
+
+        for extension in {'plv8', 'postgis'}:
+            drop_extension(postgres_engine, extension)
+
+        metadata = MetaData()
+        metadata.reflect(bind=postgres_engine)
+        metadata.drop_all(bind=postgres_engine)
+
+
+class TestShapeIngest(BaseShapeTest):
+
+    def test_insert_shapes(self):
+        city_limits = ShapeMetadata(
+            dataset_name='chicago_neighborhoods',
+            source_url=join(fixtures_path, 'chicago_neighborhoods_changed.zip')
+        )
+
+        table = ingest_shapes(city_limits, local=True)
+        sel = table.select().where(table.c['sec_neigh'] == 'ENGLEWOOD')
+        res = postgres_engine.execute(sel).fetchall()
+        altered_value = res[0]['pri_neigh']
+
+        self.assertEqual(altered_value, 'Englerwood')
+
+    def test_no_import_when_name_conflict(self):
+        city_limits = ShapeMetadata(
+            dataset_name='chicago_neighborhoods',
+            source_url=join(fixtures_path, 'chicago_neighborhoods_changed.zip')
+        )
+
+        ingest_shapes(city_limits, local=True)
+        with self.assertRaises(Exception):
+            ingest_shapes(city_limits, local=True)
+            postgres_session.rollback()
+
+    def test_delete_shape(self):
+        # Can we remove a shape that's fully ingested?
+        city_meta = postgres_session.query(ShapeMetadata).get(shape_fixtures['city'].table_name)
+        self.assertIsNotNone(city_meta)
+        city_meta.remove_table()
+        postgres_session.commit()
+        city_meta = postgres_session.query(ShapeMetadata).get(shape_fixtures['city'].table_name)
+        self.assertIsNone(city_meta)
+
+        # Can we remove a shape that's only in the metadata?
+        dummy_meta = postgres_session.query(ShapeMetadata).get(self.dummy_name)
+        self.assertIsNotNone(dummy_meta)
+        dummy_meta.remove_table()
+        postgres_session.commit()
+        dummy_meta = postgres_session.query(ShapeMetadata).get(self.dummy_name)
+        self.assertIsNone(dummy_meta)
+
+        # Add them back to return to original test state
+        ShapeTests.ingest_fixture(shape_fixtures['city'])
+        ShapeMetadata.add(human_name='Dummy Name',
+                          source_url=None,
+                          update_freq='yearly',
+                          approved_status=False)
+
+        postgres_session.commit()
