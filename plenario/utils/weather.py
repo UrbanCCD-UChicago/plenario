@@ -6,9 +6,7 @@ import tarfile
 import zipfile
 import re
 from ftplib import FTP
-#from cStringIO import StringIO
 from io import StringIO
-from csvkit.unicsv import FieldSizeLimitError
 from dateutil import parser
 from datetime import datetime, date, timedelta
 from dateutil import relativedelta
@@ -691,10 +689,10 @@ class WeatherETL(object):
                 
              
                 writer.writerow(row_vals)
-            except FieldSizeLimitError:
-                continue
             except StopIteration:
                 break
+            except Exception:
+                continue
         return self.clean_observations_hourly
 
     def _parse_zipfile_row_hourly(self, row, header, out_header):

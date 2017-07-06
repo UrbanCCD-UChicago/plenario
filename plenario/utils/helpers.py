@@ -1,6 +1,4 @@
 import csv
-import string
-from csvkit.unicsv import UnicodeCSVReader
 from plenario.utils.typeinference import normalize_column_type
 import boto3
 from plenario.settings import MAIL_USERNAME, ADMIN_EMAILS, \
