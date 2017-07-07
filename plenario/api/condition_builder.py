@@ -1,6 +1,6 @@
 import re
-from sqlalchemy import and_, or_, func
 
+from sqlalchemy import and_, or_
 
 # field_ops
 # =========
@@ -28,9 +28,8 @@ def parse_tree(table, condition_tree, literally=False):
     :param table: table object whose columns are being used in the conditions
     :param condition_tree: dictionary of conditions created from JSON
     :param literally: whether or not to create conditions as literal strings
-
-    :returns SQLAlchemy conditions for querying the table with"""
-
+    :returns SQLAlchemy conditions for querying the table with
+    """
     try:
         return _parse_condition_tree(table, condition_tree, literally)
     except Exception as ex:
@@ -43,18 +42,17 @@ def _parse_condition_tree(table, ctree, literally=False):
 
     :param table: table object whose columns are being used in the conditions
     :param ctree: dictionary of conditions created from JSON
-
-    :returns SQLAlchemy conditions for querying the table with"""
-
+    :returns SQLAlchemy conditions for querying the table with
+    """
     op = ctree['op']
 
-    if op == "and":
+    if op == 'and':
         return and_(
             _parse_condition_tree(table, child, literally)
             for child in ctree['val']
         )
 
-    elif op == "or":
+    elif op == 'or':
         return or_(
             _parse_condition_tree(table, child, literally)
             for child in ctree['val']
@@ -83,9 +81,8 @@ def _operator_to_condition(column, operator, operand, literally=False):
     :param operator: string name of the desired operator
     :param operand: some target value or parameter
     :param literally: return condition as a string literal
-
-    :returns: SQLAlchemy condition or string"""
-
+    :returns: SQLAlchemy condition or string
+    """
     if operator == 'in':
         condition = column.in_(operand.split(','))
     elif operator == 'eq':
@@ -104,7 +101,7 @@ def _operator_to_condition(column, operator, operand, literally=False):
 
         # Wraps the value in single quotes, this will only work for PostgreSQL.
         operand = "'{}'".format(operand)
-        # Substitues the :params with the actual values.
-        condition = re.sub(r":\w*", operand, str(condition))
+        # Substitutes the :params with the actual values.
+        condition = re.sub(r':\w*', operand, str(condition))
 
     return condition

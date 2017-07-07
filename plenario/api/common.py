@@ -1,5 +1,6 @@
 import csv
 import json
+import logging
 from datetime import date, datetime, time, timedelta
 from functools import update_wrapper
 from io import StringIO
@@ -13,6 +14,8 @@ from plenario.models import MetaTable
 from plenario.settings import CACHE_CONFIG
 from plenario.utils.helpers import get_size_in_degrees
 
+
+logger = logging.getLogger(__name__)
 
 cache = Cache(config=CACHE_CONFIG)
 
@@ -39,8 +42,8 @@ def unknown_object_json_handler(obj):
     elif isinstance(obj, MetaTable):
         return obj.__tablename__
     else:
-        raise ValueError("{0} cannot be parsed into JSON. \n"
-                         "{0} is of type: {1}.".format(obj, type(obj)))
+        raise ValueError('{0} cannot be parsed into JSON. \n'
+                         '{0} is of type: {1}.'.format(obj, type(obj)))
 
 
 def date_json_handler(obj):
@@ -107,8 +110,8 @@ def make_cache_key(*args, **kwargs):
 
 
 def make_csv(data):
-    print(("data.type: {}".format(type(data))))
-    print(("data.firstrow: {}".format(data[0])))
+    logger.info(('data.type: {}'.format(type(data))))
+    logger.info(('data.firstrow: {}'.format(data[0])))
     outp = StringIO()
     writer = csv.writer(outp)
     writer.writerows(data)
@@ -144,8 +147,8 @@ def make_fragment_str(geojson_fragment, buffer=100):
         geojson_fragment = shape.buffer(y).__geo_interface__
 
     geojson_fragment['crs'] = {
-        "type": "name",
-        "properties": {"name": "EPSG:4326"}
+        'type': 'name',
+        'properties': {'name': 'EPSG:4326'}
     }
 
     return json.dumps(geojson_fragment)
