@@ -1,30 +1,32 @@
+# TODO: this needs to be refactored. we've got views, utils, forms... this needs a lot of attention
+
 import itertools
 import re
-import requests
-
-import plenario.tasks as worker
-
 from collections import namedtuple
 from hashlib import md5
-from flask import request, redirect, url_for, render_template
-from flask import Blueprint, flash, session as flask_session
+from io import StringIO
+from urllib.parse import urlparse
+
+import requests
+from flask import Blueprint, flash, redirect, render_template, request, session as flask_session, url_for
 from flask_login import login_required
 from flask_wtf import Form
-from io import StringIO
 from sqlalchemy import Table
 from sqlalchemy.exc import NoSuchTableError
-from urllib.parse import urlparse
 from wtforms import SelectField, StringField
 from wtforms.validators import DataRequired
 
-from plenario.database import postgres_session, postgres_base, postgres_engine as engine
-from plenario.models import MetaTable, User, ShapeMetadata
+import plenario.tasks as worker
+from plenario.database import postgres_base, postgres_engine as engine, postgres_session
+from plenario.models import MetaTable, ShapeMetadata, User
 from plenario.settings import FLOWER_URL
-from plenario.utils.helpers import send_mail, slugify, infer_csv_columns
+from plenario.utils.helpers import infer_csv_columns, send_mail, slugify
+
 
 views = Blueprint('views', __name__)
 
-'''(Mostly) Static pages'''
+
+# (Mostly) Static pages
 
 
 @views.route('/')
@@ -77,7 +79,6 @@ def approve_shape_view(dataset_name):
 
 
 def approve_shape(dataset_name):
-
     meta = postgres_session.query(ShapeMetadata).get(dataset_name)
     ticket = worker.add_shape.delay(dataset_name).id
 
@@ -100,7 +101,6 @@ def approve_dataset_view(source_url_hash):
 
 
 def approve_dataset(source_url_hash):
-
     meta = postgres_session.query(MetaTable).get(source_url_hash)
     ticket = worker.add_dataset.delay(meta.dataset_name).id
 
@@ -117,6 +117,7 @@ def approve_dataset(source_url_hash):
 
 def send_approval_email(dataset_name, contributor_name, contributor_email):
     # Email the submitter
+    # TODO: this really should be a template that jinja loads up and then we send the interpolated string
     msg_body = """Hello %s,\r\n
 \r\n
 Your dataset has been approved and added to Plenar.io:\r\n
@@ -133,12 +134,7 @@ http://plenar.io""" % (contributor_name, dataset_name)
               recipient=contributor_email, body=msg_body)
 
 
-#
-''' Submit a dataset (Add it to MetaData
-    and try to ingest it now or later.) '''
-
-
-#
+# Submit a dataset (Add it to MetaData and try to ingest it now or later.)
 
 
 @views.route('/admin/add', methods=['GET', 'POST'])
@@ -159,6 +155,7 @@ def user_add_dataset():
 
 
 def send_submission_email(dataset_name, contributor_name, contributor_email):
+    # TODO: this really should be a template that jinja loads up and then we send the interpolated string
     msg_body = """Hello %s,\r\n\r\n
 We received your recent dataset submission to Plenar.io:\r\n\r\n%s\r\n\r\n
 After we review it, we'll notify you when your data is loaded and available.\r\n\r\n
@@ -258,7 +255,7 @@ def suggest(context):
         return render_with_context(suggestion_context)
 
 
-''' Submission helpers '''
+# Submission helpers
 
 
 def form_columns(form):
@@ -298,9 +295,8 @@ def contrib_thankyou():
     return render_template('contribute_thankyou.html', **context)
 
 
-''' Helpers that can create a new MetaTable instance
-    with a filled out submission form and dataset_info
-    taken from the source URL.'''
+# Helpers that can create a new MetaTable instance with a filled out submission form and dataset_info taken
+# from the source URL.
 
 
 def point_meta_from_submit_form(form, is_approved):
@@ -347,7 +343,7 @@ def shape_meta_from_submit_form(form, is_approved):
     return md
 
 
-'''Suggestion helpers.'''
+# Suggestion helpers.
 
 ColumnMeta = namedtuple('ColumnMeta', 'name type_ description')
 DescriptionMeta = namedtuple("DescriptionMeta",
@@ -567,7 +563,7 @@ class SocrataSuggestion(object):
         return cls._extract_four_by_four(url) is not None
 
 
-''' Monitoring and editing point datasets '''
+# Monitoring and editing point datasets
 
 
 @views.route('/admin/view-datasets')
@@ -588,7 +584,6 @@ def view_datasets():
 @views.route('/admin/dataset-status/')
 @login_required
 def dataset_status():
-
     return redirect(FLOWER_URL)
 
 
@@ -646,7 +641,6 @@ def edit_shape(dataset_name):
 
 @views.route('/update-shape/<dataset_name>')
 def update_shape_view(dataset_name):
-
     meta = postgres_session.query(ShapeMetadata).get(dataset_name)
     ticket = worker.update_shape.delay(dataset_name).id
     meta.celery_task_id = ticket
@@ -756,7 +750,6 @@ def edit_dataset(source_url_hash):
 @views.route('/admin/delete-dataset/<source_url_hash>')
 @login_required
 def delete_dataset_view(source_url_hash):
-
     meta = postgres_session.query(MetaTable).get(source_url_hash)
     worker.delete_dataset.delay(meta.dataset_name)
     return redirect(url_for('views.view_datasets'))
@@ -764,7 +757,6 @@ def delete_dataset_view(source_url_hash):
 
 @views.route('/update-dataset/<source_url_hash>')
 def update_dataset_view(source_url_hash):
-
     meta = postgres_session.query(MetaTable).get(source_url_hash)
     ticket = worker.update_dataset.delay(meta.dataset_name).id
 
@@ -775,13 +767,12 @@ def update_dataset_view(source_url_hash):
     return redirect(url_for('views.view_datasets'))
 
 
-''' Shape monitoring '''
+# Shape monitoring
 
 
 @views.route('/admin/shape-status/')
 @login_required
 def shape_status():
-
     table_name = request.args['dataset_name']
     shape_meta = ShapeMetadata.get_metadata_with_etl_result(table_name)
     return render_template('admin/shape-status.html', shape=shape_meta)
@@ -790,7 +781,6 @@ def shape_status():
 @views.route('/admin/delete-shape/<table_name>')
 @login_required
 def delete_shape_view(table_name):
-
     worker.delete_shape.delay(table_name)
     return redirect(url_for('views.view_datasets'))
 
