@@ -37,7 +37,7 @@ def create_app():
     # These other imports might eventually use API as well.
     # plenario.views does now. So we'll put them here like
     # API and not import them until they're really needed.
-    from plenario.apiary import apiary, apiary_bp
+    from plenario.apiary.blueprints import apiary, apiary_bp
     from plenario.auth import auth, login_manager
 
     app = Flask(__name__)
