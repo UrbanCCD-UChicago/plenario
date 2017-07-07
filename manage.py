@@ -90,8 +90,18 @@ def rs():
 def test():
     """Run nosetests.
     """
-    nose_commands = ['nosetests', '-s', 'tests', '-vv']
-    wait(subprocess.Popen(nose_commands))
+    test_cmds = [
+        ['nosetests', '--nologcapture', 'tests/test_api/test_point.py', '-v'],
+        ['nosetests', '--nologcapture', 'tests/test_api/test_shape.py', '-v'],
+        ['nosetests', '--nologcapture', 'tests/test_api/test_validator.py', '-v'],
+        ['nosetests', '--nologcapture', 'tests/test_etl/test_point.py', '-v'],
+        ['nosetests', '--nologcapture', 'tests/submission/', '-v'],
+        ['nosetests', '--nologcapture', 'tests/test_sensor_network/test_sensor_networks.py', '-v'],
+        ['nosetests', '--nologcapture', 'tests/test_models/test_feature_meta.py', '-v'],
+        ['nosetests', '--nologcapture', 'tests/test_sensor_network/test_nearest.py', '-v'],
+    ]
+    for cmd in test_cmds:
+        wait(subprocess.Popen(cmd))
 
 
 # @manager.command
