@@ -1,21 +1,20 @@
 import json
+
 import shapely.geometry
 import shapely.wkb
 import sqlalchemy as sa
-
-from flask import request, make_response, jsonify
+from flask import jsonify, make_response, request
 from sqlalchemy import Table, func
 from sqlalchemy.exc import SQLAlchemyError
 
-from plenario.api.common import cache, CACHE_TIMEOUT, make_cache_key
-from plenario.api.common import crossdomain, date_json_handler, RESPONSE_LIMIT
+from plenario.api.common import CACHE_TIMEOUT, RESPONSE_LIMIT, cache, crossdomain, date_json_handler, make_cache_key
 from plenario.api.response import make_error
+from plenario.database import postgres_base, postgres_engine as engine, postgres_session
 from plenario.utils.helpers import get_size_in_degrees
-from plenario.database import postgres_session, postgres_engine as engine, postgres_base
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin="*")
+@crossdomain(origin='*')
 def weather_stations():
     raw_query_params = request.args.copy()
 
@@ -27,16 +26,14 @@ def weather_stations():
         extend_existing=True
     )
 
-    valid_query, query_clauses, resp, status_code = make_query(stations_table,
-                                                               raw_query_params)
-
+    valid_query, query_clauses, resp, status_code = make_query(stations_table, raw_query_params)
     if valid_query:
 
         resp['meta']['status'] = 'ok'
         base_query = postgres_session.query(stations_table)
 
         for clause in query_clauses:
-            print(("weather_stations(): filtering on clause", clause))
+            print(('weather_stations(): filtering on clause', clause))
             base_query = base_query.filter(clause)
 
         values = [r for r in base_query.all()]
@@ -58,7 +55,7 @@ def weather_stations():
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin="*")
+@crossdomain(origin='*')
 def weather(table):
     raw_query_params = request.args.copy()
 
@@ -129,8 +126,7 @@ def weather(table):
                 'observations': weather_data[station_id],
             }
             resp['objects'].append(d)
-        resp['meta']['total'] = sum([len(r['observations'])
-                                     for r in resp['objects']])
+        resp['meta']['total'] = sum([len(r['observations']) for r in resp['objects']])
 
     resp['meta']['query'] = raw_query_params
     resp = make_response(
@@ -142,8 +138,8 @@ def weather(table):
 
 
 def year_if_valid(year_str):
-    """
-    Returns int from 2000 to 2020 if year_str is valid. Otherwise False
+    """Returns int from 2000 to 2020 if year_str is valid. Otherwise False
+    
     :param year_str:
     :return: False | int
     """
@@ -152,8 +148,8 @@ def year_if_valid(year_str):
 
 
 def month_if_valid(month_str):
-    """
-    Returns int from 1 to 12 if month_str is valid. Otherwise False.
+    """Returns int from 1 to 12 if month_str is valid. Otherwise False.
+    
     :param month_str: String submitted by user in month field
     :return: False | int
     """
@@ -186,7 +182,7 @@ def wban_is_valid(wban):
     try:
         stations_table = Table('weather_stations', postgres_base.metadata,
                                autoload=True, autoload_with=engine, extend_existing=True)
-        q = sa.select([stations_table.c["wban_code"]]).where(stations_table.c["wban_code"] == wban)
+        q = sa.select([stations_table.c['wban_code']]).where(stations_table.c['wban_code'] == wban)
         result = postgres_session.execute(q)
     except SQLAlchemyError:
         postgres_session.rollback()
@@ -211,23 +207,23 @@ def wban_list_if_valid(wban_list_str):
     return [w for w in wban_candidate_list if wban_is_valid(w)]
 
 
-@crossdomain(origin="*")
+@crossdomain(origin='*')
 def weather_fill():
     from plenario.tasks import update_weather
 
     args = request.args.copy()
     year = year_if_valid(args.get('year'))
     if not year:
-        return make_error("Must supply a year between 2000 and 2019", 400)
+        return make_error('Must supply a year between 2000 and 2019', 400)
 
     month = month_if_valid(args.get('month'))
     if not month:
-        return make_error("Must supply month as number between 1 and 12", 400)
+        return make_error('Must supply month as number between 1 and 12', 400)
 
     wbans = wban_list_if_valid(args.get('wbans'))
     if not wbans:
-        return make_error("WBAN list misformatted or no WBANS provided are "
-                          "available. Check /weather-stations", 400)
+        return make_error('WBAN list misformatted or no WBANS provided are '
+                          'available. Check /weather-stations', 400)
 
     task_id = update_weather.delay(month=month, year=year, wbans=wbans).id
     return jsonify({
@@ -236,13 +232,8 @@ def weather_fill():
     })
 
 
-'''
-make_query is a holdover from the old API implementation that used Master Table
-'''
-
-
+# make_query is a holdover from the old API implementation that used Master Table
 def make_query(table, raw_query_params):
-
     table_keys = list(table.columns.keys())
     args_keys = list(raw_query_params.keys())
     resp = {
@@ -278,7 +269,7 @@ def make_query(table, raw_query_params):
         column = table.columns.get(field)
 
         if field not in table_keys:
-            resp['meta']['message'] = '"%s" is not a valid fieldname' % field
+            resp['meta']['message'] = '{!r} is not a valid field name'.format(field)
             status_code = 400
             valid_query = False
         elif operator == 'in':
@@ -301,7 +292,7 @@ def make_query(table, raw_query_params):
                 x, y = get_size_in_degrees(100, lat)
                 val = shape.buffer(y).__geo_interface__
 
-            val['crs'] = {"type": "name", "properties": {"name": "EPSG:4326"}}
+            val['crs'] = {'type': 'name', 'properties': {'name': 'EPSG:4326'}}
             query = column.ST_Within(func.ST_GeomFromGeoJSON(json.dumps(val)))
             query_clauses.append(query)
         elif operator.startswith('time_of_day'):
@@ -315,7 +306,7 @@ def make_query(table, raw_query_params):
             try:
                 attr = list([e for e in ['%s', '%s_', '__%s__'] if hasattr(column, e % operator)])[0] % operator
             except IndexError:
-                msg = '"{}" is not a valid query operator'
+                msg = '{!r} is not a valid query operator'
                 resp['meta']['message'] = msg.format(operator)
                 status_code = 400
                 valid_query = False
