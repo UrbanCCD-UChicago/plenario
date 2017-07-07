@@ -1,12 +1,12 @@
 from datetime import datetime
+
 from flask_bcrypt import Bcrypt
 from geoalchemy2 import Geometry
-from sqlalchemy import Column, String, Boolean, Date, Text
-from sqlalchemy import Table, select, Integer, func
+from sqlalchemy import Boolean, Column, Date, Integer, String, Table, Text, func, select
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.types import NullType
 
-from plenario.database import postgres_session, postgres_base
+from plenario.database import postgres_base, postgres_session
 from plenario.utils.helpers import slugify
 
 bcrypt = Bcrypt()
@@ -14,6 +14,7 @@ bcrypt = Bcrypt()
 
 class ShapeMetadata(postgres_base):
     __tablename__ = 'meta_shape'
+
     dataset_name = Column(String, primary_key=True)
     human_name = Column(String, nullable=False)
     source_url = Column(String)
@@ -53,13 +54,13 @@ class ShapeMetadata(postgres_base):
         """
         :return: Every row of meta_shape joined with celery task status.
         """
-        shape_query = '''
+        shape_query = """
             SELECT meta.*, c.*
             FROM meta_shape as meta
             LEFT JOIN celery_taskmeta as c
             ON c.task_id = meta.celery_task_id
             WHERE meta.approved_status = TRUE;
-        '''
+        """
 
         return list(postgres_session.execute(shape_query))
 
@@ -92,7 +93,6 @@ class ShapeMetadata(postgres_base):
 
     @classmethod
     def simple_index(cls, geom):
-
         column_names = {
             'dataset_name',
             'human_name',
@@ -117,7 +117,6 @@ class ShapeMetadata(postgres_base):
         results = [dict(zip(row.keys(), row)) for row in query]
 
         return cls._add_fields_to_index(results)
-
 
     @classmethod
     def _add_fields_to_index(cls, listing):
@@ -162,11 +161,11 @@ class ShapeMetadata(postgres_base):
 
         for row in listing:
             name = row['dataset_name']
-            num_intersections_query = '''
+            num_intersections_query = """
             SELECT count(g.geom) as num_geoms
             FROM "{dataset_name}" as g
             WHERE ST_Intersects(g.geom, ST_GeomFromGeoJSON('{geojson_fragment}'))
-            '''.format(dataset_name=name, geojson_fragment=geom)
+            """.format(dataset_name=name, geojson_fragment=geom)
 
             num_intersections = postgres_session.execute(num_intersections_query) \
                 .first().num_geoms
@@ -177,13 +176,13 @@ class ShapeMetadata(postgres_base):
 
     @classmethod
     def get_metadata_with_etl_result(cls, table_name):
-        query = '''
+        query = """
             SELECT meta.*, celery.status, celery.traceback, celery.date_done
             FROM meta_shape as meta
             LEFT JOIN celery_taskmeta as celery
             ON celery.task_id = meta.celery_task_id
             WHERE meta.dataset_name='{}';
-        '''.format(table_name)
+        """.format(table_name)
 
         metadata = postgres_session.execute(query).first()
         return metadata
@@ -220,13 +219,12 @@ class ShapeMetadata(postgres_base):
         try:
             return self._shape_table
         except AttributeError:
-            self._shape_table = Table(self.dataset_name, postgres_base.metadata,
-                                      autoload=True, extend_existing=True)
+            self._shape_table = Table(self.dataset_name, postgres_base.metadata, autoload=True, extend_existing=True)
             return self._shape_table
 
     def remove_table(self):
         if self.is_ingested:
-            drop = "DROP TABLE {};".format(self.dataset_name)
+            drop = 'DROP TABLE {};'.format(self.dataset_name)
             postgres_session.execute(drop)
         postgres_session.delete(self)
 

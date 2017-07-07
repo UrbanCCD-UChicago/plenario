@@ -1,6 +1,7 @@
+from uuid import uuid4
+
 from sqlalchemy import Column, String
 from sqlalchemy.orm import synonym
-from uuid import uuid4
 
 from plenario.database import postgres_base, postgres_session
 from plenario.models import bcrypt
@@ -12,6 +13,7 @@ def get_uuid():
 
 class User(postgres_base):
     __tablename__ = 'plenario_user'
+
     id = Column(String(36), default=get_uuid, primary_key=True)
     name = Column(String, nullable=False, unique=True)
     email = Column(String, nullable=False)
