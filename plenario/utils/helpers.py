@@ -1,12 +1,14 @@
 import csv
-from plenario.utils.typeinference import normalize_column_type
-import boto3
-from plenario.settings import MAIL_USERNAME, ADMIN_EMAILS, \
-    AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION_NAME
 import math
 from collections import namedtuple
-from sqlalchemy import Table
+
+import boto3
 from slugify import slugify as _slugify
+from sqlalchemy import Table
+
+from plenario.settings import ADMIN_EMAILS, AWS_ACCESS_KEY, AWS_REGION_NAME, AWS_SECRET_KEY, MAIL_USERNAME
+from plenario.utils.typeinference import normalize_column_type
+
 
 def get_size_in_degrees(meters, latitude):
     earth_circumference = 40041000.0  # meters, average circumference
@@ -21,14 +23,13 @@ def get_size_in_degrees(meters, latitude):
 
     return degrees_x, degrees_y
 
+
 ColumnInfo = namedtuple('ColumnInfo', 'name type_ has_nulls')
 
 
 def infer_csv_columns(inp):
     """
-
-    :param inp: File handle to a CSV dataset
-                that we can throw into a UnicodeCSVReader
+    :param inp: File handle to a CSV dataset that we can throw into a UnicodeCSVReader
     :return: List of `ColumnInfo`s
     """
     reader = csv.reader(inp)
@@ -43,7 +44,6 @@ def infer_csv_columns(inp):
 
 def iter_column(idx, f):
     """
-
     :param idx: index of column
     :param f: gzip file object of CSV dataset
     :return: col_type, null_values
@@ -68,12 +68,11 @@ def iter_column(idx, f):
     return col_type, null_values
 
 
-def slugify(text: str, delimiter: str = "_") -> str:
+def slugify(text: str, delimiter: str = '_') -> str:
     return _slugify(text, separator=delimiter)
 
 
 def send_mail(subject, recipient, body):
-
     # Connect to AWS Simple Email Service
     try:
         ses_client = boto3.client(
@@ -111,7 +110,7 @@ def send_mail(subject, recipient, body):
             Message=message
         )
     except Exception as e:
-        print(e, "Failed to send email through AWS SES.")
+        print(e, 'Failed to send email through AWS SES.')
 
 
 def reflect(table_name, metadata, engine):
@@ -120,8 +119,8 @@ def reflect(table_name, metadata, engine):
     :param table_name: (str) table name
     :param metadata: (MetaData) SQLAlchemy object found in a declarative base
     :param engine: (Engine) SQLAlchemy object to send queries to the database
-    :returns: (Table) SQLAlchemy object"""
-
+    :returns: (Table) SQLAlchemy object
+    """
     return Table(
         table_name,
         metadata,
