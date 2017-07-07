@@ -5,28 +5,28 @@ from datetime import datetime, timedelta
 
 import sqlalchemy
 from dateutil import parser
-from marshmallow import fields, Schema
-from marshmallow.validate import Range, OneOf, ValidationError
+from marshmallow import Schema, fields
+from marshmallow.validate import OneOf, Range, ValidationError
 from sqlalchemy import MetaData
-from sqlalchemy.exc import DatabaseError, ProgrammingError, NoSuchTableError
+from sqlalchemy.exc import DatabaseError, NoSuchTableError, ProgrammingError
 
 from plenario.api.common import extract_first_geometry_fragment, make_fragment_str
 from plenario.api.condition_builder import field_ops
 from plenario.database import postgres_session, redshift_engine
-from plenario.models import ShapeMetadata, MetaTable
-from plenario.models.SensorNetwork import NodeMeta, NetworkMeta, FeatureMeta, SensorMeta
+from plenario.models import MetaTable, ShapeMetadata
+from plenario.models.SensorNetwork import FeatureMeta, NetworkMeta, NodeMeta, SensorMeta
 from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
 from plenario.utils.helpers import reflect
 
 
 def validate_dataset(dataset_name):
     if not MetaTable.get_by_dataset_name(dataset_name):
-        raise ValidationError("Invalid table name: {}.".format(dataset_name))
+        raise ValidationError('Invalid table name: {}.'.format(dataset_name))
 
 
 def validate_shapeset(name):
     if not ShapeMetadata.query.get(name):
-        raise ValidationError("Invalid shape name: {}.".format(name))
+        raise ValidationError('Invalid shape name: {}.'.format(name))
 
 
 def validate_many_datasets(list_of_datasets):
@@ -38,12 +38,12 @@ def validate_geom(geojson_str):
     try:
         return extract_first_geometry_fragment(geojson_str)
     except (ValueError, AttributeError):
-        raise ValidationError("Invalid geom: {}".format(geojson_str))
+        raise ValidationError('Invalid geom: {}'.format(geojson_str))
 
 
 def validate_network(network):
     if network.lower() not in NetworkMeta.index():
-        raise ValidationError("Invalid network name: {}".format(network))
+        raise ValidationError('Invalid network name: {}'.format(network))
 
 
 def validate_nodes(nodes):
@@ -52,7 +52,7 @@ def validate_nodes(nodes):
     valid_nodes = NodeMeta.index()
     for node in nodes:
         if node.lower() not in valid_nodes:
-            raise ValidationError("Invalid node ID: {}".format(node))
+            raise ValidationError('Invalid node ID: {}'.format(node))
 
 
 def validate_features(features):
@@ -60,9 +60,9 @@ def validate_features(features):
         features = [features]
     valid_features = FeatureMeta.index()
     for feature in features:
-        feature = feature.split(".")[0].lower()
+        feature = feature.split('.')[0].lower()
         if feature not in valid_features:
-            raise ValidationError("Invalid feature of interest name: {}".format(feature))
+            raise ValidationError('Invalid feature of interest name: {}'.format(feature))
 
 
 def validate_sensors(sensors):
@@ -72,7 +72,7 @@ def validate_sensors(sensors):
     for sensor in sensors:
         sensor = sensor.lower()
         if sensor not in valid_sensors:
-            raise ValidationError("Invalid sensor name: {}".format(sensor))
+            raise ValidationError('Invalid sensor name: {}'.format(sensor))
 
 
 class Validator(Schema):
@@ -87,8 +87,8 @@ class Validator(Schema):
     has a default <TYPE> checker, that along with extra <VALIDATOR FN>s will
     accept or reject the value associated with the key. If the value is missing
     or rejected, the validator will substitute it with the value specified by
-    <DEFAULT_VALUE>."""
-
+    <DEFAULT_VALUE>.
+    """
     valid_aggs = {'day', 'week', 'month', 'quarter', 'year'}
     valid_formats = {'csv', 'geojson', 'json'}
 
@@ -112,15 +112,15 @@ class Validator(Schema):
 
 class DatasetRequiredValidator(Validator):
     """Some endpoints, like /detail-aggregate, should not be allowed to receive
-    requests that do not specify a 'dataset_name' in the query string."""
-
+    requests that do not specify a 'dataset_name' in the query string.
+    """
     dataset_name = fields.Str(validate=validate_dataset, dump_to='dataset', required=True)
 
 
 class NoGeoJSONValidator(Validator):
     """Some endpoints, like /timeseries, should not allow GeoJSON as a valid
-    response format."""
-
+    response format.
+    """
     valid_formats = {'csv', 'json'}
     # Validator re-initialized so that it doesn't use old valid_formats.
     data_type = fields.Str(default='json', validate=OneOf(valid_formats))
@@ -128,23 +128,23 @@ class NoGeoJSONValidator(Validator):
 
 class NoGeoJSONDatasetRequiredValidator(DatasetRequiredValidator):
     """Some endpoints, like /detail-aggregate, should not allow GeoJSON as a valid
-    response format and require a dataset."""
-
+    response format and require a dataset.
+    """
     valid_formats = {'csv', 'json'}
     data_type = fields.Str(default='json', validate=OneOf(valid_formats))
 
 
 class NoDefaultDatesValidator(Validator):
     """Some endpoints, specifically /datasets, will not return results with
-    the original default dates (because the time window is so small)."""
-
+    the original default dates (because the time window is so small).
+    """
     obs_date__ge = fields.Date(default=None)
     obs_date__le = fields.Date(default=None)
 
 
 class ExportFormatsValidator(Validator):
-    """For /shapes/<shapeset_name>?data_type=<format>"""
-
+    """For /shapes/<shapeset_name>?data_type=<format>
+    """
     valid_formats = {'shapefile', 'kml', 'json'}
     data_type = fields.Str(default='json', validate=OneOf(valid_formats))
 
@@ -165,13 +165,13 @@ class SensorNetworkValidator(Validator):
 
 
 class NodeAggregateValidator(SensorNetworkValidator):
-    valid_sensor_aggs = ("minute", "hour", "day", "week", "month", "year")
+    valid_sensor_aggs = ('minute', 'hour', 'day', 'week', 'month', 'year')
 
     node = fields.Str(required=True, validate=validate_nodes)
     features = fields.List(fields.Str(), required=True, validate=validate_features)
-    function = fields.Str(missing="avg", default="avg", validate=lambda x: x.lower() in aggregate_fn_map)
+    function = fields.Str(missing='avg', default='avg', validate=lambda x: x.lower() in aggregate_fn_map)
 
-    agg = fields.Str(default="hour", missing="hour", validate=lambda x: x in NodeAggregateValidator.valid_sensor_aggs)
+    agg = fields.Str(default='hour', missing='hour', validate=lambda x: x in NodeAggregateValidator.valid_sensor_aggs)
     start_datetime = fields.DateTime(default=lambda: datetime.utcnow() - timedelta(days=1))
 
 
@@ -229,14 +229,13 @@ def convert(request_args):
     above.
 
     :param request_args: dictionary of request arguments
-
-    :returns: converted dictionary"""
-
+    :returns: converted dictionary
+    """
     for key, value in list(request_args.items()):
         try:
             request_args[key] = converters[key](value)
         except (KeyError, TypeError, AttributeError, NoSuchTableError):
-            # print "UNABLE TO CONVERT {} {}".format(key, value)
+            # print 'UNABLE TO CONVERT {} {}'.format(key, value)
             pass
         except (DatabaseError, ProgrammingError):
             # Failed transactions, which we do expect, can cause
@@ -277,9 +276,8 @@ def validate(validator, request_args):
 
     :param validator: what kind of validator to use
     :param request_args: dictionary of arguments from a request object
-
-    :returns: ValidatorResult namedtuple"""
-
+    :returns: ValidatorResult namedtuple
+    """
     args = request_args.copy()
 
     result = marshmallow_validate(validator, args)
@@ -314,7 +312,7 @@ def validate(validator, request_args):
                     try:
                         table = ShapeMetadata.get_by_dataset_name(t_name).shape_table
                     except (AttributeError, NoSuchTableError):
-                        result.errors[t_name] = "Table name {} could not be found.".format(t_name)
+                        result.errors[t_name] = 'Table name {} could not be found.'.format(t_name)
                         return result
 
                 # Report a tree which causes the JSON parser to fail.
@@ -324,7 +322,7 @@ def validate(validator, request_args):
                     if valid_tree(table, cond_tree):
                         result.data[key] = cond_tree
                 except (ValueError, KeyError) as err:
-                    result.errors[t_name] = "Bad tree: {} -- causes error {}.".format(value, err)
+                    result.errors[t_name] = 'Bad tree: {} -- causes error {}.'.format(value, err)
                     return result
 
             # These keys just have to do with the formatting of the JSON response.
@@ -342,8 +340,8 @@ def validate(validator, request_args):
             # If the key is not a filter, and not used to format JSON, report
             # that we ignored it.
             else:
-                warnings.append("Unused parameter {}, you cannot specify both "
-                                "column and filter arguments.".format(key))
+                warnings.append('Unused parameter {}, you cannot specify both '
+                                'column and filter arguments.'.format(key))
 
     # If no tree filters were provided, see if any of the unchecked parameters
     # are usable as column conditions.
@@ -361,10 +359,10 @@ def validate(validator, request_args):
                     valid_column_condition(table, field, value)
                     result.data[param] = args[param]
                 except KeyError:
-                    warnings.append('Unused parameter value "{}={}"'.format(param, value))
+                    warnings.append('Unused parameter value {}={!r}'.format(param, value))
                     warnings.append('{} is not a valid column for {}'.format(param, table))
                 except ValueError:
-                    warnings.append('Unused parameter value "{}={}"'.format(param, value))
+                    warnings.append('Unused parameter value {}={!r}'.format(param, value))
                     warnings.append('{} is not a valid value for {}'.format(args[param], param))
 
     # ValidatorResult(dict, dict, list)
@@ -377,17 +375,16 @@ def sensor_network_validate(validator, request_args):
 
     :param validator: type of validator to use
     :param request_args: dictionary of arguments from a request object
-
-    :returns: ValidatorResult namedtuple"""
-
+    :returns: ValidatorResult namedtuple
+    """
     args = request_args.copy()
 
     # # Prevent a time formatting issue that causes validator.load to act up
-    # # The "+" sign in dates gets turned into a space character
-    # if args.get("start_datetime"):
-    #     args["start_datetime"] = args["start_datetime"].split(" ")[0]
-    # if args.get("end_datetime"):
-    #     args["end_datetime"] = args["end_datetime"].split(" ")[0]
+    # # The '+' sign in dates gets turned into a space character
+    # if args.get('start_datetime'):
+    #     args['start_datetime'] = args['start_datetime'].split(' ')[0]
+    # if args.get('end_datetime'):
+    #     args['end_datetime'] = args['end_datetime'].split(' ')[0]
 
     result = marshmallow_validate(validator, args)
 
@@ -423,7 +420,7 @@ def sensor_network_validate(validator, request_args):
             if valid_tree(table, cond_tree):
                 result.data['filter'] = cond_tree
         except (ValueError, KeyError) as err:
-            result.errors['filter'] = "Bad tree: {} -- causes error {}.".format(raw_tree, err)
+            result.errors['filter'] = 'Bad tree: {} -- causes error {}.'.format(raw_tree, err)
             return result
 
     if unchecked:
@@ -440,17 +437,16 @@ def valid_tree(table, tree):
 
     :param table: table to build conditions for, need it for the columns
     :param tree: condition_tree
-
-    :returns: boolean value, true if the tree is valid"""
-
+    :returns: boolean value, true if the tree is valid
+    """
     if not list(tree.keys()):
-        raise ValueError("Empty or malformed tree.")
+        raise ValueError('Empty or malformed tree.')
 
     op = tree.get('op')
     if not op:
-        raise ValueError("Invalid keyword in {}".format(tree))
+        raise ValueError('Invalid keyword in {}'.format(tree))
 
-    if op == "and" or op == "or":
+    if op == 'and' or op == 'or':
         return all([valid_tree(table, subtree) for subtree in tree['val']])
 
     elif op in field_ops:
@@ -459,13 +455,13 @@ def valid_tree(table, tree):
 
         if col is None or val is None:
             err_msg = 'Missing or invalid keyword in {}'.format(tree)
-            err_msg += ' -- use format "{\'op\': OP, \'col\': COL, \'val\', VAL}"'
+            err_msg += " -- use format '{\"op\": OP, \"col\": COL, \"val\": VAL}'"
             raise ValueError(err_msg)
 
         return valid_column_condition(table, col, val)
 
     else:
-        raise ValueError("Invalid operation {}".format(op))
+        raise ValueError('Invalid operation {}'.format(op))
 
 
 def valid_column_condition(table, column_name, value):
@@ -474,14 +470,14 @@ def valid_column_condition(table, column_name, value):
 
     :param table: SQLAlchemy table object
     :param column_name: Name of the column
-    :param value: target value"""
-
+    :param value: target value
+    """
     try:
         if type(table) != sqlalchemy.sql.schema.Table:
             table = converters['dataset'](table)
         column = table.columns[column_name]
     except KeyError:
-        raise KeyError("Invalid column name {}".format(column_name))
+        raise KeyError('Invalid column name {}'.format(column_name))
 
     # Dates are trickier than other types, the check that follows this will
     # not correctly approve string dates because they are usually coerced from
@@ -491,7 +487,7 @@ def valid_column_condition(table, column_name, value):
             parser.parse(value)
             return True
         except (AttributeError, TypeError):
-            raise ValueError("Invalid value type for {}. Was expecting {}"
+            raise ValueError('Invalid value type for {}. Was expecting {}'
                              .format(value, 'datetime'))
 
     # If the value is not a date, we can do a couple more checks to see if the
@@ -502,7 +498,7 @@ def valid_column_condition(table, column_name, value):
         if type(value) != column.type.python_type:
             column.type.python_type(value)  # Blessed Python.
     except (ValueError, TypeError):
-        raise ValueError("Invalid value type for {}. Was expecting {}"
+        raise ValueError('Invalid value type for {}. Was expecting {}'
                          .format(value, column.type.python_type))
 
     return True
@@ -512,6 +508,6 @@ def has_tree_filters(request_args):
     """See if there are any <DATASET>__filter parameters.
 
     :param request_args: dictionary of request arguments
-    :returns: boolean, true if there's a filter argument"""
-
+    :returns: boolean, true if there's a filter argument
+    """
     return any('filter' in key for key in list(request_args.keys()))

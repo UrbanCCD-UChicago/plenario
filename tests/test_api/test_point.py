@@ -444,11 +444,11 @@ class PointAPITests(BasePlenarioTest):
 
         resp = self.app.get(query)
         response_data = json.loads(resp.data.decode("utf-8"))
-        self.assertTrue("Unused parameter value \"fake_column=fake\"" in response_data['meta']['message'])
+        self.assertTrue("Unused parameter value fake_column='fake'" in response_data['meta']['message'], response_data['meta']['message'])
 
     def test_bad_column_condition_with_shape(self):
         query = 'v1/api/detail/?dataset_name=flu_shot_clinics&shape=chicago_neighborhoods&fake_column=fake'
 
         resp = self.app.get(query)
         response_data = json.loads(resp.data.decode("utf-8"))
-        self.assertTrue("Unused parameter value \"fake_column=fake\"" in response_data['meta']['message'])
+        self.assertTrue("Unused parameter value fake_column='fake'" in response_data['meta']['message'])
