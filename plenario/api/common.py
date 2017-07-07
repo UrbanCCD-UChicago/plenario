@@ -1,11 +1,11 @@
 import csv
 import json
-
-from datetime import timedelta, date, datetime, time
-from flask import make_response, request, current_app
-from flask_cache import Cache
+from datetime import date, datetime, time, timedelta
 from functools import update_wrapper
 from io import StringIO
+
+from flask import current_app, make_response, request
+from flask_cache import Cache
 from shapely.geometry import asShape
 from sqlalchemy.sql.schema import Table
 
@@ -13,10 +13,11 @@ from plenario.models import MetaTable
 from plenario.settings import CACHE_CONFIG
 from plenario.utils.helpers import get_size_in_degrees
 
+
 cache = Cache(config=CACHE_CONFIG)
 
 RESPONSE_LIMIT = 1000
-CACHE_TIMEOUT = 60*60*6
+CACHE_TIMEOUT = 60 * 60 * 6
 
 
 def unknown_object_json_handler(obj):
@@ -25,8 +26,8 @@ def unknown_object_json_handler(obj):
     a non-serializable format to a serializable one.
 
     :param obj: object that json is trying to convert
-    :returns: converted object"""
-
+    :returns: converted object
+    """
     if type(obj) == Table:
         return obj.name
     elif isinstance(obj, date):
@@ -47,8 +48,8 @@ def date_json_handler(obj):
     with json.dumps().
 
     :param obj: date object that json is trying to convert
-    :returns: converted object"""
-
+    :returns: converted object
+    """
     if isinstance(obj, date):
         return obj.isoformat()
     else:
@@ -95,6 +96,7 @@ def crossdomain(origin=None, methods=None, headers=None,
 
         f.provide_automatic_options = False
         return update_wrapper(wrapped_function, f)
+
     return decorator
 
 
@@ -114,8 +116,7 @@ def make_csv(data):
 
 
 def extract_first_geometry_fragment(geojson):
-    """
-    Given a geojson document, return a geojson geometry fragment marked as 4326
+    """Given a geojson document, return a geojson geometry fragment marked as 4326
     encoding. If there are multiple features in the document, just make a
     fragment of the first feature. This is what PostGIS's ST_GeomFromGeoJSON
     expects.
