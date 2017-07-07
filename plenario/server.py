@@ -32,7 +32,7 @@ def create_app():
     # API depends on the tables in the database to exist.
     # Don't import until we really need it to create the app
     # Since otherwise it may be called before init_db.py runs.
-    from plenario.api import api, cache
+    from plenario.api.blueprints import api, cache
 
     # These other imports might eventually use API as well.
     # plenario.views does now. So we'll put them here like
