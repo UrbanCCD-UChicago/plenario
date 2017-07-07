@@ -4,7 +4,7 @@ import unittest
 
 from .fixtures import Fixtures
 
-from plenario import create_app
+from plenario.server import create_app
 
 
 class TestSensorNetworks(unittest.TestCase):
