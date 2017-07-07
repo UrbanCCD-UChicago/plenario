@@ -15,10 +15,10 @@ from kombu.exceptions import OperationalError
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
-from plenario import create_app as server
 from plenario.database import create_database, create_extension, postgres_base, psql, postgres_session, \
         drop_database, postgres_engine as plenario_engine
 from plenario.models.User import User
+from plenario.server import create_app as server
 from plenario.settings import DATABASE_CONN, REDSHIFT_CONN, DB_NAME, DEFAULT_USER
 from plenario.tasks import health
 from plenario.utils.weather import WeatherETL, WeatherStationsETL
