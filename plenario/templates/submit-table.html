@@ -1,6 +1,7 @@
 {% extends 'submit-dataset.html' %}
 {% from "macros/contributor-form.html" import contributor_form %}
 {% from "macros/metadata-form-fragment.html" import metadata_form_fragment %}
+{% from "macros/column.html" import column %}
 
 {% block requirements %}
     <div class="panel-group" id="accordion-api-datasets">
@@ -95,8 +96,10 @@
                                                     </select>
                                                 </td>
                                                 <td>{{ col.name }}</td>
-                                                <td>{{ col.type_ }}</td>
-                                                <td>{{ col.description }}</td>
+                                                <td>{{ column("col_type_" + col.name, col.type_, column_types) }}</td>
+                                                {% if columns | has_description %}
+                                                  <td>{{ col.description }}</td>
+                                                {% endif %}
                                             </tr>
                                         {% endfor %}
                                     </tbody>

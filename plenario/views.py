@@ -172,10 +172,19 @@ Thank you!\r\nThe Plenario Team\r\nhttp://plenar.io""" % (contributor_name, data
 
 
 def render_with_context(context):
+    # TODO(heyzoos)
+    # A list of supported data types deserves more significance than a list
+    # floating around in some view logic. Find a better place to put this.
+    column_types = ['date', 'location', 'number', 'text']
+
     if context['is_shapefile']:
         return render_template('submit-shape.html', **context)
     else:
-        return render_template('submit-table.html', **context)
+        return render_template(
+            'submit-table.html',
+            column_types=column_types,
+            **context
+        )
 
 
 def add(context):

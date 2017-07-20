@@ -1,0 +1,10 @@
+{% macro column(id, suggested_type, column_types) %}
+  <select id="{{ id }}" class="form-control">
+    <option value="{{ suggested_type }}">{{ suggested_type }}</option>
+    {% for column_type in column_types %}
+      {% if not column_type == suggested_type %}
+        <option value="{{ column_type }}">{{ column_type }}</option>
+      {% endif %}
+    {% endfor %}
+  </select>
+{% endmacro %}
