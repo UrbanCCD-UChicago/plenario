@@ -1,17 +1,14 @@
-from plenario.settings import DB_PORT, DB_PASSWORD, DB_USER, DB_NAME, DB_HOST
-import subprocess
-import zipfile
 import os
-import tempfile
 import shutil
+import subprocess
+import tempfile
+import zipfile
+
+from plenario.settings import DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
 
 
 postgres_connection_arg = 'PG:host={} user={} port={} dbname={} password={}'.format(
-                                  DB_HOST,
-                                  DB_USER,
-                                  DB_PORT,
-                                  DB_NAME,
-                                  DB_PASSWORD)
+    DB_HOST, DB_USER, DB_PORT, DB_NAME, DB_PASSWORD)
 
 
 class OgrError(Exception):
@@ -21,8 +18,7 @@ class OgrError(Exception):
 
 
 class OgrExport(object):
-    """
-    Given a path where we want to export a shape,
+    """Given a path where we want to export a shape,
     write a file representation of the shape dataset at table_name to that path in the requested format.
     There must not already be a file at the path.
     It is the caller's responsibility to clean up the file we create there.
@@ -83,8 +79,8 @@ class OgrExport(object):
     @staticmethod
     def _requested_format_to_ogr_format_name(requested_format):
         """
-        :param requested_format: Lowercase unicode: one of 'json', 'kml', 'shapefile'
-                                 json is default value if request is none of the expected.
+        :param requested_format: Lowercase unicode: one of 'json', 'kml', 'shapefile' json is 
+            default value if request is none of the expected.
         """
 
         format_map = {
@@ -103,28 +99,26 @@ class OgrExport(object):
 
 def import_shapefile_to_table(component_path, table_name):
     """
-
-    :param component_path: Path to unzipped shapefile components and the shared name of all components.
-                           So if folder contains foo.shp, foo.prj, foo.dbf, then component_path is path/to/dir/foo.
-                           foo.shp and foo.prj must be present.
+    :param component_path: Path to unzipped shapefile components and the shared name of all components. So if folder 
+        contains foo.shp, foo.prj, foo.dbf, then component_path is path/to/dir/foo. foo.shp and foo.prj must be present.
     :param table_name: Name that we want table to have in the database
     """
 
     args = ['ogr2ogr',
-            '-f', 'PostgreSQL',                 # Use the PostgreSQL driver. Documentation here: http://www.gdal.org/drv_pg.html
+            '-f', 'PostgreSQL',  # Use the PostgreSQL driver. Documentation here: http://www.gdal.org/drv_pg.html
 
-            '-lco', 'PRECISION=no',             # Many .dbf files don't obey their precision headers.
-                                                # So importing as precision-marked types like NUMERIC(width, precision) often fails.
-                                                # Instead, import as INTEGER, VARCHAR, FLOAT8.
+            '-lco', 'PRECISION=no',  # Many .dbf files don't obey their precision headers.
+            # So importing as precision-marked types like NUMERIC(width, precision) often fails.
+            # Instead, import as INTEGER, VARCHAR, FLOAT8.
 
-            '-nlt', 'PROMOTE_TO_MULTI',         # Import all lines and polygons as multilines and multipolygons
-                                                # We don't know if the source shapefiles will have multi or non-multi geometries,
-                                                # so we need to import the most inclusive set of types.
+            '-nlt', 'PROMOTE_TO_MULTI',  # Import all lines and polygons as multilines and multipolygons
+            # We don't know if the source shapefiles will have multi or non-multi geometries,
+            # so we need to import the most inclusive set of types.
             '-s_srs', component_path + '.prj',  # Derive source SRID from Well Known Text in .prj
-            '-t_srs', 'EPSG:4326',              # Always convert to 4326
+            '-t_srs', 'EPSG:4326',  # Always convert to 4326
             postgres_connection_arg,
-            component_path + '.shp',            # Point to .shp so that ogr2ogr knows it's importing a Shapefile.
-            '-nln', table_name,                 # (n)ew (l)ayer (n)ame. Set the name of the new table.
-            '-lco', 'GEOMETRY_NAME=geom']       # Always name the geometry column 'geom'
+            component_path + '.shp',  # Point to .shp so that ogr2ogr knows it's importing a Shapefile.
+            '-nln', table_name,  # (n)ew (l)ayer (n)ame. Set the name of the new table.
+            '-lco', 'GEOMETRY_NAME=geom']  # Always name the geometry column 'geom'
 
     subprocess.check_output(args)

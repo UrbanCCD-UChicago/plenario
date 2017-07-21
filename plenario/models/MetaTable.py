@@ -8,9 +8,7 @@ from operator import itemgetter
 import sqlalchemy as sa
 from flask_bcrypt import Bcrypt
 from geoalchemy2 import Geometry
-from sqlalchemy import Column, Text, func
-from sqlalchemy import Boolean, Date, DateTime, String
-from sqlalchemy import Table, select, Integer
+from sqlalchemy import Boolean, Column, Date, DateTime, String, Table, Text, func, select
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.exc import ProgrammingError
 
@@ -71,7 +69,6 @@ class MetaTable(postgres_base):
         :param attribution: Text describing who maintains the dataset
         :param description: Text describing the dataset.
         """
-
         def curried_slug(name):
             if name is None:
                 return None
@@ -150,15 +147,13 @@ class MetaTable(postgres_base):
         try:
             return self._point_table
         except AttributeError:
-            self._point_table = Table(self.dataset_name, postgres_base.metadata,
-                                      autoload=True, extend_existing=True)
+            self._point_table = Table(self.dataset_name, postgres_base.metadata, autoload=True, extend_existing=True)
             return self._point_table
 
     @classmethod
     def attach_metadata(cls, rows):
-        """
-        Given a list of dicts that include a dataset_name,
-        add metadata about the datasets to each dict.
+        """Given a list of dicts that include a dataset_name, add metadata about the datasets to each dict.
+        
         :param rows: List of dict-likes with a dataset_name attribute
         """
         dataset_names = [row['dataset_name'] for row in rows]
@@ -201,11 +196,16 @@ class MetaTable(postgres_base):
 
         return to_coalesce
 
-    # Return a list of [
-    # {'dataset_name': 'Foo',
-    # 'items': [{'datetime': dt, 'count': int}, ...] } ]
     @classmethod
     def timeseries_all(cls, table_names, agg_unit, start, end, geom=None, ctrees=None):
+        """Return a list of 
+        [
+            {
+                'dataset_name': 'Foo',
+                'items': [{'datetime': dt, 'count': int}, ...] 
+            } 
+        ]
+        """
         # For each table in table_names, generate a query to be unioned
         selects = []
         for name in table_names:
@@ -406,8 +406,7 @@ class MetaTable(postgres_base):
         """
         :return: Every row of meta_shape joined with celery task status.
         """
-
-        query = '''
+        query = """
             SELECT m.*, c.*
                 FROM meta_master AS m
                 LEFT JOIN celery_taskmeta AS c
@@ -418,6 +417,5 @@ class MetaTable(postgres_base):
                     LIMIT 1
                   )
             WHERE m.approved_status = 'true'
-        '''
-
+        """
         return list(postgres_session.execute(query))

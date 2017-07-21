@@ -1,13 +1,16 @@
 from datetime import datetime
-from flask import Flask
 from logging import getLogger
 
+from flask import Flask
+
 import plenario.tasks as tasks
+
 
 logger = getLogger(__name__)
 
 
 def create_worker():
+    logger.info('beginning worker setup')
 
     app = Flask(__name__)
     app.config.from_object('plenario.settings')
@@ -33,5 +36,5 @@ def create_worker():
     def check_health():
         return tasks.health.delay().id
 
-    logger.info('Running in worker mode')
+    logger.info('worker setup complete - application instance is running in worker mode')
     return app

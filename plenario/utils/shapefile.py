@@ -1,7 +1,8 @@
 import os
-import tempfile
 import shutil
-from plenario.utils.ogr2ogr import import_shapefile_to_table, OgrError
+import tempfile
+
+from plenario.utils.ogr2ogr import OgrError, import_shapefile_to_table
 
 
 class ShapefileError(Exception):
@@ -11,13 +12,11 @@ class ShapefileError(Exception):
 
 
 def import_shapefile(shapefile_zip, table_name):
-    """
-    Given a zipped shapefile, try to insert it into the database.
+    """Given a zipped shapefile, try to insert it into the database.
 
     :param shapefile_zip: The zipped shapefile.
     :type shapefile_zip: A Python zipfile.ZipFile object
     """
-
     try:
         with Shapefile(shapefile_zip) as shape:
             shape.insert_in_database(table_name)
@@ -28,8 +27,7 @@ def import_shapefile(shapefile_zip, table_name):
 
 
 class Shapefile:
-    """
-    Encapsulate unzipping and exporting of a Shapefile.
+    """Encapsulate unzipping and exporting of a Shapefile.
     """
     COMPONENT_PREFIX = 'component'
 
@@ -41,12 +39,10 @@ class Shapefile:
         self.shapefile_zip = shapefile_zip
 
     def __enter__(self):
-        """
-        Create a temporary directory
+        """Create a temporary directory
         and extract all shapefile components to it as 'COMPONENT_PREFIX.*'.
         Store that directory's path in self.unzip_dir.
         """
-
         # Extract all shapefile components to a temporary directory.
         # As implemented now, this creates an absolute path traversal vulnerability.
         # https://cwe.mitre.org/data/definitions/36.html
@@ -82,9 +78,7 @@ class Shapefile:
             raise ShapefileError('Failed to insert shapefile into database.\n{}'.format(repr(e)))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        When a Shapefile exits its managed context or there is an internal exception,
+        """When a Shapefile exits its managed context or there is an internal exception,
         remove the temporary directory.
         """
         shutil.rmtree(self.unzip_dir)
-

@@ -1,27 +1,27 @@
 import json
-import uuid
 import time
-
-from dateutil.parser import parse
-from flask import request, make_response
+import uuid
 from os import environ
 
-from plenario.api.common import crossdomain
-from plenario.api.common import unknown_object_json_handler
-from plenario.api.validator import sensor_network_validate, IFTTTValidator
-from plenario.sensor_network.api.sensor_networks import sanitize_validated_args, get_observation_queries, \
-    get_raw_metadata
+from dateutil.parser import parse
+from flask import make_response, request
+
+from plenario.api.common import crossdomain, unknown_object_json_handler
 from plenario.api.response import bad_request
+from plenario.api.validator import IFTTTValidator, sensor_network_validate
+from plenario.sensor_network.api.sensor_networks import get_observation_queries, get_raw_metadata, \
+    sanitize_validated_args
+
 
 # dictionary mapping the curated drop-down list name to the correct feature and property
-curated_map = {"temperature": "temperature.temperature"}
+curated_map = {'temperature': 'temperature.temperature'}
 
 
 # TODO: error list?
-@crossdomain(origin="*")
+@crossdomain(origin='*')
 def get_ifttt_observations():
     if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
-        return make_ifttt_error("incorrect channel key", 401)
+        return make_ifttt_error('incorrect channel key', 401)
 
     input_args = request.json
     args = dict()
@@ -49,8 +49,8 @@ def get_ifttt_observations():
     if validated_args.errors:
         return bad_request(validated_args.errors)
     validated_args.data.update({
-        "features": [validated_args.data["feature"]],
-        "feature": None
+        'features': [validated_args.data['feature']],
+        'feature': None
     })
     validated_args = sanitize_validated_args(validated_args)
 
@@ -61,34 +61,34 @@ def get_ifttt_observations():
     return run_ifttt_queries(observation_queries, curated_property)
 
 
-@crossdomain(origin="*")
+@crossdomain(origin='*')
 def get_ifttt_meta(field):
     if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
-        return make_ifttt_error("incorrect channel key", 401)
+        return make_ifttt_error('incorrect channel key', 401)
 
     data = []
     if field == 'node':
-        args = {"network": "plenario_development"}
+        args = {'network': 'plenario_development'}
         fields = ('network',)
         validated_args = sensor_network_validate(IFTTTValidator(only=fields), args)
-        data = [{"label": node.id,
-                 "value": node.id} for node in get_raw_metadata('nodes', validated_args)]
+        data = [{'label': node.id,
+                 'value': node.id} for node in get_raw_metadata('nodes', validated_args)]
     elif field == 'curated_property':
-        data = [{"label": curated_property,
-                 "value": curated_property} for curated_property in list(curated_map.keys())]
+        data = [{'label': curated_property,
+                 'value': curated_property} for curated_property in list(curated_map.keys())]
 
     return make_ifttt_response(data)
 
 
 def format_ifttt_observations(obs, curated_property):
     obs_response = {
-        "node": obs.node_id,
-        "datetime": obs.datetime.isoformat()+'+05:00',
-        "curated_property": curated_property,
-        "value": getattr(obs, curated_map[curated_property].split('.')[1]),
-        "meta": {
-            "id": uuid.uuid1().hex,
-            "timestamp": int(time.time())
+        'node': obs.node_id,
+        'datetime': obs.datetime.isoformat() + '+05:00',
+        'curated_property': curated_property,
+        'value': getattr(obs, curated_map[curated_property].split('.')[1]),
+        'meta': {
+            'id': uuid.uuid1().hex,
+            'timestamp': int(time.time())
         }
     }
 
@@ -100,14 +100,14 @@ def run_ifttt_queries(queries, curated_property):
     for query, table in queries:
         data += [format_ifttt_observations(obs, curated_property) for obs in query.all()]
 
-    data.sort(key=lambda x: parse(x["datetime"]), reverse=True)
+    data.sort(key=lambda x: parse(x['datetime']), reverse=True)
 
     return make_ifttt_response(data)
 
 
 def make_ifttt_response(data):
     resp = {
-        "data": data
+        'data': data
     }
     resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
     resp.headers['Content-Type'] = 'application/json; charset=utf-8'
@@ -116,7 +116,7 @@ def make_ifttt_response(data):
 
 def make_ifttt_error(err, status_code):
     resp = {
-        "errors": [{"message": err}]
+        'errors': [{'message': err}]
     }
     resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
     resp.headers['Content-Type'] = 'application/json; charset=utf-8'
@@ -128,41 +128,41 @@ def make_ifttt_error(err, status_code):
 # ========================
 
 
-@crossdomain(origin="*")
+@crossdomain(origin='*')
 def ifttt_status():
     if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
-        return make_ifttt_error("incorrect channel key", 401)
+        return make_ifttt_error('incorrect channel key', 401)
 
     resp = make_response('{}', 200)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
 
-@crossdomain(origin="*")
+@crossdomain(origin='*')
 def ifttt_test_setup():
     if request.headers.get('IFTTT-Channel-Key') != environ.get('IFTTT_CHANNEL_KEY'):
-        return make_ifttt_error("incorrect channel key", 401)
+        return make_ifttt_error('incorrect channel key', 401)
 
     resp = {
-        "data": {
-            "samples": {
-                "triggers": {
-                    "property_comparison": {
-                        "node": "node_dev_1",
-                        "curated_property": "temperature",
-                        "op": "gt",
-                        "val": 0
+        'data': {
+            'samples': {
+                'triggers': {
+                    'property_comparison': {
+                        'node': 'node_dev_1',
+                        'curated_property': 'temperature',
+                        'op': 'gt',
+                        'val': 0
                     }
                 },
-                "triggerFieldValidations": {
-                    "property_comparison": {
-                        "node": {
-                            "valid": "node_dev_1",
-                            "invalid": "invalid_node"
+                'triggerFieldValidations': {
+                    'property_comparison': {
+                        'node': {
+                            'valid': 'node_dev_1',
+                            'invalid': 'invalid_node'
                         },
-                        "curated_property": {
-                            "valid": "temperature",
-                            "invalid": "invalid_property"
+                        'curated_property': {
+                            'valid': 'temperature',
+                            'invalid': 'invalid_property'
                         }
                     }
                 }

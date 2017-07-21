@@ -1,31 +1,27 @@
-from flask import Blueprint, render_template, redirect, request, url_for, \
-    session as flask_session, flash
+# TODO: refactor this whole massive kludge into an `auth` package -- too much going on in here
+
+import json
+from functools import wraps
+
+from flask import Blueprint, render_template, redirect, request, url_for, flash, session as flask_session
 from flask_login import LoginManager, login_user, logout_user, login_required
+from flask_wtf import Form, CSRFProtect
+from wtforms import StringField, PasswordField
+from wtforms.validators import DataRequired, Email
+
 from plenario.database import postgres_session as db_session
 from plenario.models import User
-from flask_wtf import Form
-from flask_wtf import CsrfProtect
-from wtforms import TextField, PasswordField
-from wtforms.validators import DataRequired, Email
-from functools import wraps
-import json
+
 
 auth = Blueprint('auth', __name__)
 login_manager = LoginManager()
-csrf = CsrfProtect()
-
+csrf = CSRFProtect()
 
 
 def check_admin_status():
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            api_key = None
-            resp = {
-                'status': 'ok',
-                'message': ''
-            }
-            status_code = 200
             if flask_session.get('user_id'):
                 api_key = flask_session['user_id']
             elif request.form.get('api_key'):
@@ -37,8 +33,8 @@ def check_admin_status():
                     api_key = json.loads(request.data).get('api_key')
                 except ValueError:
                     api_key = None
-            if (api_key):
-                user = db_session.query(User).get(api_key)
+            if api_key:
+                db_session.query(User).get(api_key)
             flask_session['user_id'] = api_key
             return f(*args, **kwargs)
         return decorated
@@ -46,7 +42,7 @@ def check_admin_status():
 
 
 class LoginForm(Form):
-    email = TextField('email', validators=[DataRequired(), Email()])
+    email = StringField('email', validators=[DataRequired(), Email()])
     password = PasswordField('password', validators=[DataRequired()])
 
     def __init__(self, *args, **kwargs):
@@ -58,7 +54,7 @@ class LoginForm(Form):
         if not rv:
             return False
 
-        user = db_session.query(User)\
+        user = db_session.query(User) \
             .filter(User.email == self.email.data).first()
         if user is None:
             self.email.errors.append('Email address is not registered')
@@ -71,9 +67,10 @@ class LoginForm(Form):
         self.user = user
         return True
 
+
 class AddUserForm(Form):
-    name = TextField('name', validators=[DataRequired()])
-    email = TextField('email', validators=[DataRequired(), Email()])
+    name = StringField('name', validators=[DataRequired()])
+    email = StringField('email', validators=[DataRequired(), Email()])
     password = PasswordField('password', validators=[DataRequired()])
 
     def __init__(self, *args, **kwargs):
@@ -85,32 +82,36 @@ class AddUserForm(Form):
         if not rv:
             return False
 
-        existing_name = db_session.query(User)\
+        existing_name = db_session.query(User) \
             .filter(User.name == self.name.data).first()
         if existing_name:
             self.name.errors.append('Name is already registered')
             return False
 
-        existing_email = db_session.query(User)\
+        existing_email = db_session.query(User) \
             .filter(User.email == self.email.data).first()
         if existing_email:
             self.email.errors.append('Email address is already registered')
             return False
-        
+
         return True
+
 
 class ResetPasswordForm(Form):
     old_password = PasswordField('old_password', validators=[DataRequired()])
     new_password = PasswordField('new_password', validators=[DataRequired()])
 
+
 @login_manager.user_loader
 def load_user(userid):
     return db_session.query(User).get(userid)
+
 
 @auth.route('/logout/')
 def logout():
     logout_user()
     return redirect(url_for('views.index'))
+
 
 @auth.route('/login/', methods=['GET', 'POST'])
 def login():
@@ -121,6 +122,7 @@ def login():
         return redirect(request.args.get('next') or url_for('views.index'))
     email = form.email.data
     return render_template('admin/login.html', form=form, email=email)
+
 
 @auth.route('/admin/add-user/', methods=['GET', 'POST'])
 @login_required
@@ -142,6 +144,7 @@ def add_user():
         'users': db_session.query(User).all()
     }
     return render_template('admin/add-user.html', **context)
+
 
 @auth.route('/admin/reset-password/', methods=['GET', 'POST'])
 @login_required

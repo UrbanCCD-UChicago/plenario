@@ -3,7 +3,7 @@ import unittest
 
 from sqlalchemy.exc import ProgrammingError
 
-from plenario import create_app
+from plenario.server import create_app
 from plenario.database import postgres_engine
 from plenario.etl.point import PlenarioETL
 from plenario.models import MetaTable

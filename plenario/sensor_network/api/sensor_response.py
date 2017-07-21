@@ -1,5 +1,7 @@
 import json
+
 from flask import make_response, request
+
 from plenario.api.common import unknown_object_json_handler
 
 
