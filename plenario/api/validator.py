@@ -5,8 +5,9 @@ from datetime import datetime, timedelta
 
 import sqlalchemy
 from dateutil import parser
-from marshmallow import Schema, fields
-from marshmallow.validate import OneOf, Range, ValidationError
+from marshmallow import fields, Schema
+from marshmallow.fields import Field
+from marshmallow.validate import Range, OneOf, ValidationError
 from sqlalchemy import MetaData
 from sqlalchemy.exc import DatabaseError, NoSuchTableError, ProgrammingError
 
@@ -17,6 +18,28 @@ from plenario.models import MetaTable, ShapeMetadata
 from plenario.models.SensorNetwork import FeatureMeta, NetworkMeta, NodeMeta, SensorMeta
 from plenario.sensor_network.api.sensor_aggregate_functions import aggregate_fn_map
 from plenario.utils.helpers import reflect
+
+
+class Pointset(Field):
+    def _serialize(self, value, attr, obj):
+        return value.name
+
+    def _deserialize(self, value, attr, data):
+        try:
+            return MetaTable.get_by_dataset_name(value).point_table
+        except AttributeError:
+            raise ValidationError('{} is not a valid dataset'.format(value))
+
+
+class DateTime(Field):
+    def _serialize(self, value, attr, obj):
+        return value.isoformat()
+
+    def _deserialize(self, value, attr, data):
+        try:
+            return parser.parse(value)
+        except ValueError:
+            raise ValidationError('{} does not contain a date'.format(value))
 
 
 def validate_dataset(dataset_name):
@@ -115,6 +138,17 @@ class DatasetRequiredValidator(Validator):
     requests that do not specify a 'dataset_name' in the query string.
     """
     dataset_name = fields.Str(validate=validate_dataset, dump_to='dataset', required=True)
+
+
+class PointsetRequiredValidator(Validator):
+    """This class validates point datasets using a Field subclass instead of a
+    validation method. Ideally I should have done all of the validation like
+    this, but we'll start small with /grid."""
+
+    dataset_name = Pointset(dump_to='dataset', required=True)
+    dataset = Pointset()
+    obs_date__ge = DateTime(default=lambda: (datetime.now() - timedelta(days=90)).isoformat())
+    obs_date__le = DateTime(default=lambda: datetime.now().isoformat())
 
 
 class NoGeoJSONValidator(Validator):
