@@ -1,12 +1,12 @@
-from metar.metar import Metar
-from plenario.database import postgres_engine as engine
-import requests
 import csv
 import os
 
-from lxml import etree
+import requests
+from lxml import etree, objectify
 from lxml.etree import fromstring
-from lxml import objectify
+from metar.metar import Metar
+
+from plenario.database import postgres_engine as engine
 
 # Example METAR URL: 'https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=xml&hoursBeforeNow=1.25&stationString=KORD'
 

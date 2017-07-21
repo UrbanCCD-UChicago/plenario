@@ -1,9 +1,8 @@
 import datetime
 
 from dateutil.parser import parse
-from sqlalchemy import Boolean, Integer, BigInteger, Float, Date, \
-    String
-from sqlalchemy.dialects.postgresql import TIMESTAMP, TIME
+from sqlalchemy import BigInteger, Boolean, Date, Float, Integer, String
+from sqlalchemy.dialects.postgresql import TIME, TIMESTAMP
 
 NoneType = type(None)
 
@@ -17,8 +16,7 @@ NULL_TIME = datetime.time(0, 0, 0)
 
 
 def normalize_column_type(l):
-    """
-    Given a sequence of values in a column (l),
+    """Given a sequence of values in a column (l),
     guess its type.
 
     :param l: A column
@@ -27,7 +25,6 @@ def normalize_column_type(l):
              and null_values is a boolean
              representing whether nulls of any kind were detected.
     """
-    
     null_values = False
 
     # Convert "NA", "N/A", etc. to null types.
@@ -59,7 +56,7 @@ def normalize_column_type(l):
         for i, x in enumerate(l):
             if x == '' or x is None:
                 continue
-            
+
             int_x = int(x.replace(',', ''))
 
             if x[0] == '0' and int(x) != 0:
@@ -91,7 +88,7 @@ def normalize_column_type(l):
             if x == '' or x is None:
                 continue
 
-            float_x  = float(x.replace(',', ''))
+            float_x = float(x.replace(',', ''))
 
         return Float, null_values
     except ValueError:
@@ -106,9 +103,9 @@ def normalize_column_type(l):
             if x == '' or x is None:
                 add(NoneType)
                 continue
- 
+
             d = parse(x, default=DEFAULT_DATETIME)
- 
+
             # Is it only a time?
             if d.date() == NULL_DATE:
                 add(TIME)
@@ -116,20 +113,19 @@ def normalize_column_type(l):
             # Is it only a date?
             elif d.time() == NULL_TIME:
                 add(Date)
- 
+
             # It must be a date and time
             else:
                 add(TIMESTAMP)
-            
+
             if 'am' in x.lower():
                 ampm = True
-            
+
             if 'pm' in x.lower():
                 ampm = True
 
-            
         normal_types_set.discard(NoneType)
- 
+
         # If a mix of dates and datetimes, up-convert dates to datetimes
         if normal_types_set == set([TIMESTAMP, Date]):
             normal_types_set = set([TIMESTAMP])
@@ -141,11 +137,11 @@ def normalize_column_type(l):
             normal_types_set = set([String])
         elif normal_types_set == set([TIME]) and ampm:
             normal_types_set = set([String])
- 
+
         return normal_types_set.pop(), null_values
     except ValueError:
         pass
-    except TypeError: #https://bugs.launchpad.net/dateutil/+bug/1247643
+    except TypeError:  # https://bugs.launchpad.net/dateutil/+bug/1247643
         pass
 
     # Don't know what they are, so they must just be strings 

@@ -10,20 +10,19 @@ from dateutil.parser import parse as date_parse
 from raven import Client
 from sqlalchemy import Table
 
-from plenario.database import redshift_base, redshift_session
-from plenario.database import postgres_session, postgres_base, postgres_engine as engine
+from plenario.database import redshift_base, redshift_session, postgres_session, postgres_base, postgres_engine
 from plenario.etl.point import PlenarioETL
 from plenario.etl.shape import ShapeETL
 from plenario.models import MetaTable, ShapeMetadata
-from plenario.settings import CELERY_BROKER_URL, S3_BUCKET
-from plenario.settings import PLENARIO_SENTRY_URL, CELERY_RESULT_BACKEND
+from plenario.settings import CELERY_BROKER_URL, S3_BUCKET, PLENARIO_SENTRY_URL, CELERY_RESULT_BACKEND
 from plenario.utils.helpers import reflect
 from plenario.utils.weather import WeatherETL
+
 
 client = Client(PLENARIO_SENTRY_URL) if PLENARIO_SENTRY_URL else None
 
 worker = Celery(
-    "worker",
+    'worker',
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND
 )
@@ -32,8 +31,8 @@ logger = logging.getLogger(__name__)
 
 
 def get_meta(name: str):
-    """Return meta record given a point table name or a shape table name."""
-
+    """Return meta record given a point table name or a shape table name.
+    """
     logger.info('Begin. (name: "{}")'.format(name))
     query = postgres_session.query(MetaTable).filter(MetaTable.dataset_name == name)
     result = query.first()
@@ -52,15 +51,15 @@ def get_meta(name: str):
 
 @worker.task()
 def health() -> bool:
-    """Shows that the worker is still recieving messages."""
-
+    """Shows that the worker is still receiving messages.
+    """
     return True
 
 
 @worker.task()
 def add_dataset(name: str) -> bool:
-    """Ingest the row information for an approved point dataset."""
-
+    """Ingest the row information for an approved point dataset.
+    """
     logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
     PlenarioETL(meta).add()
@@ -70,8 +69,8 @@ def add_dataset(name: str) -> bool:
 
 @worker.task()
 def update_dataset(name: str) -> bool:
-    """Update the row information for an approved point dataset."""
-
+    """Update the row information for an approved point dataset.
+    """
     logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
     PlenarioETL(meta).update()
@@ -81,20 +80,20 @@ def update_dataset(name: str) -> bool:
 
 @worker.task()
 def delete_dataset(name: str) -> bool:
-    """Delete the table and meta information for an approved point dataset."""
-
+    """Delete the table and meta information for an approved point dataset.
+    """
     logger.info('Begin. (name: "{}")'.format(name))
-    metatable = reflect("meta_master", postgres_base.metadata, engine)
+    metatable = reflect("meta_master", postgres_base.metadata, postgres_engine)
     metatable.delete().where(metatable.c.dataset_name == name).execute()
-    reflect(name, postgres_base.metadata, engine).drop()
+    reflect(name, postgres_base.metadata, postgres_engine).drop()
     logger.info('End.')
     return True
 
 
 @worker.task()
 def add_shape(name: str) -> bool:
-    """Ingest the row information for an approved shapeset."""
-
+    """Ingest the row information for an approved shapeset.
+    """
     logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
     logger.debug('Add the shape table.')
@@ -105,8 +104,8 @@ def add_shape(name: str) -> bool:
 
 @worker.task()
 def update_shape(name: str) -> bool:
-    """Update the row information for an approved shapeset."""
-
+    """Update the row information for an approved shapeset.
+    """
     logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
     logger.debug('Update the shape table.')
@@ -117,15 +116,15 @@ def update_shape(name: str) -> bool:
 
 @worker.task()
 def delete_shape(name) -> bool:
-    """Delete the table and meta information for an approved shapeset."""
-
+    """Delete the table and meta information for an approved shapeset.
+    """
     logger.info('Begin. (name: "{}")'.format(name))
     logger.debug('Reflect the shape metadata table.')
-    metashape = reflect("meta_shape", postgres_base.metadata, engine)
+    metashape = reflect("meta_shape", postgres_base.metadata, postgres_engine)
     logger.debug('Delete the shape meta record.')
     metashape.delete().where(metashape.c.dataset_name == name).execute()
     logger.debug('Reflect and drop the corresponding shape table.')
-    reflect(name, postgres_base.metadata, engine).drop()
+    reflect(name, postgres_base.metadata, postgres_engine).drop()
     logger.info('End.')
     return True
 
@@ -133,8 +132,8 @@ def delete_shape(name) -> bool:
 @worker.task()
 def frequency_update(frequency) -> bool:
     """Queue an update task for all the tables whose corresponding meta info
-    is part of this frequency group."""
-
+    is part of this frequency group.
+    """
     logger.info('Begin. (frequency: "{}")'.format(frequency))
     logger.debug('Query for all point dataset meta records.')
     point_metas = postgres_session.query(MetaTable) \
@@ -161,8 +160,8 @@ def frequency_update(frequency) -> bool:
 
 @worker.task()
 def update_metar() -> bool:
-    """Run a METAR update."""
-
+    """Run a METAR update.
+    """
     logger.info('Begin.')
     w = WeatherETL()
     logger.debug('Call metar initialization method.')
@@ -176,8 +175,8 @@ def clean_metar() -> bool:
     """Given the latest datetime available in hourly observations table,
     delete all metar records older than that datetime. Records which exist
     in the hourly table are the quality-controlled versions of records that
-    existed in the metar table."""
-
+    existed in the metar table.
+    """
     logger.info('Begin.')
     WeatherETL().clear_metars()
     logger.info('End.')
@@ -186,8 +185,8 @@ def clean_metar() -> bool:
 
 @worker.task()
 def update_weather(month=None, year=None, wbans=None) -> bool:
-    """Run a weather update."""
-
+    """Run a weather update.
+    """
     # This should do the current month AND the previous month, just in case.
     last_month_dt = datetime.now() - timedelta(days=7)
     last_month = last_month_dt.month
@@ -206,12 +205,11 @@ def update_weather(month=None, year=None, wbans=None) -> bool:
 
 
 def start_and_end_of_the_month(dt: datetime):
-    """Get first of month and first of next month for a given datetime."""
-
+    """Get first of month and first of next month for a given datetime.
+    """
     start = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     if start.month == 12:
-        end = start.replace(year=start.year + 1, month=1, day=1, hour=0,
-                            minute=0, second=0, microsecond=0)
+        end = start.replace(year=start.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     else:
         end = start.replace(month=start.month + 1)
     return start, end
@@ -220,8 +218,8 @@ def start_and_end_of_the_month(dt: datetime):
 @worker.task()
 def archive(datetime_string: str) -> bool:
     """Store the feature data into tar files organized by node and upload
-    those tar files to s3."""
-
+    those tar files to s3.
+    """
     logger.debug('reflecting tables')
     # Get table objects for all known feature tables in redshift database
     redshift_base.metadata.reflect()
@@ -281,27 +279,26 @@ def archive(datetime_string: str) -> bool:
 
 
 def s3_upload(path: str, dest: str):
-    """Upload file found at path to s3."""
-
+    """Upload file found at path to s3.
+    """
     s3 = boto3.resource('s3')
     bucket = s3.Bucket(S3_BUCKET)
     file = open(path, 'rb')
-
     bucket.put_object(Key=dest, Body=file)
     file.close()
 
 
 def table_to_csvs(table: Table, start: datetime, end: datetime) -> list:
     """Take a feature of interest table and split it into a bunch of csv files
-    that are grouped by node. Return the names of all the files it made."""
-
+    that are grouped by node. Return the names of all the files it made.
+    """
     files = {}
     writers = {}
     file_names = []
 
-    query = redshift_session.query(table)  \
+    query = redshift_session.query(table) \
         .filter(table.c.datetime >= start) \
-        .filter(table.c.datetime < end)    \
+        .filter(table.c.datetime < end) \
         .yield_per(1000)
 
     for row in query:

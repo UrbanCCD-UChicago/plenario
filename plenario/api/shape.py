@@ -1,30 +1,23 @@
 import json
-
-
 from collections import OrderedDict
+
 from flask import make_response, request
-from marshmallow import Schema
-from marshmallow.exceptions import ValidationError
-from marshmallow.fields import Field
 from sqlalchemy import func
 from sqlalchemy.exc import NoSuchTableError
 
-from plenario.api.common import crossdomain, extract_first_geometry_fragment
-from plenario.api.common import make_fragment_str
+from plenario.api.common import crossdomain, extract_first_geometry_fragment, make_fragment_str
 from plenario.api.condition_builder import parse_tree
-from plenario.api.point import detail_query
 from plenario.api.jobs import make_job_response
-from plenario.api.response import export_dataset_to_response, make_error
-from plenario.api.response import aggregate_point_data_response, bad_request
-from plenario.api.validator import validate, has_tree_filters, Validator
-from plenario.api.validator import ExportFormatsValidator
+from plenario.api.point import detail_query
+from plenario.api.response import aggregate_point_data_response, bad_request, export_dataset_to_response, make_error
+from plenario.api.validator import ExportFormatsValidator, Validator, has_tree_filters, validate
 from plenario.models import ShapeMetadata
 
 
-@crossdomain(origin="*")
+@crossdomain(origin='*')
 def get_all_shape_datasets():
-    """Fetches metadata for every shape dataset in meta_shape."""
-
+    """Fetches metadata for every shape dataset in meta_shape.
+    """
     try:
         response_skeleton = {
             'meta': {
@@ -63,7 +56,7 @@ def get_all_shape_datasets():
     return resp
 
 
-@crossdomain(origin="*")
+@crossdomain(origin='*')
 def aggregate_point_data(point_dataset_name, polygon_dataset_name):
     consider = ('dataset_name', 'shape', 'obs_date__ge', 'obs_date__le',
                 'data_type', 'location_geom__within', 'job')
@@ -88,15 +81,14 @@ def aggregate_point_data(point_dataset_name, polygon_dataset_name):
         )
 
 
-@crossdomain(origin="*")
+@crossdomain(origin='*')
 def export_shape(dataset_name):
     """Route for /shapes/<shapeset>/ endpoint. Requires a dataset argument
     and can apply column specific filters to it.
 
     :param dataset_name: user provided name of target shapeset
-
-    :returns: response object result of _export_shape"""
-
+    :returns: response object result of _export_shape
+    """
     # Find a way to work these into the validator, they shouldn't be out here.
     if dataset_name not in ShapeMetadata.tablenames():
         return make_error(dataset_name + ' not found.', 404)
@@ -156,9 +148,8 @@ def _export_shape(args):
     single specified shape dataset.
 
     :param args: ValidatorResult of user provided arguments
-
-    :returns: response object"""
-
+    :returns: response object
+    """
     meta_params = ('shapeset', 'data_type', 'geom')
     meta_vals = (args.data.get(k) for k in meta_params)
     shapeset, data_type, geom = meta_vals
@@ -168,8 +159,8 @@ def _export_shape(args):
         error_message = error_message.format(request.args['shape'])
         return make_response(error_message, 404)
 
-    query = "SELECT * FROM {}".format(shapeset.name)
-    conditions = ""
+    query = 'SELECT * FROM {}'.format(shapeset.name)
+    conditions = ''
 
     if has_tree_filters(args.data):
         # A string literal is required for ogr2ogr to function correctly.
@@ -178,11 +169,10 @@ def _export_shape(args):
 
     if geom:
         if conditions:
-            conditions += "AND "
-        conditions += "ST_Intersects({}.geom, ST_GeomFromGeoJSON('{}'))".format(
-            shapeset.name, geom)
+            conditions += 'AND '
+        conditions += "ST_Intersects({}.geom, ST_GeomFromGeoJSON('{}'))".format(shapeset.name, geom)
 
     if conditions:
-        query += " WHERE " + conditions
+        query += ' WHERE ' + conditions
 
     return query

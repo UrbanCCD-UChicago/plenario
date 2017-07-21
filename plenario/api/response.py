@@ -1,18 +1,17 @@
 import json
 import os
-import shapely.wkb
 import tempfile
-
-from plenario.api.common import make_csv, date_json_handler
-from plenario.api.common import unknown_object_json_handler
-from plenario.models import ShapeMetadata
-from plenario.utils.ogr2ogr import OgrExport
-
 from datetime import datetime
-from flask import make_response, request, jsonify
+from functools import reduce
 from itertools import groupby
 from operator import itemgetter
-from functools import reduce
+
+import shapely.wkb
+from flask import jsonify, make_response, request
+
+from plenario.api.common import date_json_handler, make_csv, unknown_object_json_handler
+from plenario.models import ShapeMetadata
+from plenario.utils.ogr2ogr import OgrExport
 
 
 def make_error(msg, status_code):
@@ -91,16 +90,16 @@ def json_response_base(validator, objects, query=''):
 
 def geojson_response_base():
     return {
-        "type": "FeatureCollection",
-        "features": []
+        'type': 'FeatureCollection',
+        'features': []
     }
 
 
 def add_geojson_feature(geojson_response, feature_geom, feature_properties):
     new_feature = {
-        "type": "Feature",
-        "geometry": feature_geom,
-        "properties": feature_properties
+        'type': 'Feature',
+        'geometry': feature_geom,
+        'properties': feature_properties
     }
     geojson_response['features'].append(new_feature)
 
@@ -124,8 +123,8 @@ def form_csv_detail_response(to_remove, rows, dataset_names=None):
     remove_columns_from_dict(rows, to_remove)
 
     if len(rows) <= 0:
-        csv_resp = [["Sorry! Your query didn't return any results."]]
-        csv_resp += [["Try to modify your date or location parameters."]]
+        csv_resp = [['Sorry! Your query did not return any results.']]
+        csv_resp += [['Try to modify your date or location parameters.']]
     else:
         # Column headers from arbitrary row,
         # then the values from all the others
@@ -138,7 +137,7 @@ def form_csv_detail_response(to_remove, rows, dataset_names=None):
     # (ex. shapes/<shapeset>/<dataset>), the dataset names can be manually
     # assigned.
     if dname is None:
-        dname = reduce(lambda name1, name2: name1 + "_and_" + name2, dataset_names)
+        dname = reduce(lambda name1, name2: name1 + '_and_' + name2, dataset_names)
 
     filedate = datetime.now().strftime('%Y-%m-%d')
     resp.headers['Content-Type'] = 'text/csv'
@@ -159,8 +158,8 @@ def convert_result_geoms(result):
     to a list of coordinates.
 
     :param result: (list) contains the results of some query
-    :returns (list) modified result, where geoms are represented by lists"""
-
+    :returns (list) modified result, where geoms are represented by lists
+    """
     geojson_resp = geojson_response_base()
     for row in result:
         try:
@@ -176,7 +175,6 @@ def convert_result_geoms(result):
 # Point Endpoint Repsonses ====================================================
 
 def detail_aggregate_response(query_result, query_args):
-
     datatype = query_args.data['data_type']
 
     if datatype == 'csv':
@@ -194,7 +192,6 @@ def detail_aggregate_response(query_result, query_args):
 
 
 def meta_response(query_result, query_args):
-
     resp = json_response_base(query_args, query_result, request.args)
     resp['meta']['total'] = len(resp['objects'])
     status_code = 200
@@ -204,7 +201,6 @@ def meta_response(query_result, query_args):
 
 
 def fields_response(query_result, query_args):
-
     resp = json_response_base(query_args, query_result, request.args)
     resp['objects'] = query_result[0]['columns']
     status_code = 200
@@ -214,7 +210,6 @@ def fields_response(query_result, query_args):
 
 
 def detail_response(query_result, query_args):
-
     to_remove = ['point_date', 'hash']
 
     data_type = query_args.data['data_type']
@@ -229,7 +224,6 @@ def detail_response(query_result, query_args):
 
 
 def timeseries_response(query_result, query_args):
-
     resp = json_response_base(query_args, query_result, query_args.data)
 
     datatype = query_args.data['data_type']
@@ -322,7 +316,7 @@ def export_dataset_to_response(shapeset, data_type, query=None):
         # Make the downloaded filename look nice
         shapemeta = ShapeMetadata.get_by_dataset_name(shapeset.name)
         resp.headers['Content-Type'] = _shape_format_to_content_header(export_format)
-        resp.headers['Content-Disposition'] = 'attachment; filename="{}.{}"'.format(shapemeta.human_name, extension)
+        resp.headers['Content-Disposition'] = "attachment; filename='{}.{}'".format(shapemeta.human_name, extension)
         return resp
 
     except Exception as e:

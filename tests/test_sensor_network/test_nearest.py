@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
-from plenario import create_app
+from plenario.server import create_app
 from plenario.database import postgres_base, psql
 from plenario.models.SensorNetwork import NetworkMeta, NodeMeta
 from plenario.models.SensorNetwork import SensorMeta, FeatureMeta

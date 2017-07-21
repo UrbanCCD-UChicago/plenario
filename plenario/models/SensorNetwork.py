@@ -1,14 +1,12 @@
 import json
 
 from geoalchemy2 import Geometry
-from sqlalchemy import Table, String, Column, ForeignKey, ForeignKeyConstraint
-from sqlalchemy import func as sqla_fn, Boolean, BigInteger, DateTime, Float
-from sqlalchemy.dialects.postgresql import JSONB, DOUBLE_PRECISION
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, Float, ForeignKey, ForeignKeyConstraint, String, Table, \
+    func as sqla_fn
+from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION, JSONB
 from sqlalchemy.orm import relationship
 
-from plenario.database import postgres_engine
-from plenario.database import postgres_base, postgres_session, redshift_base
-
+from plenario.database import postgres_base, postgres_engine, postgres_session, redshift_base
 
 sensor_to_node = Table(
     'sensor__sensor_to_node',
@@ -36,12 +34,12 @@ def knn(lng, lat, k, network, sensors):
     :param lng: (float) longitude
     :param lat: (float) latitude
     :param k: (int) number of results to return
-    :returns: (list) of nearest k neighbors"""
-
+    :returns: (list) of nearest k neighbors
+    """
     # Convert lng-lat to geojson point
     point = "'" + json.dumps({
-        "type": "Point",
-        "coordinates": [lng, lat]
+        'type': 'Point',
+        'coordinates': [lng, lat]
     }) + "'"
 
     # How many to limit the initial bounding box query to
@@ -81,7 +79,7 @@ def knn(lng, lat, k, network, sensors):
         network=network,
         k=k,
         k_10=k_10,
-        sensors="{" + ",".join(sensors) + "}"
+        sensors='{' + ','.join(sensors) + '}'
     )
 
     return postgres_engine.execute(query).fetchall()
@@ -100,7 +98,7 @@ class NetworkMeta(postgres_base):
         return [network.name.lower() for network in networks]
 
     def __repr__(self):
-        return '<Network "{}">'.format(self.name)
+        return '<Network {!r}>'.format(self.name)
 
     def tree(self):
         sensor_tree_fn = sqla_fn.network_tree(self.name)
@@ -122,7 +120,7 @@ class NetworkMeta(postgres_base):
             for feature in sensor.values():
                 keys += feature.values()
 
-        return set([k.split(".")[0] for k in keys])
+        return set([k.split('.')[0] for k in keys])
 
 
 class NodeMeta(postgres_base):
@@ -135,7 +133,7 @@ class NodeMeta(postgres_base):
     info = Column(JSONB)
     address = Column(String)
 
-    column_editable_list = ("sensors", "info")
+    column_editable_list = ('sensors', 'info')
 
     @staticmethod
     def all(network_name):
@@ -183,7 +181,7 @@ class NodeMeta(postgres_base):
         return feature_set
 
     def __repr__(self):
-        return '<Node "{}">'.format(self.id)
+        return '<Node {!r}>'.format(self.id)
 
     def tree(self):
         return {s.name: s.tree() for s in self.sensors}
@@ -197,12 +195,12 @@ class SensorMeta(postgres_base):
     info = Column(JSONB)
 
     def features(self) -> set:
-        """Return the features that this sensor reports on."""
-
+        """Return the features that this sensor reports on.
+        """
         return {e.split('.')[0] for e in self.tree()}
 
     def __repr__(self):
-        return '<Sensor "{}">'.format(self.name)
+        return '<Sensor {!r}>'.format(self.name)
 
     def tree(self):
         return {v: k for k, v in self.observed_properties.items()}
@@ -216,13 +214,13 @@ class FeatureMeta(postgres_base):
     observed_properties = Column(JSONB)
 
     def types(self):
-        """Return a dictionary with the properties mapped to their types."""
-
+        """Return a dictionary with the properties mapped to their types.
+        """
         return {e['name']: e['type'] for e in self.observed_properties}
 
     def sensors(self) -> set:
-        """Return the set of sensors that report on this feature."""
-
+        """Return the set of sensors that report on this feature.
+        """
         results = set()
         for network in self.networks:
             for node in network.tree().values():
@@ -246,18 +244,18 @@ class FeatureMeta(postgres_base):
     def properties_of(feature):
         query = postgres_session.query(FeatureMeta.observed_properties).filter(
             FeatureMeta.name == feature)
-        return [feature + "." + prop["name"] for prop in query.first().observed_properties]
+        return [feature + '.' + prop['name'] for prop in query.first().observed_properties]
 
     def mirror(self):
         """Create feature tables in redshift for all the networks associated
-        with this feature."""
-
+        with this feature.
+        """
         for network in self.networks:
             self._mirror(network.name)
 
     def _mirror(self, network_name: str):
-        """Create a feature table in redshift for the specified network."""
-
+        """Create a feature table in redshift for the specified network.
+        """
         columns = []
         for feature in self.observed_properties:
             column_name = feature['name']
@@ -279,7 +277,7 @@ class FeatureMeta(postgres_base):
         redshift_table.create()
 
     def __repr__(self):
-        return '<Feature "{}">'.format(self.name)
+        return '<Feature {!r}>'.format(self.name)
 
 
 database_types = {
