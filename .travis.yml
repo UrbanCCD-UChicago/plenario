@@ -29,25 +29,24 @@ script:
 - nosetests --nologcapture tests/test_models/test_feature_meta.py -v
 - nosetests --nologcapture tests/test_sensor_network/test_nearest.py -v
 deploy:
-  matrix:
-  - provider: elasticbeanstalk
-    region: us-east-1
-    app: plenario
-    env: plenario-server
-    bucket_name: elasticbeanstalk-us-east-1-031052761859
-    access_key_id:
-      secure: jJrLxF9U4evRNYuDzlLNs1WflNrChqeNvWj+9N6LHy5l6qQnOF/F5lfw6rxDLq2B0+M9plB+LJd4ONNZvnB2snmm6tNKv3FhnpqXm6xW5VkPYNQsjv0kMNK+DpkvIoAiZePxJSV1kVvMZ7J6F9QvDogebXTA0qhJR/TcvE0fjPk=
-    secret_access_key:
-      secure: JoW735yFVOmTf+Frmnf9WWF+1xoqt4dW8sXbEABVa8cRpDJf62oEw+IJKyYO8czjnwUas6nSpOPnbgCEE2Yt+cpk90J2aMqmpZAWqdRNkjFC+J/ErZadYVcTcK7i+Z05PAPAGm9RDBv7iQaFgpAETFA2IHPD2+plavbazTz2fg0=
-  - provider: elasticbeanstalk
-    region: us-east-1
-    app: plenario
-    env: plenario-worker
-    bucket_name: elasticbeanstalk-us-east-1-031052761859
-    access_key_id:
-      secure: jJrLxF9U4evRNYuDzlLNs1WflNrChqeNvWj+9N6LHy5l6qQnOF/F5lfw6rxDLq2B0+M9plB+LJd4ONNZvnB2snmm6tNKv3FhnpqXm6xW5VkPYNQsjv0kMNK+DpkvIoAiZePxJSV1kVvMZ7J6F9QvDogebXTA0qhJR/TcvE0fjPk=
-    secret_access_key:
-      secure: JoW735yFVOmTf+Frmnf9WWF+1xoqt4dW8sXbEABVa8cRpDJf62oEw+IJKyYO8czjnwUas6nSpOPnbgCEE2Yt+cpk90J2aMqmpZAWqdRNkjFC+J/ErZadYVcTcK7i+Z05PAPAGm9RDBv7iQaFgpAETFA2IHPD2+plavbazTz2fg0=
+- provider: elasticbeanstalk
+  region: us-east-1
+  app: plenario
+  env: plenario-server
+  bucket_name: elasticbeanstalk-us-east-1-031052761859
+  access_key_id:
+    secure: jJrLxF9U4evRNYuDzlLNs1WflNrChqeNvWj+9N6LHy5l6qQnOF/F5lfw6rxDLq2B0+M9plB+LJd4ONNZvnB2snmm6tNKv3FhnpqXm6xW5VkPYNQsjv0kMNK+DpkvIoAiZePxJSV1kVvMZ7J6F9QvDogebXTA0qhJR/TcvE0fjPk=
+  secret_access_key:
+    secure: JoW735yFVOmTf+Frmnf9WWF+1xoqt4dW8sXbEABVa8cRpDJf62oEw+IJKyYO8czjnwUas6nSpOPnbgCEE2Yt+cpk90J2aMqmpZAWqdRNkjFC+J/ErZadYVcTcK7i+Z05PAPAGm9RDBv7iQaFgpAETFA2IHPD2+plavbazTz2fg0=
+- provider: elasticbeanstalk
+  region: us-east-1
+  app: plenario
+  env: plenario-worker
+  bucket_name: elasticbeanstalk-us-east-1-031052761859
+  access_key_id:
+    secure: jJrLxF9U4evRNYuDzlLNs1WflNrChqeNvWj+9N6LHy5l6qQnOF/F5lfw6rxDLq2B0+M9plB+LJd4ONNZvnB2snmm6tNKv3FhnpqXm6xW5VkPYNQsjv0kMNK+DpkvIoAiZePxJSV1kVvMZ7J6F9QvDogebXTA0qhJR/TcvE0fjPk=
+  secret_access_key:
+    secure: JoW735yFVOmTf+Frmnf9WWF+1xoqt4dW8sXbEABVa8cRpDJf62oEw+IJKyYO8czjnwUas6nSpOPnbgCEE2Yt+cpk90J2aMqmpZAWqdRNkjFC+J/ErZadYVcTcK7i+Z05PAPAGm9RDBv7iQaFgpAETFA2IHPD2+plavbazTz2fg0=
 notifications:
   slack:
     secure: IsCJP58JKofvwy4jVC4DEZSUShLp+i4V94dzhKSoFrhRFKeT3Te/Hn+uDPBT+ZwTcs7QF0k1DfBHTZt0za1U/Q2fabhxxarrtR3v9DGWo2OfdBjyY9TM05JmZyFESov4CxzA4USvFd+GO7P6QY1IhdDF8oSa9dCViTAerBOGLMk=
