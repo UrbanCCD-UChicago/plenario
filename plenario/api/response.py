@@ -213,13 +213,6 @@ def fields_response(query_result, query_args):
     return resp
 
 
-def grid_response(query_result):
-
-    resp = make_response(json.dumps(query_result, default=date_json_handler), 200)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
-
-
 def detail_response(query_result, query_args):
 
     to_remove = ['point_date', 'hash']

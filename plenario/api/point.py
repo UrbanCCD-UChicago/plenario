@@ -9,6 +9,7 @@ import sqlalchemy
 import traceback
 
 from collections import OrderedDict
+from datetime import datetime, timedelta
 from dateutil import parser
 from flask import request, Response, jsonify, stream_with_context
 
@@ -20,6 +21,7 @@ from plenario.api.validator import DatasetRequiredValidator
 from plenario.api.validator import NoGeoJSONDatasetRequiredValidator
 from plenario.api.validator import NoDefaultDatesValidator, NoGeoJSONValidator
 from plenario.api.validator import validate, has_tree_filters
+from plenario.api.validator import PointsetRequiredValidator
 from plenario.database import postgres_session
 from plenario.models import MetaTable
 
@@ -119,18 +121,28 @@ def datadump_view():
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin="*")
 def grid():
-    fields = ('dataset_name', 'resolution', 'buffer', 'obs_date__le', 'obs_date__ge',
-              'location_geom__within', 'job')
-    validator_result = validate(DatasetRequiredValidator(only=fields), request.args.to_dict())
 
+    fields = (
+        'dataset',
+        'dataset_name',
+        'resolution',
+        'buffer',
+        'obs_date__le',
+        'obs_date__ge',
+        'location_geom__within',
+    )
+
+    validator = PointsetRequiredValidator(only=fields)
+    validator_result = validate(validator, request.args)
     if validator_result.errors:
         return api_response.bad_request(validator_result.errors)
 
-    if validator_result.data.get('job'):
-        return make_job_response("grid", validator_result)
-    else:
-        result_data = _grid(validator_result)
-        return api_response.grid_response(result_data)
+    results = _grid(validator_result)
+
+    query = validator.dumps(validator_result.data)
+    query = json.loads(query.data)
+    results['properties'] = query
+    return jsonify(results)
 
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
@@ -476,8 +488,8 @@ def _grid(args):
 
     # We only build conditions from values with a key containing 'filter'.
     # Therefore we only build dataset conditions from condition trees.
-    dataset_conditions = {k: v for k, v in list(args.data.items()) if 'filter' in k}
-    for tablename, condition_tree in list(dataset_conditions.items()):
+    dataset_conditions = {k: v for k, v in args.data.items() if 'filter' in k}
+    for tablename, condition_tree in dataset_conditions.items():
 
         tablename = tablename.split('__')[0]
 
