@@ -237,7 +237,7 @@ class MetaTable(postgres_base):
 
             for row in rows:
                 ts_dict['items'].append({
-                    'datetime': row.time_bucket.date(),  # UTC time
+                    'datetime': row.time_bucket.isoformat(),
                     'count': row.count
                 })
                 # Aggregate top-level count across all time slices.
