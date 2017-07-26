@@ -177,7 +177,7 @@ class PointAPITests(BasePlenarioTest):
         self.assertEqual(len(lines), 6)
         for line in lines:
             self.assertEqual(len(line), len(lines[0]))
-        
+
         self.assertTrue('date' in lines[0])
         self.assertTrue('latitude' in lines[0])
         self.assertTrue('longitude' in lines[0])

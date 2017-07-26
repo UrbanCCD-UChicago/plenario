@@ -153,7 +153,7 @@ class MetaTable(postgres_base):
     @classmethod
     def attach_metadata(cls, rows):
         """Given a list of dicts that include a dataset_name, add metadata about the datasets to each dict.
-        
+
         :param rows: List of dict-likes with a dataset_name attribute
         """
         dataset_names = [row['dataset_name'] for row in rows]
@@ -198,12 +198,12 @@ class MetaTable(postgres_base):
 
     @classmethod
     def timeseries_all(cls, table_names, agg_unit, start, end, geom=None, ctrees=None):
-        """Return a list of 
+        """Return a list of
         [
             {
                 'dataset_name': 'Foo',
-                'items': [{'datetime': dt, 'count': int}, ...] 
-            } 
+                'items': [{'datetime': dt, 'count': int}, ...]
+            }
         ]
         """
         # For each table in table_names, generate a query to be unioned
@@ -237,7 +237,7 @@ class MetaTable(postgres_base):
 
             for row in rows:
                 ts_dict['items'].append({
-                    'datetime': row.time_bucket.isoformat(),
+                    'datetime': row.time_bucket.date().isoformat(),
                     'count': row.count
                 })
                 # Aggregate top-level count across all time slices.
