@@ -14,12 +14,16 @@ from plenario.models import ShapeMetadata
 from plenario.utils.ogr2ogr import OgrExport
 
 
-def make_error(msg, status_code):
+def make_error(msg, status_code, arguments=None):
+
+    if not arguments:
+        arguments = request.args
+
     resp = {
         'meta': {
             'status': 'error',
             'message': msg,
-            'query': request.args
+            'query': arguments
         },
         'objects': [],
     }

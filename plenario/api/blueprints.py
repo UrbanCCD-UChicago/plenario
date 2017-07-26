@@ -8,9 +8,10 @@ from plenario.sensor_network.api.sensor_networks import check, get_aggregations,
     get_network_map, get_network_metadata, get_node_download, get_node_metadata, get_observation_nearest, \
     get_observations, get_observations_download, get_sensor_metadata
 from .common import cache, make_cache_key
-from .point import datadump_view, dataset_fields, detail, detail_aggregate, get_job_view, grid, meta, timeseries
+from .point import datadump_view, dataset_fields, detail, detail_aggregate, get_job_view, grid, meta
 from .sensor import weather, weather_fill, weather_stations
 from .shape import aggregate_point_data, export_shape, get_all_shape_datasets
+from .timeseries import timeseries
 
 
 api = Blueprint('api', __name__)

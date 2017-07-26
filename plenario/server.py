@@ -42,6 +42,7 @@ def create_app():
 
     app = Flask(__name__)
     app.config.from_object('plenario.settings')
+    app.config['JSON_SORT_KEYS'] = False
     app.url_map.strict_slashes = False
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
