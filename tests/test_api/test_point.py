@@ -356,6 +356,7 @@ class PointAPITests(BasePlenarioTest):
         query = '?obs_date__ge=2000-08-01&agg=year&dataset_name__in=flu_shot_clinics,landmarks'
 
         resp_data = self.get_api_response(endpoint + query)
+        print(resp_data)
 
         self.assertEqual(resp_data['objects'][0]['count'], 65)
         self.assertEqual(resp_data['objects'][1]['count'], 149)
@@ -366,7 +367,7 @@ class PointAPITests(BasePlenarioTest):
 
         resp_data = self.get_api_response(endpoint + query)
 
-        self.assertIn('Invalid table name: landmarkz.', resp_data['meta']['message']['dataset_name__in'])
+        self.assertIn('landmarkz', resp_data['meta']['message']['dataset_name__in']['1'][0])
 
     # ================================
     # /timeseries with condition trees

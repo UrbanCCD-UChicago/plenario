@@ -39,24 +39,6 @@ def get_job_view(ticket):
 
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin='*')
-def timeseries():
-    fields = ('location_geom__within', 'dataset_name', 'dataset_name__in',
-              'agg', 'obs_date__ge', 'obs_date__le', 'data_type', 'job')
-    validator = NoGeoJSONValidator(only=fields)
-    validator_result = validate(validator, request.args.to_dict())
-
-    if validator_result.errors:
-        return api_response.bad_request(validator_result.errors)
-
-    if validator_result.data.get('job'):
-        return make_job_response('timeseries', validator_result)
-    else:
-        panel = _timeseries(validator_result)
-        return api_response.timeseries_response(panel, validator_result)
-
-
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin='*')
 def detail_aggregate():
     fields = ('location_geom__within', 'dataset_name', 'agg', 'obs_date__ge',
               'obs_date__le', 'data_type', 'job')
@@ -180,70 +162,6 @@ def meta():
 # ============
 # _route logic
 # ============
-
-
-def _timeseries(args):
-    meta_params = ['geom', 'dataset', 'dataset_name__in', 'obs_date__ge', 'obs_date__le', 'agg']
-    meta_vals = [args.data.get(k) for k in meta_params]
-    geom, dataset, table_names, start_date, end_date, agg = meta_vals
-
-    ctrees = {}
-
-    if has_tree_filters(args.data):
-        # Timeseries is a little tricky. If there aren't filters,
-        # it would be ridiculous to build a condition tree for every one.
-        for field, value in list(args.data.items()):
-            if 'filter' in field:
-                # This pattern matches the last occurrence of the '__' pattern.
-                # Prevents an error that is caused by dataset names with trailing
-                # underscores.
-                tablename = re.split(r'__(?!_)', field)[0]
-                metarecord = MetaTable.get_by_dataset_name(tablename)
-                pt = metarecord.point_table
-                ctrees[pt.name] = parse_tree(pt, value)
-        # Just cleanliness, since we don't use this argument. Doesn't have
-        # to show up in the JSON response.
-        del args.data['dataset']
-
-    # If no dataset_name__in list was provided, have to fill it in by invoking
-    # MetaTable.index() here! Not in the validator. This way the list stays up
-    # to date.
-    if table_names is None:
-        table_names = MetaTable.index()
-        args.data['dataset_name__in'] = table_names
-
-    # If a single dataset was provided, it's the only thing we need to consider.
-    if dataset is not None:
-        table_names = [dataset.name]
-        del args.data['dataset_name__in']
-
-    # remove table names which wouldn't return anything for the query, given
-    # the time and geom constraints
-    try:
-        table_names = MetaTable.narrow_candidates(table_names, start_date, end_date, geom)
-    except Exception as e:
-        traceback.print_exc()
-        msg = 'Failed to gather candidate tables.'
-        return api_response.make_raw_error('{}: {}'.format(msg, e))
-        # TODO: Correctly handle _timeseries (and all the other endpoints)
-        # TODO: so that make_error is called when there is an error.
-
-    # If there aren't any table names, it causes an error down the code. Better
-    # to return and inform them that the request wouldn't have found anything.
-    if not table_names:
-        return api_response.bad_request('Your request does not return any results. Try '
-                                        'adjusting your time constraint or location '
-                                        'parameters.')
-
-    try:
-        panel = MetaTable.timeseries_all(
-            table_names, agg, start_date, end_date, geom, ctrees
-        )
-    except Exception as e:
-        msg = 'Failed to construct timeseries.'
-        return api_response.make_raw_error('{}: {}'.format(msg, e))
-
-    return MetaTable.attach_metadata(panel)
 
 
 def _detail_aggregate(args):

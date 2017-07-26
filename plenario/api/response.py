@@ -14,12 +14,16 @@ from plenario.models import ShapeMetadata
 from plenario.utils.ogr2ogr import OgrExport
 
 
-def make_error(msg, status_code):
+def make_error(msg, status_code, arguments=None):
+
+    if not arguments:
+        arguments = request.args
+
     resp = {
         'meta': {
             'status': 'error',
             'message': msg,
-            'query': request.args
+            'query': arguments
         },
         'objects': [],
     }
@@ -221,48 +225,6 @@ def detail_response(query_result, query_args):
 
     elif data_type == 'geojson':
         return form_geojson_detail_response(to_remove, query_result)
-
-
-def timeseries_response(query_result, query_args):
-    resp = json_response_base(query_args, query_result, query_args.data)
-
-    datatype = query_args.data['data_type']
-    if datatype == 'json':
-        resp = make_response(json.dumps(resp, default=unknown_object_json_handler), 200)
-        resp.headers['Content-Type'] = 'application/json'
-    elif datatype == 'csv':
-
-        # response format
-        # temporal_group,dataset_name_1,dataset_name_2
-        # 2014-02-24 00:00:00,235,653
-        # 2014-03-03 00:00:00,156,624
-
-        fields = ['temporal_group']
-        for o in resp['objects']:
-            fields.append(o['dataset_name'])
-
-        csv_resp = []
-        i = 0
-        for k, g in groupby(resp['objects'], key=itemgetter('dataset_name')):
-            l_g = list(g)[0]
-
-            j = 0
-            for row in l_g['items']:
-                # first iteration, populate the first column with temporal_groups
-                if i == 0:
-                    csv_resp.append([row['datetime']])
-                csv_resp[j].append(row['count'])
-                j += 1
-            i += 1
-
-        csv_resp.insert(0, fields)
-        csv_resp = make_csv(csv_resp)
-        resp = make_response(csv_resp, 200)
-        resp.headers['Content-Type'] = 'text/csv'
-        filedate = datetime.now().strftime('%Y-%m-%d')
-        resp.headers['Content-Disposition'] = 'attachment; filename=%s.csv' % filedate
-
-    return resp
 
 
 # Shape Endpoint Responses ====================================================
