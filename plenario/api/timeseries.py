@@ -23,8 +23,8 @@ class TimeseriesValidator(Schema):
     dataset_name = Pointset(default=None)
     dataset_name__in = Commalist(Pointset(), default=lambda: list())
     location_geom__within = Geometry(default=None)
-    obs_date__ge = DateTime(default=lambda: datetime.now())
-    obs_date__le = DateTime(default=lambda: datetime.now() - timedelta(days=90))
+    obs_date__ge = DateTime(default=lambda: datetime.now() - timedelta(days=90))
+    obs_date__le = DateTime(default=lambda: datetime.now())
     data_type = Str(default='json', validate=OneOf({'csv', 'json'}))
 
     @post_load
