@@ -43,7 +43,7 @@ def timeseries():
     deserialized_arguments = validator.load(request.args)
 
     if deserialized_arguments.errors:
-        return make_error(deserialized_arguments.error, 400, deserialized_arguments.data)
+        return make_error(deserialized_arguments.errors, 400, deserialized_arguments.data)
 
     qargs = deserialized_arguments.data
 
