@@ -407,7 +407,7 @@ def _grid(args):
     dataset_conditions = {k: v for k, v in args.data.items() if 'filter' in k}
     for tablename, condition_tree in dataset_conditions.items():
 
-        tablename = tablename.split('__')[0]
+        tablename = tablename.rsplit('__')[0]
 
         metatable = MetaTable.get_by_dataset_name(tablename)
         table = metatable.point_table
