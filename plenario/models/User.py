@@ -3,15 +3,15 @@ from uuid import uuid4
 from sqlalchemy import Column, String
 from sqlalchemy.orm import synonym
 
-from plenario.database import postgres_base, postgres_session
 from plenario.models import bcrypt
+from plenario.server import db
 
 
 def get_uuid():
     return str(uuid4())
 
 
-class User(postgres_base):
+class User(db.Model):
     __tablename__ = 'plenario_user'
 
     id = Column(String(36), default=get_uuid, primary_key=True)
@@ -35,7 +35,7 @@ class User(postgres_base):
 
     @classmethod
     def get_by_username(cls, name):
-        return postgres_session.query(cls).filter(cls.name == name).first()
+        return db.session.query(cls).filter(cls.name == name).first()
 
     @classmethod
     def check_password(cls, name, value):
