@@ -15,15 +15,12 @@ from kombu.exceptions import OperationalError
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
-from plenario.database import create_database, create_extension, postgres_base, psql, postgres_session, \
-        drop_database, postgres_engine as plenario_engine
+from plenario.database import create_database, create_extension, psql, drop_database
 from plenario.models.User import User
-from plenario.server import create_app as server
+from plenario.server import db, create_app as server
 from plenario.settings import DATABASE_CONN, REDSHIFT_CONN, DB_NAME, DEFAULT_USER
 from plenario.tasks import health
-from plenario.utils.weather import WeatherETL, WeatherStationsETL
 from plenario.worker import create_worker as worker
-
 
 logger = logging.getLogger('manage.py')
 logger.setLevel(logging.DEBUG)
@@ -135,17 +132,12 @@ def init():
             sleep(interval)
 
     try:
-        create_extension(plenario_engine, 'postgis')
-        create_extension(plenario_engine, 'plv8')
+        create_extension(db.engine, 'postgis')
+        create_extension(db.engine, 'plv8')
     except ProgrammingError:
         logger.debug('[plenario] It already exists!')
 
-    logger.debug('[plenario] Creating metadata tables')
-    postgres_base.metadata.create_all()
-
-    logger.debug('[plenario] Creating weather tables')
-    WeatherStationsETL().make_station_table()
-    WeatherETL().make_tables()
+    db.create_all()
 
     # Set up custom functions, triggers and views in postgres
     psql('./plenario/dbscripts/sensor_tree.sql')
@@ -157,11 +149,11 @@ def init():
         user = User(**DEFAULT_USER)
 
         try:
-            postgres_session.add(user)
-            postgres_session.commit()
+            db.session.add(user)
+            db.session.commit()
         except IntegrityError:
             logger.debug('[plenario] Already exists!')
-            postgres_session.rollback()
+            db.session.rollback()
 
     # This will get celery to set up its meta tables
     try:

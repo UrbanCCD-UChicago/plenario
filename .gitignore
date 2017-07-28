@@ -46,3 +46,7 @@ _venv/
 # Flower
 flower
 flower.*
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
