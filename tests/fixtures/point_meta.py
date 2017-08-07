@@ -1,5 +1,5 @@
 flu_url = 'https://data.cityofchicago.org/api/views/rfdj-hdmf/rows.csv?accessType=DOWNLOAD'
-flu_path = 'Flu_Shot_Clinic_Locations_-_2013.csv'
+flu_path = 'clinics.csv'
 
 flu_shot_meta = {
     'dataset_name': 'flu_shot_clinics',

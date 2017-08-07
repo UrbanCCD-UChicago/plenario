@@ -43,7 +43,7 @@ class Pointset(Field):
 
     def _deserialize(self, value, attr, data):
         try:
-            return MetaTable.get_by_dataset_name(value).point_table
+            return MetaTable.get_by_dataset_name(value).table
         except AttributeError:
             raise ValidationError('{} is not a valid dataset'.format(value))
 

@@ -3,16 +3,14 @@ import logging.config
 from logging import getLogger
 
 import yaml
-from flask import Flask, render_template, redirect, url_for, request
+from flask import Flask, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from raven.contrib.flask import Sentry
 
-from plenario.database import postgres_session as db_session
 from plenario.models import bcrypt
 from plenario.settings import DATABASE_CONN, PLENARIO_SENTRY_URL, REDSHIFT_CONN
 from plenario.utils.helpers import slugify as slug
-from plenario.views import views
 
 sentry = None
 if PLENARIO_SENTRY_URL:
@@ -32,7 +30,7 @@ db = SQLAlchemy()
 # Specifies multiple binds, for each bind flask-sqlalchemy will maintain an
 # engine to communicate with the database.
 SQLALCHEMY_BINDS = {
-    'postgresql': DATABASE_CONN,
+    'postgres': DATABASE_CONN,
     'redshift': REDSHIFT_CONN
 }
 
@@ -44,10 +42,9 @@ SQLALCHEMY_DATABASE_URI = DATABASE_CONN
 # to enable when you're debugging things.
 SQLALCHEMY_ECHO = True
 
-# Tracking modifications are necessary for registering events on signals
-# emitted by sqlalchemy models. Since we don't make use of the signals and
-# this setting adds significant overhead, we'll disable it.
-SQLALCHEMY_TRACK_MODIFICATIONS = False
+# Tracking modifications are necessary for registering hooks on signals
+# emitted by sqlalchemy models.
+SQLALCHEMY_TRACK_MODIFICATIONS = True
 
 
 def create_app():
@@ -63,8 +60,10 @@ def create_app():
     # API and not import them until they're really needed.
     from plenario.apiary.blueprints import apiary, apiary_bp
     from plenario.auth import auth, login_manager
+    from plenario.views import views
 
     app = Flask(__name__)
+    app.response_class = JsonResponse
 
     app.config.from_object('plenario.settings')
     app.config['SQLALCHEMY_BINDS'] = SQLALCHEMY_BINDS
@@ -88,31 +87,13 @@ def create_app():
     apiary.init_app(app)
     app.register_blueprint(apiary_bp)
 
-    @app.before_request
-    def check_maintenance_mode():
-        """If maintenance mode is turned on in settings.py, Disable the API and the interactive pages in the explorer.
-        """
-        maint = app.config.get('MAINTENANCE')
-        maint_pages = ['/v1/api', '/explore', '/admin']
-
-        maint_on = False
-        for m in maint_pages:
-            if m in request.path:
-                maint_on = True
-
-        if maint and maint_on and request.path != url_for('views.maintenance'):
-            return redirect(url_for('views.maintenance'))
-
-    @app.teardown_appcontext
-    def shutdown_session(exception=None):
-        db_session.remove()
-
     @app.errorhandler(404)
     def page_not_found(e):
         return render_template('404.html'), 404
 
     @app.errorhandler(500)
     def page_not_found(e):
+        db.session.rollback()
         return render_template('error.html'), 500
 
     @app.template_filter('slugify')
@@ -141,3 +122,6 @@ def create_app():
 
     logger.info('application setup completed')
     return app
+
+
+from plenario.response import JsonResponse

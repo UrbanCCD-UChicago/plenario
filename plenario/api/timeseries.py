@@ -1,20 +1,20 @@
 import json
 import re
-
 from datetime import datetime, timedelta
-from flask import request, jsonify
 from itertools import groupby
 from operator import itemgetter
+
+from flask import request, jsonify
 from marshmallow import Schema
 from marshmallow.decorators import pre_dump, post_load
-from marshmallow.fields import Str, List
+from marshmallow.fields import Str
 from marshmallow.validate import OneOf
 
 from plenario.api.common import crossdomain, cache, CACHE_TIMEOUT, make_cache_key
 from plenario.api.condition_builder import parse_tree
-from plenario.api.fields import Geometry, Pointset, DateTime, Commalist
 from plenario.api.response import make_error, make_csv, make_response
 from plenario.api.validator import has_tree_filters
+from plenario.fields import Geometry, Pointset, DateTime, Commalist
 from plenario.models import MetaTable
 
 
@@ -82,7 +82,7 @@ def timeseries():
                 # underscores.
                 tablename = re.split(r'__(?!_)', field)[0]
                 metarecord = MetaTable.get_by_dataset_name(tablename)
-                pt = metarecord.point_table
+                pt = metarecord.table
                 ctrees[pt.name] = parse_tree(pt, json.loads(value))
                 raw_ctrees[pt.name] = json.loads(value)
 

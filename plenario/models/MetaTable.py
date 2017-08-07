@@ -9,9 +9,11 @@ import sqlalchemy as sa
 from flask_bcrypt import Bcrypt
 from geoalchemy2 import Geometry
 from sqlalchemy import Boolean, Column, Date, DateTime, String, Table, Text, func, select
+from sqlalchemy import MetaData
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.exc import ProgrammingError
 
+from plenario.etl.point import PlenarioETL
 from plenario.server import db
 from plenario.utils.helpers import get_size_in_degrees, slugify
 
@@ -140,15 +142,23 @@ class MetaTable(db.Model):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
     def column_info(self):
-        return self.point_table.c
+        return self.table.c
 
     @property
-    def point_table(self):
-        try:
-            return self._point_table
-        except AttributeError:
-            self._point_table = Table(self.dataset_name, db.metadata, autoload=True, extend_existing=True)
-            return self._point_table
+    def table(self):
+        """Return a sqlalchemy table object pointing at the dataset which
+        corresponds to this metatable instance. We use a fresh MetaData
+        instance here because we do *not* want this table registered with
+        the global db.metadata object.
+        """
+
+        return Table(
+            self.dataset_name,
+            MetaData(),
+            autoload=True,
+            autoload_with=db.engine,
+            extend_existing=True
+        )
 
     @classmethod
     def attach_metadata(cls, rows):
@@ -321,7 +331,7 @@ class MetaTable(db.Model):
         size_x, size_y = get_size_in_degrees(resolution, center[1])
 
         # Generate a count for each resolution by resolution square
-        t = self.point_table
+        t = self.table
         q = db.session.query(func.count(t.c.hash),
                                    func.ST_SnapToGrid(t.c.geom, size_x, size_y)
                                    .label('squares')) \
@@ -342,7 +352,7 @@ class MetaTable(db.Model):
         # Reading this blog post
         # http://no0p.github.io/postgresql/2014/05/08/timeseries-tips-pg.html
         # inspired this implementation.
-        t = self.point_table
+        t = self.table
 
         # Special case for the 'quarter' unit of aggregation.
         step = '3 months' if agg_unit == 'quarter' else '1 ' + agg_unit
@@ -419,3 +429,13 @@ class MetaTable(db.Model):
             WHERE m.approved_status = 'true'
         """
         return list(db.session.execute(query))
+
+    # TODO(heyzoos)
+    # Remove the need for a 'source_path' argument, it's an ugly method
+    # signature and the underlying logic should either be able to infer
+    # that the source is local or it should be a separate method.
+    def load(self, source_path=None):
+        """Ingest the point event table associated with the metadata held by this instance.
+        """
+
+        return PlenarioETL(self, source_path=source_path).add()

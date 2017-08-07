@@ -3,15 +3,12 @@ import csv
 import io
 import json
 import re
-import traceback
-from collections import OrderedDict
 
 import shapely.geometry
 import shapely.wkb
 import sqlalchemy
 
 from collections import OrderedDict
-from datetime import datetime, timedelta
 from dateutil import parser
 from flask import Response, jsonify, request, stream_with_context
 
@@ -21,7 +18,7 @@ from plenario.api.jobs import get_job, make_job_response
 from plenario.api.validator import DatasetRequiredValidator, NoDefaultDatesValidator, \
     NoGeoJSONDatasetRequiredValidator, NoGeoJSONValidator, has_tree_filters, validate, \
     PointsetRequiredValidator
-from plenario.database import postgres_session
+from plenario.server import db
 from plenario.models import MetaTable
 from . import response as api_response
 
@@ -48,30 +45,9 @@ def detail_aggregate():
     if validator_result.errors:
         return api_response.bad_request(validator_result.errors)
 
-    if validator_result.data.get('job'):
-        return make_job_response('detail-aggregate', validator_result)
-    else:
-        time_counts = _detail_aggregate(validator_result)
-        return api_response.detail_aggregate_response(time_counts, validator_result)
-
-
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin='*')
-def detail():
-    fields = ('location_geom__within', 'dataset_name', 'shape', 'obs_date__ge',
-              'obs_date__le', 'data_type', 'offset', 'date__time_of_day_ge',
-              'date__time_of_day_le', 'limit', 'job')
-    validator = DatasetRequiredValidator(only=fields)
-    validator_result = validate(validator, request.args.to_dict())
-
-    if validator_result.errors:
-        return api_response.bad_request(validator_result.errors)
-
-    if validator_result.data.get('job'):
-        return make_job_response('detail', validator_result)
-    else:
-        result_rows = _detail(validator_result)
-        return api_response.detail_response(result_rows, validator_result)
+    time_counts = _detail_aggregate(validator_result)
+    db.session.commit()
+    return api_response.detail_aggregate_response(time_counts, validator_result)
 
 
 @crossdomain(origin='*')
@@ -143,22 +119,6 @@ def dataset_fields(dataset_name):
         return api_response.fields_response(result_data, validator_result)
 
 
-@cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
-@crossdomain(origin='*')
-def meta():
-    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name', 'location_geom__within', 'job')
-    validator_result = validate(NoDefaultDatesValidator(only=fields), request.args.to_dict())
-
-    if validator_result.errors:
-        return api_response.bad_request(validator_result.errors)
-
-    if validator_result.data.get('job'):
-        return make_job_response('meta', validator_result)
-    else:
-        result_data = _meta(validator_result)
-        return api_response.meta_response(result_data, validator_result)
-
-
 # ============
 # _route logic
 # ============
@@ -191,7 +151,7 @@ def _detail_aggregate(args):
         # Prevents an error that is caused by dataset names with trailing
         # underscores.
         tablename = re.split(r'__(?!_)', tablename)[0]
-        table = MetaTable.get_by_dataset_name(tablename).point_table
+        table = MetaTable.get_by_dataset_name(tablename).table
         try:
             conditions = parse_tree(table, condition_tree)
         except ValueError:  # Catches empty condition tree.
@@ -208,28 +168,6 @@ def _detail_aggregate(args):
         time_counts += [{'count': c, 'datetime': d} for c, d in ts[1:]]
 
     return time_counts
-
-
-def _detail(args):
-    meta_params = ('dataset', 'shape', 'data_type', 'limit', 'offset')
-    meta_vals = (args.data.get(k) for k in meta_params)
-    dataset, shapeset, data_type, limit, offset = meta_vals
-
-    q = detail_query(args).order_by(dataset.c.point_date.desc())
-
-    # Apply limit and offset.
-    q = q.limit(limit)
-    q = q.offset(offset) if offset else q
-
-    try:
-        columns = [c.name for c in dataset.columns]
-        if shapeset:
-            columns += [c.name for c in shapeset.columns]
-        return [OrderedDict(list(zip(columns, row))) for row in q.all()]
-    except Exception as e:
-        postgres_session.rollback()
-        msg = 'Failed to fetch records.'
-        return api_response.make_raw_error('{}: {}'.format(msg, e))
 
 
 def datadump(**kwargs):
@@ -347,7 +285,7 @@ def detail_query(args, aggregate=False):
         return api_response.bad_request('Too many table filters provided.')
 
     # Query the point dataset.
-    q = postgres_session.query(dataset)
+    q = db.session.query(dataset)
 
     # If the user specified a geom, filter results to those within its shape.
     if geom:
@@ -410,7 +348,7 @@ def _grid(args):
         tablename = tablename.rsplit('__')[0]
 
         metatable = MetaTable.get_by_dataset_name(tablename)
-        table = metatable.point_table
+        table = metatable.table
         conditions = parse_tree(table, condition_tree)
 
         try:
@@ -440,72 +378,6 @@ def _grid(args):
         api_response.add_geojson_feature(resp, new_geom, new_property)
 
     return resp
-
-
-def _meta(args):
-    """Generate meta information about table(s) with records from MetaTable.
-
-    :param args: dictionary of request arguments (?foo=bar)
-    :returns: response dictionary
-    """
-    meta_params = ('dataset', 'geom', 'obs_date__ge', 'obs_date__le')
-    meta_vals = (args.data.get(k) for k in meta_params)
-    dataset, geom, start_date, end_date = meta_vals
-
-    # Columns to select as-is
-    cols_to_return = ['human_name', 'dataset_name', 'source_url', 'view_url',
-                      'date_added', 'last_update', 'update_freq', 'attribution',
-                      'description', 'obs_from', 'obs_to', 'column_names',
-                      'observed_date', 'latitude', 'longitude', 'location']
-    col_objects = [getattr(MetaTable, col) for col in cols_to_return]
-
-    # Columns that need pre-processing
-    col_objects.append(sqlalchemy.func.ST_AsGeoJSON(MetaTable.bbox))
-    cols_to_return.append('bbox')
-
-    # Only return datasets that have been successfully ingested
-    q = postgres_session.query(*col_objects).filter(MetaTable.date_added.isnot(None))
-
-    # Filter over datasets if user provides full date range or geom
-    should_filter = geom or (start_date and end_date)
-
-    if dataset is not None:
-        # If the user specified a name, don't try any filtering.
-        # Just spit back that dataset's metadata.
-        q = q.filter(MetaTable.dataset_name == dataset.name)
-
-    # Otherwise, just send back all the (filtered) datasets
-    elif should_filter:
-        if geom:
-            intersects = sqlalchemy.func.ST_Intersects(
-                sqlalchemy.func.ST_GeomFromGeoJSON(geom),
-                MetaTable.bbox
-            )
-            q = q.filter(intersects)
-        if start_date and end_date:
-            q = q.filter(
-                sqlalchemy.and_(
-                    MetaTable.obs_from < end_date,
-                    MetaTable.obs_to > start_date
-                )
-            )
-
-    metadata_records = [dict(list(zip(cols_to_return, row))) for row in q.all()]
-    for record in metadata_records:
-        try:
-            if record.get('bbox') is not None:
-                # serialize bounding box geometry to string
-                record['bbox'] = json.loads(record['bbox'])
-            # format columns in the expected way
-            record['columns'] = [{'field_name': k, 'field_type': v}
-                                 for k, v in list(record['column_names'].items())]
-        except Exception as e:
-            args.warnings.append(e.message)
-
-        # clear column_names off the json, users don't need to see it
-        del record['column_names']
-
-    return metadata_records
 
 
 # =====

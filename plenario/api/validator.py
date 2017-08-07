@@ -26,7 +26,7 @@ class Pointset(Field):
 
     def _deserialize(self, value, attr, data):
         try:
-            return MetaTable.get_by_dataset_name(value).point_table
+            return MetaTable.get_by_dataset_name(value).table
         except AttributeError:
             raise ValidationError('{} is not a valid dataset'.format(value))
 
@@ -238,7 +238,7 @@ ValidatorResult = namedtuple('ValidatorResult', 'data errors warnings')
 converters = {
     'agg': str,
     'buffer': int,
-    'dataset': lambda x: MetaTable.get_by_dataset_name(x).point_table,
+    'dataset': lambda x: MetaTable.get_by_dataset_name(x).table,
     'shapeset': lambda x: ShapeMetadata.get_by_dataset_name(x).shape_table,
     'data_type': str,
     'shape': lambda x: ShapeMetadata.get_by_dataset_name(x).shape_table,
@@ -341,7 +341,7 @@ def validate(validator, request_args):
 
                 # Report a filter which specifies a non-existent tree.
                 try:
-                    table = MetaTable.get_by_dataset_name(t_name).point_table
+                    table = MetaTable.get_by_dataset_name(t_name).table
                 except (AttributeError, NoSuchTableError):
                     try:
                         table = ShapeMetadata.get_by_dataset_name(t_name).shape_table

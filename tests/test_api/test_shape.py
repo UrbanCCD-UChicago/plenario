@@ -1,18 +1,21 @@
 import json
 import os
-import urllib.request, urllib.parse, urllib.error
+import urllib.error
+import urllib.parse
+import urllib.request
 import zipfile
 from io import BytesIO
 
-from plenario.database import postgres_session, postgres_engine as engine
-from plenario.models import ShapeMetadata
-from plenario.etl.shape import ShapeETL
-from plenario.utils.shapefile import Shapefile
-from tests.fixtures.base_test import BasePlenarioTest, FIXTURE_PATH, \
+from tests.fixtures.base_test import PlenarioTestCase, FIXTURE_PATH, \
     shape_fixtures
 
+from plenario.database import postgres_session, postgres_engine as engine
+from plenario.etl.shape import ShapeETL
+from plenario.models import ShapeMetadata
+from plenario.utils.shapefile import Shapefile
 
-class ShapeTests(BasePlenarioTest):
+
+class ShapeTests(PlenarioTestCase):
 
     @classmethod
     def setUpClass(cls):

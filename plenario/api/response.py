@@ -195,15 +195,6 @@ def detail_aggregate_response(query_result, query_args):
     return resp
 
 
-def meta_response(query_result, query_args):
-    resp = json_response_base(query_args, query_result, request.args)
-    resp['meta']['total'] = len(resp['objects'])
-    status_code = 200
-    resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
-
-
 def fields_response(query_result, query_args):
     resp = json_response_base(query_args, query_result, request.args)
     resp['objects'] = query_result[0]['columns']
@@ -211,20 +202,6 @@ def fields_response(query_result, query_args):
     resp = make_response(json.dumps(resp, default=unknown_object_json_handler), status_code)
     resp.headers['Content-Type'] = 'application/json'
     return resp
-
-
-def detail_response(query_result, query_args):
-    to_remove = ['point_date', 'hash']
-
-    data_type = query_args.data['data_type']
-    if data_type == 'json':
-        return form_json_detail_response(to_remove, query_args, query_result)
-
-    elif data_type == 'csv':
-        return form_csv_detail_response(to_remove, query_result)
-
-    elif data_type == 'geojson':
-        return form_geojson_detail_response(to_remove, query_result)
 
 
 # Shape Endpoint Responses ====================================================

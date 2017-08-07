@@ -1,10 +1,28 @@
+import csv
 import json
 import os
-import urllib.request, urllib.parse, urllib.error
+import urllib.error
+import urllib.parse
+import urllib.request
 from io import StringIO
-import csv
 
-from tests.fixtures.base_test import BasePlenarioTest, fixtures_path
+from plenario.models import MetaTable
+
+from tests.base import PlenarioTestCase
+
+
+def ingest(fixture, name, url, date=None, location=None, latitude=None, longitude=None):
+    source = os.path.join('tests', 'fixtures', fixture)
+
+    MetaTable(
+        human_name=name,
+        observed_date=date,
+        location=location,
+        latitude=latitude,
+        longitude=longitude,
+        url=url
+    ).load(source)
+
 
 # Filters
 # =======
@@ -22,14 +40,14 @@ FLU_FILTER_COMPOUND_AND = FLU_BASE + '{"op": "and", "val": [' + \
                           FLU_FILTER_SIMPLE2 + ']}'
 # Returns 13 rows.
 FLU_FILTER_COMPOUND_OR = FLU_BASE + '{"op": "or", "val": [' + \
-                          FLU_FILTER_SIMPLE + ', ' + \
-                          FLU_FILTER_SIMPLE2 + ']}'
+                         FLU_FILTER_SIMPLE + ', ' + \
+                         FLU_FILTER_SIMPLE2 + ']}'
 # Returns 4 rows.
 FLU_FILTER_NESTED = '{"op": "and", "val": [' \
                     '   {"op": "ge", "col": "date", "val": "2013-11-01"},' \
                     '   {"op": "or", "val": [' + \
-                            FLU_FILTER_SIMPLE + ', ' + \
-                            FLU_FILTER_SIMPLE2 + \
+                    FLU_FILTER_SIMPLE + ', ' + \
+                    FLU_FILTER_SIMPLE2 + \
                     '       ]' \
                     '   }' \
                     ']}'
@@ -48,13 +66,7 @@ def get_loop_rect():
     return get_escaped_geojson('loop_rectangle.json')
 
 
-class PointAPITests(BasePlenarioTest):
-
-    @classmethod
-    def setUpClass(cls):
-        super(PointAPITests, cls).setUpClass()
-        super(PointAPITests, cls).ingest_points()
-        super(PointAPITests, cls).ingest_shapes()
+class PointAPITests(PlenarioTestCase):
 
     def get_api_response(self, query_string):
         """This bit of code seems to be repeated alot."""
@@ -62,29 +74,6 @@ class PointAPITests(BasePlenarioTest):
         response = self.app.get(query)
         return json.loads(response.data.decode("utf-8"))
 
-    # ========
-    # datasets
-    # ========
-
-    def test_metadata_no_args(self):
-        r = self.get_api_response('datasets')
-        self.assertEqual(len(r), 2)
-        self.assertEqual(len(r['objects']), 3)
-
-    def test_metadata_big_lower_bound(self):
-        r = self.get_api_response('datasets?obs_date__ge=1000-01-01')
-        self.assertEqual(len(r), 2)
-        self.assertEqual(len(r['objects']), 3)
-
-    def test_metadata_big_upper_bound(self):
-        r = self.get_api_response('datasets?obs_date__le=2016-01-01')
-        self.assertEqual(len(r), 2)
-        self.assertEqual(len(r['objects']), 3)
-
-    def test_metadata_both_bounds(self):
-        r = self.get_api_response('datasets?obs_date__le=2016-01-01&obs_date__ge=2000-01-01')
-        self.assertEqual(len(r), 2)
-        self.assertEqual(len(r['objects']), 3)
 
     def test_metadata_single_dataset(self):
         r = self.get_api_response('datasets?dataset_name=crimes')
@@ -94,8 +83,8 @@ class PointAPITests(BasePlenarioTest):
 
     def test_metadata_filter(self):
         escaped_query_rect = get_loop_rect()
-        query = 'datasets?location_geom__within={}'\
-                '&obs_date__ge={}&obs_date__le={}'\
+        query = 'datasets?location_geom__within={}' \
+                '&obs_date__ge={}&obs_date__le={}' \
             .format(escaped_query_rect, '2015-1-1', '2016-1-1')
         r = self.get_api_response(query)
         self.assertEqual(len(r['objects']), 1)
@@ -121,7 +110,8 @@ class PointAPITests(BasePlenarioTest):
     # ====================
 
     def test_detail_with_simple_flu_filter(self):
-        r = self.get_api_response('detail?obs_date__ge=2000&dataset_name=flu_shot_clinics&' + FLU_BASE + FLU_FILTER_SIMPLE)
+        r = self.get_api_response(
+            'detail?obs_date__ge=2000&dataset_name=flu_shot_clinics&' + FLU_BASE + FLU_FILTER_SIMPLE)
         self.assertEqual(r['meta']['total'], 4)
 
     def test_detail_with_compound_flu_filters_and(self):
@@ -133,7 +123,8 @@ class PointAPITests(BasePlenarioTest):
         self.assertEqual(r['meta']['total'], 13)
 
     def test_detail_with_nested_flu_filters(self):
-        r = self.get_api_response('detail?obs_date__ge=2000&dataset_name=flu_shot_clinics&' + FLU_BASE + FLU_FILTER_NESTED)
+        r = self.get_api_response(
+            'detail?obs_date__ge=2000&dataset_name=flu_shot_clinics&' + FLU_BASE + FLU_FILTER_NESTED)
         self.assertEqual(r['meta']['total'], 4)
 
     # ============================
@@ -400,56 +391,122 @@ class PointAPITests(BasePlenarioTest):
         # Landmark filter gets applied.
         self.assertEqual(resp_data['objects'][2]['count'], 3)
 
-    # =================
-    # /detail-aggregate
-    # =================
 
-    def test_detail_aggregate_with_just_lower_time_bound(self):
+class TestDatasetsApi(PlenarioTestCase):
 
-        resp = self.get_api_response('detail-aggregate?dataset_name=crimes'
-                                     '&obs_date__ge=2015-01-01')
-        self.assertEqual(resp['count'], 7)
+    def test_endpoint_exists(self):
+        response = self.client.get('/v1/api/datasets')
+        self.assert200(response)
 
-    def test_aggregate(self):
-        # Use same params as for timeseries
-        query = '/v1/api/detail-aggregate/?dataset_name=flu_shot_clinics' \
-                '&obs_date__ge=2013-09-22&obs_date__le=2013-10-1&agg=week'
-        resp = self.app.get(query)
-        response_data = json.loads(resp.data.decode("utf-8"))
+    def test_result_is_formatted_correctly(self):
+        response = self.client.get('/v1/api/datasets')
+        self.assertEquals(list(response.json.keys()), ['meta', 'objects'])
+        self.assertEquals(list(response.json['meta'].keys()), ['status', 'query', 'total'])
 
-        expected_counts = [1, 1, 3]
-        observed_counts = [obj['count'] for obj in response_data['objects']]
-        self.assertEqual(expected_counts, observed_counts)
+    def test_result_has_correct_total(self):
+        ingest(fixture='clinics.csv', name='Flu Shot Clinics', url='somewhere', date='date', location='location')
+        ingest(fixture='clinics.csv', name='The Other Clinics', url='elsewhere', date='date', location='location')
+        response = self.client.get('/v1/api/datasets')
+        self.assertEquals(response.json['meta']['total'], 2)
+        self.assertEquals(len(response.json['objects']), 2)
+
+    def test_with_dataset_query_argument(self):
+        ingest(fixture='clinics.csv', name='Flu Shot Clinics', url='somewhere', date='date', location='location')
+        ingest(fixture='clinics.csv', name='The Other Clinics', url='elsewhere', date='date', location='location')
+        response = self.client.get('/v1/api/datasets'
+                                   '?dataset_name=the_other_clinics')
+        self.assertEquals(response.json['meta']['total'], 1)
+        self.assertEquals(len(response.json['objects']), 1)
+        self.assertEquals(response.json['objects'][0]['human_name'], 'The Other Clinics')
+
+    def test_with_invalid_dataset_query_argument(self):
+        ingest(fixture='clinics.csv', name='Flu Shot Clinics', url='somewhere', date='date', location='location')
+        response = self.client.get('/v1/api/datasets'
+                                   '?dataset_name=foo')
+        self.assertEquals(len(response.json['errors']), 1)
+
+    def test_with_obs_date__le_query_argument(self):
+        ingest(fixture='clinics.csv', name='Flu Shot Clinics', url='somewhere', date='date', location='location')
+        ingest(fixture='radios.csv', name='Community Radio Events', url='radios', date='date', latitude='lat', longitude='lon')
+        response = self.client.get('/v1/api/datasets'
+                                   '?obs_date__le=2015-01-01T00:00:00')
+        self.assertEqual(len(response.json['objects']), 1)
+        self.assertEqual(response.json['objects'][0]['human_name'], 'Flu Shot Clinics')
+
+    def test_with_obs_date__ge_query_argument(self):
+        ingest(fixture='clinics.csv', name='Flu Shot Clinics', url='somewhere', date='date', location='location')
+        ingest(fixture='radios.csv', name='Community Radio Events', url='radios', date='date', latitude='lat', longitude='lon')
+        response = self.client.get('/v1/api/datasets'
+                                   '?obs_date__ge=2014-01-01T00:00:00')
+        self.assertEqual(len(response.json['objects']), 1)
+        self.assertEqual(response.json['objects'][0]['human_name'], 'Community Radio Events')
+
+    def test_with_both_obs_date_arguments(self):
+        ingest(fixture='clinics.csv', name='Flu Shot Clinics', url='somewhere', date='date', location='location')
+        ingest(fixture='radios.csv', name='Community Radio Events', url='radios', date='date', latitude='lat', longitude='lon')
+        ingest(fixture='landmarks.csv', name='Landmarks', url='landmarks', date='DATE', location='location')
+        response = self.client.get('/v1/api/datasets'
+                                   '?obs_date__ge=2012-07-01T00:00:00'
+                                   '&obs_date__le=2014-01-01T00:00:00')
+        self.assertEqual(len(response.json['objects']), 1)
+        self.assertEqual(response.json['objects'][0]['human_name'], 'Flu Shot Clinics')
+
+
+
+class TestAggregateApi(PlenarioTestCase):
+
+    def test_both_time_bounds(self):
+        ingest_flu_shot_clinics()
+        response = self.client.get('/v1/api/detail-aggregate'
+                                   '?dataset_name=flu_shot_clinics'
+                                   '&obs_date__ge=2013-09-22'
+                                   '&obs_date__le=2013-10-01'
+                                   '&agg=week')
+        self.assertEqual([o['count'] for o in response.json['objects']], [1, 1, 3])
+
+    def test_column_filter(self):
+        ingest_flu_shot_clinics()
+        response = self.client.get('v1/api/detail-aggregate'
+                                   '?dataset_name=flu_shot_clinics'
+                                   '&obs_date__le=2014-1-1'
+                                   '&event_type=Church'
+                                   '&agg=year')
+        print(response)
+        self.assertEqual(response.json['objects'][0]['count'], 6)
+
+    def test_lower_time_bound(self):
+        ingest_flu_shot_clinics()
+        response = self.client.get('/v1/api/detail-aggregate'
+                                   '?dataset_name=flu_shot_clinics'
+                                   '&obs_date__ge=2013-10-02')
+        self.assertEqual(response.json['count'], 60)
+
+
+class TestDetailApi(PlenarioTestCase):
 
     def test_polygon_filter(self):
-        query = '/v1/api/detail/?dataset_name=flu_shot_clinics' \
-                '&obs_date__ge=2013-09-22&obs_date__le=2013-10-1' \
-                '&shape=chicago_neighborhoods'
-        resp = self.app.get(query)
-        response_data = json.loads(resp.data.decode("utf-8"))
-
-        self.assertEqual(response_data['meta']['total'], 5)
-
-    def test_aggregate_column_filter(self):
-        query = 'v1/api/detail-aggregate/' \
-                '?obs_date__ge=2013-1-1&obs_date__le=2014-1-1' \
-                '&dataset_name=flu_shot_clinics&event_type=Church&agg=year'
-
-        resp = self.app.get(query)
-        response_data = json.loads(resp.data.decode("utf-8"))
-        # 6 Church-led flu shot clinics.
-        self.assertEqual(response_data['objects'][0]['count'], 6)
+        ingest_flu_shot_clinics()
+        response = self.client.get('/v1/api/detail'
+                                   '?dataset_name=flu_shot_clinics'
+                                   '&obs_date__ge=2013-09-22'
+                                   '&obs_date__le=2013-10-1'
+                                   '&shape=chicago_neighborhoods')
+        self.assertEqual(response.json['meta']['total'], 5)
 
     def test_bad_column_condition(self):
-        query = 'v1/api/detail/?dataset_name=flu_shot_clinics&fake_column=fake'
-
-        resp = self.app.get(query)
-        response_data = json.loads(resp.data.decode("utf-8"))
-        self.assertTrue("Unused parameter value fake_column='fake'" in response_data['meta']['message'], response_data['meta']['message'])
+        ingest_flu_shot_clinics()
+        response = self.client.get('v1/api/detail'
+                                   '?dataset_name=flu_shot_clinics'
+                                   '&fake_column=fake')
+        self.assertTrue("Unused parameter value fake_column='fake'" in response.json['meta']['message'])
 
     def test_bad_column_condition_with_shape(self):
-        query = 'v1/api/detail/?dataset_name=flu_shot_clinics&shape=chicago_neighborhoods&fake_column=fake'
+        ingest_flu_shot_clinics()
+        response = self.client.get('v1/api/detail'
+                                   '?dataset_name=flu_shot_clinics'
+                                   '&shape=chicago_neighborhoods'
+                                   '&fake_column=fake')
+        self.assertTrue("Unused parameter value fake_column='fake'" in response.json['meta']['message'])
 
-        resp = self.app.get(query)
-        response_data = json.loads(resp.data.decode("utf-8"))
-        self.assertTrue("Unused parameter value fake_column='fake'" in response_data['meta']['message'])
+
+# TODO(heyzoos) remove repeated db.session.commit in point api logic

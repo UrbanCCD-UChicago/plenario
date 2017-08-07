@@ -1,6 +1,3 @@
-# import json
-
-# from csvkit.unicsv import UnicodeCSVReader
 import csv
 from logging import getLogger
 from geoalchemy2 import Geometry
@@ -8,9 +5,8 @@ from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
 from sqlalchemy import select, func
 from sqlalchemy.exc import NoSuchTableError
 
-from plenario.database import postgres_base, postgres_engine
-from plenario.database import postgres_session
-from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError, delete_absent_hashes
+from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError
+from plenario.server import db
 from plenario.utils.helpers import iter_column, slugify
 
 logger = getLogger(__name__)
@@ -100,8 +96,8 @@ class Staging(object):
                 add_unique_hash(self.table.name)
                 self.table = Table(
                     self.name,
-                    postgres_base.metadata,
-                    autoload_with=postgres_engine,
+                    MetaData(),
+                    autoload_with=db.engine,
                     extend_existing=True
                 )
                 return self
@@ -110,7 +106,7 @@ class Staging(object):
         logger.info('End.')
 
     def _drop(self):
-        postgres_engine.execute("DROP TABLE IF EXISTS {};"
+        db.engine.execute("DROP TABLE IF EXISTS {};"
                                 .format('s_' + self.dataset.name))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -131,7 +127,7 @@ class Staging(object):
         # Be paranoid and remove the table if one by this name already exists.
         table = Table(self.name, MetaData(), *self.cols, extend_existing=True)
         self._drop()
-        table.create(bind=postgres_engine)
+        table.create(bind=db.engine)
 
         # Fill in the columns we expect from the CSV.
         names = ['"' + c.name + '"' for c in self.cols]
@@ -140,7 +136,7 @@ class Staging(object):
             format(t_name=self.name, cols=', '.join(names))
 
         # In order to issue a COPY, we need to drop down to the psycopg2 DBAPI.
-        conn = postgres_engine.raw_connection()
+        conn = db.engine.raw_connection()
         try:
             with conn.cursor() as cursor:
                 f.seek(0)
@@ -197,7 +193,7 @@ def _null_malformed_geoms(existing):
     # (off the coast of Africa).
     upd = existing.update().values(geom=None).\
         where(existing.c.geom == select([func.ST_SetSRID(func.ST_MakePoint(0, 0), 4326)]))
-    postgres_engine.execute(upd)
+    db.engine.execute(upd)
 
 
 def _make_col(name, type, nullable):
@@ -227,7 +223,7 @@ class Creation(object):
             try:
                 new.insert()
             except Exception as e:
-                self.table.drop(bind=postgres_engine, checkfirst=True)
+                self.table.drop(bind=db.engine, checkfirst=True)
                 raise e
 
     def _init_table(self):
@@ -245,11 +241,14 @@ class Creation(object):
             Column('point_date', TIMESTAMP, nullable=True, index=True),
             Column('geom', Geometry('POINT', srid=4326),
                    nullable=True, index=True)]
-        new_table = Table(self.dataset.name, MetaData(),
-                          *(original_cols + derived_cols))
+        new_table = Table(
+            self.dataset.name,
+            MetaData(),
+            *(original_cols + derived_cols)
+        )
 
-        new_table.drop(postgres_engine, checkfirst=True)
-        new_table.create(postgres_engine)
+        new_table.drop(db.engine, checkfirst=True)
+        new_table.create(db.engine)
         return new_table
 
     def _add_trigger(self):
@@ -257,7 +256,7 @@ class Creation(object):
                          ON "{table}"
                          FOR EACH ROW EXECUTE PROCEDURE audit.if_modified()""".\
                       format(table=self.dataset.name)
-        postgres_engine.execute(add_trigger)
+        db.engine.execute(add_trigger)
 
 
 class Update(object):
@@ -313,7 +312,7 @@ class Update(object):
         # Drop the table first out of healthy paranoia
         self._drop()
         try:
-            self.table.create(bind=postgres_engine)
+            self.table.create(bind=db.engine)
         except Exception as e:
             raise PlenarioETLError(repr(e) +
                                    '\nCould not create table n_' + d.name)
@@ -321,7 +320,7 @@ class Update(object):
         ins = self.table.insert().from_select(cols_to_insert, sel)
         # Populate it with records from our select statement.
         try:
-            postgres_engine.execute(ins)
+            db.engine.execute(ins)
         except Exception as e:
             raise PlenarioETLError(repr(e) + '\n' + str(sel))
         else:
@@ -342,7 +341,7 @@ class Update(object):
         ins = self.existing.insert().from_select(sel_cols, sel)
 
         try:
-            postgres_engine.execute(ins)
+            db.engine.execute(ins)
         except Exception as e:
             raise PlenarioETLError(repr(e) +
                                    '\n Failed on statement: ' + str(ins))
@@ -353,7 +352,7 @@ class Update(object):
                         '\n Failed to null out geoms with (0,0) geocoding')
 
     def _drop(self):
-        postgres_engine.execute("DROP TABLE IF EXISTS {};".format(self.name))
+        db.engine.execute("DROP TABLE IF EXISTS {};".format(self.name))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._drop()
@@ -394,12 +393,12 @@ def update_meta(metatable, table):
 
     metatable.update_date_added()
 
-    metatable.obs_from, metatable.obs_to = postgres_session.query(
+    metatable.obs_from, metatable.obs_to = db.session.query(
         func.min(table.c.point_date),
         func.max(table.c.point_date)
     ).first()
 
-    metatable.bbox = postgres_session.query(
+    metatable.bbox = db.session.query(
         func.ST_SetSRID(
             func.ST_Envelope(func.ST_Union(table.c.geom)),
             4326
@@ -411,5 +410,5 @@ def update_meta(metatable, table):
         if c.name not in {'geom', 'point_date', 'hash'}
     }
 
-    postgres_session.add(metatable)
-    postgres_session.commit()
+    db.session.add(metatable)
+    db.session.commit()
