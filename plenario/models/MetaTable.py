@@ -8,6 +8,7 @@ from operator import itemgetter
 import sqlalchemy as sa
 from flask_bcrypt import Bcrypt
 from geoalchemy2 import Geometry
+from shapely.geometry import shape
 from sqlalchemy import Boolean, Column, Date, DateTime, String, Table, Text, func, select
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.exc import ProgrammingError
@@ -320,20 +321,34 @@ class MetaTable(postgres_base):
         # center[1] is longitude
         size_x, size_y = get_size_in_degrees(resolution, center[1])
 
-        # Generate a count for each resolution by resolution square
         t = self.point_table
-        q = postgres_session.query(func.count(t.c.hash),
-                                   func.ST_SnapToGrid(t.c.geom, size_x, size_y)
-                                   .label('squares')) \
-            .filter(*conditions) \
-            .group_by('squares')
+
+        if geom:
+            geojson = json.loads(geom)
+            origin = shape(geojson).centroid
+            q = postgres_session.query(
+                    func.count(t.c.hash),
+                    func.ST_SnapToGrid(
+                        t.c.geom, 
+                        origin.x,
+                        origin.y,
+                        size_x, 
+                        size_y
+                    ).label('squares')
+                ).filter(*conditions).group_by('squares')
+            q = q.filter(t.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geom)))
+
+        else:
+            # Generate a count for each resolution by resolution square
+            q = postgres_session.query(func.count(t.c.hash),
+                                       func.ST_SnapToGrid(t.c.geom, size_x, size_y)
+                                       .label('squares')) \
+                .filter(*conditions) \
+                .group_by('squares')
 
         if obs_dates:
             q = q.filter(t.c.point_date >= obs_dates['lower'])
             q = q.filter(t.c.point_date <= obs_dates['upper'])
-
-        if geom:
-            q = q.filter(t.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geom)))
 
         return postgres_session.execute(q), size_x, size_y
 
