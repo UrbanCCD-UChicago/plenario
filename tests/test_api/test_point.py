@@ -400,8 +400,8 @@ class TestDatasetsApi(PlenarioTestCase):
 
     def test_result_is_formatted_correctly(self):
         response = self.client.get('/v1/api/datasets')
-        self.assertEquals(list(response.json.keys()), ['meta', 'objects'])
-        self.assertEquals(list(response.json['meta'].keys()), ['status', 'query', 'total'])
+        self.assertCountEqual(list(response.json.keys()), ['meta', 'objects'])
+        self.assertCountEqual(list(response.json['meta'].keys()), ['status', 'query', 'total'])
 
     def test_result_has_correct_total(self):
         ingest(fixture='clinics.csv', name='Flu Shot Clinics', url='somewhere', date='date', location='location')
@@ -420,7 +420,6 @@ class TestDatasetsApi(PlenarioTestCase):
         self.assertEquals(response.json['objects'][0]['human_name'], 'The Other Clinics')
 
     def test_with_invalid_dataset_query_argument(self):
-        ingest(fixture='clinics.csv', name='Flu Shot Clinics', url='somewhere', date='date', location='location')
         response = self.client.get('/v1/api/datasets'
                                    '?dataset_name=foo')
         self.assertEquals(len(response.json['errors']), 1)
@@ -444,14 +443,156 @@ class TestDatasetsApi(PlenarioTestCase):
     def test_with_both_obs_date_arguments(self):
         ingest(fixture='clinics.csv', name='Flu Shot Clinics', url='somewhere', date='date', location='location')
         ingest(fixture='radios.csv', name='Community Radio Events', url='radios', date='date', latitude='lat', longitude='lon')
-        ingest(fixture='landmarks.csv', name='Landmarks', url='landmarks', date='DATE', location='location')
+        ingest(fixture='landmarks.csv', name='Landmarks', url='landmarks', date='LANDMARK DESIGNATION DATE', location='Location')
         response = self.client.get('/v1/api/datasets'
                                    '?obs_date__ge=2012-07-01T00:00:00'
                                    '&obs_date__le=2014-01-01T00:00:00')
         self.assertEqual(len(response.json['objects']), 1)
         self.assertEqual(response.json['objects'][0]['human_name'], 'Flu Shot Clinics')
 
+    def test_with_invalid_obs_date__ge(self):
+        response = self.client.get('/v1/api/datasets'
+                                   '?obs_date__ge=foo')
+        self.assertEquals(len(response.json['errors']), 1)
+        self.assertIn('obs_date__ge', response.json['errors'])
 
+    def test_with_invalid_obs_date__le(self):
+        response = self.client.get('/v1/api/datasets'
+                                   '?obs_date__le=foo')
+        self.assertEquals(len(response.json['errors']), 1)
+        self.assertIn('obs_date__le', response.json['errors'])
+
+    def test_with_empty_location_geom(self):
+        ingest(fixture='landmarks.csv', name='Landmarks', url='landmarks', date='LANDMARK DESIGNATION DATE', location='Location')
+        bounding_box = {
+          "type": "FeatureCollection",
+          "features": [
+            {
+              "type": "Feature",
+              "properties": {},
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      -91.73583984374999,
+                      41.343824581185686
+                    ],
+                    [
+                      -90.28564453124999,
+                      41.343824581185686
+                    ],
+                    [
+                      -90.28564453124999,
+                      42.66628070564928
+                    ],
+                    [
+                      -91.73583984374999,
+                      42.66628070564928
+                    ],
+                    [
+                      -91.73583984374999,
+                      41.343824581185686
+                    ]
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+
+        bounding_box = json.dumps(bounding_box)
+        response = self.client.get('/v1/api/datasets'
+                                   '?location_geom__within={}'.format(bounding_box))
+        self.assertEqual(len(response.json['objects']), 0)
+
+    def test_with_correct_location_geom(self):
+        ingest(fixture='landmarks.csv', name='Landmarks', url='landmarks', date='LANDMARK DESIGNATION DATE', location='Location')
+        bounding_box = {
+              "type": "FeatureCollection",
+              "features": [
+                {
+                  "type": "Feature",
+                  "properties": {},
+                  "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                      [
+                        [
+                          -90.19775390625,
+                          39.99395569397331
+                        ],
+                        [
+                          -84.0234375,
+                          39.99395569397331
+                        ],
+                        [
+                          -84.0234375,
+                          43.42898792344155
+                        ],
+                        [
+                          -90.19775390625,
+                          43.42898792344155
+                        ],
+                        [
+                          -90.19775390625,
+                          39.99395569397331
+                        ]
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+
+        bounding_box = json.dumps(bounding_box)
+        response = self.client.get('/v1/api/datasets'
+                                       '?location_geom__within={}'.format(bounding_box))
+        self.assertEqual(len(response.json['objects']), 1)
+
+    def test_with_invalid_location_geom(self):
+        ingest(fixture='landmarks.csv', name='Landmarks', url='landmarks', date='LANDMARK DESIGNATION DATE', location='Location')
+        bounding_box = {
+              "type": "FeatureCollection",
+              "features": [
+                {
+                  "type": "Feature",
+                  "properties": {},
+                  "geometry": {
+                    "type": "foo",
+                    "coordinates": [
+                      [
+                        [
+                          -90.19775390625,
+                          39.99395569397331
+                        ],
+                        [
+                          -84.0234375,
+                          39.99395569397331
+                        ],
+                        [
+                          -84.0234375,
+                          43.42898792344155
+                        ],
+                        [
+                          -90.19775390625,
+                          43.42898792344155
+                        ],
+                        [
+                          -90.19775390625,
+                          39.99395569397331
+                        ]
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+        bounding_box = json.dumps(bounding_box)
+        response = self.client.get('/v1/api/datasets'
+                                       '?location_geom__within={}'.format(bounding_box))
+
+        self.assertEquals(len(response.json['errors']), 1)
 
 class TestAggregateApi(PlenarioTestCase):
 
