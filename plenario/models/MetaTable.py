@@ -323,28 +323,19 @@ class MetaTable(postgres_base):
 
         t = self.point_table
 
-        if geom:
-            geojson = json.loads(geom)
-            origin = shape(geojson).centroid
-            q = postgres_session.query(
-                    func.count(t.c.hash),
-                    func.ST_SnapToGrid(
-                        t.c.geom, 
-                        origin.x,
-                        origin.y,
-                        size_x, 
-                        size_y
-                    ).label('squares')
-                ).filter(*conditions).group_by('squares')
-            q = q.filter(t.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geom)))
+        q = postgres_session.query(
+                func.count(t.c.hash),
+                func.ST_SnapToGrid(
+                    t.c.geom,
+                    0,
+                    0,
+                    size_x,
+                    size_y
+                ).label('squares')
+            ).filter(*conditions).group_by('squares')
 
-        else:
-            # Generate a count for each resolution by resolution square
-            q = postgres_session.query(func.count(t.c.hash),
-                                       func.ST_SnapToGrid(t.c.geom, size_x, size_y)
-                                       .label('squares')) \
-                .filter(*conditions) \
-                .group_by('squares')
+        if geom:
+            q = q.filter(t.c.geom.ST_Within(func.ST_GeomFromGeoJSON(geom)))
 
         if obs_dates:
             q = q.filter(t.c.point_date >= obs_dates['lower'])
