@@ -8,10 +8,11 @@ from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
 from sqlalchemy import select, func
 from sqlalchemy.exc import NoSuchTableError
 
+from itertools import islice
 from plenario.database import postgres_base, postgres_engine
 from plenario.database import postgres_session
 from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError, delete_absent_hashes
-from plenario.utils.helpers import iter_column, slugify
+from plenario.utils.helpers import iter_column, slugify, typeinfer
 
 logger = getLogger(__name__)
 
@@ -91,12 +92,13 @@ class Staging(object):
 
         logger.info('Begin.')
         with self.file_helper as helper:
-            text_handle = open(helper.handle.name, "rt")
-            self.cols = self._from_inference(text_handle)
+            handle = open(helper.handle.name, "rt")
+            head = islice(handle, 1000)
+            self.cols = typeinfer(handle)
 
             # Grab the handle to build a table from the CSV
             try:
-                self.table = self._make_table(text_handle)
+                self.table = self._make_table(handle)
                 add_unique_hash(self.table.name)
                 self.table = Table(
                     self.name,

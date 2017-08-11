@@ -1,10 +1,12 @@
+import agate
 import csv
 import math
 from collections import namedtuple
 
+import sqlalchemy
 import boto3
 from slugify import slugify as _slugify
-from sqlalchemy import Table
+from sqlalchemy import Column, Table
 
 from plenario.settings import ADMIN_EMAILS, AWS_ACCESS_KEY, AWS_REGION_NAME, AWS_SECRET_KEY, MAIL_USERNAME
 from plenario.utils.typeinference import normalize_column_type
@@ -27,20 +29,27 @@ def get_size_in_degrees(meters, latitude):
 ColumnInfo = namedtuple('ColumnInfo', 'name type_ has_nulls')
 
 
+def typeinfer(file) -> list:
+    """Use agate to a dictionary that describes csv column types."""
+
+    typemap = {
+        agate.Boolean: sqlalchemy.Boolean,
+        agate.Date: sqlalchemy.Text,
+        agate.DateTime: sqlalchemy.DateTime,
+        agate.Number: sqlalchemy.Numeric,
+        agate.Text: sqlalchemy.Text
+    }
+
+    tester = agate.TypeTester(limit=1000)
+    table = agate.Table.from_csv(file, column_types=tester)
+    table = table.rename(slug_columns=True)
+    types = [typemap[type(o)] for o in table.column_types]
+    schema = zip(table.column_names, types)
+    return [Column(name, dtype) for name, dtype in schema]
+
+
 def infer_csv_columns(inp):
-    """
-    :param inp: File handle to a CSV dataset that we can throw into a UnicodeCSVReader
-    :return: List of `ColumnInfo`s
-    """
-    reader = csv.reader(inp)
-    header = next(reader)
-    inp.seek(0)
-    iter_output = [iter_column(col_idx, inp)
-                   for col_idx in range(len(header))]
-
-    return [ColumnInfo(name, type_, has_nulls)
-            for name, (type_, has_nulls) in zip(header, iter_output)]
-
+    return typeinfer(inp)
 
 def iter_column(idx, f):
     """
