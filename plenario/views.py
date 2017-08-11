@@ -412,7 +412,7 @@ class GenericSuggestion(object):
 
     def _infer_columns(self):
         r = requests.get(self.file_url, stream=True)
-        inp = StringIO()
+        inp = StringIO(encoding='utf-8')
 
         head = itertools.islice(r.iter_lines(), 1000)
         for line in head:
