@@ -146,7 +146,15 @@ def dataset_fields(dataset_name):
 @cache.cached(timeout=CACHE_TIMEOUT, key_prefix=make_cache_key)
 @crossdomain(origin='*')
 def meta():
-    fields = ('obs_date__le', 'obs_date__ge', 'dataset_name', 'location_geom__within', 'job')
+    fields = (
+        'dataset_name',
+        'dataset_name__in',
+        'obs_date__le',
+        'obs_date__ge',
+        'location_geom__within',
+        'job'
+    )
+
     validator_result = validate(NoDefaultDatesValidator(only=fields), request.args.to_dict())
 
     if validator_result.errors:
@@ -448,9 +456,16 @@ def _meta(args):
     :param args: dictionary of request arguments (?foo=bar)
     :returns: response dictionary
     """
-    meta_params = ('dataset', 'geom', 'obs_date__ge', 'obs_date__le')
+    meta_params = (
+        'dataset',
+        'dataset_name__in',
+        'geom',
+        'obs_date__ge',
+        'obs_date__le'
+    )
+
     meta_vals = (args.data.get(k) for k in meta_params)
-    dataset, geom, start_date, end_date = meta_vals
+    dataset, dataset_name__in, geom, start_date, end_date = meta_vals
 
     # Columns to select as-is
     cols_to_return = ['human_name', 'dataset_name', 'source_url', 'view_url',
@@ -470,9 +485,9 @@ def _meta(args):
     should_filter = geom or (start_date and end_date)
 
     if dataset is not None:
-        # If the user specified a name, don't try any filtering.
-        # Just spit back that dataset's metadata.
         q = q.filter(MetaTable.dataset_name == dataset.name)
+    elif dataset_name__in:
+        q = q.filter(MetaTable.dataset_name.in_(dataset_name__in))
 
     # Otherwise, just send back all the (filtered) datasets
     elif should_filter:
