@@ -86,9 +86,7 @@ class MetaTable(postgres_base):
 
         assert human_name
         self.human_name = human_name
-        # Known issue: slugify fails hard on Non-ASCII
-        self.dataset_name = kwargs.get('dataset_name',
-                                       curried_slug(human_name)[:50])
+        self.dataset_name = kwargs.get('dataset_name', curried_slug(human_name)[:50])
 
         assert observed_date
         self.observed_date = curried_slug(observed_date)
