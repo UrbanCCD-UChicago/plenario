@@ -21,6 +21,7 @@ install:
 - python manage.py init
 script:
 - nosetests --nologcapture tests/test_datasets_api.py -v
+- nosetests --nologcapture tests/test_point_etl.py -v
 - nosetests --nologcapture tests/test_api/test_point.py -v
 - nosetests --nologcapture tests/test_api/test_shape.py -v
 - nosetests --nologcapture tests/test_api/test_validator.py -v
