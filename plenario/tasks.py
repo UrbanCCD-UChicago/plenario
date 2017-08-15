@@ -71,8 +71,6 @@ def add_dataset(name: str) -> bool:
 def update_dataset(name: str) -> bool:
     """Update the row information for an approved point dataset.
     """
-    import sys
-    print("MUH ENCODING: " + sys.getdefaultencoding())
     logger.info('Begin. (name: "{}")'.format(name))
     meta = get_meta(name)
     PlenarioETL(meta).update()

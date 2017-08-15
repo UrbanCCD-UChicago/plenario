@@ -90,8 +90,8 @@ class Staging(object):
 
         logger.info('Begin.')
         with self.file_helper as helper:
-            handle = open(helper.handle.name, "rt")
-            head = islice(handle, 10000)
+            handle = open(helper.handle.name, "rt", encoding='utf-8')
+            head = islice(handle, 100)
             sample = StringIO()
             sample.write(''.join(head))
             self.cols = infer(sample)

@@ -2,7 +2,9 @@ import math
 
 import agate
 import boto3
+import dateutil.parser
 import sqlalchemy
+from datetime import date
 from slugify import slugify as _slugify
 from sqlalchemy import Column, Table
 
@@ -23,6 +25,35 @@ def get_size_in_degrees(meters, latitude):
     return degrees_x, degrees_y
 
 
+class ParserInfo(dateutil.parser.parserinfo):
+    """Restrict what counts as a valid date for dateutil."""
+
+    AMPM = []
+    HMS = []
+    MONTHS = []
+    PERTAIN = []
+    WEEKDAYS = []
+
+
+class Date(agate.Date):
+    """Modified version of agate's date data type that isn't so insanely
+    aggresive about parsing dates. Originally, it would infer 'sunday' or
+    'tomorrow' as valid dates."""
+
+    def __init__(self, date_format=None, **kwargs):
+        super(Date, self).__init__(**kwargs)
+        self.date_format = date_format
+
+    def cast(self, value, **kwargs):
+        if isinstance(value, date) or value is None:
+            return value
+
+        try:
+            return dateutil.parser.parse(value, parserinfo=ParserInfo()).date()
+        except (TypeError, ValueError):
+            raise agate.CastError()
+
+
 def infer(file):
     """Use agate to generate a list that describes a source csv's column types."""
 
@@ -30,14 +61,14 @@ def infer(file):
         agate.Boolean(),
         agate.Number(currency_symbols=[]),
         agate.TimeDelta(),
-        agate.Date(),
+        Date(),
         agate.DateTime(),
         agate.Text()
     ])
 
     typemap = {
         agate.Boolean: sqlalchemy.Boolean,
-        agate.Date: sqlalchemy.Text,
+        Date: sqlalchemy.Date,
         agate.DateTime: sqlalchemy.DateTime,
         agate.Number: sqlalchemy.Numeric,
         agate.Text: sqlalchemy.Text
