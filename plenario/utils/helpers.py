@@ -4,7 +4,7 @@ import agate
 import boto3
 import dateutil.parser
 import sqlalchemy
-from datetime import date
+from datetime import datetime
 from slugify import slugify as _slugify
 from sqlalchemy import Column, Table
 
@@ -35,21 +35,21 @@ class ParserInfo(dateutil.parser.parserinfo):
     WEEKDAYS = []
 
 
-class Date(agate.Date):
-    """Modified version of agate's date data type that isn't so insanely
+class DateTime(agate.DateTime):
+    """Modified version of agate's datetime data type that isn't so insanely
     aggresive about parsing dates. Originally, it would infer 'sunday' or
     'tomorrow' as valid dates."""
 
     def __init__(self, date_format=None, **kwargs):
-        super(Date, self).__init__(**kwargs)
+        super(DateTime, self).__init__(**kwargs)
         self.date_format = date_format
 
     def cast(self, value, **kwargs):
-        if isinstance(value, date) or value is None:
+        if isinstance(value, datetime) or value is None:
             return value
 
         try:
-            return dateutil.parser.parse(value, parserinfo=ParserInfo()).date()
+            return dateutil.parser.parse(value, parserinfo=ParserInfo())
         except (TypeError, ValueError):
             raise agate.CastError()
 
@@ -60,16 +60,13 @@ def infer(file):
     tester = agate.TypeTester(types=[
         agate.Boolean(),
         agate.Number(currency_symbols=[]),
-        agate.TimeDelta(),
-        Date(),
-        agate.DateTime(),
+        DateTime(),
         agate.Text()
     ])
 
     typemap = {
         agate.Boolean: sqlalchemy.Boolean,
-        Date: sqlalchemy.Date,
-        agate.DateTime: sqlalchemy.DateTime,
+        DateTime: sqlalchemy.DateTime,
         agate.Number: sqlalchemy.Numeric,
         agate.Text: sqlalchemy.Text
     }

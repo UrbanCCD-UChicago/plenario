@@ -7,7 +7,7 @@ from geoalchemy2 import Geometry
 from plenario.etl.point import Staging, PlenarioETL
 import os
 import json
-from datetime import date
+from datetime import date, datetime
 from plenario.models import MetaTable
 from manage import init
 
@@ -193,7 +193,7 @@ class StagingTableTests(TestCase):
 
         sel = sa.select([table.c.date]).where(table.c.event_name == 'baz')
         changed_date = postgres_engine.execute(sel).fetchone()[0]
-        self.assertEqual(changed_date, date(1993, 11, 10))
+        self.assertEqual(changed_date, datetime(1993, 11, 10, 0, 0))
 
     def test_new_table(self):
         drop_if_exists(self.unloaded_meta.dataset_name)

@@ -88,14 +88,15 @@ class Staging(object):
     def __enter__(self):
         """Create the staging table. Will be named s_[dataset_name]"""
 
-        logger.info('Begin.')
         with self.file_helper as helper:
+            logger.info('Inferring column types')
             handle = open(helper.handle.name, "rt", encoding='utf-8')
             head = islice(handle, 100)
             sample = StringIO()
             sample.write(''.join(head))
             self.cols = infer(sample)
 
+            logger.info('Creating staging table "{}"'.format(self.name))
             self.table = self._make_table(handle)
             add_unique_hash(self.table.name)
             self.table = Table(
@@ -105,7 +106,7 @@ class Staging(object):
                 extend_existing=True
             )
 
-        logger.info('End.')
+            handle.close()
         return self
 
     def _drop(self):

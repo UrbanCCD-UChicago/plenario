@@ -23,6 +23,8 @@ RESPONSE_LIMIT = 1000
 CACHE_TIMEOUT = 60 * 60 * 6
 
 
+# TODO(heyzoos)
+# This needs some serious refactoring.
 def unknown_object_json_handler(obj):
     """When trying to dump values into JSON, sometimes the json.dumps() method
     finds values that it cannot serialize. This converts those objects from
@@ -42,8 +44,10 @@ def unknown_object_json_handler(obj):
     elif isinstance(obj, MetaTable):
         return obj.__tablename__
     else:
-        raise ValueError('{0} cannot be parsed into JSON. \n'
-                         '{0} is of type: {1}.'.format(obj, type(obj)))
+        return str(obj)
+    # else:
+    #     raise ValueError('{0} cannot be parsed into JSON. \n'
+    #                      '{0} is of type: {1}.'.format(obj, type(obj)))
 
 
 def date_json_handler(obj):
