@@ -1,18 +1,16 @@
-# import json
-
-# from csvkit.unicsv import UnicodeCSVReader
-import csv
+from io import StringIO
+from itertools import islice
 from logging import getLogger
+
 from geoalchemy2 import Geometry
 from sqlalchemy import TIMESTAMP, Table, Column, MetaData, String
 from sqlalchemy import select, func
 from sqlalchemy.exc import NoSuchTableError
 
-from itertools import islice
-from plenario.database import postgres_base, postgres_engine
+from plenario.database import postgres_engine
 from plenario.database import postgres_session
-from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError, delete_absent_hashes
-from plenario.utils.helpers import iter_column, slugify, typeinfer
+from plenario.etl.common import ETLFile, add_unique_hash, PlenarioETLError
+from plenario.utils.helpers import infer
 
 logger = getLogger(__name__)
 
@@ -93,23 +91,22 @@ class Staging(object):
         logger.info('Begin.')
         with self.file_helper as helper:
             handle = open(helper.handle.name, "rt")
-            head = islice(handle, 1000)
-            self.cols = typeinfer(handle)
+            head = islice(handle, 10000)
+            sample = StringIO()
+            sample.write(''.join(head))
+            self.cols = infer(sample)
 
-            # Grab the handle to build a table from the CSV
-            try:
-                self.table = self._make_table(handle)
-                add_unique_hash(self.table.name)
-                self.table = Table(
-                    self.name,
-                    postgres_base.metadata,
-                    autoload_with=postgres_engine,
-                    extend_existing=True
-                )
-                return self
-            except Exception as e:
-                raise PlenarioETLError(e)
+            self.table = self._make_table(handle)
+            add_unique_hash(self.table.name)
+            self.table = Table(
+                self.name,
+                MetaData(),
+                autoload_with=postgres_engine,
+                extend_existing=True
+            )
+
         logger.info('End.')
+        return self
 
     def _drop(self):
         postgres_engine.execute("DROP TABLE IF EXISTS {};"
@@ -173,22 +170,6 @@ class Staging(object):
         original_cols = [c for c in ingested_cols if c.name not in ['geom', 'point_date', 'hash']]
         # Make copies that don't refer to the existing table.
         cols = [_copy_col(c) for c in original_cols]
-
-        logger.info('End.')
-        return cols
-
-    @staticmethod
-    def _from_inference(f):
-        """Generate columns by scanning CSV and inferring column types."""
-
-        logger.info('Begin.')
-        reader = csv.reader(f)
-        header = list(map(slugify, next(reader)))
-
-        cols = []
-        for col_idx, col_name in enumerate(header):
-            col_type, nullable = iter_column(col_idx, f)
-            cols.append(_make_col(col_name, col_type, nullable))
 
         logger.info('End.')
         return cols

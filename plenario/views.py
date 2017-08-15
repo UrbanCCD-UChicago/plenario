@@ -20,8 +20,7 @@ import plenario.tasks as worker
 from plenario.database import postgres_base, postgres_engine as engine, postgres_session
 from plenario.models import MetaTable, ShapeMetadata, User
 from plenario.settings import FLOWER_URL
-from plenario.utils.helpers import infer_csv_columns, send_mail, slugify, typeinfer
-
+from plenario.utils.helpers import send_mail, slugify, infer
 
 views = Blueprint('views', __name__)
 
@@ -413,7 +412,9 @@ class GenericSuggestion(object):
     def _infer_columns(self):
         response = requests.get(self.file_url, stream=True)
         head = itertools.islice(response.iter_lines(), 1000)
-        return typeinfer(head)
+        file = StringIO()
+        file.write(''.join(head))
+        return infer(file)
 
 
 class SocrataSuggestion(object):

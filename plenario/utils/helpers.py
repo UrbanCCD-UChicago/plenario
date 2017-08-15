@@ -1,15 +1,12 @@
-import agate
-import csv
 import math
-from collections import namedtuple
 
-import sqlalchemy
+import agate
 import boto3
+import sqlalchemy
 from slugify import slugify as _slugify
 from sqlalchemy import Column, Table
 
 from plenario.settings import ADMIN_EMAILS, AWS_ACCESS_KEY, AWS_REGION_NAME, AWS_SECRET_KEY, MAIL_USERNAME
-from plenario.utils.typeinference import normalize_column_type
 
 
 def get_size_in_degrees(meters, latitude):
@@ -26,11 +23,17 @@ def get_size_in_degrees(meters, latitude):
     return degrees_x, degrees_y
 
 
-ColumnInfo = namedtuple('ColumnInfo', 'name type_ has_nulls')
+def infer(file):
+    """Use agate to generate a list that describes a source csv's column types."""
 
-
-def typeinfer(file) -> list:
-    """Use agate to a dictionary that describes csv column types."""
+    tester = agate.TypeTester(types=[
+        agate.Boolean(),
+        agate.Number(currency_symbols=[]),
+        agate.TimeDelta(),
+        agate.Date(),
+        agate.DateTime(),
+        agate.Text()
+    ])
 
     typemap = {
         agate.Boolean: sqlalchemy.Boolean,
@@ -40,7 +43,7 @@ def typeinfer(file) -> list:
         agate.Text: sqlalchemy.Text
     }
 
-    tester = agate.TypeTester(limit=1000)
+    file.seek(0)
     table = agate.Table.from_csv(file, column_types=tester)
     table = table.rename(slug_columns=True)
     types = [typemap[type(o)] for o in table.column_types]
@@ -49,32 +52,7 @@ def typeinfer(file) -> list:
 
 
 def infer_csv_columns(inp):
-    return typeinfer(inp)
-
-def iter_column(idx, f):
-    """
-    :param idx: index of column
-    :param f: gzip file object of CSV dataset
-    :return: col_type, null_values
-             where col_type is inferred type from typeinference.py
-             and null_values is whether null values were found and normalized.
-    """
-    f.seek(0)
-    reader = csv.reader(f)
-
-    # Discard the header
-    next(reader)
-
-    col = []
-    for row in reader:
-        if row:
-            try:
-                col.append(row[idx])
-            except IndexError:
-                # Bad data. Maybe we can fill with nulls?
-                pass
-    col_type, null_values = normalize_column_type(col)
-    return col_type, null_values
+    return infer(inp)
 
 
 def slugify(text: str, delimiter: str = '_') -> str:
