@@ -12,6 +12,10 @@ at the [Computation Institute](http://ci.uchicago.edu)
 of the [University of Chicago](http://uchicago.edu) and [Argonne National Laboratory](http://www.anl.gov).
 It is maintained by UrbanCCD and was prototyped by [DataMade](http://datamade.us).
 
+## Development Information
+
+We are currently developing the next version of Plenario. Information regarding the build process and other information can found at [https://github.com/UrbanCCD-UChicago/plenario-platform/wiki](https://github.com/UrbanCCD-UChicago/plenario-platform/wiki).
+
 ## Running locally with Docker
 
 To maximize development portability, we use Docker and Docker Compose. To build and run the Plenario application using docker, do the following:
