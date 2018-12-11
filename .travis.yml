@@ -1,6 +1,7 @@
 language: python
 python:
 - '3.4'
+
 addons:
   postgresql: '9.4'
   apt:
@@ -8,17 +9,24 @@ addons:
     - gdal-bin
     - postgresql-9.4-postgis-2.3
     - postgresql-9.4-plv8
+
 services:
 - postgresql
 - redis-server
+
 sudo: required
+
 dist: trusty
+
 cache: pip
+
 before_install:
 - pip install -r requirements.txt
+
 install:
 - sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
 - python manage.py init
+
 script:
 - nosetests --nologcapture tests/test_api/test_point.py -v
 - nosetests --nologcapture tests/test_api/test_shape.py -v
@@ -28,6 +36,7 @@ script:
 - nosetests --nologcapture tests/test_sensor_network/test_sensor_networks.py -v
 - nosetests --nologcapture tests/test_models/test_feature_meta.py -v
 - nosetests --nologcapture tests/test_sensor_network/test_nearest.py -v
+
 deploy:
 - provider: elasticbeanstalk
   region: us-east-1
