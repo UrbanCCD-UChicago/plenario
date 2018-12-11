@@ -21,6 +21,7 @@
 #.*#
 *.todo
 /.idea/
+.vscode/
 
 # Miscellaneous
 Icon?
