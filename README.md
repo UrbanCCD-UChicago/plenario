@@ -156,12 +156,6 @@ Thanks for the following services that have given us free academic/open source a
 * Will Engler
 * Jesus Bracho
 
-## Join Our Community
-
-Join us on Gitter for technical help with the Plenario API,
-
-[![Join the chat at https://gitter.im/UrbanCCD-UChicago/plenario](https://badges.gitter.im/UrbanCCD-UChicago/plenario.svg)](https://gitter.im/UrbanCCD-UChicago/plenario?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
 ## Testing
 
 The plenario/tests folder includes a suite of API tests split across the /points and /shapes directories. To run the tests using with nose, use the command 'nosetests tests' from the /plenario directory
@@ -174,9 +168,7 @@ Report it here: https://github.com/UrbanCCD-UChicago/plenario/issues
 ## Note on Patches/Pull Requests
 
 Pull requests make us very happy.
-If you're interested in contributing, come chat with us on Gitter
-to discuss what you'd like to do.
-Then follow [common best practices](http://www.contribution-guide.org/)
+Follow [common best practices](http://www.contribution-guide.org/)
 to send us a PR.
 
 ## Copyright
