@@ -66,7 +66,7 @@ python-editor==1.0.3
 python-slugify==1.2.4
 pytimeparse==1.1.6
 pytz==2017.2
-PyYAML==3.13
+PyYAML==5.1
 raven==5.24.3
 redis==2.10.5
 requests==2.21.0
