@@ -23,9 +23,9 @@ cache: pip
 before_install:
 - pip install -r requirements.txt
 
-install:
-- sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
-- python manage.py init
+# install:
+# - sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
+# - python manage.py init
 
 # script:
 # - nosetests --nologcapture tests/test_api/test_point.py -v
