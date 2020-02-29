@@ -44,15 +44,15 @@ deploy:
   env: plenario-server
   bucket_name: elasticbeanstalk-us-east-1-031052761859
   access_key_id:
-    secure: ghmLbJnHdoeT7/R82YUxtWaM3KDutzWkaRHQD67cPbOcJ666jKUosBjQUaI1OAFPHMGmRxzPaS8Yt0b9Iyp4tPc+LvLVjkUEhAS9CeqhJiUslBN2huACN9cwA6mt7VwdWCP4AVmd9wgn+yJ/46YMjlkmmU/QbhpDq+lhvN2fPuA=
+    secure: "ghmLbJnHdoeT7/R82YUxtWaM3KDutzWkaRHQD67cPbOcJ666jKUosBjQUaI1OAFPHMGmRxzPaS8Yt0b9Iyp4tPc+LvLVjkUEhAS9CeqhJiUslBN2huACN9cwA6mt7VwdWCP4AVmd9wgn+yJ/46YMjlkmmU/QbhpDq+lhvN2fPuA="
   secret_access_key:
-    secure: ndTAOMAppAd1jkTryp+VTVP9A++DgctnfR2AKlg4eg/dwYbj3ZLIsJOSo1rTvxxyphKxJL5umPa4SFzmVVOM4WN6rZKIQKGoFgEUkC3P6jQg28WhESuS09xx2YBGH2RQg8DlQk+FH+bvBNEKIZpuFzWwu957kVnEInS6VWocHzU=
+    secure: "ndTAOMAppAd1jkTryp+VTVP9A++DgctnfR2AKlg4eg/dwYbj3ZLIsJOSo1rTvxxyphKxJL5umPa4SFzmVVOM4WN6rZKIQKGoFgEUkC3P6jQg28WhESuS09xx2YBGH2RQg8DlQk+FH+bvBNEKIZpuFzWwu957kVnEInS6VWocHzU="
 - provider: elasticbeanstalk
   region: us-east-1
   app: plenario
   env: plenario-worker
   bucket_name: elasticbeanstalk-us-east-1-031052761859
   access_key_id:
-    secure: ghmLbJnHdoeT7/R82YUxtWaM3KDutzWkaRHQD67cPbOcJ666jKUosBjQUaI1OAFPHMGmRxzPaS8Yt0b9Iyp4tPc+LvLVjkUEhAS9CeqhJiUslBN2huACN9cwA6mt7VwdWCP4AVmd9wgn+yJ/46YMjlkmmU/QbhpDq+lhvN2fPuA=
+    secure: "ghmLbJnHdoeT7/R82YUxtWaM3KDutzWkaRHQD67cPbOcJ666jKUosBjQUaI1OAFPHMGmRxzPaS8Yt0b9Iyp4tPc+LvLVjkUEhAS9CeqhJiUslBN2huACN9cwA6mt7VwdWCP4AVmd9wgn+yJ/46YMjlkmmU/QbhpDq+lhvN2fPuA="
   secret_access_key:
-    secure: ndTAOMAppAd1jkTryp+VTVP9A++DgctnfR2AKlg4eg/dwYbj3ZLIsJOSo1rTvxxyphKxJL5umPa4SFzmVVOM4WN6rZKIQKGoFgEUkC3P6jQg28WhESuS09xx2YBGH2RQg8DlQk+FH+bvBNEKIZpuFzWwu957kVnEInS6VWocHzU=
+    secure: "ndTAOMAppAd1jkTryp+VTVP9A++DgctnfR2AKlg4eg/dwYbj3ZLIsJOSo1rTvxxyphKxJL5umPa4SFzmVVOM4WN6rZKIQKGoFgEUkC3P6jQg28WhESuS09xx2YBGH2RQg8DlQk+FH+bvBNEKIZpuFzWwu957kVnEInS6VWocHzU="
