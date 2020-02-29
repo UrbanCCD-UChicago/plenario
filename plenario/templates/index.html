@@ -5,11 +5,11 @@
 
     <div class="jumbotron">
       <div class="row" style="display:inline-block"><img src='/static/images/logo-large.png' class='img-responsive' alt='Plenar.io logo' height="100px" width="100px"/></div>
-      <h2 style="font-size: 40px;">The next stage in open data.</h2>
-       <p>Plenario is a centralized hub for open datasets from around the world, ready to search and download.</p>
+      <h2 style="font-size: 40px;">Plenario is Retiring</h2>
+       <p>On March 31, 2020 we will retire Plenario. Eight years ago we created Plenario to explore new ways to discover and
+      evaluate open data. Today's open data portals now provide such features and more! Thanks for being part of the journey.</p>
       <p>
         <a class="btn btn-primary btn-lg" role="button" href="{{ url_for('views.explore_view') }}"><i class='fa fa-globe'></i> Explore</a>
-        <a class="btn btn-info btn-lg" role="button" href="{{ url_for('views.user_add_dataset') }}"><i class='fa fa-plus-circle'></i> Add data</a>
       </p>
     </div>
 
@@ -25,11 +25,6 @@
         </div>
       </div>
     </div>
-
-    <h3>Anyone can add data.</h3>
-    <p>Anyone can add datasets to Plenario via the <a href={{ url_for('views.user_add_dataset') }}>Add dataset form</a>. You can add any publicly available CSV dataset as long as it includes date and location information; publicly available ESRI Shapefiles enclosed in .zip files can also be added.</p>
-
-    <p class="text-center"><a class="btn btn-info btn-lg" href="{{ url_for('views.user_add_dataset') }}">Add a dataset&nbsp;&nbsp;<i class="fa fa-arrow-circle-right"></i></a></p>
 
     <h3>Extremely easy to access.</h3>
     <p class="lead">No coding, no NDAs, no navigating government websites older than you are. Accessing the data is as easy as selecting dates and drawing on a map. (Don't worry, you can still <a href="{{ url_for('views.api_docs_view') }}#docs">code</a>.)</p>
