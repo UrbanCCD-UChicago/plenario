@@ -22,7 +22,7 @@ datetime-truncate==1.0.1
 dbfread==2.0.7
 docutils==0.13.1
 et-xmlfile==1.0.1
-Flask==0.12.2
+Flask==1.0
 Flask-Admin==1.5.0
 Flask-BabelEx==0.9.3
 Flask-Bcrypt==0.7.1
