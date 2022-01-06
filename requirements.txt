@@ -11,7 +11,7 @@ blinker==1.4
 boto==2.47.0
 boto3==1.4.4
 botocore==1.5.79
-celery==4.0.2
+celery==5.2.2
 certifi==2017.4.17
 cffi==1.10.0
 chardet==3.0.4
